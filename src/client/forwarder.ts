@@ -9,9 +9,10 @@
  * outages and process restarts; memory-only sources provide no such guarantee.
  *
  * Idempotency: every forwarded job carries the deterministic remote jobId
- * `fwd:<localQueueKey>:<localJobId>`. The server dedupes custom jobIds while
- * their ownership is retained; after bounded retention or removal, downstream
- * effects must still tolerate at-least-once delivery.
+ * `fwd:<localQueueKey>:<localJobId>`. The server dedupes a custom jobId only
+ * while that job is live (waiting, delayed or active); completion or the DLQ
+ * releases the id, so a re-forward after that creates a new remote job.
+ * Downstream effects must tolerate at-least-once delivery.
  */
 
 import { EventEmitter } from 'events';

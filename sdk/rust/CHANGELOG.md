@@ -21,6 +21,10 @@
 - Add `proptest` 1.7.0 tree/chain properties with shrinking, atomic tree and
   chain E2E tests, and cargo-mutants 26.0.0 campaigns scoped to the pure
   planner and snapshot validator.
+- Correct the README API table to list only existing methods under their real
+  names (no scheduler listing, webhooks, worker listing, stats, queue listing,
+  progress query, or children values), complete the dependency list, and state
+  that `Hello` is sent only by an explicit `Connection::hello()` call.
 
 ## 0.1.1 - 2026-07-20
 

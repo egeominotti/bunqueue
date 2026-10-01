@@ -68,15 +68,14 @@ function lastmodForUrl(url) {
 export default defineConfig({
   site: 'https://bunqueue.dev',
 
-  // The processor renders .md pages only. Starlight's MDX pipeline instead
-  // reads the legacy top-level `markdown.gfm` flag, which has no default in
-  // Astro 6 (z.boolean().optional()) — leave it out and every GFM table in a
-  // .mdx page is emitted as literal |---| text. Keep both the processor and
-  // the explicit flag until MDX inherits processor options. Do NOT follow the
-  // deprecation warning's advice to move `gfm` onto unified() only: MDX
-  // ignores processor options entirely and .mdx tables would break again.
+  // Astro 7 defaults to the Sätteri Markdown pipeline. This site stays on the
+  // remark/rehype pipeline (the explicit @astrojs/markdown-remark dependency)
+  // so heading anchors, Starlight asides and code blocks render exactly as
+  // before. @astrojs/mdx 8 (bundled by Starlight) inherits `gfm` from this
+  // processor, so .mdx tables no longer need the deprecated top-level
+  // `markdown.gfm` flag. Keep `gfm: true` here: without it every GFM table
+  // in a .md or .mdx page is emitted as literal |---| text.
   markdown: {
-    gfm: true,
     processor: unified({ gfm: true }),
   },
 
@@ -96,7 +95,25 @@ export default defineConfig({
         '@root': path.resolve(__dirname, '..'),
       },
     },
-    build: {},
+    build: {
+      rolldownOptions: {
+        // Astro 7 still prefixes every MDX `?astroPropagatedAssets` module
+        // with a "use astro:head-inject" directive that nothing reads (head
+        // propagation is detected from the module's `__astroPropagation`
+        // export), and Rolldown warns once per MDX page that it may be
+        // dropped. Silence exactly that message; every other warning,
+        // including other module-level directives, still reaches the log.
+        onwarn(warning, warn) {
+          if (
+            warning.code === 'MODULE_LEVEL_DIRECTIVE' &&
+            warning.message.includes('"use astro:head-inject"')
+          ) {
+            return;
+          }
+          warn(warning);
+        },
+      },
+    },
   },
 
   integrations: [

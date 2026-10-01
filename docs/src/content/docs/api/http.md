@@ -2234,7 +2234,7 @@ that information; the outer event envelope always supplies `event`, `ts`, and
 | `client:connected`           | `clientId, transport`                | TCP client connected                      |
 | `client:disconnected`        | `clientId, transport`                | TCP client disconnected                   |
 | `auth:failed`                | `clientId?` or `transport`           | TCP command or HTTP authentication failed |
-| `cleanup:orphans-removed`    | `count`                              | Orphaned processing entries removed       |
+| `cleanup:orphans-removed`    | `count`                              | Silent active jobs recovered as stalls    |
 | `cleanup:stale-deps-removed` | `count`                              | Stale dependency entries removed          |
 
 #### Periodic, Storage, Server & Memory (12 events)

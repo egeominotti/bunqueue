@@ -282,7 +282,7 @@ before a late SQLite insert. Selective permanent removal then transitions
 `failed` to absent without retrying and releases terminal indexes, custom-ID,
 dependency-result, result/log, and parent flow-failure ownership. 4. Broadcast `failed`; if retried, also broadcast `Retried` (prev `failed`). 5. Flow propagation when NOT retried: `failParentOnFailure` → `onChildTerminalFailure`; `removeDependencyOnFailure`/`ignoreDependencyOnFailure`/`continueParentOnFailure` → `onChildDependencyOption`.
 
-`calculateBackoff` (`src/domain/job/state.ts:37-54`): fixed = `delay * (0.8 + rand*0.4)` (±20% jitter); exponential / default = `base * 2^attempts * (0.5 + rand)` (±50% jitter), capped at `backoffConfig.maxDelay ?? DEFAULT_MAX_BACKOFF` (1 h). The same cap governs stall retries. `maxDelay` is carried into repeat successors (`buildRepeatSuccessor` copies `backoffConfig`) and cron-spawned jobs (`CronJobOptions.backoff`).
+`calculateBackoff` (`src/domain/job/state.ts:37-54`): fixed = `delay * (0.8 + rand*0.4)` (±20% jitter); exponential / default = `base * 2^attempts * (0.5 + rand)` (±50% jitter), capped at `backoffConfig.maxDelay ?? DEFAULT_MAX_BACKOFF` (1 h). The same cap governs stall retries. The processor `DelayedError` re-delay (`calculateDelayedErrorDelay`, same file) uses the base delay without growth or jitter (a non-positive or `NaN` base falls back to `1000`), capped at a positive finite `maxDelay`, else `DEFAULT_MAX_BACKOFF`: a `maxDelay` of `0` does not apply there, so a job that keeps throwing `DelayedError` never re-runs without a wait. `maxDelay` is carried into repeat successors (`buildRepeatSuccessor` copies `backoffConfig`) and cron-spawned jobs (`CronJobOptions.backoff`).
 
 ### Batch ack (`ackHelpers.ts`)
 

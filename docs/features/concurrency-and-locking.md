@@ -1,6 +1,6 @@
 # Concurrency & Locking
 
-> **Category:** Engine · **Source:** `src/shared/lock.ts`, `src/shared/asyncLock.ts`, `src/shared/rwLock.ts`, `src/shared/lockTimeout.ts`, `src/shared/semaphore.ts`, `src/application/lockManager.ts`, `src/application/lockOperations.ts`, `src/application/stallDetection.ts`, `src/domain/types/stall.ts`
+> **Category:** Engine · **Source:** `src/shared/lock.ts`, `src/shared/asyncLock.ts`, `src/shared/rwLock.ts`, `src/shared/lockTimeout.ts`, `src/shared/semaphore.ts`, `src/application/lockManager.ts`, `src/application/lockOperations.ts`, `src/application/stallDetection.ts`, `src/application/orphanRecovery.ts`, `src/domain/types/stall.ts`
 
 ## Purpose
 
@@ -141,8 +141,8 @@ Via `ctx.eventsManager.broadcast` and `ctx.dashboardEmit`:
   event first so embedded and TCP Workers observe the lease loss consistently.
 - `Failed` (`EventType.Failed`) — immediately after `Stalled` when lock expiry
   exhausts `maxStalls` or `maxAttempts` and moves the job to the DLQ.
-- Dashboard events: `job:lock-expired` (lockManager.ts:149), `job:stalled` (stallDetection.ts:112).
-- Webhook: `stalled` (stallDetection.ts:125).
+- Dashboard events: `job:lock-expired` (lockManager.ts:178), `job:stalled` (stallDetection.ts:138).
+- Webhook: `stalled` (stallDetection.ts:151).
 
 ## Data Models
 
@@ -192,8 +192,8 @@ Lease state lives in `ctx.jobLocks: Map<JobId, JobLock>` and stall candidates li
 
 ### Lease lifecycle
 
-1. **Acquire** — on `PULL`, `pullWithLock` calls `createLock(jobId, owner, ctx, ttl)` (`queue-manager/delivery.ts`). `createLock` returns `null` unless the job is in `processing` and has no existing lock (lockOperations.ts:19–24, defensive against double-lease).
-2. **Renew** — `JobHeartbeat`/`ExtendLock` → `renewJobLock`. Fails if no lock, token mismatch, or already expired (in which case the stale lock is deleted) (lockOperations.ts:48–73). On success it also refreshes `job.lastHeartbeat` for legacy stall detection (lockOperations.ts:66–69).
+1. **Acquire** — on `PULL`, `pullWithLock` calls `createLock(jobId, owner, ctx, ttl)` (`queue-manager/delivery.ts`). `createLock` (lockOperations.ts:20–44) returns `null` unless the job is in `processing`; an existing lease of the same processing generation also returns `null` (defensive against double-lease), while a lease from an earlier generation is replaced and its client ownership detached (`detachClientJob`).
+2. **Renew** — `JobHeartbeat`/`ExtendLock` → `renewJobLock`. Fails if no lock, token mismatch, or already expired (in which case the stale lock is deleted) (lockOperations.ts:62–87). On success it also refreshes `job.lastHeartbeat` for legacy stall detection (lockOperations.ts:79–84).
 3. **Authorize and release** — `ACK`, `FAIL`, result-bearing/bare `ACKB`, and
    every active-state move first call `assertLeaseToken`. If a lock record
    exists, omitting the token or presenting a different token rejects the
@@ -204,7 +204,8 @@ Lease state lives in `ctx.jobLocks: Map<JobId, JobLock>` and stall candidates li
 
 Manual management claims are also terminal for the current lease even when the
 job itself is requeued. `releaseClaimedJobOwnership` removes the `jobLocks`
-entry and detaches the id from every `clientJobs` owner in the same synchronous
+entry and detaches the id from its `clientJobs` owner (`detachClientJob`, O(1)
+through the `clientJobOwners` reverse index) in the same synchronous
 processing-map claim used by `moveActiveToWait`, `moveToWaitingChildren`,
 `moveJobToDelayed`, and active `discardJob`. Both deletions are idempotent, so a
 concurrent disconnect cleanup cannot leave a lease behind or release the
@@ -270,13 +271,13 @@ misaligned `ids`, `tokens`, or `results` arrays before invoking the manager.
 
 ### `checkExpiredLocks` (lock-expiry sweep)
 
-Runs on the background timer at `stallCheckMs` (5 s), registered in `background/lifecycle.ts`. Three phases (lockManager.ts:40):
+Runs on the background timer at `stallCheckMs` (5 s), registered in `background/lifecycle.ts`. Three phases (lockManager.ts:42):
 
-1. **Collect** (lock-free read) — scan `ctx.jobLocks`; for each `isLockExpired` lock, look up the job in its processing shard. If the job is gone, delete the orphan lock immediately (lockManager.ts:61–63).
-2. **Group** by `shardIdx` then `procIdx` (lockManager.ts:71–84) so locks are acquired in hierarchy order.
-3. **Process** under `withWriteLock(shardLocks[shardIdx])` → `withWriteLock(processingLocks[procIdx])` (lockManager.ts:87–97). Before mutating, revalidate that the processing map still contains the collected job object, the lock table still contains the same lease object, and that lease is still expired. This makes overlapping sweeps idempotent and rejects a renewal, ACK, or new delivery generation that won after collection. For each surviving job (`processExpiredLockInner`, lockManager.ts:105):
-   - Remove from processing.
-   - `cron:` jobs with preventOverlap are **discarded**, not requeued (#75) — record the exact retired lease token in a bounded map, release resources, drop from the index, and delete from SQLite (lockManager.ts:124–131).
+1. **Collect** (lock-free read) — scan `ctx.jobLocks`; for each `isLockExpired` lock, look up the job in its processing shard. If the job is gone, or the lease belongs to an earlier processing generation (`isLeaseFromEarlierGeneration`: stall retry kept it as a stale-outcome guard and the job was delivered again without a lease), no live delivery holds it: delete the orphan lease and leave the job alone (lockManager.ts:55–70). A newer lockless delivery is governed by stall detection, not by an earlier delivery's lease; before this rule that lease's expiry requeued the newer delivery (`test/repro-recovery-sweeps-current-generation.test.ts`).
+2. **Group** by `shardIdx` then `procIdx` (lockManager.ts:74–89) so locks are acquired in hierarchy order.
+3. **Process** under `withWriteLock(shardLocks[shardIdx])` → `withWriteLock(processingLocks[procIdx])` (lockManager.ts:91–114). Before mutating, revalidate that the processing map still contains the collected job object, the lock table still contains the same lease object, that lease is still expired, and it still belongs to the delivery in processing (the job object is reused by its next delivery, so object identity alone cannot tell deliveries apart). This makes overlapping sweeps idempotent and rejects a renewal, ACK, or new delivery generation that won after collection. For each surviving job (`processExpiredLockInner`, lockManager.ts:122):
+   - Remove from processing and detach the owning client connection (`detachClientJob`).
+   - `cron:` jobs with preventOverlap are **discarded**, not requeued (#75) — record the exact retired lease token in a bounded map, release resources, drop from the index, and delete from SQLite (lockManager.ts:143–150).
    - Otherwise: `attempts++`, `startedAt = null`, `stallCount++`. If `attempts >= maxAttempts` or `stallCount >= maxStalls` → terminal DLQ and ordered `Stalled` → `Failed` broadcasts; otherwise `requeueExpiredJob` and a `Stalled` broadcast.
    - Delete the lock and emit `job:lock-expired`.
 
@@ -294,32 +295,44 @@ generation cannot recover after restart.
 
 ### `checkStalledJobs` (two-phase stall detection)
 
-Runs on the background timer at `stallCheckMs` (5 s), registered in `background/lifecycle.ts`. Two-phase to avoid false positives (stallDetection.ts:21):
+Runs on the background timer at `stallCheckMs` (5 s), registered in `background/lifecycle.ts`. Two-phase to avoid false positives (stallDetection.ts:22):
 
-1. **Phase 1** — for each `jobId` carried over in `ctx.stalledCandidates`, re-check `getStallAction`. If the job vanished or stall detection is disabled, drop the candidate. A still-non-`Keep` action is confirmed (stallDetection.ts:25–47).
-2. **Phase 2** — scan all `processingShards`; any job whose `getStallAction !== Keep` becomes a candidate for the **next** cycle (stallDetection.ts:50–62). A job must be flagged stalled in two consecutive cycles before action is taken.
+1. **Phase 1** — for each `jobId` carried over in `ctx.stalledCandidates`, re-check `getStallAction`. If the job vanished or stall detection is disabled, drop the candidate. A still-non-`Keep` action is confirmed (stallDetection.ts:26–48).
+2. **Phase 2** — scan all `processingShards`; any job whose `getStallAction !== Keep` becomes a candidate for the **next** cycle (stallDetection.ts:50–63). A job must be flagged stalled in two consecutive cycles before action is taken.
+3. **Act** — each confirmed stall goes to `handleStalledJob` with the `stillStalled` re-check (stallDetection.ts:65–79): under both locks the job must still be stalled under the queue's current configuration. A heartbeat, progress update, renewal or new delivery of the same job object that lands while the handler waits for the locks keeps the job; before this re-check the stale confirmation retried it anyway (`test/repro-recovery-sweeps-current-generation.test.ts`).
 
 `getStallAction` → `checkStall` (stall.ts:41): returns `Keep` if `startedAt === null`, still inside `gracePeriod`, or `now - lastHeartbeat <= stallInterval` (per-job `job.stallTimeout` overrides the config interval). Otherwise increments a hypothetical count and returns `MoveToDlq` when `>= maxStalls`, else `Retry`.
 
-`handleStalledJob` (stallDetection.ts:79) re-acquires `shardLocks[idx]` → `processingLocks[procIdx]`, re-verifies the job is still in processing (stallDetection.ts:94) before acting, then calls `moveStalliedJobToDlq` or `retryStalliedJob`. A confirmed stall that would make `attempts >= maxAttempts` is terminal even when the stall-count action alone said retry. Events/webhooks are broadcast **after** the locked section, only if `handled` (stallDetection.ts:111). `retryStalliedJob` bumps stall count + attempts, computes `runAt = now + calculateBackoff(job)` (exponential w/ jitter), appends timeline entries (capped at `MAX_TIMELINE_ENTRIES`), re-pushes, and persists both retry counters via `updateForRetry`. Both stall paths discard `cron:` preventOverlap jobs instead of retrying/DLQ-ing.
+`handleStalledJob` (exported from `stallDetection.ts`) re-acquires `shardLocks[idx]` → `processingLocks[procIdx]`, re-verifies that the same job object is still in processing (identity, not just id membership) and, when the caller passes a `StallRecheck`, evaluates it under both locks before acting, then calls `moveStalliedJobToDlq` or `retryStalliedJob`. It returns `true` only when it performed the transition, and every transition detaches the job from its owning client connection (`detachClientJob`), so the silent connection's later disconnect cannot release the job's next delivery. The stall checker passes `stillStalled`; cleanup's orphan recovery (`orphanRecovery.ts`, see [Background Tasks](./background-tasks.md)) passes its whole orphan predicate (stall configuration, grace period, silence window and current-generation lease), so a heartbeat or configuration change that lands while it waits for either lock keeps the job. A confirmed stall that would make `attempts >= maxAttempts` is terminal even when the stall-count action alone said retry. Events/webhooks are broadcast **after** the locked section, only if `handled` (stallDetection.ts:137). `retryStalliedJob` bumps stall count + attempts, computes `runAt = now + calculateBackoff(job)` (exponential w/ jitter), appends timeline entries (capped at `MAX_TIMELINE_ENTRIES`), re-pushes, and persists both retry counters via `updateForRetry`. Both stall paths discard `cron:` preventOverlap jobs instead of retrying/DLQ-ing.
 
 ## Concurrency & Locking
 
-**Lock hierarchy** (acquire strictly in this order — CLAUDE.md): `jobIndex` → `completedJobs` → `shards[N]` → `processingShards[N]`. In practice `jobIndex` (a plain `Map`) and `completedJobs` (a `BoundedSet`) are **read lock-free first**, then the two real `RWLock` arrays are taken as write locks in order: `shardLocks[shardIdx]` **before** `processingLocks[procIdx]`. Both `checkExpiredLocks` (lockManager.ts:87–97) and `handleStalledJob` (stallDetection.ts:91–92) follow this; `checkExpiredLocks` pre-groups its work by `(shardIdx, procIdx)` specifically so it can take locks in hierarchy order even when many expired locks span shards.
+**Lock hierarchy** (acquire strictly in this order — CLAUDE.md): `jobIndex` → `completedJobs` → `shards[N]` → `processingShards[N]`. In practice `jobIndex` (a plain `Map`) and `completedJobs` (a `BoundedSet`) are **read lock-free first**, then the two real `RWLock` arrays are taken as write locks in order: `shardLocks[shardIdx]` **before** `processingLocks[procIdx]`. Both `checkExpiredLocks` (lockManager.ts:91–114) and `handleStalledJob` (and therefore cleanup's orphan recovery, which holds no lock of its own when calling it) follow this; `checkExpiredLocks` pre-groups its work by `(shardIdx, procIdx)` specifically so it can take locks in hierarchy order even when many expired locks span shards.
 
-**Lease vs. heartbeat (two independent stall signals).** A job can be reclaimed by either (a) `JobLock` TTL expiry (`checkExpiredLocks`), used when the worker pulled _with_ a lock token, or (b) heartbeat-timeout stall detection (`checkStalledJobs`), driven by `job.lastHeartbeat`/`stallInterval`. `renewJobLock` updates both (lockOperations.ts:66–69), so a worker heartbeating its lease also keeps stall detection satisfied.
+**Lease vs. heartbeat (two independent stall signals).** A job can be reclaimed by either (a) `JobLock` TTL expiry (`checkExpiredLocks`), used when the worker pulled _with_ a lock token, or (b) heartbeat-timeout stall detection (`checkStalledJobs`), driven by `job.lastHeartbeat`/`stallInterval`. `renewJobLock` updates both (lockOperations.ts:79–84), so a worker heartbeating its lease also keeps stall detection satisfied.
 
 **Races handled:**
 
-- _Late ACK after lock expiry_ — the #101 grace window (`isExpiredButOwned`) honors a genuine same-instance completion while rejecting a re-pulled-job double-completion via the `createdAt >= startedAt` guard (`queue-manager/delivery.ts`).
+- _Late ACK after lock expiry_ — the #101 grace window (`isExpiredButOwned`) honors a genuine same-instance completion while rejecting a re-pulled-job double-completion via the `createdAt >= startedAt` guard (`queue-manager/delivery.ts`, through `isLeaseFromEarlierGeneration`).
 - _Stall re-lease generation_ — the stall retry path may leave the previous
   lock as a stale-outcome guard while the job is queued. When a later pull has
-  a newer `startedAt`, `createLock` atomically replaces that lease and removes
-  the old TCP client ownership before the new connection is registered. A
+  a newer `startedAt`, `createLock` atomically replaces that lease and detaches
+  any remaining TCP client ownership before the new connection is registered
+  (the stall transition itself already detached it). The
+  generation rule lives in one helper, `isLeaseFromEarlierGeneration`
+  (`domain/job/locks.ts`): a lease is stale when `job.startedAt >
+  lock.createdAt`. Pull stamps `startedAt` before the lease is created, so a
+  lease from the current pull has `createdAt >= startedAt` and the strict
+  comparison keeps a same-millisecond lease current. `createLock`, the lease
+  token checks in `queue-manager/delivery.ts`, cleanup's orphan liveness rule
+  and the lock-expiry sweep all use it, so an earlier generation's unexpired
+  lease never keeps the current generation alive and its expiry never
+  reclaims the current generation. A
   duplicate lock request for the same processing generation still returns
   `null`. The stale worker token can therefore neither heartbeat nor complete
   the replacement generation.
-- _Concurrent completion vs. stall handler_ — both `checkExpiredLocks` and `handleStalledJob` re-verify membership in `processingShards` under the locks before mutating (lockManager.ts:57, stallDetection.ts:94), so a job completed between phases is skipped and no stale `Stalled`/`Failed` event fires.
+- _Concurrent completion vs. stall handler_ — both `checkExpiredLocks` and `handleStalledJob` re-verify the collected job object in `processingShards` under the locks before mutating, so a job completed between phases is skipped and no stale `Stalled`/`Failed` event fires.
+- _Overlapping recovery sweeps_ — the stall checker, cleanup's orphan recovery and lock expiry all transition under `shardLocks` → `processingLocks`, and each first re-verifies that the collected job object is still in processing **and** that its own trigger still holds for the current delivery: `stillStalled` (stall configuration and heartbeat age), the orphan predicate, or the same expired lease of the current generation. The first transition removes the job from processing, so the others find nothing to do. Guarantee: one delivery is recovered at most once, whichever sweeps overlap and in either order (cleanup vs cleanup in `test/cleanup-orphan-recovery-guards.test.ts`; cleanup vs stall checker and cleanup vs lock expiry in `test/recovery-sweeps-overlap.test.ts`). Limit: the job object is reused by its next delivery, so a sweep that waited across a recovery **and** a re-delivery judges the new delivery afresh by its own trigger; it acts only if that delivery is itself stalled or expired, which is a legitimate second recovery, not a duplicate of the first.
 - _Atomic pull handoff (2.8.31):_ the queue to processing transition happens in one synchronous critical section under the shard write lock: `tryDequeueNextJob` pops the job, inserts it into `processingShards`, and flips the `jobIndex` entry to `processing` before yielding (pull.ts:97-117). The processing-shard `Map` is written without taking `processingLocks` there; this is safe because until the flip no id-targeted critical section can be mid-operation on that id, and it avoids holding the hot shard write lock across an await. `finalizeProcessing` (pull.ts:133) then does only post-await bookkeeping (markActive persistence, counters, broadcast) and re-checks membership in `processingShards` first: if a management op (discard, moveToDelayed, obliterate) claimed the job in between, the pull does not deliver it to the worker.
 - _Double release_ — every `LockGuard` is idempotent.
 
@@ -344,8 +357,8 @@ Runs on the background timer at `stallCheckMs` (5 s), registered in `background/
 | ------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `LOCK_TIMEOUT_MS` (env)         | `5000`      | Default timeout for `AsyncLock`/`RWLock` acquisition (`lockTimeout.ts`).                                                                             |
 | `DEFAULT_LOCK_TTL`              | `30_000` ms | Job lease TTL when `pullWithLock` is called without an explicit `ttl` (`src/domain/job/constants.ts:3`, consumed by `src/domain/job/locks.ts:5-10`). |
-| `StallConfig.enabled`           | `true`      | Per-queue toggle for stall detection (stall.ts:21).                                                                                                  |
-| `StallConfig.stallInterval`     | `30_000` ms | No-heartbeat window before a job is a stall candidate; per-job `stallTimeout` overrides.                                                             |
+| `StallConfig.enabled`           | `true`      | Per-queue toggle for stall detection (stall.ts:21). `false` also opts the queue out of cleanup's orphan recovery (`orphanRecovery.ts`).            |
+| `StallConfig.stallInterval`     | `30_000` ms | No-heartbeat window before a job is a stall candidate; per-job `stallTimeout` overrides. Orphan window = `max(30 min, stallTimeout ?? stallInterval)`. |
 | `StallConfig.maxStalls`         | `3`         | Stalls before the job is moved to DLQ.                                                                                                               |
 | `StallConfig.gracePeriod`       | `5_000` ms  | Quiet period after start before stall checks apply.                                                                                                  |
 | `stallCheckMs` (config)         | `5_000` ms  | Interval for **both** `checkStalledJobs` and `checkExpiredLocks` (`application/types/config.ts`, `background/lifecycle.ts`).                         |

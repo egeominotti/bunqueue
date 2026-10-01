@@ -143,6 +143,39 @@ late processor result or exception as an acknowledged no-op: it emits neither
 a second `completed`/`failed` event nor a Worker `error`, and a newer retry lease
 remains free to finish normally.
 
+## Postpone a job with DelayedError
+
+Throw `DelayedError` from a TypeScript `Worker` processor when a job cannot run
+yet but has not failed. The Worker moves the job back to `delayed`: the attempt
+is not counted and no `failed` event fires.
+
+```typescript
+import { DelayedError, Queue, Worker } from 'bunqueue/client';
+
+const queue = new Queue('reports', { embedded: true });
+
+const worker = new Worker('reports', async (job) => {
+  if (!(await upstreamReady())) throw new DelayedError('upstream not ready');
+  return buildReport(job.data);
+}, { embedded: true });
+
+// Postponed by at most 5 seconds, not by the 60-second base delay.
+await queue.add('daily', { day: '2026-10-01' }, {
+  backoff: { type: 'fixed', delay: 60_000, maxDelay: 5_000 },
+});
+```
+
+The wait is the job's base backoff (the numeric `backoff`, or `backoff.delay`
+for the object form) with no exponential growth and no jitter; a base of 0 (or
+a negative one) falls back to 1000 ms. It is then capped at `backoff.maxDelay`,
+or at 1 hour when no cap is set. Embedded and TCP Workers compute the same wait.
+
+The wait is never zero. `maxDelay: 0` makes failed attempts retry immediately,
+but it does not apply to `DelayedError`: the job is not failing and no attempt
+is counted, so a zero wait would let a processor that keeps throwing
+`DelayedError` run the job again in a tight loop. A job with `maxDelay: 0` waits
+its base backoff, capped at 1 hour.
+
 ## Where to go next
 
 | Guide | What it covers |

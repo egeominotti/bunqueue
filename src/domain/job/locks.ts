@@ -1,4 +1,4 @@
-import type { JobId, JobLock } from '../types/jobs/model';
+import type { Job, JobId, JobLock } from '../types/jobs/model';
 import { DEFAULT_LOCK_TTL } from './constants';
 import { generateLockToken } from './ids';
 
@@ -29,4 +29,22 @@ export function renewLock(lock: JobLock, newTtl?: number, now: number = Date.now
   lock.expiresAt = now + ttl;
   lock.lastRenewalAt = now;
   lock.renewalCount++;
+}
+
+/**
+ * True when `lock` was created for an earlier processing generation of `job`,
+ * that is, the job was pulled again after the lease was granted. Stall retry
+ * deliberately keeps the previous lease as a stale-outcome guard, so a lease in
+ * `jobLocks` is not necessarily the current one.
+ *
+ * Pull stamps `startedAt` from a clock read taken before the lease is created
+ * in the same delivery, so a lease from the current pull always has
+ * `createdAt >= startedAt`. The comparison is strict: a lease created in the
+ * same millisecond as the pull belongs to the current generation.
+ */
+export function isLeaseFromEarlierGeneration(
+  job: Pick<Job, 'startedAt'>,
+  lock: Pick<JobLock, 'createdAt'>
+): boolean {
+  return job.startedAt !== null && job.startedAt !== undefined && job.startedAt > lock.createdAt;
 }

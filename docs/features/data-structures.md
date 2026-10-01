@@ -130,7 +130,7 @@ Internal shapes:
 Each `push`/`updatePriority`/`updateRunAt` assigns a monotonically increasing `bigint` generation and stores it in both the index entry and a new heap entry. `pop`/`peek` (`:99`, `:119`) compare the top heap entry's generation against the index entry; on mismatch (`:105`) the entry is dropped via `removeTop()` and the scan continues. Consequences:
 
 - `remove` (`:146`) and updates do **not** touch the heap — they only mutate the index, so the heap accumulates stale entries.
-- `compact()` (`:244`) filters out stale entries and rebuilds via O(n) `heapify` (`:262`); `needsCompaction(threshold)` returns `getStaleRatio() > threshold`. Background tasks trigger this: `cleanupTasks.ts:28` uses threshold `0.2`, `statsManager.ts:160` uses `0.1`.
+- `compact()` (`:244`) filters out stale entries and rebuilds via O(n) `heapify` (`:262`); `needsCompaction(threshold)` returns `getStaleRatio() > threshold`. Background tasks trigger this: `cleanupTasks.ts:39` uses threshold `0.2`, `statsManager.ts:156` uses `0.1`.
 - `generation` is `bigint`, deliberately overflow-proof at extreme throughput.
 
 One `IndexedPriorityQueue` is created lazily per queue name inside a shard

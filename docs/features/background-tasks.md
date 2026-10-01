@@ -1,6 +1,6 @@
 # Background Tasks
 
-> **Category:** Scheduling · **Source:** `src/application/backgroundTasks.ts`, `src/application/background/`, `src/application/cleanupTasks.ts`, `src/application/dependencyProcessor.ts`, `src/application/monitoringChecks.ts`, `src/application/taskErrorTracking.ts`
+> **Category:** Scheduling · **Source:** `src/application/backgroundTasks.ts`, `src/application/background/`, `src/application/cleanupTasks.ts`, `src/application/orphanRecovery.ts`, `src/application/clientOwnership.ts`, `src/application/dependencyProcessor.ts`, `src/application/monitoringChecks.ts`, `src/application/taskErrorTracking.ts`
 
 ## Purpose
 
@@ -20,14 +20,14 @@ Owns:
 - Job-timeout enforcement and explicit failure classification (`background/timeouts.ts`).
 - DLQ maintenance dispatch in `background/dlq.ts`.
 - Startup recovery, split by lifecycle state under `background/recovery/`.
-- Memory-bound cleanup of orphaned processing entries, stale waiting-deps, unique keys/groups, stalled candidates, orphaned `jobIndex`/`jobLocks`, and empty queues (`cleanupTasks.ts` plus the focused `emptyQueueCleanup.ts` reconciler).
+- Recovery of orphaned processing entries (through the stall path, `orphanRecovery.ts`), memory-bound cleanup of stale waiting-deps, unique keys/groups, stalled candidates, orphaned `jobIndex`/`jobLocks`, client ownership of ended deliveries (`pruneEndedClientDeliveries`, `clientOwnership.ts`), and empty queues (`cleanupTasks.ts` plus the focused `emptyQueueCleanup.ts` reconciler).
 - Dependency resolution as a safety fallback to the event-driven fast path (`processPendingDependencies`, `dependencyProcessor.ts:16`).
 - Dashboard threshold monitoring and hysteresis state (`runMonitoringChecks`, `monitoringChecks.ts:56`).
 - Circuit-breaker error tracking for the `cleanup`, `dependency`, and `lockExpiration` tasks (`taskErrorTracking.ts`).
 
 Does NOT own (delegated):
 
-- Stall classification/handling — delegated to `checkStalledJobs` in `stallDetection.ts` (see [Concurrency & Locking](./concurrency-and-locking.md)).
+- Stall classification/handling — delegated to `checkStalledJobs` in `stallDetection.ts` (see [Concurrency & Locking](./concurrency-and-locking.md)). Cleanup's orphan recovery reuses the same exported `handleStalledJob` transition.
 - Expired-lock requeue/DLQ logic — delegated to `checkExpiredLocks` in `lockManager.ts`.
 - The actual DLQ re-queue/purge mechanics — delegated to `processAutoRetry` / `purgeExpiredDlq` in `dlqManager.ts` (see [Dead Letter Queue](./dead-letter-queue.md)).
 - Cron/delayed scheduling — owned by `CronScheduler` (started/stopped here but implemented in [Scheduler & Cron](./scheduler-and-cron.md)).
@@ -39,7 +39,7 @@ Does NOT own (delegated):
 Internal:
 
 - [Core Queue Engine](./core-queue-engine.md) — operates on `ctx.shards`, `ctx.processingShards`, `ctx.jobIndex`, and the `BackgroundContext` built by `QueueManager`'s context factory.
-- `stallDetection.ts` (`checkStalledJobs`) and `lockManager.ts` (`checkExpiredLocks`) — invoked directly from the interval bodies.
+- `stallDetection.ts` (`checkStalledJobs`) and `lockManager.ts` (`checkExpiredLocks`) — invoked directly from the interval bodies; `orphanRecovery.ts` (called from `cleanupTasks.ts`) calls `handleStalledJob` for orphans.
 - `dlqManager.ts` (`processAutoRetry`, `purgeExpiredDlq`) — see [Dead Letter Queue](./dead-letter-queue.md).
 - [Persistence](./persistence.md) — `ctx.storage` (`loadActiveJobs`, `loadPendingJobs`, `loadCompletedJobs`, `loadDlq`, `loadQueueState`, `saveDlqEntry`, `deleteJob`, `updateForRetry`) and `isCorruptDependsOn` from `sqliteSerializer`.
 - [Scheduler & Cron](./scheduler-and-cron.md) — `CronScheduler.start()` / `.stop()`.
@@ -89,6 +89,16 @@ Exported from `cleanupTasks.ts`:
 export async function cleanup(ctx: BackgroundContext): Promise<void>;
 ```
 
+Exported from `orphanRecovery.ts` (called by `cleanup`):
+
+```typescript
+export const ORPHAN_WINDOW_FLOOR_MS = 30 * 60 * 1000;
+export async function recoverOrphanedProcessingEntries(
+  ctx: BackgroundContext,
+  now: number
+): Promise<void>;
+```
+
 Exported from `dependencyProcessor.ts`:
 
 ```typescript
@@ -132,13 +142,13 @@ Emitted via `ctx.dashboardEmit?.(event, data)` (consumed by [bunqueue Cloud Dash
 - `dlq:auto-retried`, `dlq:expired` — `performDlqMaintenance` (`background/dlq.ts`)
 - `cleanup:completed-removed` — bounded automatic SQLite retention
   (`cleanupTasks.ts`)
-- `cleanup:orphans-removed` — `cleanOrphanedProcessingEntries` (`cleanupTasks.ts:75`)
-- `cleanup:stale-deps-removed` — `cleanStaleWaitingDependencies` (`cleanupTasks.ts:113`)
+- `cleanup:orphans-removed` — `recoverOrphanedProcessingEntries` (`orphanRecovery.ts`); `count` is the number of orphans this pass took out of processing through the stall path (each one also emits `job:stalled`). The name is kept for dashboard compatibility.
+- `cleanup:stale-deps-removed` — `cleanStaleWaitingDependencies` (`cleanupTasks.ts`)
 - `queue:removed` — `cleanEmptyQueues` (`emptyQueueCleanup.ts`)
 - `job:dependencies-resolved` — `promoteJobsToQueue` (`dependencyProcessor.ts:105`)
 - `queue:idle`, `queue:threshold`, `worker:overloaded`, `server:memory-warning`, `storage:size-warning` — `monitoringChecks.ts`
 
-The stall and lock-expiry intervals additionally drive `job:stalled` /
+The stall and lock-expiry intervals (and cleanup's orphan recovery, through the stall path) additionally drive `job:stalled` /
 `job:lock-expired` events plus `EventType.Stalled`/`EventType.Failed` broadcasts
 and `stalled` webhooks from their respective sibling modules (see [Webhooks,
 Events & Job Logs](./webhooks-and-events.md)). A terminal lock expiry broadcasts
@@ -236,29 +246,89 @@ For each queue in `queueNamesCache`, calls `processAutoRetry` (re-queues entries
 
 ### `cleanup` (`cleanupTasks.ts`)
 
-Runs in order each tick: refresh delayed counters per shard; compact any priority queue with `needsCompaction(0.2)` (>20% tombstones); then `cleanOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, `cleanUniqueKeysAndGroups`, `cleanStalledCandidates`, `cleanOrphanedJobIndex`, `cleanOrphanedJobLocks`, `cleanEmptyQueues`.
+Runs in order each tick: refresh delayed counters per shard; compact any priority queue with `needsCompaction(0.2)` (>20% tombstones); then `recoverOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, `cleanUniqueKeysAndGroups`, `cleanStalledCandidates`, `cleanOrphanedJobIndex`, `cleanOrphanedJobLocks`, `pruneEndedClientDeliveries`, `cleanEmptyQueues`.
 
-`cleanOrphanedProcessingEntries` drops an in-memory processing entry (from
-`processingShards`, `jobIndex` and the timeout scheduler, with no state
-transition) only when it has shown **no liveness for 30 minutes**
-(`isOrphanedProcessingEntry`):
+`recoverOrphanedProcessingEntries` (`orphanRecovery.ts`) is a backstop for the
+stall checker and does not recover anything the stall checker would keep. One
+difference: like lock expiration and startup recovery it treats `maxStalls: 0`
+as unlimited, while the stall checker moves a job to the DLQ on its first stall
+(`src/domain/types/stall.ts`). It recovers an
+active job only when all of these hold (`isOrphanedProcessingEntry`):
 
 - `startedAt` is set (an entry without it is never an orphan here);
-- `now - max(startedAt, lastHeartbeat) > 30 min`. `lastHeartbeat` is refreshed at
+- the queue's stall detection is enabled (`shard.getStallConfig(queue).enabled`).
+  A queue with `enabled: false` is skipped entirely: disabling stall detection
+  opts the queue out of every heartbeat-based recovery, this one included;
+- the job is past the queue's `gracePeriod` (`now - startedAt >= gracePeriod`),
+  as `checkStall` requires;
+- `now - max(startedAt, lastHeartbeat) > window`, where
+  `window = max(30 min, job.stallTimeout ?? stallInterval)`
+  (`ORPHAN_WINDOW_FLOOR_MS`). A job or queue that allows itself a longer stall
+  window postpones recovery to that window; a shorter one keeps the 30-minute
+  floor. Because `max(startedAt, lastHeartbeat) >= lastHeartbeat` and the
+  window is at least the stall window, every orphan is also stalled by the
+  stall checker's own rule. `lastHeartbeat` is refreshed at
   pull, by token-less `jobHeartbeat`, by progress updates and by every successful
   lock renewal (`renewJobLock`, the default worker path with `useLocks: true`), so
   a job that keeps heartbeating or renewing is never aged out however long it runs;
-- the job holds **no unexpired lock** in `jobLocks`. A valid lease is ownership
-  granted to a worker (for example a long `lockDuration` without renewals); the
-  lock-expiration sweep, not cleanup, decides when it lapses. An expired lease
-  does not count as liveness.
+- the job holds **no unexpired lock of its current processing generation** in
+  `jobLocks`. A valid lease is ownership granted to a worker (for example a long
+  `lockDuration` without renewals); the lock-expiration sweep, not cleanup,
+  decides when it lapses. An expired lease does not count as liveness, and
+  neither does a lease from an earlier generation: stall retry keeps the
+  previous lease in place as a stale-outcome guard, so the sweep applies the
+  same rule as `createLock` (`isLeaseFromEarlierGeneration`, `domain/job/locks.ts`):
+  the lease is stale when `job.startedAt > lock.createdAt`. Pull stamps
+  `startedAt` from a clock read taken before `createLock` runs in the same
+  delivery, so a lease from the current pull always has `createdAt >= startedAt`;
+  the comparison is strict, so a lease created in the same millisecond as the
+  pull still protects the job.
 
-The predicate is evaluated in phase 1 and again under the processing write lock
-in phase 2 with a fresh clock, because a heartbeat, progress update or renewal
-can land while the sweep waits for the lock. Before this rule the sweep aged
-entries by `startedAt` alone and removed heartbeating long-running jobs, which
-their workers could then no longer ACK
-(`test/repro-cleanup-heartbeating-active-job.test.ts`).
+An orphan is a stalled job the stall checker did not reclaim (for example its
+recovery attempt failed on a lock timeout), so it takes the stall recovery
+path: phase 1 collects candidates lock-free, phase 2 calls
+`handleStalledJob(job, action, ctx, recheck)` per orphan. That call takes
+`shardLocks[shardIndex(queue)]` then `processingLocks[procIdx]` (hierarchy
+order; the sweep holds no lock of its own), confirms the same job object is
+still in processing, and only then runs the whole predicate again with a fresh
+clock and the current stall configuration, because a heartbeat, progress
+update, renewal or `setStallConfig` can land while the sweep waits for either
+lock. If the job is still an orphan it is recovered exactly like a stall:
+concurrency/group/unique-key resources are released (`releaseJobResources`),
+the owning client connection is detached (`detachClientJob`), the timeout entry
+is cancelled, `attempts` and
+`stallCount` are incremented, and the job is retried with backoff and persisted
+with `updateForRetry`, or moved to the DLQ (`saveDlqEntry` + `deleteJob`) when
+`attempts` runs out or the stall budget is spent. The stall budget follows lock
+expiry and startup recovery: a positive `maxStalls` sends the orphan to the DLQ
+once `stallCount + 1 >= maxStalls`; `0` is unlimited. Cron `preventOverlap`
+jobs are discarded for the scheduler to recreate. `job:stalled` and the
+`Stalled` queue event are emitted after the transition, and one
+`cleanup:orphans-removed { count }` summarizes the pass. A recovery error is
+logged per job and the sweep continues; an entry left in processing is
+reconsidered on the next tick.
+
+Before this rule the sweep aged entries by `startedAt` alone and removed
+heartbeating long-running jobs (`test/repro-cleanup-heartbeating-active-job.test.ts`).
+After that fix it still only deleted a true orphan from `processingShards`,
+`jobIndex` and the timeout scheduler: the concurrency slot, group slot and
+unique key stayed held, SQLite kept the row `active`, no attempt was counted and
+no event fired until a restart resurrected the job
+(`test/repro-cleanup-orphan-recovery.test.ts`,
+`test/cleanup-orphan-recovery-guards.test.ts`). The fixed 30-minute window
+then overrode the stall configuration: a job with a longer `stallTimeout`, a
+queue with a longer `stallInterval`, or a queue with stall detection disabled
+was recovered after 30 minutes and could run twice
+(`test/repro-orphan-window-respects-stall-config.test.ts`,
+`test/orphan-window-boundaries.test.ts`).
+
+`pruneEndedClientDeliveries` runs synchronously after the lock sweep and drops
+every client ownership record whose delivery has ended (its `jobIndex` entry is
+no longer the processing entry the connection registered). Recovery paths
+detach ownership themselves; the prune bounds `clientJobs`/`clientJobOwners`
+when an ACK or FAIL arrives on a different pooled connection than the pull,
+which unregisters the sender rather than the owner. See
+[Webhooks, Events & Job Logs](./webhooks-and-events.md) for the ownership rule.
 
 A dependency-gated job older than one hour is removed under its shard write lock after a TOCTOU age re-check. Its SQLite row or pending buffered insert is deleted first, then the reverse dependency index, `jobIndex`, owned unique/custom ID reservations, and dependency-result consumer edges are released together.
 
@@ -297,9 +367,9 @@ Returns immediately if `dashboardEmit` is unset. Otherwise runs `checkQueueIdle`
 
 The lock hierarchy is `jobIndex → completedJobs → shards[N] → processingShards[N]` (see [Concurrency & Locking](./concurrency-and-locking.md)). Within this module:
 
-- `cleanOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, and `cleanOrphanedJobIndex` use a **two-phase** pattern: collect candidates lock-free, then mutate under the owning write lock and re-check membership/age inside the lock (for processing entries, the full liveness predicate: heartbeat age and unexpired lock).
+- `recoverOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, and `cleanOrphanedJobIndex` use a **two-phase** pattern: collect candidates lock-free, then mutate under the owning write lock and re-check membership/age inside the lock. For processing entries the second phase is `handleStalledJob`, which holds `shardLocks` then `processingLocks` and re-checks job identity plus the full orphan predicate (stall configuration, grace period, silence window and an unexpired lease of the current generation) before the transition.
 - `processPendingDependencies` acquires `shardLocks[i]` **before** reading `waitingDeps`, then runs shards in parallel via `Promise.all`.
-- The stall and lock-expiry delegates (`stallDetection.ts`, `lockManager.ts`) acquire `shardLocks` **before** `processingLocks` (hierarchy order). The lock-expiry sweep revalidates the collected job identity, current lease identity, and expiry under both locks before consuming either recovery budget; overlapping sweeps, renewal, ACK, and a newer delivery generation therefore cannot reclaim the same lease twice. Events are broadcast only after the winning transition.
+- The stall and lock-expiry delegates (`stallDetection.ts`, `lockManager.ts`) acquire `shardLocks` **before** `processingLocks` (hierarchy order). The stall checker re-evaluates its confirmed stall under both locks (`StallRecheck`), so a heartbeat or a new delivery of the same job object that lands while it waits keeps the job. The lock-expiry sweep revalidates the collected job identity, current lease identity, expiry and lease generation (`isLeaseFromEarlierGeneration`) under both locks before consuming either recovery budget; overlapping sweeps, renewal, ACK, and a newer delivery generation therefore cannot reclaim the same lease twice, and an earlier delivery's lease never reclaims a later lockless delivery. Overlapping stall, orphan and lock-expiry recoveries of one delivery transition it at most once (`test/recovery-sweeps-overlap.test.ts`). Events are broadcast only after the winning transition.
 - Timeout entries are registered only after processing ownership (and any lease)
   is established. ACK/FAIL, manual moves, disconnect recovery, stall/lock
   recovery, cleanup, obliterate, and shutdown invalidate the matching entry.
@@ -308,7 +378,7 @@ The lock hierarchy is `jobIndex → completedJobs → shards[N] → processingSh
 - `cleanUniqueKeysAndGroups`, `cleanStalledCandidates`, and `cleanOrphanedJobLocks` run without locks. `cleanEmptyQueues` is also lock-free, but its database read, set construction, and removals form one synchronous no-`await` turn. Processing `JobLocation` entries carry `queueName`, so an ACK between processing-map removal and completed publication still protects the owning queue. Push, batch, and flow entry points increment all unique target-queue admission counts before the first registration callback or `await`, then decrement them in `finally`; cleanup therefore sees every lock waiter and callback-reentrant admission. Stale dependency removal does take the shard write lock because it updates ownership, persistence, and reverse indexes as one lifecycle.
 - `recover` runs in the constructor before any concurrent traffic, so it is lock-free by construction.
 
-Stall detection uses two-phase confirmation (a job must be flagged in two consecutive 5s cycles via `stalledCandidates`) so a brief GC pause does not trigger a false stall. Lock expiry and stall detection both reset `startedAt`, bump `attempts`/`stallCount`, and call `releaseJobResources` to free the concurrency slot + group + unique key before re-pushing or moving to DLQ. Both reclaim paths enforce `attempts < maxAttempts` and `stallCount < maxStalls` before requeueing; `updateForRetry` persists both counters so a restart cannot replenish either budget.
+Stall detection uses two-phase confirmation (a job must be flagged in two consecutive 5s cycles via `stalledCandidates`) so a brief GC pause does not trigger a false stall. Lock expiry, stall detection and cleanup's orphan recovery (which reuses the stall transition) all reset `startedAt`, bump `attempts`/`stallCount`, and call `releaseJobResources` to free the concurrency slot + group + unique key before re-pushing or moving to DLQ. Both reclaim paths enforce `attempts < maxAttempts` and `stallCount < maxStalls` before requeueing; `updateForRetry` persists both counters so a restart cannot replenish either budget.
 
 ## Edge Cases & Failure Modes
 
@@ -354,7 +424,7 @@ Monitoring thresholds are read from env vars at module load (`monitoringChecks.t
 | `MEMORY_WARNING_MB`            | `0` (disabled) | Emit `server:memory-warning` when heap reaches it (re-arms below 90%)       |
 | `STORAGE_WARNING_MB`           | `0` (disabled) | Emit `storage:size-warning` when SQLite size reaches it (re-arms below 90%) |
 
-DLQ behavior (`autoRetry`, `maxAge`) is configured per queue via `setDlqConfig`; see [Dead Letter Queue](./dead-letter-queue.md). Stall behavior (`maxStalls`, `stallInterval`, `gracePeriod`) is per queue via `setStallConfig`. General env vars live in [Configuration & Entrypoint](./configuration.md).
+DLQ behavior (`autoRetry`, `maxAge`) is configured per queue via `setDlqConfig`; see [Dead Letter Queue](./dead-letter-queue.md). Stall behavior (`enabled`, `maxStalls`, `stallInterval`, `gracePeriod`) is per queue via `setStallConfig`; cleanup's orphan recovery reads the same configuration (skips disabled queues, waits `max(30 min, stallTimeout ?? stallInterval)` and the grace period). General env vars live in [Configuration & Entrypoint](./configuration.md).
 
 ## Related Docs
 

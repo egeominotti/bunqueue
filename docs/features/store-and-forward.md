@@ -143,7 +143,7 @@ interface ConnectionOptions {
 }
 ```
 
-The deterministic remote id is plain string-formatted: `` `fwd:${source.queueKey}:${job.id}` `` (`forwarder.ts:94`). `queueKey` is `prefixKey + name` (`src/client/queue/runtime/state.ts:26-30`), so the remote id is namespaced by the source queue's full key.
+The deterministic remote id is plain string-formatted: `` `fwd:${source.queueKey}:${job.id}` `` (`forwarder.ts:97`). `queueKey` is `prefixKey + name` (`src/client/queue/runtime/state.ts:26-30`), so the remote id is namespaced by the source queue's full key.
 
 ## Business Logic / Control Flow
 
@@ -175,7 +175,7 @@ The Forwarder holds no locks of its own. Concurrency is the `Worker`'s `concurre
 
 ## Edge Cases & Failure Modes
 
-- **Idempotent re-forwards (bounded).** Every push carries `jobId = fwd:<queueKey>:<localId>`. The server dedupes custom job ids, so a re-forward after a crash/retry does not duplicate the job remotely (`forwarder.ts:10-12`, `forwarder.ts:94`). **Invariant/gotcha:** dedupe only holds *within the server's custom-id retention window* (the bounded `customIdMap` LRU, see [Deduplication & Unique Jobs](./deduplication-and-unique.md)). If the same `localId` is re-forwarded after eviction (or after `removeOnComplete` drops it), a duplicate remote job is possible. Local job-id reuse across DB resets would likewise collide.
+- **Idempotent re-forwards (bounded).** Every push carries `jobId = fwd:<queueKey>:<localId>`. The server dedupes custom job ids, so a re-forward after a crash/retry does not duplicate the job remotely (`forwarder.ts:11-15`, `forwarder.ts:97`). **Invariant/gotcha:** dedupe only holds *while the remote job is live* (waiting, delayed or active). The server releases a custom id when the job completes (`src/application/operations/ack/completion.ts:43`) or moves to the DLQ (`src/application/operations/ack/failure.ts:29`), and the bounded `customIdMap` LRU can evict it earlier (see [Deduplication & Unique Jobs](./deduplication-and-unique.md)). A re-forward of the same `localId` after that creates a duplicate remote job. Local job-id reuse across DB resets would likewise collide.
 - **Listener-error isolation.** A throwing `forwarded` listener is caught and ignored so it cannot fail an already-succeeded forward (`forwarder.ts:103-107`).
 - **`error` event suppression.** Worker `failed`/`error` are only re-emitted as `Forwarder` `error` when `listenerCount('error') > 0` (`forwarder.ts:123,126`). This prevents `EventEmitter`'s default "throw on unhandled error" from crashing the process on a transient uplink failure — but it also means errors are silently dropped if you never attach an `error` listener. Failed forwards remain local jobs; they survive process restart only when the source uses a surviving SQLite volume, subject to the normal buffered/durable write boundary and retry/DLQ retention.
 - **Auto-batch disabled on the remote.** The remote queue forces `autoBatch:{ enabled:false }` (`forwarder.ts:88`); forwards are individual pushes, not coalesced.

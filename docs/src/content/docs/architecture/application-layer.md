@@ -29,8 +29,9 @@ src/application/
 ├── postgres-queue-manager/ # Transactional operations and local projection
 ├── operations/            # PUSH, PULL, ACK, Query
 ├── backgroundTasks.ts     # Task orchestration
-├── cleanupTasks.ts        # Memory cleanup, orphan removal
-├── clientTracking.ts      # Client connection tracking
+├── cleanupTasks.ts        # Memory cleanup, calls orphan recovery
+├── clientOwnership.ts     # Which connection owns each delivery
+├── clientTracking.ts      # Disconnect release of owned deliveries
 ├── contextFactory.ts      # Context creation helpers
 ├── dependencyProcessor.ts # Dependency resolution
 ├── dlqManager.ts          # Dead letter queue
@@ -41,6 +42,7 @@ src/application/
 ├── lockOperations.ts      # Lock acquire/release ops
 ├── metricsExporter.ts     # Prometheus metrics export
 ├── monitoringChecks.ts    # Periodic health checks
+├── orphanRecovery.ts      # Stall-checker backstop for silent jobs
 ├── stallDetection.ts      # Stall detection
 ├── statsManager.ts        # Queue statistics
 ├── taskErrorTracking.ts   # Background task circuit breaker
@@ -220,6 +222,7 @@ and the user-facing [storage guide](/guide/databases/).
     <span class="bq-diag-group-label">phase 1, process previous candidates</span>
     <div class="bq-diag-layer">For each job in stalledCandidates: still in processing? get stall config</div>
     <div class="bq-diag-arrow">↓ if confirmed stalled</div>
+    <div class="bq-diag-layer">Take the shard then processing lock, re-check the stall <i>a heartbeat that landed meanwhile keeps the job</i>, detach the silent connection</div>
     <div class="bq-diag-row">
       <div class="bq-diag-cell">stallCount &lt; maxStalls <i>increment + retry</i></div>
       <div class="bq-diag-cell bq-diag-accent">stallCount &gt;= maxStalls <i>move to DLQ</i></div>
@@ -229,7 +232,7 @@ and the user-facing [storage guide](/guide/databases/).
     <span class="bq-diag-group-label">phase 2, mark new candidates</span>
     <div class="bq-diag-layer">For each job in processingShards: no heartbeat for &gt; stallInterval <i>30s</i>, add to stalledCandidates <i>checked next tick</i></div>
   </div>
-  <p class="bq-diag-note">Why two-phase? It prevents false positives from transient delays, like a GC pause or a network hiccup.</p>
+  <p class="bq-diag-note">Why two-phase? It prevents false positives from transient delays, like a GC pause or a network hiccup. Lock expiry reclaims only the delivery its lease was granted to: an earlier delivery's leftover lease is deleted, never used to requeue a newer one.</p>
 </div>
 
 ### Dependency Resolution
@@ -255,11 +258,12 @@ and the user-facing [storage guide](/guide/databases/).
   <div class="bq-diag-head"><b>Cleanup</b><span>every 10s</span></div>
   <div class="bq-diag-layer">1. Refresh delayed counts in each shard</div>
   <div class="bq-diag-layer bq-diag-accent">2. Compact priority queues <i>if stale ratio &gt; 20%, rebuild heap</i></div>
-  <div class="bq-diag-layer">3. Clean orphaned processing entries <i>active jobs with no liveness for &gt; 30min: no pull, heartbeat, progress update or lock renewal in that window, and no unexpired lock; re-checked under the processing lock</i></div>
+  <div class="bq-diag-layer">3. Recover orphaned processing entries <i>only on queues with stall detection enabled and past gracePeriod: active jobs with no pull, heartbeat, progress update or lock renewal for longer than max(30min, stallTimeout or stallInterval), and no unexpired lease of the current delivery. Each one takes the stall path: rule re-checked under the shard and processing locks, slot released, owning connection detached, attempt counted, then retried with backoff or moved to the DLQ</i></div>
   <div class="bq-diag-layer">4. Clean stale waiting dependencies <i>waiting &gt; 1 hour</i></div>
   <div class="bq-diag-layer">5. Clean expired unique keys</div>
-  <div class="bq-diag-layer">6. Clean orphaned job index entries</div>
-  <div class="bq-diag-layer">7. Remove empty queues</div>
+  <div class="bq-diag-layer">6. Clean orphaned job index entries and leases</div>
+  <div class="bq-diag-layer">7. Prune client ownership of ended deliveries</div>
+  <div class="bq-diag-layer">8. Remove empty queues</div>
 </div>
 
 ## Event Broadcasting

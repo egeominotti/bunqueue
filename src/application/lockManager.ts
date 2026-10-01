@@ -4,13 +4,14 @@
  */
 
 import type { Job, JobId, JobLock } from '../domain/types/job';
-import { isLockExpired } from '../domain/types/job';
+import { isLeaseFromEarlierGeneration, isLockExpired } from '../domain/types/job';
 import { FailureReason, recordJobFailureAttempt } from '../domain/types/dlq';
 import { StallAction } from '../domain/types/stall';
 import { EventType } from '../domain/types/queue';
 import type { IndexedPriorityQueue } from '../domain/queue/priorityQueue';
 import { shardIndex, processingShardIndex } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
+import { detachClientJob } from './clientOwnership';
 import type { LockContext } from './types';
 
 // Re-export lock operations
@@ -55,11 +56,14 @@ export async function checkExpiredLocks(ctx: LockContext): Promise<void> {
     if (isLockExpired(lock, now)) {
       const procIdx = processingShardIndex(jobId);
       const job = ctx.processingShards[procIdx].get(jobId);
-      if (job) {
+      if (job && !isLeaseFromEarlierGeneration(job, lock)) {
         const shardIdx = shardIndex(job.queue);
         expired.push({ jobId, lock, procIdx, shardIdx, job });
       } else {
-        // Job not in processing - just clean up the orphan lock
+        // No live delivery holds this lease: the job left processing, or it
+        // was delivered again without a lease after stall retry kept this one
+        // as a stale-outcome guard. Stall detection, not this lease, governs
+        // that newer delivery, so only the orphan lease is removed.
         ctx.jobLocks.delete(jobId);
       }
     }
@@ -92,10 +96,13 @@ export async function checkExpiredLocks(ctx: LockContext): Promise<void> {
           for (const { jobId, lock, job } of items) {
             const currentJob = ctx.processingShards[procIdx].get(jobId);
             const currentLock = ctx.jobLocks.get(jobId);
+            // The same job object is reused by its next delivery, so the
+            // lease must also still belong to the delivery in processing.
             if (
               currentJob !== job ||
               currentLock !== lock ||
-              !isLockExpired(currentLock, Date.now())
+              !isLockExpired(currentLock, Date.now()) ||
+              isLeaseFromEarlierGeneration(currentJob, currentLock)
             ) {
               continue;
             }
@@ -124,9 +131,10 @@ function processExpiredLockInner(
   const shard = ctx.shards[shardIdx];
   const queue = shard.getQueue(job.queue);
 
-  // Remove from processing
+  // Remove from processing; the delivery ends, and so does its client ownership.
   ctx.processingShards[procIdx].delete(jobId);
   ctx.timeoutScheduler.cancel(jobId);
+  detachClientJob(jobId, ctx);
 
   // Discard cron jobs with preventOverlap instead of re-queuing (#75).
   // During graceful shutdown, heartbeats stop and the lock expires before

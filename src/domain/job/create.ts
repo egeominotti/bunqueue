@@ -8,7 +8,7 @@ import { normalizeJobPayload } from './payload';
  * non-finite, negative or over-limit value is dropped and the default cap applies
  * instead of turning the retry delay into NaN or an unbounded wait.
  */
-function parseMaxDelay(value: unknown): number | undefined {
+export function parseMaxDelay(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
   return value >= 0 && value <= MAX_BACKOFF_DELAY ? value : undefined;
 }

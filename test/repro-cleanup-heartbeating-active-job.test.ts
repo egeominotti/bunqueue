@@ -169,7 +169,7 @@ describe('cleanup keeps long-running jobs that still heartbeat', () => {
     expect(await qm.getJobState(id)).toBe('completed');
   });
 
-  test('a silent job whose lock lease already expired is still removed as an orphan', async () => {
+  test('a silent job whose lock lease already expired is recovered as an orphan', async () => {
     qm = new QueueManager();
     const ctx = backgroundContext(qm);
 
@@ -187,8 +187,15 @@ describe('cleanup keeps long-running jobs that still heartbeat', () => {
 
     await cleanup(ctx);
 
+    // Spec change: an orphan used to be dropped from processingShards and
+    // jobIndex with no state transition. It now takes the stall recovery path
+    // (test/repro-cleanup-orphan-recovery.test.ts): it leaves processing, is
+    // requeued with the attempt counted, and the lapsed lease is cleared by the
+    // same cleanup pass because the job is no longer processing.
     expect(ctx.processingShards[processingShardIndex(id)].has(id)).toBe(false);
-    expect(ctx.jobIndex.has(id)).toBe(false);
+    expect(ctx.jobIndex.get(id)?.type).toBe('queue');
+    expect(['waiting', 'prioritized', 'delayed']).toContain(await qm.getJobState(id));
+    expect((await qm.getJob(id))?.attempts).toBe(1);
     expect(ctx.jobLocks.has(id)).toBe(false);
   });
 });

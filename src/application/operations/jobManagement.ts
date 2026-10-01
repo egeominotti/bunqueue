@@ -13,6 +13,7 @@ import { processingShardIndex } from '../../shared/hash';
 import { webhookLog } from '../../shared/logger';
 import { type RWLock, withWriteLock } from '../../shared/lock';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
+import type { ClientJobOwner } from '../clientOwnership';
 import {
   type DependencyCompletionTracker,
   releaseDependencyCompletionPins,
@@ -65,6 +66,7 @@ export interface JobManagementContext {
   jobIndex: Map<JobId, JobLocation>;
   jobLocks: Map<JobId, JobLock>;
   clientJobs: Map<string, Set<JobId>>;
+  clientJobOwners: Map<JobId, ClientJobOwner>;
   webhookManager: WebhookManager;
   eventsManager: EventsManager;
   repeatChain?: Map<JobId, JobId>;

@@ -245,6 +245,11 @@ python -m venv .venv && .venv/bin/pip install -e '.[test]'
 BUNQUEUE_SDK_SOAK_SECONDS=3600 .venv/bin/python tests/soak.py
 ```
 
+The pytest-based suites require Python 3.10 or later: the `test` extra pins
+pytest 9.0.3, the release that fixes CVE-2025-71176, and installs no pytest on
+Python 3.9. The standalone integration, E2E and soak runners also run on
+Python 3.9.
+
 Mutation testing is intentionally a final, slower quality gate and requires
 Python 3.10 or later (the runtime package remains compatible with Python 3.9):
 

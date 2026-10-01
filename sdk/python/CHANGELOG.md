@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Raise the `test` extra from pytest 8.4.2 to 9.0.3, which fixes
+  CVE-2025-71176 (GHSA-6w46-j5rx-g56g, insecure tmpdir handling). pytest 9
+  requires Python 3.10+, so the pin carries a `python_version >= '3.10'`
+  marker and the pytest-based suites now need Python 3.10+; the runtime
+  package and the standalone integration/E2E runners still support 3.9.
+
 ### Fixed
 
 - Wake the saturated Worker pull loop when an ACK or FAIL releases a

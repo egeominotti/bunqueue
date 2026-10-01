@@ -1,4 +1,5 @@
 import type { EventEmitter } from 'events';
+import { calculateDelayedErrorDelay } from '../../domain/job/state';
 import type { Job as InternalJob } from '../../domain/types/job';
 import { DelayedError, UnrecoverableError } from '../errors';
 import { getSharedManager } from '../manager';
@@ -73,17 +74,14 @@ async function handleDelayedError<T, R>(
   const { embedded, tcp, emitter } = config;
   if (config.shouldAbandonOutcome?.()) return;
   try {
+    const delay = calculateDelayedErrorDelay(internalJob);
     if (embedded) {
-      await getSharedManager().moveToDelayed(
-        internalJob.id,
-        internalJob.backoff || 1000,
-        context.token ?? undefined
-      );
+      await getSharedManager().moveToDelayed(internalJob.id, delay, context.token ?? undefined);
     } else if (tcp) {
       await tcp.send({
         cmd: 'MoveToDelayed',
         id: internalJob.id,
-        delay: internalJob.backoff || 1000,
+        delay,
         ...(context.token ? { token: context.token } : {}),
       });
     }

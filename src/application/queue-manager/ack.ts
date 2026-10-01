@@ -3,6 +3,7 @@ import { FailureReason } from '../../domain/types/dlq';
 import { ackJob, ackJobBatch, ackJobBatchWithResults, failJob } from '../operations/ack';
 import type { AckBatchOutcome, AckOutcome, CompletionOptions, FailJobOptions } from '../types/ack';
 import * as lockMgr from '../lockManager';
+import { detachClientJob } from '../clientOwnership';
 import { QueueManagerDelivery } from './delivery';
 
 export class QueueManagerAck extends QueueManagerDelivery {
@@ -214,10 +215,7 @@ export class QueueManagerAck extends QueueManagerDelivery {
     this.timedOutJobs.set(job.id, generation);
     if (lock) this.retiredTimeoutLeaseTokens.set(lock.token, generation);
     lockMgr.releaseLock(job.id, this.contextFactory.getLockContext(), lock?.token);
-    for (const [clientId, jobs] of this.clientJobs) {
-      jobs.delete(job.id);
-      if (jobs.size === 0) this.clientJobs.delete(clientId);
-    }
+    detachClientJob(job.id, { clientJobs: this.clientJobs, clientJobOwners: this.clientJobOwners });
   }
 
   private async failWithOptions(

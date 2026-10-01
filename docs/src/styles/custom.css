@@ -456,7 +456,7 @@ hr {
   }
 
   /* Mobile menu button touch target */
-  starlight-menu-button button {
+  .sl-menu-button {
     min-width: 44px;
     min-height: 44px;
   }
@@ -603,8 +603,10 @@ starlight-toc a[aria-current='true'] {
 }
 
 /* Mobile menu button: flat, integrated with the header (kill the default
-   floating white circle + shadow) */
-starlight-menu-button button {
+   floating white circle + shadow). Starlight 0.42 renders a bare
+   `.sl-menu-button` that opens the sidebar popover; the open state is
+   `:has(~ :popover-open)`, not the old `aria-expanded` wrapper attribute. */
+.sl-menu-button {
   background: transparent !important;
   border: 1px solid var(--bq-line);
   border-radius: 0.45rem;
@@ -612,8 +614,8 @@ starlight-menu-button button {
   color: var(--sl-color-gray-2) !important;
 }
 
-starlight-menu-button button:hover,
-starlight-menu-button[aria-expanded='true'] button {
+.sl-menu-button:hover,
+.sl-menu-button:has(~ :popover-open) {
   color: var(--sl-color-white) !important;
   border-color: var(--bq-brand);
 }

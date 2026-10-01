@@ -209,9 +209,9 @@ RAM-only, uncounted prefix while avoiding a false all-or-nothing guarantee.
 
 `customIdMap.get(customId)` → `jobIndex` location → resolve from queue / `waitingDeps` / `waitingChildren` / `processingShards` / completed (storage fallback) / DLQ.
 
-### Forwarder dedup key (`src/client/forwarder.ts:94`)
+### Forwarder dedup key (`src/client/forwarder.ts:97`)
 
-Store-and-forward assigns each forwarded job the deterministic remote id `fwd:<source.queueKey>:<localJobId>`, sent as the remote `jobId`. The server's custom-id idempotency then makes a re-forward after a crash/retry a no-op remotely. See [Store-and-Forward](./store-and-forward.md).
+Store-and-forward assigns each forwarded job the deterministic remote id `fwd:<source.queueKey>:<localJobId>`, sent as the remote `jobId`. The server's custom-id idempotency then makes a re-forward after a crash/retry a no-op remotely while the remote job is still live; once it completes or reaches the DLQ the id is released and a re-forward creates a new job. See [Store-and-Forward](./store-and-forward.md).
 
 ### Bunqueue auto-dedup/debounce (`dedupDebounce.ts:21`)
 
@@ -289,7 +289,7 @@ Lifecycle / release:
 | Option / Env                                                        | Default                | Effect                                                       |
 | ------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------ |
 | `maxCustomIds` (QueueManager config, `application/types/config.ts`) | `50_000`               | LRU cap for `customIdMap`                                    |
-| per-queue unique-key trim threshold (`cleanupTasks.ts:105`)         | `1000`                 | force half-trim above this size                              |
+| per-queue unique-key trim threshold (`cleanupTasks.ts:113`)         | `1000`                 | force half-trim above this size                              |
 | `JobOptions.jobId`                                                  | —                      | custom idempotency id                                        |
 | `JobOptions.deduplication.{id,ttl,extend,replace}`                  | `ttl` none / no expiry | unique-key dedup + strategy                                  |
 | `Bunqueue` `deduplication.ttl` (`dedupDebounce.ts:28`)              | `3600000` ms           | default dedup TTL for auto-injected keys                     |

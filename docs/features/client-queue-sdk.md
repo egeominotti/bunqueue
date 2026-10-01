@@ -277,8 +277,9 @@ failure reason to both `getJob()` and `getJobs[Async]()`. Its options come from
 `buildJobOpts` (`client/jobHelpers.ts`), which reflects an object backoff as
 `{ type, delay, maxDelay? }` and adds `maxDelay` only when the job has one, so
 `job.opts.backoff` round-trips the caller's cap. Jobs delivered to a TCP worker
-are parsed by `worker/jobParser.ts`, which does not read `backoffConfig`; there
-`job.opts.backoff` stays the numeric base delay. The live properties,
+are parsed by `worker/jobParser.ts`, which also reads the `backoffConfig` the
+server already includes in every pulled job (`null` for a numeric backoff), so
+`job.opts.backoff` round-trips there too. The live properties,
 `toJSON()`, and `asJSON()` therefore describe the same broker generation in
 embedded and TCP mode instead of query proxies resetting lifecycle counters to
 zero.
@@ -310,7 +311,7 @@ zero.
   `operations/add/bulk.ts:130-133`).
 - **Synchronous TCP boundaries**: `getJobs`/`getWaiting`/… (sync) return `[]`, `count()` returns `0`, `getCountsPerPriority()` returns `{}`, and `isPaused()` returns `false` in TCP mode because their signatures cannot await a round trip. Use the corresponding `Async` variants for authoritative remote results. The same rule applies to synchronous DLQ reads and fire-and-forget mutation forms; use `getDlqAsync`, `getDlqStatsAsync`, `retryDlqAsync`, `retryDlqByFilterAsync`, `purgeDlqAsync`, and `retryCompletedAsync` when the result matters. Selective `removeDlqJob` is deliberately Promise-based even without the suffix, and `removeDlqJobAsync` is its explicit alias. Limit getters, worker discovery, dependency methods, deduplication methods, and `moveToWaitingChildren` are asynchronous and now query or mutate the selected broker runtime directly.
 - **Detached conversion helpers**: broker-returned `Job` instances always receive a complete live operation context. Low-level callers that invoke `createPublicJob` without a context receive only detached fallback behavior and must not treat that helper as a broker client.
-- **Idempotency**: `jobId`/`deduplication.id` make `add` idempotent (custom-id dedup, server-side, retention-window-bounded). `forward()` uses deterministic remote ids (`fwd:<queue>:<localId>`) so re-forwards don't duplicate (see [Store-and-Forward](./store-and-forward.md)).
+- **Idempotency**: `jobId`/`deduplication.id` make `add` idempotent (custom-id dedup, server-side, only while the job is live: completion or the DLQ releases the id). `forward()` uses deterministic remote ids (`fwd:<queue>:<localId>`) so re-forwards don't duplicate (see [Store-and-Forward](./store-and-forward.md)).
 - **Metrics/event retention**: `getMetrics(type,start,end)` returns queue-scoped,
   newest-first one-minute buckets over identical embedded/TCP paths.
   `trimEvents(maxLength)` returns the exact number removed from that queue's
@@ -332,7 +333,7 @@ zero.
   `queue/runtime/state.ts` forwards `queueKey = prefixKey + name`, so two queues
   with the same logical name but different prefixes never collide; a consuming
   Worker must use the same prefix.
-- **Processor error classes**: throwing `UnrecoverableError` skips remaining retries (straight to failed/DLQ); `DelayedError` re-delays without counting as a failure (`errors.ts`).
+- **Processor error classes**: throwing `UnrecoverableError` skips remaining retries (straight to failed/DLQ); `DelayedError` re-delays without counting as a failure (`errors.ts`), by the base backoff capped at a positive `backoff.maxDelay` (a `maxDelay` of 0 does not apply; the wait is never zero) (`calculateDelayedErrorDelay`, see `client-worker-sdk.md`).
 
 ## Configuration
 

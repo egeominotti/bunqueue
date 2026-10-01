@@ -34,6 +34,30 @@ head:
   value without a non-empty string `id`, with unknown or repeated fields, that
   is not a map or keyword list (structs included), or combined with a raw
   `dedup` option used to be accepted and ignored.
+- **A genuinely orphaned active job is retried instead of disappearing.** When
+  stall detection is enabled for its queue, a job that sends no heartbeat,
+  progress update or lock renewal for longer than both 30 minutes and its stall
+  timeout (`stallTimeout`, or the queue's `stallInterval`), and holds no lease
+  from its current delivery, is now recovered like a stalled job: retried with
+  the attempt counted, or moved to the DLQ. It used to vanish from memory until
+  a restart. Queues with stall detection disabled are left alone. Deliveries
+  that keep sending heartbeats, or that hold an unexpired lease, never reach
+  this path.
+- **`DelayedError` delays are capped and never zero.** The delay is the base
+  backoff (1 second when it is not positive) capped at a positive
+  `backoff.maxDelay`, or at 1 hour otherwise. A `maxDelay` of 0 does not apply
+  to `DelayedError`, so the postponement is never zero. A
+  numeric backoff above 1 hour used to postpone the job for the full value. TCP
+  workers now see `job.opts.backoff` in its object form when the job was added
+  that way.
+- **A disconnecting client only releases deliveries it still owns.** Each
+  active job now records the connection and delivery that own it. Stall
+  recovery, orphan recovery, lock expiration, timeouts, management moves and
+  discards detach that ownership, so a client that went silent can no longer
+  release the job's next delivery to another worker when it finally closes.
+- **Python SDK: the pytest-based suites need Python 3.10 or later.** The test
+  extra pins pytest 9.0.3, which drops Python 3.9; the SDK itself still
+  supports 3.9.
 
 ### Fixed
 
@@ -62,6 +86,44 @@ head:
   `uniqueKey` and `ttl`, `extend` and `replace` as `dedup`, as in the other
   SDKs. An explicit non-empty `uniqueKey` still wins. Regression:
   `sdk/elixir/test/deduplication_options_test.exs`.
+- **Orphan recovery releases what the job held.** When cleanup recovers an
+  orphan it now goes through the stall path, which releases the queue
+  concurrency slot, group slot and unique key, records the attempt in SQLite,
+  and emits the `stalled` event and webhook. A lease left over from an earlier
+  delivery no longer counts as liveness for the current one. Regressions:
+  `test/repro-cleanup-orphan-recovery.test.ts`,
+  `test/cleanup-orphan-recovery-guards.test.ts`.
+- **Recovery sweeps act only on the current delivery.** The stall checker now
+  re-checks that the job is still stalled after taking its locks, so a
+  heartbeat or new delivery that lands meanwhile keeps the job. Lock expiration
+  ignores a lease left from an earlier delivery instead of requeuing the newer
+  one. Overlapping cleanup, stall and lock-expiration sweeps recover a job once.
+  Regressions: `test/repro-recovered-job-stale-client-release.test.ts`,
+  `test/repro-recovery-sweeps-current-generation.test.ts`,
+  `test/repro-orphan-window-respects-stall-config.test.ts`.
+- **`DelayedError` honors `backoff.maxDelay` in embedded and TCP mode.** The
+  worker re-delayed the job by the base backoff and ignored the cap; TCP
+  workers also dropped the backoff configuration the server sends.
+  Regressions:
+  `test/repro-delayed-error-max-delay.test.ts`,
+  `test/repro-delayed-error-zero-max-delay.test.ts`.
+- **Documentation:** the Rust SDK README listed APIs that do not exist
+  (scheduler listing, webhooks, workers, stats, progress reads, children
+  values), and the Rust and Elixir READMEs claimed `Hello` is sent on connect.
+  The store-and-forward guides now state that a re-forward is deduplicated only
+  while the remote job is live; completion or the DLQ releases its custom id.
+
+### Security
+
+- **Documentation site dependencies upgraded.** Astro 7.3.5 (from 6.4.8),
+  Starlight 0.42.5, `@astrojs/react` 7.0.0, `@astrojs/sitemap` 3.7.4 and sharp
+  0.35.5 resolve the open advisories, including a critical remote code
+  execution through AVIF image optimization in Astro, base-path authorization
+  bypass and XSS issues in Astro, and libvips/libheif vulnerabilities in sharp.
+  The site build does not process images through sharp, so those paths were not
+  reachable, but the packages are patched.
+- **Python SDK: pytest 9.0.3** for the vulnerable tmpdir handling in earlier
+  versions.
 
 ## [2.9.6] - 2026-10-01
 

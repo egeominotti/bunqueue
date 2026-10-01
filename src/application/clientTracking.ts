@@ -6,48 +6,43 @@
 import type { Job, JobId } from '../domain/types/job';
 import { shardIndex } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
+import { detachClientJob, dropClient, ownsCurrentDelivery } from './clientOwnership';
 import type { LockContext } from './types';
 
-/**
- * Register a job as owned by a client (called on PULL).
- */
-export function registerClientJob(clientId: string, jobId: JobId, ctx: LockContext): void {
-  let jobs = ctx.clientJobs.get(clientId);
-  if (!jobs) {
-    jobs = new Set();
-    ctx.clientJobs.set(clientId, jobs);
-  }
-  jobs.add(jobId);
-}
+export { registerClientJob, unregisterClientJob } from './clientOwnership';
 
 /**
- * Unregister a job from a client (called on ACK/FAIL).
+ * A disconnecting client may release only a delivery it still owns, and only
+ * when no renewal proves a worker is still holding it.
+ *
+ * A job whose lock has been renewed since pull (renewalCount > 0) is being
+ * actively heartbeated by a live worker. With a pooled client, heartbeats
+ * travel on a DIFFERENT connection than the one that pulled, so THIS socket
+ * closing does not mean the worker died — re-queuing here would re-dispatch
+ * (double-execute) a job the worker still holds. Leave it; lock expiry /
+ * stall detection reclaims it if the worker truly stops heartbeating.
+ * A never-renewed lock (renewalCount === 0) keeps the original fast-recovery
+ * behavior: requeue immediately on disconnect.
  */
-export function unregisterClientJob(
-  clientId: string | undefined,
-  jobId: JobId,
-  ctx: LockContext
-): void {
-  if (!clientId) return;
-  const jobs = ctx.clientJobs.get(clientId);
-  if (jobs) {
-    jobs.delete(jobId);
-    if (jobs.size === 0) {
-      ctx.clientJobs.delete(clientId);
-    }
-  }
+function isReleasable(clientId: string, jobId: JobId, ctx: LockContext): boolean {
+  if (!ownsCurrentDelivery(clientId, jobId, ctx)) return false;
+  const lock = ctx.jobLocks.get(jobId);
+  return !(lock && lock.renewalCount > 0);
 }
 
 /**
  * Release all jobs owned by a client back to queue (called on TCP disconnect).
  * Returns the number of jobs released.
  *
- * Uses proper locking to prevent race conditions.
+ * Only deliveries the client still owns are touched (`ownsCurrentDelivery`): a
+ * job recovered from this client and delivered again to another worker is not
+ * this client's to release. The rule is checked when collecting and again
+ * under the shard and processing write locks.
  */
 export async function releaseClientJobs(clientId: string, ctx: LockContext): Promise<number> {
   const jobs = ctx.clientJobs.get(clientId);
   if (!jobs || jobs.size === 0) {
-    ctx.clientJobs.delete(clientId);
+    dropClient(clientId, ctx);
     return 0;
   }
 
@@ -61,17 +56,7 @@ export async function releaseClientJobs(clientId: string, ctx: LockContext): Pro
   for (const jobId of jobs) {
     const loc = ctx.jobIndex.get(jobId);
     if (loc?.type !== 'processing') continue;
-
-    // A job whose lock has been renewed since pull (renewalCount > 0) is being
-    // actively heartbeated by a live worker. With a pooled client, heartbeats
-    // travel on a DIFFERENT connection than the one that pulled, so THIS socket
-    // closing does not mean the worker died — re-queuing here would re-dispatch
-    // (double-execute) a job the worker still holds. Leave it; lock expiry /
-    // stall detection reclaims it if the worker truly stops heartbeating.
-    // A never-renewed lock (renewalCount === 0) keeps the original fast-recovery
-    // behavior: requeue immediately on disconnect.
-    const lock = ctx.jobLocks.get(jobId);
-    if (lock && lock.renewalCount > 0) continue;
+    if (!isReleasable(clientId, jobId, ctx)) continue;
 
     const procIdx = loc.shardIdx;
     const job = ctx.processingShards[procIdx].get(jobId);
@@ -85,7 +70,7 @@ export async function releaseClientJobs(clientId: string, ctx: LockContext): Pro
   }
 
   if (jobsToRelease.length === 0) {
-    ctx.clientJobs.delete(clientId);
+    dropClient(clientId, ctx);
     return 0;
   }
 
@@ -124,7 +109,7 @@ export async function releaseClientJobs(clientId: string, ctx: LockContext): Pro
           await withWriteLock(ctx.processingLocks[procIdx], () => {
             for (const { jobId } of shardItems) {
               const job = ctx.processingShards[procIdx].get(jobId);
-              if (!job) continue;
+              if (!job || !isReleasable(clientId, jobId, ctx)) continue;
               released += releaseJobToQueue({ jobId, job, procIdx, queueShardIdx, ctx, now });
             }
           });
@@ -138,7 +123,7 @@ export async function releaseClientJobs(clientId: string, ctx: LockContext): Pro
     // Prevents a leak in ctx.clientJobs that would otherwise accumulate
     // across every TCP disconnect that hit a lock timeout. Jobs left in
     // 'active' state will be recovered by the stall detector on its next tick.
-    ctx.clientJobs.delete(clientId);
+    dropClient(clientId, ctx);
   }
 }
 
@@ -146,7 +131,8 @@ export async function releaseClientJobs(clientId: string, ctx: LockContext): Pro
  * Force-release client tracking without acquiring queue locks.
  * Used as a last-resort fallback when releaseClientJobs has exhausted its
  * retry budget (e.g. persistent lock contention on TCP disconnect). For each
- * orphaned job:
+ * job whose current delivery the client still owns (`ownsCurrentDelivery`;
+ * a stale registration must not expire another worker's delivery):
  *   - clears `jobLocks` so a stale lock token can't survive the disconnect
  *     until its TTL expires;
  *   - expires both `lastHeartbeat` (so stall detection's heartbeat check
@@ -167,14 +153,16 @@ export async function releaseClientJobs(clientId: string, ctx: LockContext): Pro
 export function forceReleaseClientJobs(clientId: string, ctx: LockContext): number {
   const jobs = ctx.clientJobs.get(clientId);
   if (!jobs || jobs.size === 0) {
-    ctx.clientJobs.delete(clientId);
+    dropClient(clientId, ctx);
     return 0;
   }
 
   let touched = 0;
   for (const jobId of jobs) {
-    // Always drop any lock token for this job, even if the location is no
-    // longer 'processing' — prevents stale tokens from surviving.
+    // Not this client's delivery any more (recovered, finished, or delivered
+    // again to another worker): its lock and timers belong to someone else.
+    if (!ownsCurrentDelivery(clientId, jobId, ctx)) continue;
+    // Drop this delivery's lock token so it cannot survive the disconnect.
     ctx.jobLocks.delete(jobId);
 
     const loc = ctx.jobIndex.get(jobId);
@@ -189,7 +177,7 @@ export function forceReleaseClientJobs(clientId: string, ctx: LockContext): numb
     touched++;
   }
 
-  ctx.clientJobs.delete(clientId);
+  dropClient(clientId, ctx);
   return touched;
 }
 
@@ -212,8 +200,9 @@ function releaseJobToQueue(opts: ReleaseJobOptions): number {
   ctx.processingShards[procIdx].delete(jobId);
   ctx.timeoutScheduler.cancel(jobId);
 
-  // Release lock if exists
+  // Release lock if exists; the delivery ends here, so does its ownership.
   ctx.jobLocks.delete(jobId);
+  detachClientJob(jobId, ctx);
 
   // Release all job resources (concurrency, uniqueKey, groupId)
   shard.releaseJobResources(job.queue, job.uniqueKey, job.groupId, job.id);

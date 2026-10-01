@@ -1,10 +1,10 @@
 # Webhooks, Events & Job Logs
 
-> **Category:** Observability · **Source:** `src/application/webhookManager.ts`, `src/domain/types/webhook.ts`, `src/application/eventsManager.ts`, `src/application/jobLogsManager.ts`, `src/application/clientTracking.ts`, `src/infrastructure/server/tcp/connections.ts`, `src/client/events.ts`
+> **Category:** Observability · **Source:** `src/application/webhookManager.ts`, `src/domain/types/webhook.ts`, `src/application/eventsManager.ts`, `src/application/jobLogsManager.ts`, `src/application/clientTracking.ts`, `src/application/clientOwnership.ts`, `src/infrastructure/server/tcp/connections.ts`, `src/client/events.ts`
 
 ## Purpose
 
-This module provides the server's outbound and inbound observability surfaces for job activity. `WebhookManager` delivers HTTP callbacks (with optional HMAC signing and SSRF protection) when job lifecycle events occur; `EventsManager` is the in-process pub/sub hub that fans events out to local subscribers (SSE, dashboard, `WaitJob`) and feeds the webhook layer; `jobLogsManager` stores bounded per-job log lines; and `clientTracking` owns the client→job ownership map that releases in-flight jobs back to their queues when a TCP/SSE connection drops. Together they answer "what happened to my jobs" without coupling the core queue engine to any transport.
+This module provides the server's outbound and inbound observability surfaces for job activity. `WebhookManager` delivers HTTP callbacks (with optional HMAC signing and SSRF protection) when job lifecycle events occur; `EventsManager` is the in-process pub/sub hub that fans events out to local subscribers (SSE, dashboard, `WaitJob`) and feeds the webhook layer; `jobLogsManager` stores bounded per-job log lines; and `clientOwnership`/`clientTracking` own the client→job ownership map (one owner per delivery) that releases in-flight jobs back to their queues when a TCP/SSE connection drops. Together they answer "what happened to my jobs" without coupling the core queue engine to any transport.
 
 ## Responsibilities & Scope
 
@@ -15,7 +15,7 @@ Owns:
 - In-process scalar/batch event broadcast to subscribers and event-driven
   completion waiters used by `WaitJob` (`eventsManager.ts`).
 - Bounded per-job log buffers (`jobLogsManager.ts:19`).
-- Client-job ownership tracking and disconnect-time release/requeue (`clientTracking.ts:14`).
+- Client-job ownership tracking (`clientOwnership.ts`) and disconnect-time release/requeue (`clientTracking.ts`).
 
 Does NOT own:
 
@@ -91,9 +91,16 @@ function addJobLog(jobId, message, ctx: JobLogsContext, level?: 'info'|'warn'|'e
 function getJobLogs(jobId, ctx): JobLogEntry[];
 function clearJobLogs(jobId, ctx, keepLogs?: number): void;
 
-// clientTracking.ts
-function registerClientJob(clientId, jobId, ctx): void;        // on PULL
+// clientOwnership.ts (registerClientJob/unregisterClientJob re-exported by clientTracking.ts)
+interface ClientJobOwner { readonly clientId: string; readonly delivery: JobLocation | undefined }
+function registerClientJob(clientId, jobId, ctx): void;        // on PULL; one owner per delivery
 function unregisterClientJob(clientId | undefined, jobId, ctx): void; // on ACK/FAIL
+function detachClientJob(jobId, ctx): void;                    // delivery ended without the owner's outcome
+function ownsCurrentDelivery(clientId, jobId, ctx): boolean;   // release/force-release gate
+function dropClient(clientId, ctx): void;                      // forget a disconnected client
+function pruneEndedClientDeliveries(ctx): number;              // periodic cleanup
+
+// clientTracking.ts
 function releaseClientJobs(clientId, ctx): Promise<number>;    // on disconnect (locked)
 function forceReleaseClientJobs(clientId, ctx): number;        // lock-free fallback
 ```
@@ -219,17 +226,21 @@ payloads; TCP Workers reuse the same dedicated subscription for `stalled`.
 
 ### Client tracking & disconnect release
 
-- `registerClientJob` (on PULL) and `unregisterClientJob` (on ACK/FAIL) maintain `clientJobs: Map<clientId, Set<jobId>>`, deleting the set when empty (`clientTracking.ts:14`).
+- `registerClientJob` (on PULL) and `unregisterClientJob` (on ACK/FAIL) maintain `clientJobs: Map<clientId, Set<jobId>>`, deleting the set when empty, together with its reverse index `clientJobOwners: Map<jobId, ClientJobOwner>` (`clientOwnership.ts`). Every mutation of the two maps goes through that module, so a job is in `clientJobs.get(c)` exactly when its owner record names `c`, and every operation is O(1) per job.
+- **Delivery identity.** The owner record stores the `jobIndex` entry current at registration. Only a pull installs a `{ type: 'processing' }` entry and every pull installs a fresh object, so the record identifies one delivery: a later delivery of the same job id never matches it. `ownsCurrentDelivery(clientId, jobId)` is true only when the record names the client and the job's current `jobIndex` entry is that same processing object.
+- **One owner per delivery.** `registerClientJob` detaches any previous owner of the job before recording the new one. `unregisterClientJob` removes only the caller's own claim, so a late outcome handled on one connection cannot detach a newer delivery owned by another.
+- **Every delivery-ending transition detaches the owner** (`detachClientJob`): stall retry/DLQ (`handleStalledJob`, which cleanup's orphan recovery also uses), lock expiration (`processExpiredLockInner`), processing timeout (`retireTimedOutGeneration`), management claims (`releaseClaimedJobOwnership`: move to wait/delayed/waiting-children, discard), a stale-lease replacement in `createLock`, disconnect release itself (`releaseJobToQueue`) and obliterate. Before this, stall and orphan recovery and lock expiration left the job in the silent connection's set; when that connection finally closed, `releaseClientJobs` released the job's new delivery owned by another client and it ran twice (`test/repro-recovered-job-stale-client-release.test.ts`, `test/client-ownership-recovery.test.ts`).
+- **Pruning.** An ACK/FAIL sent on another pooled connection than the pull unregisters the sender, not the owner. Cleanup's `pruneEndedClientDeliveries` drops every record whose delivery ended (its `jobIndex` entry is no longer the registered one), so with SQLite or in-memory storage ownership is bounded by live deliveries plus at most one cleanup interval of ended ones. Only a record whose current `jobIndex` entry is the registered processing delivery survives, so a registration that arrives after its delivery ended is pruned too. **PostgreSQL limitation:** PostgreSQL mode runs no cleanup and keeps no local `jobIndex`, so a record left by an outcome sent on another pooled connection lives until the pulling connection closes, as `clientJobs` entries already did.
 - On disconnect, the TCP server calls `releaseClientJobsWithRetry` (3 attempts, exponential backoff 100/200/400 ms) → `releaseClientJobs`; on persistent lock failure it falls back to `forceReleaseClientJobs` (`src/infrastructure/server/tcp/connections.ts:87-111`, retry loop in `src/infrastructure/server/tcp/clientRelease.ts:4-22`). SSE disconnect calls `releaseClientJobs` directly (`sseHandler.ts:255-260`).
-- `releaseClientJobs` runs in three phases: (1) collect lock-free, skipping non-`processing` jobs and jobs whose lock has `renewalCount > 0`; (2) group by processing shard then queue shard; (3) acquire **shardLock → processingLock** and call `releaseJobToQueue` (`clientTracking.ts:47`).
-- `releaseJobToQueue` removes the job from the processing shard, deletes its lock, releases concurrency/uniqueKey/groupId resources, then either **discards** cron `preventOverlap` jobs (uniqueKey `cron:*` → deleted, not requeued, fixing the #73 "starts right away on reconnect" bug, `clientTracking.ts:222`) or re-queues it with `startedAt=null` and re-indexed as `{ type: 'queue' }`.
+- `releaseClientJobs` runs in three phases: (1) collect lock-free, keeping only `processing` jobs that pass `isReleasable` (the client owns the current delivery and its lock, if any, has `renewalCount === 0`); (2) group by processing shard then queue shard; (3) acquire **shardLock → processingLock**, re-run `isReleasable` against the locked state and call `releaseJobToQueue` (`clientTracking.ts`). A stale registration (for example one a future transition forgot to detach) therefore cannot release a later delivery owned by another worker.
+- `releaseJobToQueue` removes the job from the processing shard, deletes its lock, detaches its ownership, releases concurrency/uniqueKey/groupId resources, then either **discards** cron `preventOverlap` jobs (uniqueKey `cron:*` → deleted, not requeued, fixing the #73 "starts right away on reconnect" bug) or re-queues it with `startedAt=null` and re-indexed as `{ type: 'queue' }`.
 
 ## Concurrency & Locking
 
-- `releaseClientJobs` follows the project lock hierarchy: **shardLocks before processingLocks** (`clientTracking.ts:122`). Reads (phase 1) are lock-free; mutations happen under both locks.
-- The `renewalCount > 0` guard prevents a **double-execute** race: with a pooled client, heartbeats travel on a different connection than the one that pulled, so the pulling socket closing does not mean the worker died — such jobs are left for lock-expiry/stall detection to reclaim (`clientTracking.ts:66`).
-- `forceReleaseClientJobs` is intentionally lock-free: it always drops `jobLocks[jobId]` (no stale token survives the disconnect) and, for still-`processing` jobs, sets `lastHeartbeat = 0` and `startedAt = 0` so the stall detector's grace gate passes on its next eligible tick. It accepts that a concurrent stall/lock-expiry path may mutate the same job — worst case the write lands on an object no longer in the map (wasted, never corrupting) (`clientTracking.ts:167`).
-- `releaseClientJobs` clears `clientJobs` in a `finally` block even on mid-flight lock failure, preventing an unbounded `clientJobs` leak across disconnects that hit lock timeouts (`clientTracking.ts:136`).
+- `releaseClientJobs` follows the project lock hierarchy: **shardLocks before processingLocks** (`clientTracking.ts`). Reads (phase 1) are lock-free; the release decision is repeated and the mutations happen under both locks.
+- The `renewalCount > 0` guard prevents a **double-execute** race: with a pooled client, heartbeats travel on a different connection than the one that pulled, so the pulling socket closing does not mean the worker died — such jobs are left for lock-expiry/stall detection to reclaim (`isReleasable`, `clientTracking.ts`).
+- `forceReleaseClientJobs` is intentionally lock-free and acts only on deliveries the client still owns (`ownsCurrentDelivery`): for each it drops `jobLocks[jobId]` (no stale token survives the disconnect) and sets `lastHeartbeat = 0` and `startedAt = 0` so the stall detector's grace gate passes on its next eligible tick. A job recovered from the client and delivered again keeps the new owner's lock and timers. It accepts that a concurrent stall/lock-expiry path may mutate the same job — worst case the write lands on an object no longer in the map (wasted, never corrupting) (`clientTracking.ts`).
+- `releaseClientJobs` drops the client (`dropClient`: its `clientJobs` set and only its own owner records) in a `finally` block even on mid-flight lock failure, preventing an unbounded leak across disconnects that hit lock timeouts (`clientTracking.ts`).
 
 The PostgreSQL adapter keeps the same connection-facing contract with durable
 lease ownership. Disconnect release row-locks the exact generation and only

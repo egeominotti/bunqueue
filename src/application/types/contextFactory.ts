@@ -1,4 +1,5 @@
 import type { Shard } from '../../domain/queue/shard';
+import type { ClientJobOwner } from '../clientOwnership';
 import type { FailureReason } from '../../domain/types/dlq';
 import type { Job, JobId, JobLock } from '../../domain/types/job';
 import type { JobLocation } from '../../domain/types/queue';
@@ -40,6 +41,7 @@ export interface ContextDependencies {
   jobLogQueues: Map<JobId, string>;
   jobLocks: Map<JobId, JobLock>;
   clientJobs: Map<string, Set<JobId>>;
+  clientJobOwners: Map<JobId, ClientJobOwner>;
   stalledCandidates: Set<JobId>;
   pendingDepChecks: Set<JobId>;
   pendingQueueAdmissions: Map<string, number>;

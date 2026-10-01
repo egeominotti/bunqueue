@@ -1,5 +1,5 @@
 import type { Job, JobId, JobInput, JobLock } from '../../domain/types/job';
-import { DEFAULT_LOCK_TTL } from '../../domain/types/job';
+import { DEFAULT_LOCK_TTL, isLeaseFromEarlierGeneration } from '../../domain/types/job';
 import type { AtomicFlowBatchInput, AtomicFlowBatchResult } from '../../domain/types/flow';
 import type { GroupPullOptions } from '../../domain/types/group';
 import { EventType } from '../../domain/types/queue';
@@ -128,7 +128,7 @@ export class QueueManagerDelivery extends QueueManagerState {
     const location = this.jobIndex.get(jobId);
     if (location?.type !== 'processing') return;
     const job = this.processingShards[location.shardIdx].get(jobId);
-    if (!job || (job.startedAt !== null && job.startedAt > lock.createdAt)) {
+    if (!job || isLeaseFromEarlierGeneration(job, lock)) {
       throw new Error(`Invalid or expired lock token for job ${jobId}`);
     }
   }
@@ -143,7 +143,7 @@ export class QueueManagerDelivery extends QueueManagerState {
     const lock = lockCtx.jobLocks.get(jobId);
     if (lock?.token !== token) return false;
     const job = this.processingShards[location.shardIdx].get(jobId);
-    return !(job && job.startedAt !== null && job.startedAt > lock.createdAt);
+    return !(job && isLeaseFromEarlierGeneration(job, lock));
   }
 
   protected isStallRetried(jobId: JobId): boolean {

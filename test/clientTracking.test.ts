@@ -50,6 +50,7 @@ function createMinimalLockContext(overrides?: Partial<LockContext>): LockContext
     jobIndex: new Map<JobId, JobLocation>(),
     jobLocks: new Map<JobId, JobLock>(),
     clientJobs: new Map<string, Set<JobId>>(),
+    clientJobOwners: new Map(),
     processingShards,
     processingLocks,
     shards,

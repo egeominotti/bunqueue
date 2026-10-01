@@ -59,6 +59,7 @@ function createTestDependencies(overrides?: Partial<ContextDependencies>): Conte
     jobLogQueues: new Map<JobId, string>(),
     jobLocks: new Map<JobId, JobLock>(),
     clientJobs: new Map<string, Set<JobId>>(),
+    clientJobOwners: new Map(),
     stalledCandidates: new Set<JobId>(),
     pendingDepChecks: new Set<JobId>(),
     pendingQueueAdmissions: new Map<string, number>(),

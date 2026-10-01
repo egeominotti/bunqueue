@@ -34,7 +34,8 @@ cargo add bunqueue-client
 ```
 
 Requires Rust 1.85+ (edition 2024). Dependencies: `rmpv` (msgpack values),
-`rustls` (TLS), `serde_json`, `thiserror`.
+`rustls` with `rustls-native-certs` and `rustls-pemfile` (TLS, system trust
+store, PEM CA bundles), `getrandom` (flow job IDs), `serde_json`, `thiserror`.
 
 ## Quick start
 
@@ -58,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 use bunqueue_client::{Value, Worker, WorkerOptions};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Worker (blocking; jobs run on a bounded thread pool)
+    // Worker (blocking; at most `concurrency` processor threads at a time)
     let worker = Worker::new(
         "emails",
         |job| {
@@ -80,7 +81,11 @@ while `Job::data()` returns the submitted `Value` unchanged, including a map
 with its own `name`, scalar, array, or `Nil`. Legacy maps that stored the job
 name inside `data` remain readable. Scheduler templates use separate
 `jobName` and `data` fields.
-The client negotiates protocol v3 and advertises `separate-job-name` in `Hello`.
+`Hello` is optional protocol discovery and is never sent automatically on
+connect. `Connection::hello()` sends it explicitly with protocol v3 and the
+`separate-job-name` capability; `Connection::protocol_version()` and
+`Connection::capabilities()` call it and read the broker's answer. Share one
+`Connection` with `Queue::with_connection` to query it.
 
 ## Failure semantics
 
@@ -109,16 +114,17 @@ replace the broker's terminal state or persisted result.
 
 ## API surface
 
-| Area       | Capabilities                                                                                                                                                        |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Produce    | `add`, `add_bulk` (custom ids preserved), the complete wire job option set: priority, delay, attempts, backoff, jobId, deduplication, dependsOn, lifo, durable, ... |
-| Query      | jobs, states, results, progress, `wait_for_job`, counts, job logs, children values                                                                                  |
-| Control    | pause, resume, drain, clean, obliterate, promote, retry, change priority/delay, update data                                                                         |
-| DLQ        | get, retry, purge                                                                                                                                                   |
-| Schedulers | cron pattern or fixed interval, execution limit, get/list/remove                                                                                                    |
-| Admin      | webhooks, rate limit with duration window and broker-side TTL, workers, stats, list queues, ping                                                                    |
-| Flows      | `FlowProducer`: atomic parent/child trees (`add`) and dependency chains (`add_chain`)                                                                               |
-| Worker     | bounded thread pool, batch pulls capped by concurrency, ACK-gated completion, reconnect-safe registration                                                           |
+| Area       | Capabilities                                                                                                                                                                                              |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Produce    | `add`, `add_bulk` (custom ids preserved), `JobOptions` with the complete wire job option set: `priority`, `delay`, `attempts`, `backoff`, `job_id`, `deduplication`, `depends_on`, `lifo`, `durable`, ... |
+| Query      | `get_job`, `get_job_by_custom_id`, `get_jobs`, `get_state`, `get_result`, `wait_for_job`, `get_job_counts`, `count`, `get_job_logs`                                                                       |
+| Control    | `pause`, `resume`, `is_paused`, `drain`, `clean`, `obliterate`, `remove`, `promote`, `retry_job`, `change_priority`, `change_delay`, `update_job_data`                                                    |
+| DLQ        | `get_dlq`, `retry_dlq`, `purge_dlq`                                                                                                                                                                       |
+| Schedulers | `upsert_job_scheduler` (cron pattern or fixed interval, execution limit, timezone), `get_job_scheduler`, `remove_job_scheduler`                                                                           |
+| Admin      | `set_rate_limit` (optional duration window and broker-side TTL), `clear_rate_limit`, `ping`                                                                                                               |
+| Job        | `update_progress`, `log`, `extend_lock` on a `Job` handle                                                                                                                                                 |
+| Flows      | `FlowProducer`: atomic parent/child trees (`add`) and dependency chains (`add_chain`)                                                                                                                     |
+| Worker     | at most `concurrency` processor threads, batch pulls capped by concurrency, ACK-gated completion, reconnect-safe registration                                                                             |
 
 ## Security
 

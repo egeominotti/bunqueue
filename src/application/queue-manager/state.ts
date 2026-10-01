@@ -24,6 +24,7 @@ import { DependencyCompletionTracker } from '../dependencyCompletions';
 import { JobTimeoutScheduler } from '../background/timeouts';
 import type { RetiredTimeoutGeneration } from '../types/background';
 import { QueueTelemetryJournal } from '../queueTelemetryJournal';
+import type { ClientJobOwner } from '../clientOwnership';
 import { createContextCallbacks, createContextDependencies, managerRuntime } from './context';
 
 export type { QueueManagerConfig };
@@ -58,6 +59,7 @@ export abstract class QueueManagerState {
   protected depFlushRunning = false;
   protected readonly jobLocks = new Map<JobId, JobLock>();
   protected readonly clientJobs = new Map<string, Set<JobId>>();
+  protected readonly clientJobOwners = new Map<JobId, ClientJobOwner>();
   protected readonly repeatChain = new Map<JobId, JobId>();
   protected readonly failedChildrenValues = new Map<JobId, Record<string, string>>();
   protected readonly ignoredChildrenFailures = new Map<JobId, Record<string, string>>();

@@ -3,8 +3,25 @@
  * Parses job data from TCP responses
  */
 
-import type { Job as InternalJob } from '../../domain/types/job';
+import { parseMaxDelay } from '../../domain/job/create';
+import type { BackoffConfig, Job as InternalJob } from '../../domain/types/job';
 import { jobId, normalizeLegacyJobPayload } from '../../domain/types/job';
+
+/**
+ * Read the object-form backoff (`{ type, delay, maxDelay? }`) the server
+ * serializes with every pulled job. Numeric-backoff jobs carry `null`, and a
+ * missing field or anything that is not a well-formed config also yields
+ * `null`, leaving the numeric `backoff` authoritative. An unusable `maxDelay` is
+ * dropped, exactly as job creation does, so the default cap applies instead.
+ */
+function parseBackoffConfig(value: unknown): BackoffConfig | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { type, delay, maxDelay } = value as Record<string, unknown>;
+  if (type !== 'fixed' && type !== 'exponential') return null;
+  if (typeof delay !== 'number' || !Number.isFinite(delay)) return null;
+  const cap = parseMaxDelay(maxDelay);
+  return cap === undefined ? { type, delay } : { type, delay, maxDelay: cap };
+}
 
 /**
  * Parse job from TCP response data
@@ -28,6 +45,7 @@ export function parseJobFromResponse(
     attempts: (jobData.attempts as number | undefined) ?? 0,
     maxAttempts: (jobData.maxAttempts as number | undefined) ?? 3,
     backoff: (jobData.backoff as number | undefined) ?? 1000,
+    backoffConfig: parseBackoffConfig(jobData.backoffConfig),
     ttl: (jobData.ttl as number | undefined) ?? null,
     timeout: (jobData.timeout as number | undefined) ?? null,
     uniqueKey: (jobData.uniqueKey as string | undefined) ?? null,

@@ -143,9 +143,18 @@ Notable supporting types:
   `CronJobOptions.backoff`. `DEFAULT_MAX_BACKOFF = 3_600_000` (1h) is the cap when
   `maxDelay` is absent. Backoff math in `calculateBackoff`
   (`src/domain/job/state.ts:37-54`): fixed = ±20% jitter, exponential = `delay * 2^attempts`
-  with ±50% jitter, both capped at `maxDelay ?? DEFAULT_MAX_BACKOFF`.
+  with ±50% jitter, both capped at `maxDelay ?? DEFAULT_MAX_BACKOFF`. A processor
+  `DelayedError` uses `calculateDelayedErrorDelay` (same file): the base delay
+  (`backoffConfig.delay`, else `backoff`; a base that is not positive, e.g. `0`,
+  negative or `NaN`, falls back to `1000`) with no growth or jitter, capped at a
+  positive finite `maxDelay`, else `DEFAULT_MAX_BACKOFF`. `maxDelay: 0` does not
+  apply to it, so the wait is always positive and finite: DelayedError counts no
+  attempt, and a zero wait would re-pull the job in a tight loop. `PULL`/`PULLB` already serialize the whole `Job`,
+  so `backoffConfig` (or `null`) reaches TCP workers, which parse it in
+  `client/worker/jobParser.ts`.
   `maxDelay` accepts `0..MAX_BACKOFF_DELAY` (`86_400_000`, 24h, the same bound as
-  `backoff.delay`); `0` makes every retry immediate. `PUSH`, `PUSHB`, HTTP push
+  `backoff.delay`); `0` makes every retry immediate (not a `DelayedError`
+  postponement, see above). `PUSH`, `PUSHB`, HTTP push
   (`validateBackoffField`) and atomic flows (`validateAtomicFlowBatch`) reject a
   non-numeric, non-finite or out-of-range value; `null` counts as absent.
   `createJob` keeps only a finite in-range value and silently drops anything
@@ -155,7 +164,11 @@ Notable supporting types:
 - `JobTimelineEntry` (`src/domain/types/jobs/model.ts:33-39`) — `{ state, timestamp, worker?, error?, attempt? }`,
   capped at `MAX_TIMELINE_ENTRIES = 20` (`src/domain/job/constants.ts:2`).
 - `JobLock` (`src/domain/types/jobs/model.ts:139-148`) — `{ jobId, token, owner, createdAt, expiresAt,
-lastRenewalAt, renewalCount, ttl }`. `DEFAULT_LOCK_TTL = 30_000`.
+lastRenewalAt, renewalCount, ttl }`. `DEFAULT_LOCK_TTL = 30_000`. A lease belongs to an earlier
+processing generation when `job.startedAt > lock.createdAt` (`isLeaseFromEarlierGeneration`,
+`src/domain/job/locks.ts`); a same-millisecond lease is current. Such a stale lease is replaced
+by `createLock`, rejected by lease-token checks, never counts as liveness for cleanup, and its
+expiry never reclaims the current delivery (the lock-expiry sweep only deletes it).
 
 ### Job State Machine
 
@@ -224,7 +237,7 @@ Allowed transitions (enforced across `pull`/`ack`/`fail` operations and
 > before its processing generation is released.
 
 Helper predicates: `isDelayed`, `isReady`, `isExpired`, `isTimedOut`,
-`canRetry` (`src/domain/job/state.ts:19-58`).
+`canRetry` (`src/domain/job/state.ts:19-84`).
 
 ---
 
@@ -319,7 +332,12 @@ Supporting enums/types:
 
 - `JobLocation` (`src/domain/types/queue.ts:121-126`) — the jobIndex value:
   `{type:'queue',shardIdx,queueName}` | `{type:'processing',shardIdx,queueName}` |
-  `{type:'completed',queueName}` | `{type:'dlq',queueName}`.
+  `{type:'completed',queueName}` | `{type:'dlq',queueName}`. Only a pull installs a
+  `processing` entry and each pull installs a fresh object, so that object identifies one
+  delivery.
+- `ClientJobOwner` (`src/application/clientOwnership.ts`) — `{ clientId, delivery }`: the TCP/WS/SSE
+  connection that registered a job and the `jobIndex` entry current at registration. Disconnect
+  release acts on a job only while `jobIndex.get(id)` is still that `processing` object.
 - `EventType` (`src/domain/types/queue.ts:129-145`) — 14 event types: `pushed`, `pulled`,
   `completed`, `failed`, `progress`, `stalled`, `removed`, `delayed`,
   `duplicated`, `retried`, `waiting-children`, `drained`, `paused`, `resumed`.
@@ -1558,6 +1576,8 @@ its context interfaces in `src/application/types/contexts.ts`, and sized by
 | `retiredTimeoutLeaseTokens` | `BoundedMap<string, RetiredTimeoutGeneration>` | 50,000                    | FIFO batch                                   |
 | `waitingDeps`               | per-shard map                                  | unbounded*                | follows live dependency waiters              |
 | `pendingQueueAdmissions`    | `Map<string, number>`                          | transient*                | reference-counted `finally` release          |
+| `clientJobs`                | `Map<clientId, Set<JobId>>`                    | live deliveries*          | detach on delivery end; dropped on disconnect |
+| `clientJobOwners`           | `Map<JobId, ClientJobOwner>`                   | live deliveries*          | same records as `clientJobs`; cleanup prune  |
 | `telemetryJournal.events`   | per-queue arrays                               | 10,000 each               | oldest event first                           |
 | terminal metric buckets     | per queue/type map or SQLite rows              | 20,160 each               | minutes older than newest window             |
 
@@ -1565,7 +1585,16 @@ its context interfaces in `src/application/types/contexts.ts`, and sized by
 their lifecycle or dependency edges rather than capped by size.
 `pendingQueueAdmissions` contains only queue names currently crossing an
 asynchronous single, batch, or flow admission boundary; concurrent operations
-share a count and each releases exactly once. The
+share a count and each releases exactly once. `clientJobs` and its reverse index
+`clientJobOwners` hold one record per job delivered to a connection (one owner
+per delivery). Every delivery-ending transition without the owner's outcome
+detaches the record, disconnect drops the client, and cleanup's
+`pruneEndedClientDeliveries` drops records whose delivery ended (an outcome sent
+on another pooled connection), so with SQLite or in-memory storage they stay
+bounded by live deliveries plus one cleanup interval. PostgreSQL mode runs no
+cleanup and keeps no local `jobIndex`, so there a record left by an outcome
+sent on another pooled connection lives until the pulling connection closes,
+as `clientJobs` entries already did. The
 `maxWaitingDeps` compatibility option has a default of `10_000` but is not
 currently an admission or eviction limit. The other caps above reflect the
 source defaults in `src/application/types/config.ts` (for example

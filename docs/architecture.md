@@ -115,7 +115,12 @@ be claimed.
   explicit contexts from `ContextFactory`; their contracts live separately in
   [`application/types/`](../src/application/types). Active-job management claims
   are split into `jobMoveOperations.ts` (state/resource transitions) and
-  `jobClaim.ts` (lease/client ownership cleanup). Houses DLQ, Events, Worker,
+  `jobClaim.ts` (lease/client ownership cleanup). Per-delivery client ownership
+  (`clientJobs` and its `clientJobOwners` reverse index) lives in
+  `clientOwnership.ts`; every delivery-ending recovery detaches it, and
+  `clientTracking.ts` releases on disconnect only deliveries the connection
+  still owns. Cleanup's orphan recovery, a backstop for the stall checker that
+  follows the per-queue stall configuration, lives in `orphanRecovery.ts`. Houses DLQ, Events, Worker,
   JobLogs, Stats managers, and the batch `QueueStatsAggregator`. DLQ reads/purge
   live in `dlqManager.ts`; manual and automatic DLQ retry transitions live in
   `dlqRetry.ts`, while cold completed retry lives in
@@ -903,7 +908,7 @@ from `DEFAULT_CONFIG` ([`application/types/config.ts`](../src/application/types/
 
 | Task                  | Interval (default)                               | Purpose                                                                                                                     |
 | --------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Cleanup + monitoring  | `cleanupIntervalMs` = **10 s**                   | Enforce memory bounds, evict orphans, run monitoring checks                                                                 |
+| Cleanup + monitoring  | `cleanupIntervalMs` = **10 s**                   | Enforce memory bounds, recover orphans (stall-config aware), prune ended client ownership, run monitoring checks            |
 | Job timeout deadline  | per active `startedAt + timeout`                 | Fail/requeue at the earliest registered processing deadline                                                                 |
 | Stall check           | `stallCheckMs` = **5 s**                         | Two-phase detection of unresponsive workers                                                                                 |
 | Lock expiration       | `stallCheckMs` = **5 s**                         | Reclaim leases whose token TTL elapsed                                                                                      |

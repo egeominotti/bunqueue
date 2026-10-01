@@ -263,6 +263,7 @@ HOST=0.0.0.0               BUNQUEUE_DATA_PATH=./data/bunq.db
 AUTH_TOKENS=token1,token2  CORS_ALLOW_ORIGIN=*
 METRICS_AUTH=false          # Require auth for /metrics endpoint
 TCP_SOCKET_PATH=           # RESERVED, not wired: TCP always binds HOST:TCP_PORT
+                           # (client ConnectionOptions.socketPath is not read either)
 HTTP_SOCKET_PATH=          # Unix socket for HTTP (works)
 TLS_CERT_FILE=             # PEM cert — native TLS on TCP+HTTP (with TLS_KEY_FILE)
 TLS_KEY_FILE=              # PEM private key (both or neither; partial = startup error)
@@ -449,8 +450,9 @@ const tlsQueue = new Queue<T>('emails', {
 
 // Store-and-forward (edge → central): drains local jobs to a remote server.
 // Remote failure → local retry/DLQ (nothing lost); deterministic remote jobId
-// fwd:<queue>:<localId> dedupes re-forwards within the server's custom-id
-// retention window (bounded LRU; removeOnComplete evicts). Source: src/client/forwarder.ts
+// fwd:<queue>:<localId> dedupes re-forwards only while the remote job is live
+// (waiting, delayed or active); completion or the DLQ releases the custom id, so a
+// later re-forward creates a new job. Source: src/client/forwarder.ts
 const fwd = embeddedQueue.forward({
   to: { host: 'central', port: 6789, tls: true },
   queue: 'ingest', // optional remote name
@@ -548,7 +550,8 @@ interface WorkerOptions {
 ```sql
 -- Jobs: id, queue, data, priority, state, run_at, attempts, ...
 CREATE INDEX idx_jobs_queue_state ON jobs(queue, state);
-CREATE INDEX idx_jobs_run_at ON jobs(run_at) WHERE state IN ('waiting','delayed');
+CREATE INDEX idx_jobs_run_at ON jobs(run_at)
+  WHERE state IN ('waiting','prioritized','waiting-children','delayed');
 
 -- DLQ: id, job_id, queue, entry (msgpack blob), entered_at
 -- Cron: name, queue, data, schedule, repeat_every, next_run, timezone

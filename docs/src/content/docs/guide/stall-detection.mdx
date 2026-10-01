@@ -137,7 +137,7 @@ curl -X PUT http://localhost:6790/queues/my-queue/stall-config \
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `enabled` | `true` | Enable/disable stall detection |
+| `enabled` | `true` | Enable/disable stall detection. `false` also turns off the 30-minute safety net for the queue |
 | `stallInterval` | `30000` | Time (ms) without a heartbeat before a job is stalled |
 | `maxStalls` | `3` | Max stalls before moving to DLQ |
 | `gracePeriod` | `5000` | Initial grace period (ms) after a job starts |
@@ -369,6 +369,33 @@ Two things reset the stall timer: the worker's automatic heartbeat (every `heart
 
 1. **Retry**: the path depends on how the stall was detected. Heartbeat-stall recovery re-queues the job with its stall count incremented and `runAt` pushed out by the job's retry backoff (exponential unless configured as fixed), without waking blocked pullers, so pickup waits for the backoff plus the next poll. Lock-expiry recovery re-queues without backoff and notifies waiting workers immediately.
 2. **DLQ**: the job becomes terminal when either its cumulative stall count reaches `maxStalls` or the interrupted delivery consumes its final normal `attempts` slot. The attempts check wins ties: since each stall also consumes an attempt, with the defaults (`maxStalls: 3`, `attempts: 3`) a repeatedly stalling job lands in the DLQ as `max_attempts_exceeded`. The `stalled` classification appears only when `maxStalls` is lower than the job's remaining `attempts` budget.
+
+A broker-side safety net backs up stall detection and never contradicts it.
+The periodic cleanup (every 10s) recovers an active job only when its queue has
+stall detection enabled, the job is past `gracePeriod`, it holds no unexpired
+lock from its current delivery, and it has had no heartbeat, progress update or
+lock renewal for **the longer of 30 minutes and its own stall window** (the
+job's `stallTimeout`, otherwise the queue's `stallInterval`). Such a job is
+recovered through the same heartbeat-stall path, with the same backoff,
+`attempts`/`maxStalls` budgets, DLQ placement and `stalled` event. One
+difference: like lock expiration, the safety net treats `maxStalls: 0` as
+unlimited, while the stall checker moves the job to the DLQ on its first stall.
+
+- With `enabled: false` the queue is skipped: no heartbeat-based recovery at
+  all. A job whose worker vanishes stays active until its lock expires, its
+  `timeout` fires, its connection's disconnect releases it, or it is moved or
+  removed.
+- A `stallTimeout` or `stallInterval` longer than 30 minutes postpones the
+  safety net to that window instead of recovering the job early.
+- In practice the safety net acts only when stall detection itself could not
+  (for example its recovery failed on lock contention).
+
+Cron jobs with `preventOverlap` are discarded and recreated at the next tick
+instead.
+
+A recovered job also stops belonging to the connection that went silent: when
+that connection finally closes, the server does not release the job's next
+delivery to another worker.
 
 ## Listening for stalls
 

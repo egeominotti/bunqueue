@@ -3,7 +3,14 @@
  */
 
 import type { JobId, JobLock, LockToken } from '../domain/types/job';
-import { createJobLock, isLockExpired, renewLock, DEFAULT_LOCK_TTL } from '../domain/types/job';
+import {
+  createJobLock,
+  isLeaseFromEarlierGeneration,
+  isLockExpired,
+  renewLock,
+  DEFAULT_LOCK_TTL,
+} from '../domain/types/job';
+import { detachClientJob } from './clientOwnership';
 import type { LockContext } from './types';
 
 /**
@@ -22,18 +29,13 @@ export function createLock(
   const existing = ctx.jobLocks.get(jobId);
   if (existing) {
     const job = ctx.processingShards[loc.shardIdx].get(jobId);
-    const isNewGeneration =
-      job?.startedAt !== null && job?.startedAt !== undefined && job.startedAt > existing.createdAt;
-    if (!isNewGeneration) return null;
+    if (!job || !isLeaseFromEarlierGeneration(job, existing)) return null;
 
     // Stall retry deliberately leaves the previous lease as a stale-outcome
     // guard. Once that job is pulled again, replace the lease and detach the
     // old connection before the new connection registers ownership.
     ctx.jobLocks.delete(jobId);
-    for (const [clientId, jobs] of ctx.clientJobs) {
-      if (!jobs.delete(jobId)) continue;
-      if (jobs.size === 0) ctx.clientJobs.delete(clientId);
-    }
+    detachClientJob(jobId, ctx);
   }
 
   const lock = createJobLock(jobId, owner, ttl);

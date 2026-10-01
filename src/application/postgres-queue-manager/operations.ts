@@ -179,7 +179,7 @@ export class PostgresQueueManagerOperations extends PostgresQueueManagerCloud {
     for (const id of this.clientJobs.get(clientId) ?? []) {
       const token = this.tokenFor(id);
       if (token) leases.set(id, token);
-      else this.clientJobs.get(clientId)?.delete(id);
+      else this.unregisterClientJob(clientId, id);
     }
     if (this.clientJobs.get(clientId)?.size === 0) this.clientJobs.delete(clientId);
     const session: ClientReleaseSession = { leases, released: 0, inFlight: null };
@@ -204,8 +204,7 @@ export class PostgresQueueManagerOperations extends PostgresQueueManagerCloud {
     for (const [id, token] of [...session.leases]) {
       const released = await this.postgresStore.releaseClientLease(id, token);
       session.leases.delete(id);
-      this.clientJobs.get(clientId)?.delete(id);
-      if (this.clientJobs.get(clientId)?.size === 0) this.clientJobs.delete(clientId);
+      this.unregisterClientJob(clientId, id);
       if (this.activeTokens.get(id) === token) this.activeTokens.delete(id);
       if (released) session.released++;
       await this.refreshJob(id);

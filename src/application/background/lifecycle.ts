@@ -14,6 +14,7 @@ function getLockContext(ctx: BackgroundContext): LockContext {
     jobLocks: ctx.jobLocks,
     retiredCronLeaseTokens: ctx.retiredCronLeaseTokens,
     clientJobs: ctx.clientJobs,
+    clientJobOwners: ctx.clientJobOwners,
     processingShards: ctx.processingShards,
     processingLocks: ctx.processingLocks,
     shards: ctx.shards,

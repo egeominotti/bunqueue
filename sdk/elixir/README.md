@@ -110,7 +110,9 @@ Job names are top-level protocol metadata. `job.name` reads that field, while
 `job.data` preserves the submitted term, including a map with its own name,
 scalar, list, or `nil`. Legacy maps that stored the job name inside data remain
 readable. Scheduler templates use separate `"jobName"` and `"data"` fields.
-The client negotiates protocol v3 and advertises `separate-job-name` in `Hello`.
+`Hello` is optional protocol discovery and is never sent automatically on
+connect. `Bunqueue.Queue.hello/1` sends it explicitly with protocol v3 and the
+`separate-job-name` capability and returns the broker's answer.
 
 The queue module also exposes pause/resume/drain/clean, delayed-job promotion,
 DLQ retry and purge, rate and concurrency limits, and cron schedulers.

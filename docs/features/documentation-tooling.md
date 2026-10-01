@@ -4,6 +4,58 @@ The public documentation site is an Astro/Starlight project under
 `docs/src/content/docs/`. Repository scripts keep generated API metadata,
 social images, and executable documentation claims reproducible.
 
+## Framework versions and upgrade constraints
+
+`docs/package.json` pins the site to Astro 7.3 (Vite 8 with Rolldown and the
+Rust compiler), Starlight 0.42, `@astrojs/react` 7, `@astrojs/sitemap` 3.7,
+`@astrojs/markdown-remark` 7.3 and `sharp` 0.35.5. These are security floors,
+not just current releases: Astro below 7.2.8 and `sharp` below 0.35.4 carry
+known advisories (AVIF image-optimization RCE, base-path authorization bypass
+and XSS in Astro; libvips and libheif CVEs in `sharp`), and Starlight 0.42
+requires Astro 7.2.10 or later. Astro 7 needs Node.js 22.12.0 or later, the
+same floor as Astro 6, so the Vercel project and the CI docs job are
+unchanged. `docs/bun.lock` must resolve a single `sharp` at or above 0.35.4.
+The build currently feeds no raster image through Astro's image service (the
+logo is SVG and screenshots are served from `public/`), but `sharp` remains
+Astro's optional image backend and is kept patched.
+
+- **Markdown pipeline.** Astro 7 defaults to the Sätteri processor. The site
+  keeps `markdown.processor: unified({ gfm: true })` from the explicitly
+  declared `@astrojs/markdown-remark`, so heading anchors, Starlight asides and
+  Expressive Code blocks render exactly as before. `@astrojs/mdx` 8 (bundled by
+  Starlight) inherits `gfm` from that processor, which is why the deprecated
+  top-level `markdown.gfm` flag is gone. Without `gfm: true`, every GFM table
+  renders as literal `|---|` text. Moving to Sätteri is a separate change that
+  must be checked against every anchor and aside.
+- **Whitespace.** `compressHTML: true` is explicit. Astro 7 otherwise defaults
+  to `'jsx'`, which strips spaces between inline elements.
+- **Build log.** A clean build prints no warnings. `vite.build.rolldownOptions.onwarn`
+  drops only Rolldown's `MODULE_LEVEL_DIRECTIVE` warning for the dead
+  `"use astro:head-inject"` directive that Astro 7.3 still adds to every MDX
+  `?astroPropagatedAssets` module. Remove the filter once Astro stops emitting
+  that directive. `src/content/i18n/en.json` is an intentionally empty
+  Starlight UI-string override. Starlight always queries an `i18n`
+  collection. Under Astro 7 a missing collection logs "collection i18n does
+  not exist or is empty" on every build, because Starlight's `console.warn`
+  silencing no longer reaches Astro's logger.
+- **Mobile menu.** Starlight 0.42 renders the drawer toggle as a bare
+  `.sl-menu-button` that opens the `#starlight__sidebar` popover. The
+  `<starlight-menu-button>` wrapper, its `aria-expanded` attribute and the
+  `data-mobile-menu-expanded` body attribute no longer exist. Style the open
+  state with `.sl-menu-button:has(~ :popover-open)`. While the drawer is open,
+  Starlight marks `.main-frame` as `inert`.
+- **Sidebar width.** Starlight 0.39+ sets `scrollbar-gutter: stable` on the
+  sidebar pane. With the site's classic 8px `::-webkit-scrollbar`, Chromium
+  would reserve that width permanently and wrap longer labels, so
+  `docs-navigation.css` resets the pane to `scrollbar-gutter: auto`.
+- **Tabs.** Starlight 0.41.8 made tab ids page-scoped (`tab-0-0`, not a global
+  `tab-N`). Do not link to generated tab ids.
+
+After any framework upgrade, require a warning-free `bun run build`, the docs
+unit tests, a link and anchor check over `docs/dist`, and before/after
+screenshots of the homepage, a guide, the changelog and the mobile drawer in
+both themes.
+
 ## Open Graph image generator
 
 `docs/scripts/generate-og.ts` owns SVG rendering, font loading, lane artwork,

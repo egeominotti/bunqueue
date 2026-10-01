@@ -33,6 +33,9 @@
   other option path. A missing or empty `id`, unknown fields, a struct, or
   combining it with raw `dedup` raise `ArgumentError`; scheduler job templates
   reject it by name. Regression-tested against a real broker.
+- Correct the README: `Hello` is not sent on connect; protocol v3 and the
+  `separate-job-name` capability are advertised only by an explicit
+  `Bunqueue.Queue.hello/1` call.
 
 ## 0.1.1
 

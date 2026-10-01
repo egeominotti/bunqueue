@@ -30,6 +30,7 @@ export class QueueManagerLifecycle extends QueueManagerDependencies {
     this.jobLocks.clear();
     this.stalledCandidates.clear();
     this.clientJobs.clear();
+    this.clientJobOwners.clear();
     this.repeatChain.clear();
     this.failedChildrenValues.clear();
     this.ignoredChildrenFailures.clear();

@@ -588,7 +588,9 @@ await queue.add('sync', data, {
 });
 ```
 
-The server rejects a `maxDelay` that is not a finite number between 0 and 86,400,000 (24 hours) on `PUSH`, `PUSHB`, HTTP push and atomic flows; atomic flows also reject it in embedded mode. Embedded `Queue.add` and `addBulk`, and scheduler job templates, ignore an invalid `maxDelay` and keep the 1-hour default. `Queue.getJob`, `Queue.getJobs`, `FlowProducer` results and embedded `add()` return `maxDelay` in `job.opts.backoff` when it was set. Jobs delivered to a TCP `Worker` expose only the numeric base `backoff`; the server still applies the cap when it schedules the retry.
+The server rejects a `maxDelay` that is not a finite number between 0 and 86,400,000 (24 hours) on `PUSH`, `PUSHB`, HTTP push and atomic flows; atomic flows also reject it in embedded mode. Embedded `Queue.add` and `addBulk`, and scheduler job templates, ignore an invalid `maxDelay` and keep the 1-hour default. `Queue.getJob`, `Queue.getJobs`, `FlowProducer` results, embedded `add()` and the jobs a `Worker` receives (embedded and TCP) return `maxDelay` in `job.opts.backoff` when it was set. A job added with a numeric `backoff` keeps the number in `job.opts.backoff`. The server applies the cap itself when it schedules a retry.
+
+A processor that throws `DelayedError` postpones the job by its base backoff (`backoff`, or `backoff.delay` for the object form) without growth or jitter, falling back to 1000 ms when the base is 0 or negative, and capped at `maxDelay` (1 hour by default). The wait is never zero: `maxDelay: 0` only makes failed attempts retry immediately, so a `DelayedError` job with `maxDelay: 0` waits its base backoff, capped at 1 hour. See [Postpone a job with DelayedError](/guide/worker/errors/#postpone-a-job-with-delayederror).
 
 ### KeepJobs
 

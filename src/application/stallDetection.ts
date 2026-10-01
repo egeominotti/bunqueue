@@ -12,6 +12,7 @@ import type { WebhookEvent } from '../domain/types/webhook';
 import { queueLog } from '../shared/logger';
 import { shardIndex, processingShardIndex, SHARD_COUNT } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
+import { detachClientJob } from './clientOwnership';
 import type { BackgroundContext } from './types';
 
 /**
@@ -61,9 +62,15 @@ export function checkStalledJobs(ctx: BackgroundContext): void {
     }
   }
 
-  // Process confirmed stalled jobs
+  // Process confirmed stalled jobs. The confirmation is re-checked under the
+  // stall-path locks: a heartbeat, progress update or new delivery of the same
+  // job object can land while the handler waits for them.
+  const stillStalled: StallRecheck = (job, lockedNow) => {
+    const config = ctx.shards[shardIndex(job.queue)].getStallConfig(job.queue);
+    return config.enabled && getStallAction(job, config, lockedNow) !== StallAction.Keep;
+  };
   for (const { job, action } of confirmedStalled) {
-    handleStalledJob(job, action, ctx).catch((err: unknown) => {
+    handleStalledJob(job, action, ctx, stillStalled).catch((err: unknown) => {
       queueLog.error('Failed to handle stalled job', {
         jobId: String(job.id),
         error: String(err),
@@ -73,14 +80,25 @@ export function checkStalledJobs(ctx: BackgroundContext): void {
 }
 
 /**
- * Handle a stalled job based on the action
- * Uses proper locking to prevent race conditions
+ * Caller-specific condition evaluated with both write locks held, right after
+ * the stall path confirms the same job object is still in processing. Returning
+ * false leaves the job untouched, so a caller can re-verify its own trigger
+ * (for example cleanup's orphan liveness rule) atomically with the transition.
  */
-async function handleStalledJob(
+export type StallRecheck = (job: Job, now: number) => boolean;
+
+/**
+ * Recover a stalled job: retry it with the attempt counted and backoff applied,
+ * or move it to the DLQ once attempts are exhausted or `action` says so.
+ * Takes `shardLocks[idx]` then `processingLocks[procIdx]` (lock hierarchy).
+ * @returns true when this call performed the transition.
+ */
+export async function handleStalledJob(
   job: Job,
   action: StallAction,
-  ctx: BackgroundContext
-): Promise<void> {
+  ctx: BackgroundContext,
+  recheck?: StallRecheck
+): Promise<boolean> {
   const idx = shardIndex(job.queue);
   const procIdx = processingShardIndex(job.id);
 
@@ -91,10 +109,12 @@ async function handleStalledJob(
 
   await withWriteLock(ctx.shardLocks[idx], async () => {
     await withWriteLock(ctx.processingLocks[procIdx], () => {
-      // Verify job is still in processing (might have been handled already)
-      if (!ctx.processingShards[procIdx].has(job.id)) {
+      // Verify the same job is still in processing (it might have been handled
+      // already, or its id reused by a different job object).
+      if (ctx.processingShards[procIdx].get(job.id) !== job) {
         return; // Job already completed, don't broadcast stalled event
       }
+      if (recheck && !recheck(job, Date.now())) return;
 
       const shard = ctx.shards[idx];
       const attemptsExhausted = job.attempts + 1 >= job.maxAttempts;
@@ -105,6 +125,9 @@ async function handleStalledJob(
       } else {
         retryStalliedJob(job, ctx, shard, procIdx, idx);
       }
+      // The silent connection no longer owns this job: its disconnect must not
+      // release the job's next delivery.
+      detachClientJob(job.id, ctx);
 
       handled = true;
     });
@@ -129,6 +152,7 @@ async function handleStalledJob(
       data: { stallCount: job.stallCount, action: handledAction },
     });
   }
+  return handled;
 }
 
 /** Move stalled job to DLQ */

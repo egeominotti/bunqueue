@@ -1,4 +1,5 @@
 import type { Shard } from '../../domain/queue/shard';
+import type { ClientJobOwner } from '../clientOwnership';
 import type { FailureReason } from '../../domain/types/dlq';
 import type { Job, JobId, JobLock } from '../../domain/types/job';
 import type { JobLocation } from '../../domain/types/queue';
@@ -37,6 +38,7 @@ export interface QueueManagerState {
   readonly retiredCronLeaseTokens: MapLike<JobId, string>;
   readonly timeoutScheduler: JobTimeoutScheduler;
   readonly clientJobs: Map<string, Set<JobId>>;
+  readonly clientJobOwners: Map<JobId, ClientJobOwner>;
   readonly stalledCandidates: Set<JobId>;
   readonly pendingDepChecks: Set<JobId>;
   readonly pendingQueueAdmissions: Map<string, number>;
@@ -60,6 +62,7 @@ export interface LockContext {
   jobLocks: Map<JobId, JobLock>;
   retiredCronLeaseTokens: MapLike<JobId, string>;
   clientJobs: Map<string, Set<JobId>>;
+  clientJobOwners: Map<JobId, ClientJobOwner>;
   processingShards: Map<JobId, Job>[];
   processingLocks: RWLock[];
   shards: Shard[];

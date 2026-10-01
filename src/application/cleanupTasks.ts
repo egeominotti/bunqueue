@@ -3,11 +3,12 @@
  * Handles orphaned entries, stale data, and memory management
  */
 
-import type { Job, JobId, JobLock } from '../domain/types/job';
-import { isLockExpired } from '../domain/types/job';
+import type { JobId } from '../domain/types/job';
 import { processingShardIndex, SHARD_COUNT } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
 import type { BackgroundContext } from './types';
+import { pruneEndedClientDeliveries } from './clientOwnership';
+import { recoverOrphanedProcessingEntries } from './orphanRecovery';
 import { releaseDependencyCompletionPins } from './dependencyCompletions';
 import { cleanCompletedJobs } from './completedCleanup';
 import { cleanEmptyQueues } from './emptyQueueCleanup';
@@ -18,8 +19,6 @@ import { cleanEmptyQueues } from './emptyQueueCleanup';
  */
 export async function cleanup(ctx: BackgroundContext): Promise<void> {
   const now = Date.now();
-  // A processing entry is dropped only after 30 minutes without any liveness signal.
-  const orphanTimeout = 30 * 60 * 1000;
 
   const retention = ctx.config.completedRetentionMs;
   if (retention !== null && retention !== undefined) {
@@ -43,71 +42,15 @@ export async function cleanup(ctx: BackgroundContext): Promise<void> {
     }
   }
 
-  await cleanOrphanedProcessingEntries(ctx, now, orphanTimeout);
+  // A backstop for the stall checker; see orphanRecovery.ts for the window.
+  await recoverOrphanedProcessingEntries(ctx, now);
   await cleanStaleWaitingDependencies(ctx, now);
   cleanUniqueKeysAndGroups(ctx, now);
   cleanStalledCandidates(ctx);
   await cleanOrphanedJobIndex(ctx);
   cleanOrphanedJobLocks(ctx);
+  pruneEndedClientDeliveries(ctx);
   cleanEmptyQueues(ctx);
-}
-
-/**
- * A processing entry is an orphan only when it has shown no liveness for the
- * whole window. Pull, token-less heartbeats, progress updates and lock renewals
- * all refresh `lastHeartbeat`, so age is measured from the latest of
- * `startedAt` and `lastHeartbeat`. An unexpired lock lease is ownership granted
- * to a worker; lock expiration, not this sweep, decides when it lapses.
- * Entries without `startedAt` are never orphans here.
- */
-function isOrphanedProcessingEntry(
-  job: Job,
-  lock: JobLock | undefined,
-  now: number,
-  orphanTimeout: number
-): boolean {
-  if (!job.startedAt) return false;
-  if (lock && !isLockExpired(lock, now)) return false;
-  const lastActivity = Math.max(job.startedAt, job.lastHeartbeat || 0);
-  return now - lastActivity > orphanTimeout;
-}
-
-async function cleanOrphanedProcessingEntries(
-  ctx: BackgroundContext,
-  now: number,
-  orphanTimeout: number
-): Promise<void> {
-  for (let i = 0; i < SHARD_COUNT; i++) {
-    // Phase 1: Collect candidates (read-only, no lock needed)
-    const orphaned: JobId[] = [];
-    for (const [jobId, job] of ctx.processingShards[i]) {
-      if (isOrphanedProcessingEntry(job, ctx.jobLocks.get(jobId), now, orphanTimeout)) {
-        orphaned.push(jobId);
-      }
-    }
-
-    if (orphaned.length === 0) continue;
-
-    // Phase 2: Delete with lock to prevent race conditions
-    await withWriteLock(ctx.processingLocks[i], () => {
-      // Re-check liveness under the lock: a heartbeat, progress update or lock
-      // renewal can land while this sweep waits for the write lock.
-      const lockedNow = Date.now();
-      let removed = 0;
-      for (const jobId of orphaned) {
-        const job = ctx.processingShards[i].get(jobId);
-        if (!job) continue;
-        if (!isOrphanedProcessingEntry(job, ctx.jobLocks.get(jobId), lockedNow, orphanTimeout)) {
-          continue;
-        }
-        ctx.processingShards[i].delete(jobId);
-        ctx.timeoutScheduler.cancel(jobId);
-        ctx.jobIndex.delete(jobId);
-        removed++;
-      }
-      if (removed > 0) ctx.dashboardEmit?.('cleanup:orphans-removed', { count: removed });
-    });
-  }
 }
 
 async function cleanStaleWaitingDependencies(ctx: BackgroundContext, now: number): Promise<void> {

@@ -4,10 +4,10 @@
  */
 
 import type { JobId, JobLock } from '../../domain/types/job';
+import { detachClientJob, type ClientOwnershipMaps } from '../clientOwnership';
 
-export interface JobClaimContext {
+export interface JobClaimContext extends ClientOwnershipMaps {
   jobLocks: Map<JobId, JobLock>;
-  clientJobs: Map<string, Set<JobId>>;
 }
 
 /**
@@ -19,9 +19,5 @@ export interface JobClaimContext {
  */
 export function releaseClaimedJobOwnership(jobId: JobId, ctx: JobClaimContext): void {
   ctx.jobLocks.delete(jobId);
-
-  for (const [clientId, jobs] of ctx.clientJobs) {
-    if (!jobs.delete(jobId)) continue;
-    if (jobs.size === 0) ctx.clientJobs.delete(clientId);
-  }
+  detachClientJob(jobId, ctx);
 }

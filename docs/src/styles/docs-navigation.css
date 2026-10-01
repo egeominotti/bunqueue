@@ -59,6 +59,14 @@ nav.sidebar .sidebar-content {
   overscroll-behavior: contain;
 }
 
+/* Starlight 0.39+ sets `scrollbar-gutter: stable` on the sidebar pane. With
+   the site's classic 8px ::-webkit-scrollbar, Chromium then reserves 8px even
+   when nothing scrolls, and longer labels such as "Framework Integrations"
+   wrap at tablet and desktop widths. Keep the full pane width. */
+nav.sidebar .sidebar-pane {
+  scrollbar-gutter: auto;
+}
+
 nav.sidebar .top-level > li {
   border: 0;
   margin-bottom: 12px;

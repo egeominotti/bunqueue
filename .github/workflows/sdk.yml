@@ -169,7 +169,11 @@ jobs:
           python -m venv .venv
           .venv/bin/pip install --quiet build hatchling
           .venv/bin/pip install --quiet -e '.[test]'
+      # pytest 9.0.3 (the CVE-2025-71176 fix) requires Python 3.10+, so the
+      # test extra installs no pytest on 3.9. The standalone runners below
+      # still exercise the Python 3.9 runtime.
       - name: Flow planner properties (Hypothesis)
+        if: matrix.python != '3.9'
         working-directory: sdk/python
         run: .venv/bin/python -m pytest tests/test_flow_plan_property.py -q
       - name: Integration + e2e

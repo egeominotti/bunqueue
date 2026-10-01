@@ -1,4 +1,5 @@
 import type { Shard } from '../../domain/queue/shard';
+import type { ClientJobOwner } from '../clientOwnership';
 import type { DlqEntry } from '../../domain/types/dlq';
 import type { FailureReason } from '../../domain/types/dlq';
 import type { Job, JobId, JobInput, JobLock } from '../../domain/types/job';
@@ -47,6 +48,7 @@ export interface QueueManagerStateView {
   stalledCandidates: Set<JobId>;
   jobLocks: Map<JobId, JobLock>;
   clientJobs: Map<string, Set<JobId>>;
+  clientJobOwners: Map<JobId, ClientJobOwner>;
   repeatChain: Map<JobId, JobId>;
   queueNamesCache: Set<string>;
   eventsManager: EventsManager;

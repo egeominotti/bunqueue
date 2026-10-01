@@ -125,11 +125,12 @@ What `forward()` guarantees:
   it. This assumes the gateway process or persistent volume survives; use
   `durable: true` for local jobs that cannot tolerate SQLite's 10ms hard-crash
   window.
-- **Re-forwards deduplicate while ownership is retained.** Each forwarded job
+- **Re-forwards deduplicate while the remote job is live.** Each forwarded job
   carries a deterministic remote job id, `fwd:<local queue>:<local job id>`, and
-  the server treats that custom id as a no-op while its ownership record is
-  retained. End-to-end processing remains at-least-once; see the bounded-window
-  caveat below.
+  the server treats a second push with that id as a no-op while the remote job
+  is waiting, delayed or active. Once it completes or reaches the DLQ the id is
+  released, so a re-forward after that creates a new remote job. End-to-end
+  processing is at-least-once: make remote processors idempotent.
 - **Priority is preserved.** Pass `durable: true` in the forward options to
   bypass a remote SQLite server's write buffer. PostgreSQL admissions are
   already transactional.
@@ -179,11 +180,11 @@ See [Cron & Scheduled Jobs](/guide/cron/) for cron expressions and timezones.
 
 ## Gotchas
 
-- **Forward dedup has a window.** The server remembers custom job ids in a
-  bounded cache, and `removeOnComplete` on the remote evicts entries. A
-  re-forward long after the original completed and was evicted can be accepted
-  again. Retaining completed jobs extends the window; strict exactly-once
-  effects require downstream idempotency.
+- **Forward dedup only covers live jobs.** The server releases a custom job id
+  when the remote job completes or moves to the DLQ, whether or not the job
+  itself is kept, and its bounded id cache can evict entries earlier. A
+  re-forward that arrives after the original finished is accepted as a new job,
+  so strict exactly-once effects require downstream idempotency.
 - **`forwarder.on('error')` is observability, not control flow.** Failed forwards are already handled by the local retry and DLQ path; the event just tells you the uplink is unhappy.
 - **One process per SQLite file.** Run the bridge, worker, and forwarder in the same process (as above), or switch to a local bunqueue server if you need several processes on the gateway.
 

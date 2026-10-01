@@ -69,8 +69,12 @@ describe('CleanupTasks', () => {
     });
   });
 
-  describe('cleanOrphanedProcessingEntries', () => {
-    test('should remove jobs stuck in processing beyond stall timeout', async () => {
+  // Spec change: an orphan used to be dropped from processingShards and
+  // jobIndex with no state transition, leaking its concurrency slot and leaving
+  // the SQLite row active. It now takes the stall recovery path: it leaves
+  // processing and is requeued with the attempt counted (or moved to the DLQ).
+  describe('recoverOrphanedProcessingEntries', () => {
+    test('should recover jobs stuck in processing beyond the orphan window', async () => {
       // Push and pull a job to move it to processing
       const pushed = await qm.push('test-queue', { data: { msg: 'stuck' } });
       const pulled = await qm.pull('test-queue');
@@ -93,9 +97,11 @@ describe('CleanupTasks', () => {
 
       await cleanup(ctx);
 
-      // Job should have been removed from processing
+      // Job left processing and was requeued for retry with the attempt counted
       expect(ctx.processingShards[procIdx].has(pulled!.id)).toBe(false);
-      expect(ctx.jobIndex.has(pulled!.id)).toBe(false);
+      expect(ctx.jobIndex.get(pulled!.id)?.type).toBe('queue');
+      expect((await qm.getJob(pulled!.id))?.attempts).toBe(1);
+      expect(qm.getStats().active).toBe(0);
     });
 
     test('should not remove recently started processing jobs', async () => {
@@ -112,7 +118,7 @@ describe('CleanupTasks', () => {
       expect(ctx.jobIndex.has(pulled!.id)).toBe(true);
     });
 
-    test('should clean multiple orphaned processing entries across shards', async () => {
+    test('should recover multiple orphaned processing entries across shards', async () => {
       const pulledJobs: Job[] = [];
 
       // Push and pull multiple jobs to distribute across processing shards
@@ -137,12 +143,13 @@ describe('CleanupTasks', () => {
 
       await cleanup(ctx);
 
-      // All orphaned jobs should be cleaned
+      // All orphaned jobs left processing and were requeued for retry
       for (const job of pulledJobs) {
         const procIdx = processingShardIndex(job.id);
         expect(ctx.processingShards[procIdx].has(job.id)).toBe(false);
-        expect(ctx.jobIndex.has(job.id)).toBe(false);
+        expect(ctx.jobIndex.get(job.id)?.type).toBe('queue');
       }
+      expect(qm.getStats().active).toBe(0);
     });
   });
 

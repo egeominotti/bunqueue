@@ -116,7 +116,7 @@ Re-exported (with a `@deprecated` alias) from `src/client/sandboxedWorker.ts`.
 - `AckBatcher` (`ackBatcher.ts:25`) with `queue/flush/stop/waitForInFlight/hasPending`.
 - `pullEmbedded(config, count)` / `pullTcp(config, tcp, count, closing)` (`workerPull.ts`).
 - `startHeartbeat(deps, intervalMs)` / `sendHeartbeat(deps)` (`workerHeartbeat.ts`).
-- `parseJobFromResponse(jobData, queueName)` (`jobParser.ts:13`).
+- `parseJobFromResponse(jobData, queueName)` (`jobParser.ts`).
 
 ### TCP commands sent (client → server)
 
@@ -145,7 +145,12 @@ See [data-model](../data-model.md) for the full `Job` shape. Key types used here
 - `SandboxedWorkerOptions`: `client/sandboxed/types/options.ts`.
 - `WorkerProcess` and IPC requests/responses:
   `client/sandboxed/types/process.ts`.
-- `jobParser` builds an `InternalJob` from a TCP response, defaulting `maxAttempts=3`, `backoff=1000`, `attempts=0`, etc. (`jobParser.ts:13`).
+- `jobParser` builds an `InternalJob` from a TCP response, defaulting `maxAttempts=3`, `backoff=1000`, `attempts=0`, etc. (`jobParser.ts`).
+  It also reads the object-form `backoffConfig` (`{ type, delay, maxDelay? }`) that the
+  server serializes with every pulled job, so `job.opts.backoff` and the
+  `DelayedError` cap see `maxDelay` in TCP mode. A missing field, `null`
+  (numeric backoff) or malformed object yields `null`; an unusable
+  `maxDelay` is dropped through the same `parseMaxDelay` rule `createJob` uses.
 
 ## Business Logic / Control Flow
 
@@ -308,8 +313,21 @@ charge. The Worker sends its captured token, so a stale processor cannot
 discard a newer delivery generation.
 
 Failure path (`handleJobFailure`, `processorOutcome.ts`): `DelayedError` →
-`handleDelayedError` re-delays the job (`backoff || 1000`) without counting a
-failure and forwards the current lease token in both transports;
+`handleDelayedError` re-delays the job by `calculateDelayedErrorDelay(job)`
+(`src/domain/job/state.ts`) without counting a failure and forwards the current
+lease token in both transports. The wait is `min(base, cap)` with no attempt
+growth and no jitter. `base` is `backoffConfig ? backoffConfig.delay : backoff`
+when that is a positive number, else `1000` (covers `0`, negative and `NaN`
+bases from embedded admission). `cap` is `backoffConfig.maxDelay` when that is a
+positive finite number, else `DEFAULT_MAX_BACKOFF`. A `maxDelay` of `0` (which
+makes failed retries immediate) does not apply here: DelayedError never counts
+an attempt, so a zero wait would let a processor that keeps throwing it re-pull
+the job in a tight loop. The wait is therefore always positive and finite, and
+a `maxDelay: 0` job waits its base delay capped at 1 hour. Embedded calls
+`manager.moveToDelayed`; TCP sends `MoveToDelayed` with that `delay`, using the
+`backoffConfig` parsed from the pulled job. `SandboxedWorker` does not recognize
+`DelayedError`: the error crosses the worker-thread boundary as a message string
+and the job is failed like any other error;
 `UnrecoverableError` → forces `maxAttempts=1, attempts=0` so retries are
 skipped; stack lines are computed _before_ the send (capped at 50 on the wire,
 authoritative cap server-side — bug #74), then `FAIL` is sent (embedded

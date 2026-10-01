@@ -31,6 +31,7 @@ export function createContextDependencies(state: QueueManagerStateView): Context
     jobLogQueues: state.jobLogQueues,
     jobLocks: state.jobLocks,
     clientJobs: state.clientJobs,
+    clientJobOwners: state.clientJobOwners,
     stalledCandidates: state.stalledCandidates,
     pendingDepChecks: state.pendingDepChecks,
     pendingQueueAdmissions: state.pendingQueueAdmissions,

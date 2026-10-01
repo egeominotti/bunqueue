@@ -6,6 +6,7 @@ import {
   releaseDependencyCompletionPins,
 } from '../dependencyCompletions';
 import * as queueControl from '../operations/queueControl';
+import { detachClientJob } from '../clientOwnership';
 import { QueueManagerQueries } from './queries';
 
 export class QueueManagerControl extends QueueManagerQueries {
@@ -84,11 +85,13 @@ export class QueueManagerControl extends QueueManagerQueries {
         toDrop.add(jobId);
       }
     }
+    const ownership = { clientJobs: this.clientJobs, clientJobOwners: this.clientJobOwners };
     for (const jobId of toDrop) {
       const location = this.jobIndex.get(jobId);
       if (location?.type === 'processing') {
         this.processingShards[location.shardIdx]?.delete(jobId);
       }
+      detachClientJob(jobId, ownership);
       this.timeoutScheduler.cancel(jobId);
       this.jobIndex.delete(jobId);
       this.completedJobs.delete(jobId);
