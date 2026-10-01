@@ -1,0 +1,138 @@
+/* Web dashboard: copy and command beside a framed screenshot, capabilities in a row below. */
+.bq-home .home-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 48px 64px;
+}
+
+.bq-home .home-dashboard-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  color: var(--home-accent);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.home-dashboard-badge span {
+  padding-left: 12px;
+  border-left: 1px solid var(--home-line);
+  color: var(--home-muted);
+  font-weight: 400;
+}
+
+.bq-home .home-dashboard-copy h2 + p {
+  max-width: 46ch;
+  margin-top: 20px;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.bq-home .home-dashboard-command {
+  margin: 28px 0 0;
+  padding: 14px 18px;
+  overflow-x: auto;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  background: var(--home-surface);
+  color: var(--sl-color-text);
+  font: 0.95rem var(--bq-mono);
+}
+
+.home-dashboard-command span {
+  color: var(--home-muted);
+  user-select: none;
+}
+
+.bq-home .home-dashboard-command code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+}
+
+.bq-home .home-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 28px;
+}
+
+.bq-home .home-dashboard-actions .home-text-link {
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The screenshot is dark UI in both themes, so the frame stays neutral. */
+.bq-home .home-dashboard-shot {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--home-line);
+  border-radius: 12px;
+  background: #0a0a0d;
+  box-shadow: 0 24px 60px -32px rgb(0 0 0 / 0.55);
+}
+
+.home-dashboard-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.home-dashboard-list {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--home-line);
+}
+
+.bq-home .home-dashboard-list li {
+  margin: 0;
+  padding: 24px 28px 0 0;
+}
+
+.bq-home .home-dashboard-list li + li {
+  padding-left: 28px;
+  border-left: 1px solid var(--home-line);
+}
+
+.bq-home .home-dashboard-list p {
+  margin-top: 8px;
+  color: var(--home-muted);
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 1024px) {
+  .bq-home .home-dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-dashboard-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 8px;
+  }
+  .bq-home .home-dashboard-list li:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .bq-home .home-dashboard {
+    gap: 32px;
+  }
+  .home-dashboard-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bq-home .home-dashboard-list li,
+  .bq-home .home-dashboard-list li + li {
+    padding: 20px 0 0;
+    border-left: 0;
+  }
+}

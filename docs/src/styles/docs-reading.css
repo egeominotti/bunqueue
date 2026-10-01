@@ -198,6 +198,26 @@
   }
 }
 
+/* Product screenshots in guides: framed, full column width, captioned. */
+:root[data-has-sidebar] .sl-markdown-content .bq-shot {
+  margin: 1.75rem 0;
+}
+
+:root[data-has-sidebar] .bq-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 10px;
+}
+
+:root[data-has-sidebar] .bq-shot figcaption {
+  margin-top: 0.6rem;
+  color: var(--sl-color-gray-3);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

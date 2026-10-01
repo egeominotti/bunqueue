@@ -43,6 +43,7 @@ Key facts:
 ## Operations & Production
 
 - [Deployment Guide](https://bunqueue.dev/guide/deployment/): Docker, systemd, PM2, health checks, resource limits
+- [Web Dashboard](https://bunqueue.dev/guide/dashboard/): Open-source operator console for jobs, DLQ, cron, workers, workflows and server control
 - [Monitoring](https://bunqueue.dev/guide/monitoring/): Prometheus metrics, Grafana dashboards, DLQ alerts
 - [OpenTelemetry](https://bunqueue.dev/guide/telemetry/): Distributed tracing, latency histograms, throughput tracking
 - [S3 Backup & Recovery](https://bunqueue.dev/guide/backup/): Automated backups to AWS S3, Cloudflare R2, MinIO, DigitalOcean Spaces

@@ -2,7 +2,7 @@
 // Capabilities follow a job's lifecycle; each stage reuses its state color from the hero.
 const stages = [
   { state: 'waiting', stage: 'Before it runs', title: 'Control what runs next.', body: 'Priorities, delayed jobs, rate limits, concurrency controls and FIFO groups.', href: '/guide/queue/', link: 'Queue controls' },
-  { state: 'active', stage: 'While it runs', title: 'See what is happening.', body: 'Progress updates, heartbeats and stall detection, plus job queries, Prometheus metrics, health probes and events. Connect AI tools through the native MCP server.', href: '/guide/monitoring/', link: 'Monitoring and operations' },
+  { state: 'active', stage: 'While it runs', title: 'See what is happening.', body: 'Progress updates, heartbeats and stall detection, plus job queries, Prometheus metrics, health probes and events. Watch it all in the web dashboard, or connect AI tools through the native MCP server.', href: '/guide/monitoring/', link: 'Monitoring and operations' },
   { state: 'retry', stage: 'When it fails', title: 'Make failed work retryable.', body: 'Retries with backoff, stall recovery and a dead letter queue you can inspect and replay.', href: '/guide/worker/errors/', link: 'Retries and recovery' },
   { state: 'completed', stage: 'After it completes', title: 'Coordinate what comes next.', body: 'Parent-child flows continue once their children complete, and cron schedules queue the next run. A separate workflow engine adds in-process orchestration on Bun.', href: '/guide/flow/', link: 'Flows and dependencies' },
 ];

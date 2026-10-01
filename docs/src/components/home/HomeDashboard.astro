@@ -1,0 +1,47 @@
+---
+// The web dashboard lives in its own repository and ships separately. This section sits
+// directly below the hero so the operator console is visible before the quickstart.
+import '../../styles/home-dashboard.css';
+
+const capabilities = [
+  { title: 'See it live', body: 'Server health, throughput, per-queue status, workers and a streaming activity feed.' },
+  { title: 'Work the jobs', body: 'Browse, inspect and enqueue jobs, triage the dead letter queue and manage cron schedules.' },
+  { title: 'Run the server', body: 'Start, stop and restart the process, follow its logs and query SQLite over a read-only connection.' },
+  { title: 'Safe by default', body: 'Actions the server cannot perform atomically stay disabled. The control agent stays on loopback.' },
+];
+---
+
+<section class="home-section home-dashboard" aria-labelledby="dashboard-title">
+  <div class="home-dashboard-copy">
+    <span class="home-dashboard-badge">Web dashboard <span>Open source · Beta</span></span>
+    <h2 id="dashboard-title">Operate it from your browser.</h2>
+    <p>bunqueue dashboard is a free operator console for your server: jobs, dead letters, cron, workers, workflows and the server process, in one place.</p>
+    <pre class="home-dashboard-command"><code><span aria-hidden="true">$ </span>bunx bunqueue-dashboard</code></pre>
+    <p class="home-note">Serves the dashboard on <code>127.0.0.1:8080</code> and connects to your server's HTTP API on port <code>6790</code>.</p>
+    <div class="home-dashboard-actions">
+      <a class="home-button" href="/guide/dashboard/">Dashboard guide</a>
+      <a class="home-button-secondary" href="https://egeominotti.github.io/bunqueue-dashboard/">Live demo <span aria-hidden="true">↗</span></a>
+      <a class="home-text-link" href="https://github.com/egeominotti/bunqueue-dashboard">egeominotti/bunqueue-dashboard <span aria-hidden="true">↗</span></a>
+    </div>
+  </div>
+
+  <figure class="home-dashboard-shot">
+    <img
+      src="/dashboard/overview.webp"
+      width="1600"
+      height="1196"
+      loading="lazy"
+      decoding="async"
+      alt="The bunqueue dashboard Overview page: a connected-server banner, job counters, a per-queue health grid and a live activity feed."
+    />
+  </figure>
+
+  <ul class="home-dashboard-list" role="list">
+    {capabilities.map(({ title, body }) => (
+      <li>
+        <h3>{title}</h3>
+        <p>{body}</p>
+      </li>
+    ))}
+  </ul>
+</section>

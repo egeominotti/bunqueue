@@ -137,6 +137,15 @@ head:
   suffix, URLs without a trailing slash redirect with 308 to the canonical
   page, current API reference pages gain a social image, and the changelog
   outline lists releases only.
+- Add a [Web Dashboard guide](/guide/dashboard/) for the open-source
+  [bunqueue dashboard](https://github.com/egeominotti/bunqueue-dashboard):
+  quick start, capabilities, a connection diagram, the actions that fail
+  closed, deployment options, configuration variables, the security model for
+  network access, and the experimental AI Copilot's data handling. The
+  homepage introduces the dashboard directly below the hero with a screenshot,
+  the `bunx bunqueue-dashboard` command and links to the guide, the live demo
+  and the repository. "Dashboard" is the first link in the header and mobile
+  menu, and the sidebar lists the guide under Run in Production.
 
 ## [2.9.5] - 2026-09-09
 

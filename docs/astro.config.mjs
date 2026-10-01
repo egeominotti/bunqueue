@@ -275,6 +275,7 @@ export default defineConfig({
             { label: 'Configuration File', link: '/guide/configuration/' },
             { label: 'Environment Variables', link: '/guide/env-vars/' },
             { label: 'Native TLS', link: '/guide/tls/' },
+            { label: 'Web Dashboard', link: '/guide/dashboard/' },
             { label: 'Monitoring', link: '/guide/monitoring/' },
             { label: 'Telemetry', link: '/guide/telemetry/' },
             { label: 'Webhooks', link: '/guide/webhooks/' },

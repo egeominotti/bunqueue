@@ -549,6 +549,7 @@ bunx bunqueue-dashboard
 https://github.com/user-attachments/assets/e8a8d38e-b4a6-4dc8-8360-876c0f24d116
 
 [Live demo](https://egeominotti.github.io/bunqueue-dashboard/) ·
+[Dashboard guide](https://bunqueue.dev/guide/dashboard/) ·
 [User guide](https://egeominotti.github.io/bunqueue-dashboard/docs/user-guide) ·
 [GitHub](https://github.com/egeominotti/bunqueue-dashboard)
 

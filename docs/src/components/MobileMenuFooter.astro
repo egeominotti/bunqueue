@@ -3,12 +3,13 @@ import Default from '@astrojs/starlight/components/MobileMenuFooter.astro';
 
 /**
  * Adds the site nav links to Starlight's mobile drawer. On phones the
- * header collapses to logo + search + CTA, so Blog / Simulator /
- * vs BullMQ live here instead.
+ * header collapses to logo + search + CTA, so Dashboard / Blog /
+ * Simulator / vs BullMQ live here instead.
  */
 ---
 
 <nav class="bq-mobile-nav" aria-label="Site">
+  <a href="/guide/dashboard/">Dashboard</a>
   <a href="/blog/">Blog</a>
   <a href="/simulator/">Simulator</a>
   <a href="/guide/comparison/">vs BullMQ</a>
@@ -18,7 +19,8 @@ import Default from '@astrojs/starlight/components/MobileMenuFooter.astro';
 <style>
   .bq-mobile-nav {
     display: flex;
-    gap: 1.25rem;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
     padding: 0.85rem var(--sl-sidebar-pad-x, 1rem);
     border-top: 1px solid var(--sl-color-gray-6);
   }

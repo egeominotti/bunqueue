@@ -105,14 +105,15 @@ the test suite.
 ## Homepage onboarding
 
 The homepage at `docs/src/content/docs/index.mdx` opens with the cross-language
-value proposition, shows public projects that use bunqueue, and then reaches
-the quickstart before storage or advanced features. Its existing `#quickstart`
-anchor contains a complete local server path with explicit TCP/HTTP ports and
-Node.js, Deno and Python examples. A separate tab shows Bun embedded mode with
-`embedded: true` on both clients. The SQLite server example binds to loopback
-and explicitly enables persistence; the embedded example describes its
-ephemeral default. `test/docs-homepage-snippets.test.ts` compiles both
-TypeScript quickstarts, so the page must keep exactly two `typescript` fences.
+value proposition, introduces the web dashboard, shows public projects that use
+bunqueue, and then reaches the quickstart before storage or advanced features.
+Its existing `#quickstart` anchor contains a complete local server path with
+explicit TCP/HTTP ports and Node.js, Deno and Python examples. A separate tab
+shows Bun embedded mode with `embedded: true` on both clients. The SQLite server
+example binds to loopback and explicitly enables persistence; the embedded
+example describes its ephemeral default. `test/docs-homepage-snippets.test.ts`
+compiles both TypeScript quickstarts, so the page must keep exactly two
+`typescript` fences.
 
 `components/home/HomeHero.astro` owns the headline ("Add a background job in
 one language. Process it in another.", which keeps the primary keyword in the
@@ -134,7 +135,27 @@ content. The rows are decorative (`aria-hidden`) and carry `data-nosnippet`, so
 simulated job names never appear in search snippets; the caption states that
 the data is simulated and stays indexable.
 
-`HomeUsedBy.astro`, directly below the hero, lists public GitHub repositories
+`HomeDashboard.astro`, directly below the hero, introduces the separately
+released [bunqueue dashboard](https://github.com/egeominotti/bunqueue-dashboard):
+a framed Overview screenshot, the `bunx bunqueue-dashboard` command with its
+default ports, four capability rows, and links to `/guide/dashboard/`, the live
+demo and the repository. The screenshot is the static WebP
+`public/dashboard/overview.webp` (converted from the dashboard repository's
+own screenshots), so the build makes no request to another site. It is dark UI
+in both themes, so its frame stays neutral. Its styles live in
+`styles/home-dashboard.css`, which includes the section's own tablet and phone
+breakpoints.
+
+The guide page `guide/dashboard.mdx` uses `components/DashboardArchitecture.astro`,
+a static diagram of browser, dashboard process and server whose figcaption
+carries the full description and which stacks through a container query when
+its own width falls below 760px (the table of contents narrows the column),
+and the `.bq-shot` figure style from `docs-reading.css` for captioned
+screenshots. Facts on that page come from the
+dashboard repository's README, user guide and known-issues page; recheck them
+when the dashboard changes its defaults, ports or fail-closed operations.
+
+`HomeUsedBy.astro`, below the dashboard section, lists public GitHub repositories
 that import bunqueue in their own source. Each row names the repository, its
 GitHub star count, its purpose and how it uses bunqueue, with no logos or
 implied endorsement, and the section links to GitHub's dependents graph. Star
@@ -158,7 +179,8 @@ tokens, including one color per job state for dark and light themes, the type
 scale and the hero; `styles/home-ledger.css` styles the simulation;
 `styles/home-setup.css` covers section intros and the quickstart;
 `styles/home-sections.css` covers projects, lifecycle, storage, migration, FAQ
-and closing; `styles/home-responsive.css` holds the tablet and phone layouts.
+and closing; `styles/home-dashboard.css` covers the dashboard section;
+`styles/home-responsive.css` holds the tablet and phone layouts.
 The h1 and h2 headings use the self-hosted Bricolage Grotesque at 75% width
 (its `wdth.css` axis file is imported by `HomeHero.astro`, and
 `components/Head.astro` preloads the latin width-axis file on the homepage only
@@ -218,7 +240,10 @@ the sitemap and verifies historical exclusion. See
 
 ## Shared documentation interface
 
-`Header.astro` loads the shared navigation, reading and table styles from
+`Header.astro` owns the header links (Dashboard, Blog, Simulator, vs BullMQ and
+llms.txt); `MobileMenuFooter.astro` repeats them, except llms.txt, in the mobile
+drawer, so a new header link belongs in both. `Header.astro` also loads the
+shared navigation, reading and table styles from
 `docs-navigation.css`, `docs-reading.css` and `docs-tables.css`. They retain
 Starlight's search, sidebar persistence, tab synchronization, mobile drawer,
 and active table-of-contents tracking. Reading styles use `data-has-sidebar`
