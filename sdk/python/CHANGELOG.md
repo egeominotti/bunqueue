@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Make the `ack_batching_suppresses_only_timed_out_position` E2E test wait for
+  the `completed` event, not only the broker state. The broker marks the job
+  completed when it applies the ACKB, but the worker emits the event only after
+  the reply returns, so a state poll landing in between failed the assertion on
+  a loaded CI runner (Python 3.9). The test still asserts that only the live
+  job completes.
 - Wake the saturated Worker pull loop when an ACK or FAIL releases a
   concurrency slot, retaining the existing 50 ms fallback while avoiding a
   full polling delay between completion waves.

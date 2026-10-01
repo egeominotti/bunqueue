@@ -121,6 +121,12 @@ head:
   after the convergence wait, and the test still proves the extension outlives
   the original TTL. Regression:
   `test/postgres-dedup-cache-convergence.test.ts`.
+- **CI: a Python SDK E2E test waits for the event it asserts.** The ACKB
+  timeout-suppression test checked the worker's `completed` events as soon as
+  the broker showed the job completed, but the worker emits the event only
+  after the ACKB reply returns. A loaded Python 3.9 runner polled in between and
+  failed. It now waits for the event and still asserts that only the live job
+  completes. Test: `sdk/python/tests/e2e_worker_ack_batch.py`.
 
 ### Security
 

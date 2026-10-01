@@ -59,13 +59,22 @@ def ack_batching_suppresses_only_timed_out_position(server: Server) -> None:
         try:
             timed = queue.add("timed", {"kind": "timed"}, attempts=1, timeout=100)
             live = queue.add("live", {"kind": "live"}, attempts=1, timeout=2_000)
+            # The broker marks `live` completed when it applies the ACKB; the
+            # worker emits `completed` only after the ACKB reply returns. Wait for
+            # the event too, then give the same settle loop time to (wrongly)
+            # emit `timed` before asserting that only `live` completed.
             assert wait_until(
                 lambda: queue.get_state(timed.id) == "failed"
-                and queue.get_state(live.id) == "completed",
+                and queue.get_state(live.id) == "completed"
+                and len(completed) >= 1,
                 15,
+            ), (
+                f"timed={queue.get_state(timed.id)!r} live={queue.get_state(live.id)!r} "
+                f"completed={completed!r} errors={errors!r}"
             )
-            assert completed == [(live.id, "live")]
-            assert errors == []
+            time.sleep(0.2)
+            assert completed == [(live.id, "live")], f"completed={completed!r} errors={errors!r}"
+            assert errors == [], f"errors={errors!r}"
         finally:
             worker.close(timeout=10)
 
