@@ -25,6 +25,14 @@
 - Add StreamData 1.4.0 tree/chain properties with shrinking, atomic tree and
   chain E2E tests, and separate Muex 0.8.1 mutation campaigns for the pure
   planner and snapshot validator.
+- Fix the `deduplication` job option: it was sent as `dedup` without a
+  `uniqueKey`, so the broker accepted and ignored it and same-id adds created
+  separate jobs. Its `id` now becomes `uniqueKey` (an explicit non-empty
+  `uniqueKey` still wins, in any option order) and only
+  `ttl`/`extend`/`replace` travel as `dedup`, in `add`, `add_bulk`, and every
+  other option path. A missing or empty `id`, unknown fields, a struct, or
+  combining it with raw `dedup` raise `ArgumentError`; scheduler job templates
+  reject it by name. Regression-tested against a real broker.
 
 ## 0.1.1
 

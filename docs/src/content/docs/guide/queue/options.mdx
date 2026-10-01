@@ -131,7 +131,7 @@ names shown in the table.
 | `priority`         | `number`                    | `0`     | Higher = processed first                                             |
 | `delay`            | `number`                    | `0`     | Delay in ms before processing                                        |
 | `attempts`         | `number`                    | `3`     | Max total executions, first run included (`3` = 1 run + 2 retries)   |
-| `backoff`          | `number \| { type, delay }` | `1000`  | Backoff base in ms, or `{ type: 'fixed' \| 'exponential', delay }`   |
+| `backoff`          | `number \| { type, delay, maxDelay? }` | `1000`  | Backoff base in ms, or `{ type: 'fixed' \| 'exponential', delay, maxDelay? }`; `maxDelay` caps each retry delay (default: 1 hour, max: 1 day) |
 | `timeout`          | `number`                    | -       | Processing timeout in ms                                             |
 | `jobId`            | `string`                    | -       | Custom ID for idempotent adds                                        |
 | `deduplication`    | `object`                    | -       | TTL-based dedup (`id`, `ttl`, `extend`, `replace`)                   |

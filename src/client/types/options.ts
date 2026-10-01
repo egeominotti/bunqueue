@@ -6,6 +6,8 @@ export interface ParentOpts {
 export interface BackoffOptions {
   type: 'fixed' | 'exponential';
   delay: number;
+  /** Upper bound for one retry delay in ms (0 to 86,400,000). Defaults to 1 hour. */
+  maxDelay?: number;
 }
 
 export interface KeepJobs {

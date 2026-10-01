@@ -114,15 +114,21 @@ Wire/job fields relevant here (full definitions in [data-model](../data-model.md
 
 | Field                                 | Source                                 | Meaning                                                                  |
 | ------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------ |
-| `JobOptions.jobId`                    | `src/client/types/options.ts:49`       | Custom idempotency id → becomes `job.customId` and the job's primary key |
-| `JobOptions.deduplication`            | `src/client/types/options.ts:66`       | `{ id, ttl?, extend?, replace? }` (BullMQ v5 compatible)                 |
-| `JobOptions.debounce`                 | `src/client/types/options.ts:67`       | `{ id, ttl }` (stored only — see gotcha below)                           |
+| `JobOptions.jobId`                    | `src/client/types/options.ts:59`       | Custom idempotency id → becomes `job.customId` and the job's primary key |
+| `JobOptions.deduplication`            | `src/client/types/options.ts:76`       | `{ id, ttl?, extend?, replace? }` (BullMQ v5 compatible)                 |
+| `JobOptions.debounce`                 | `src/client/types/options.ts:77`       | `{ id, ttl }` (stored only — see gotcha below)                           |
 | `Job.uniqueKey`                       | `src/domain/types/jobs/model.ts:58`    | `= deduplication.id`; drives unique-key dedup                            |
 | `Job.customId`                        | `src/domain/types/jobs/model.ts:59`    | `= jobId` (explicit custom id only); mapped via `customIdMap`            |
 | `Job.deduplicationTtl/Extend/Replace` | `src/domain/types/jobs/model.ts:82-84` | persisted dedup strategy/TTL                                             |
 | `UniqueKeyEntry`                      | `domain/types/deduplication.ts:28`     | in-memory `{ jobId, expiresAt, registeredAt }`                           |
 
 Client → wire mapping (`src/client/queue/operations/add/payload.ts:34-81`): `uniqueKey = deduplication?.id`, `customId = jobId` (only an **explicit** `jobId`), `dedup = { ttl, extend, replace }`. The dedup id is carried solely by `uniqueKey` into `handleDeduplication` and is deliberately **not** mirrored into `customId`: doing so made `handleCustomId` short-circuit a same-key re-add as an idempotent no-op _before_ `handleDeduplication`'s suppress/replace/extend logic could run — silently dropping `replace`/`extend` in **embedded** mode. The TCP single-push (`core.ts:69` → `customId: cmd.jobId`) and bulk paths already send `customId = jobId` only, so this aligns embedded with the (correct) TCP behavior.
+
+The polyglot SDKs apply the same `deduplication` → `uniqueKey` + `dedup` split
+before the TCP `PUSH`/`PUSHB` (for example `sdk/python/bunqueue/options.py` and
+`sdk/elixir/lib/bunqueue/options.ex`). A client that sent only `dedup` would be
+silently ignored by `handleDeduplication`, which returns early without a
+`uniqueKey`.
 
 SQLite columns: `jobs.unique_key`, `jobs.custom_id` (`schema.ts:34-35`). Note `idx_jobs_unique ON jobs(queue, unique_key) WHERE unique_key IS NOT NULL` (`schema.ts:58-59`) is a **non-unique** index for lookup speed — uniqueness is enforced in memory, not by the database. Custom-id idempotency is backstopped by the `jobs.id` PRIMARY KEY (the custom id becomes the row id).
 
@@ -269,7 +275,7 @@ Lifecycle / release:
 - **Memory bounds:** `customIdMap` is an `LRUMap` capped at `maxCustomIds` (default `50_000` in `application/types/config.ts`; initialized in `queue-manager/state.ts`). Unique-key registries are swept every cleanup tick (`cleanExpiredUniqueKeys`, `cleanupTasks.ts`) and any single-queue registry exceeding **1000** entries is force-trimmed by half via insertion-order iteration — under churn a still-live key can be evicted, weakening (not breaking) dedup. LRU eviction of `customIdMap` likewise allows a re-add to slip through.
 - **Debounce is metadata-only (gotcha):** `debounce` sets
   `job.debounceId`/`job.debounceTtl` (`operations/add/single.ts:63-64`,
-  `operations/add/bulk.ts:63-64`, `domain/job/create.ts:72-73`) but does **not**
+  `operations/add/bulk.ts:63-64`, `domain/job/create.ts:88-89`) but does **not**
   populate `uniqueKey`, so it does not itself suppress pushes —
   `handleDeduplication` returns early when `uniqueKey` is falsy. BullMQ-style
   debounce behavior is achieved via `deduplication` with `extend: true` (which

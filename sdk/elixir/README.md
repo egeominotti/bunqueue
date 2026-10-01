@@ -85,7 +85,24 @@ acknowledges.
 
 Single-job `jobId` is automatically renamed to `customId` inside `PUSHB`.
 Unknown options raise `ArgumentError`; advertised options are never silently
-dropped. Integers outside int32 are recursively encoded as float64 for
+dropped.
+
+`deduplication` collapses repeated adds of the same key into one job. Its `id`
+is sent as the broker's `uniqueKey` and `ttl`/`extend`/`replace` as the nested
+`dedup` policy, exactly like the other SDKs:
+
+```elixir
+# Same id within 1 hour = no new job; the second call returns the first job.
+{:ok, first} =
+  Bunqueue.Queue.add(queue, "notify", %{user_id: "123"},
+    deduplication: %{id: "notify-123", ttl: 3_600_000}
+  )
+```
+
+The value may be a map or keyword list. A missing, empty, or non-string `id`,
+an unknown field, a struct, or combining it with the raw `dedup` option raises
+`ArgumentError`; an explicit non-empty `uniqueKey` takes precedence over the
+`id` in any option order. Integers outside int32 are recursively encoded as float64 for
 JavaScript interoperability (exact up to 2^53; pass larger 64-bit identifiers
 as strings).
 

@@ -139,9 +139,19 @@ Notable supporting types:
 - `RepeatConfig` (`src/domain/types/jobs/model.ts:13-25`) — repeatable-job config (`every`, `pattern`,
   `limit`, `count`, `tz`, …). In-memory only on a `Job`; not a SQLite column.
 - `BackoffConfig` (`src/domain/types/jobs/model.ts:27-31`) — `{ type: 'fixed' | 'exponential'; delay; maxDelay? }`.
-  `DEFAULT_MAX_BACKOFF = 3_600_000` (1h). Backoff math in `calculateBackoff`
-  (`src/domain/job/state.ts:37-53`): fixed = ±20% jitter, exponential = `delay * 2^attempts`
-  with ±50% jitter, both capped at `maxDelay`.
+  It is also the object form of `JobInput.backoff`, `PushCommand.backoff` and
+  `CronJobOptions.backoff`. `DEFAULT_MAX_BACKOFF = 3_600_000` (1h) is the cap when
+  `maxDelay` is absent. Backoff math in `calculateBackoff`
+  (`src/domain/job/state.ts:37-54`): fixed = ±20% jitter, exponential = `delay * 2^attempts`
+  with ±50% jitter, both capped at `maxDelay ?? DEFAULT_MAX_BACKOFF`.
+  `maxDelay` accepts `0..MAX_BACKOFF_DELAY` (`86_400_000`, 24h, the same bound as
+  `backoff.delay`); `0` makes every retry immediate. `PUSH`, `PUSHB`, HTTP push
+  (`validateBackoffField`) and atomic flows (`validateAtomicFlowBatch`) reject a
+  non-numeric, non-finite or out-of-range value; `null` counts as absent.
+  `createJob` keeps only a finite in-range value and silently drops anything
+  else, because embedded and cron admission skip the server validator. SQLite
+  persists it in `jobs.extended_options`; PostgreSQL keeps it in the MessagePack
+  job payload.
 - `JobTimelineEntry` (`src/domain/types/jobs/model.ts:33-39`) — `{ state, timestamp, worker?, error?, attempt? }`,
   capped at `MAX_TIMELINE_ENTRIES = 20` (`src/domain/job/constants.ts:2`).
 - `JobLock` (`src/domain/types/jobs/model.ts:139-148`) — `{ jobId, token, owner, createdAt, expiresAt,
@@ -221,7 +231,7 @@ Helper predicates: `isDelayed`, `isReady`, `isExpired`, `isTimedOut`,
 ## JobOptions
 
 `JobInput` (`src/domain/types/jobs/model.ts:92-137`) is the creation-time shape. Defaults are applied
-by `createJob` (`src/domain/job/create.ts:77-118`) using `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`).
+by `createJob` (`src/domain/job/create.ts:93-134`) using `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`).
 
 | Option                      | Type                                                                | Default      |
 | --------------------------- | ------------------------------------------------------------------- | ------------ |
@@ -229,7 +239,7 @@ by `createJob` (`src/domain/job/create.ts:77-118`) using `JOB_DEFAULTS` (`src/do
 | `priority`                  | `number`                                                            | `0`          |
 | `delay`                     | `number` (ms)                                                       | `0`          |
 | `maxAttempts`               | `number`                                                            | `3`          |
-| `backoff`                   | `number \| { type: 'fixed'\|'exponential'; delay }`                 | `1000`       |
+| `backoff`                   | `number \| { type: 'fixed'\|'exponential'; delay; maxDelay? }`      | `1000`       |
 | `ttl`                       | `number \| null`                                                    | `null`       |
 | `timeout`                   | `number \| null`                                                    | `null`       |
 | `uniqueKey`                 | `string \| null`                                                    | `null`       |
@@ -257,7 +267,7 @@ by `createJob` (`src/domain/job/create.ts:77-118`) using `JOB_DEFAULTS` (`src/do
 | `debounceTtl`               | `number \| null`                                                    | `null`       |
 | `timestamp`                 | `number` (overrides `createdAt`)                                    | `Date.now()` |
 
-`dedup` maps onto job fields via `parseBullMQV5Options` (`src/domain/job/create.ts:60-74`):
+`dedup` maps onto job fields via `parseBullMQV5Options` (`src/domain/job/create.ts:76-91`):
 `deduplicationTtl = dedup.ttl ?? null`, `deduplicationExtend = dedup.extend ??
 false`, `deduplicationReplace = dedup.replace ?? false`.
 
@@ -416,7 +426,7 @@ Defined in `src/domain/types/cron.ts`.
 
 ```typescript
 export interface CronJob {
-  // cron.ts:28-52
+  // cron.ts:31-56
   readonly name: string; // primary key
   readonly queue: string;
   readonly data: unknown;
@@ -436,20 +446,22 @@ export interface CronJob {
 }
 ```
 
-`CronJobInput` (`cron.ts:55-79`) is the creation shape; `createCronJob`
-(`cron.ts:82-107`) requires either `schedule` or `repeatEvery`, rejects a supplied
+`CronJobInput` (`cron.ts:59-84`) is the creation shape; `createCronJob`
+(`cron.ts:106-132`) requires either `schedule` or `repeatEvery`, rejects a supplied
 interval unless it is a positive safe integer in milliseconds, and applies
 defaults: `priority:0`, `executions:0`, `skipMissedOnRestart:true`,
 `skipIfNoWorker:false`, `preventOverlap:true`. **Important:** `maxLimit <= 0`
 is normalized to `null` (unlimited) — storing `0` would make `isAtLimit`
-treat the cron as already exhausted (`cron.ts:99`). When both timing fields are
+treat the cron as already exhausted (`cron.ts:124`). When both timing fields are
 valid, `schedule` takes precedence for compatibility.
 
-`CronJobOptions` (`cron.ts:17-25`) is the per-spawn subset of `JobInput`:
+`CronJobOptions` (`cron.ts:20-28`) is the per-spawn subset of `JobInput`:
 `maxAttempts`, `backoff`, `timeout`, `delay`, `stallTimeout`,
-`removeOnComplete`, `removeOnFail`.
+`removeOnComplete`, `removeOnFail`. `backoff` has the `number | BackoffConfig`
+shape, so a spawned job inherits `maxDelay`. Cron job options do not pass
+through the server option validator; `createJob` drops an unusable `maxDelay`.
 
-Predicates: `isAtLimit` (`cron.ts:110-113`), `isDue` (`cron.ts:116-118`).
+Predicates: `isAtLimit` (`cron.ts:135-138`), `isDue` (`cron.ts:141-143`).
 The SQLite engine persists this in `cron_jobs`; `dedup` and `jobOptions` are
 BLOBs. The PostgreSQL engine persists the complete MessagePack cron value in
 `bunqueue_crons.payload` beside indexed `next_run`/execution fields.
@@ -885,7 +897,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 ```
 
 The row type `DbJob` mirrors this (BLOB → `Uint8Array`). `extended_options`
-persists object backoff, repeat-chain configuration, advanced log/size options,
+persists object backoff (including `maxDelay`), repeat-chain configuration, advanced log/size options,
 dedup/debounce policy, and the durable-write flag; for grouped jobs it also
 stores the hidden positive-decimal `groupFifoOrder`. A missing legacy blob uses
 safe defaults. The order is restored as `bigint` and stays internal: ungrouped

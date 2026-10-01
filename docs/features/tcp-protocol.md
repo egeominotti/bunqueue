@@ -100,7 +100,7 @@ export class FrameParser {
 }
 ```
 
-`protocol.ts` also exports a **legacy JSON-text path** — `parseCommand`/`parseCommands`/`serializeResponse(string)`/`LineBuffer` (newline-delimited) from `protocol/commands.ts` and `protocol/lineBuffer.ts` — and validators `validateQueueName`, `validateGroupId`, `validateJobData` (10MB cap, `protocol/validation.ts:8-19`), `validateNumericField`, `validateBackoffField` (number or `{ type, delay }` object form, `protocol/validation.ts:41-55`), `validateJobOptions`, plus `ConnectionState`/`createConnectionState`. The binary `FrameParser` path is the one the TCP server uses; the JSON-text helpers are not invoked by `createTcpServer`.
+`protocol.ts` also exports a **legacy JSON-text path** — `parseCommand`/`parseCommands`/`serializeResponse(string)`/`LineBuffer` (newline-delimited) from `protocol/commands.ts` and `protocol/lineBuffer.ts` — and validators `validateQueueName`, `validateGroupId`, `validateJobData` (10MB cap, `protocol/validation.ts:13-24`), `validateNumericField`, `validateBackoffField` (number or `{ type, delay, maxDelay? }` object form, `protocol/validation.ts:46-66`), `validateJobOptions`, plus `ConnectionState`/`createConnectionState`. The binary `FrameParser` path is the one the TCP server uses; the JSON-text helpers are not invoked by `createTcpServer`.
 
 Exported from `socketWriteQueue.ts`:
 

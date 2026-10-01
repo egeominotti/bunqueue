@@ -23,6 +23,27 @@ job-name capability; the broker remains a Bun application.
 
 All public modules are split below the repository's 300-line source limit.
 
+## Job options
+
+`Bunqueue.Options.job/2` is the single option mapper for `Queue.add/4`,
+`Queue.add_bulk/2` entries, flow nodes, and scheduler job templates. Keys are
+allowlisted and renamed to their wire fields; an unknown key raises
+`ArgumentError`. Inside bulk and flow input, `jobId` becomes `customId`.
+
+`deduplication` (a map or keyword list with atom or string keys) is resolved
+after every other key, so the result does not depend on option order:
+
+- `id` becomes `uniqueKey`, the only field the broker deduplicates on. An
+  explicit `uniqueKey` option other than `nil` or `""` wins over it.
+- `ttl`, `extend`, and `replace` form the nested `dedup` policy with string
+  keys. `nil` values are dropped, and `dedup` is omitted when nothing remains.
+- A missing, empty, or non-string `id`, an unknown or duplicate field, a value
+  that is not a map or keyword list, or combining it with the raw `dedup`
+  option raises `ArgumentError`. `deduplication: nil` adds nothing.
+- `uniqueKey` and `dedup` remain raw passthrough options. Atomic flows reject
+  both (and therefore `deduplication`); scheduler job templates reject them
+  because `jobOptions` carries only retry and timing fields.
+
 ## Transport invariants
 
 - Authentication is the first frame on every socket generation.

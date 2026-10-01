@@ -173,7 +173,7 @@ queue.add("charge", data, JobOptions {
 
 ### How do retries and backoff work?
 
-`attempts` sets the maximum tries, `backoff` sets the wait between them. A plain number means exponential backoff (waits roughly double each retry: ~2s, ~4s, ~8s with a 1000ms base); the object form `{ type: 'fixed' | 'exponential', delay }` matches BullMQ. All delays get automatic jitter, a small random spread so thousands of failed jobs do not retry in the same instant, and are capped at 1 hour by default.
+`attempts` sets the maximum tries, `backoff` sets the wait between them. A plain number means exponential backoff (waits roughly double each retry: ~2s, ~4s, ~8s with a 1000ms base); the object form `{ type: 'fixed' | 'exponential', delay }` matches BullMQ. All delays get automatic jitter, a small random spread so thousands of failed jobs do not retry in the same instant, and are capped at 1 hour by default; add `maxDelay` to the object form (`{ type: 'exponential', delay: 1000, maxDelay: 30000 }`) to set a different cap per job.
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">

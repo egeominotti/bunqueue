@@ -1,14 +1,30 @@
 import type { BackoffConfig, Job, JobId, JobInput, RepeatConfig } from '../types/jobs/model';
-import { JOB_DEFAULTS } from './constants';
+import { JOB_DEFAULTS, MAX_BACKOFF_DELAY } from './constants';
 import { normalizeJobPayload } from './payload';
 
-function parseBackoff(
-  input: number | { type: 'fixed' | 'exponential'; delay: number } | undefined
-): { backoff: number; backoffConfig: BackoffConfig | null } {
-  if (typeof input === 'object') {
+/**
+ * Keep a caller-supplied retry-delay cap only when it is usable. Embedded and
+ * cron admission do not pass through the server validator, so a non-numeric,
+ * non-finite, negative or over-limit value is dropped and the default cap applies
+ * instead of turning the retry delay into NaN or an unbounded wait.
+ */
+function parseMaxDelay(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return value >= 0 && value <= MAX_BACKOFF_DELAY ? value : undefined;
+}
+
+function parseBackoff(input: JobInput['backoff'] | null): {
+  backoff: number;
+  backoffConfig: BackoffConfig | null;
+} {
+  if (typeof input === 'object' && input !== null) {
+    const maxDelay = parseMaxDelay(input.maxDelay);
     return {
       backoff: input.delay,
-      backoffConfig: { type: input.type, delay: input.delay },
+      backoffConfig:
+        maxDelay === undefined
+          ? { type: input.type, delay: input.delay }
+          : { type: input.type, delay: input.delay, maxDelay },
     };
   }
   return { backoff: input ?? JOB_DEFAULTS.backoff, backoffConfig: null };

@@ -249,7 +249,7 @@ Concurrency relevant to this layer:
   error response when their authoritative read fails. An empty successful map
   now means the read succeeded and found no values; database failures can no
   longer masquerade as that result.
-- **NaN / non-finite guards:** `validateNumericField` rejects `NaN`/`Infinity` (important for `WaitJob`/`PULL` timeouts, which a hand-rolled `<min`/`>max` check would let through and resolve instantly; `protocol/validation.ts:21-42`), and `toFiniteNumber` guards `RateLimit`/`SetConcurrency` limits (`handlers/advanced/configNumbers.ts:1-5`).
+- **NaN / non-finite guards:** `validateNumericField` rejects `NaN`/`Infinity` (important for `WaitJob`/`PULL` timeouts, which a hand-rolled `<min`/`>max` check would let through and resolve instantly; `protocol/validation.ts:26-44`), and `toFiniteNumber` guards `RateLimit`/`SetConcurrency` limits (`handlers/advanced/configNumbers.ts:1-5`).
 - **Auth bypass surface:** `Auth` is processed before the auth gate, so it is always reachable; failed attempts emit `auth:failed` but otherwise return a generic `Invalid token`. There is no per-connection attempt counter at this layer.
 - **`ConnectionState.authenticated` is vestigial:** `protocol/commands.ts:29-31` sets it to `false`, but the authoritative auth flag is `HandlerContext.authenticated` (set to `authTokens.size === 0` at `tcp/connections.ts:35-40`). Do not read `state.authenticated` for gating.
 - **Bootstrap fail-fast:** partial TLS, ambiguous/missing storage configuration,
@@ -275,7 +275,7 @@ auth, telemetry, timeout, SQLite path, TLS, Cloud, and S3 fields plus
 [PostgreSQL 15–18 Multi-Broker Persistence](./postgres-multibroker.md), and
 [Security: TLS, Auth, CORS](./security-tls-auth.md).
 
-Input-validation limits enforced by the handlers (from `protocol.ts`): queue name ≤256 chars and `^[a-zA-Z0-9_\-.:]+$`; job data ≤10MB; `PULL`/`PULLB` timeout `[0,60000]`; `PULLB` count `[1,1000]`; `WaitJob` timeout `[0,600000]`; option bounds for `priority` `[-1e6,1e6]`, `delay`/`ttl` ≤1yr, `timeout`/`backoff`/`stallTimeout` ≤1day, `maxAttempts` `[1,1000]`. `backoff` accepts either a number (ms) or the object form `{ type: 'fixed'|'exponential', delay }` (`validateBackoffField`) — `type` must be `fixed`/`exponential` and `delay` ≤1day, matching embedded parity; `PUSH`, `PUSHB` (per job, via `validatePushBatchJobs`) and `PUSHF` validate the applicable bounds. `PUSHF` additionally caps the full graph as described above.
+Input-validation limits enforced by the handlers (from `protocol.ts`): queue name ≤256 chars and `^[a-zA-Z0-9_\-.:]+$`; job data ≤10MB; `PULL`/`PULLB` timeout `[0,60000]`; `PULLB` count `[1,1000]`; `WaitJob` timeout `[0,600000]`; option bounds for `priority` `[-1e6,1e6]`, `delay`/`ttl` ≤1yr, `timeout`/`backoff`/`stallTimeout` ≤1day, `maxAttempts` `[1,1000]`. `backoff` accepts either a number (ms) or the object form `{ type: 'fixed'|'exponential', delay, maxDelay? }` (`validateBackoffField`) — `type` must be `fixed`/`exponential`, `delay` must be in `[0, 1day]`, and an optional `maxDelay` (per-job retry-delay cap; `null` = absent) must be a finite number in `[0, 1day]` (`MAX_BACKOFF_DELAY`), matching embedded parity; `PUSH`, `PUSHB` (per job, via `validatePushBatchJobs`) and `PUSHF` validate the applicable bounds. `PUSHF` additionally caps the full graph as described above.
 
 ## Related Docs
 

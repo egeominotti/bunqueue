@@ -18,6 +18,51 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## Unreleased
+
+### Behavior changes
+
+- **`PUSH`, `PUSHB`, `PUSHF` and HTTP push validate `backoff.maxDelay`.** A
+  value that is not a finite number between 0 and 86,400,000 ms is now
+  rejected; it used to be accepted and silently dropped. Go, PHP, Python and
+  Rust pass the backoff object through unchanged, so their callers see the
+  error too.
+- **A `null` backoff is accepted.** `PUSH` with `backoff: null` used to fail
+  with a raw engine error (`null is not an object (evaluating 'input.delay')`);
+  it now uses the default backoff.
+- **Elixir SDK: invalid `deduplication:` values raise `ArgumentError`.** A
+  value without a non-empty string `id`, with unknown or repeated fields, that
+  is not a map or keyword list (structs included), or combined with a raw
+  `dedup` option used to be accepted and ignored.
+
+### Fixed
+
+- **Periodic cleanup no longer drops long-running jobs that are still alive.**
+  The 10-second cleanup removed every active job started more than 30 minutes
+  ago from memory without a state change, even while its worker kept sending
+  heartbeats or renewing its lock, so the worker could no longer acknowledge
+  it. A job now counts as orphaned only when nothing has been heard from it
+  (no heartbeat, progress update or lock renewal) for 30 minutes and it holds
+  no unexpired lock, and the check is repeated under the processing shard's
+  write lock. PostgreSQL mode was not affected. Regression:
+  `test/repro-cleanup-heartbeating-active-job.test.ts`.
+- **`backoff.maxDelay` now caps retry delays.** The option was part of the job
+  model and the retry calculation, and the Rust, Python and legacy TypeScript
+  SDKs sent it, but job creation dropped it, so every job kept the 1-hour
+  default cap. It is now kept and persisted, and `Queue.getJob`,
+  `Queue.getJobs`, `FlowProducer` results and embedded `add()` return it in
+  `job.opts.backoff`; jobs delivered to a TCP `Worker` still expose only the
+  numeric base `backoff`, and the server applies the cap either way. Atomic
+  flows reject an invalid value in both modes; embedded `Queue.add`/`addBulk`
+  and scheduler job templates ignore it and keep the default. Regressions:
+  `test/repro-backoff-max-delay.test.ts`, `test/backoff-max-delay-paths.test.ts`.
+- **Elixir SDK: the `deduplication:` option works.** It was sent as `dedup`
+  without a `uniqueKey`, which the server ignores, so two adds with the same
+  deduplication id created two jobs. `deduplication.id` is now sent as
+  `uniqueKey` and `ttl`, `extend` and `replace` as `dedup`, as in the other
+  SDKs. An explicit non-empty `uniqueKey` still wins. Regression:
+  `sdk/elixir/test/deduplication_options_test.exs`.
+
 ## [2.9.6] - 2026-10-01
 
 ### Behavior changes

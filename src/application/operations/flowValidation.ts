@@ -1,3 +1,4 @@
+import { MAX_BACKOFF_DELAY } from '../../domain/job/constants';
 import type { AtomicFlowBatchInput } from '../../domain/types/flow';
 import { validateGroupId, validateGroupPriority } from '../../domain/types/group';
 import { isWellFormedJobId, normalizeJobPayload, type JobInput } from '../../domain/types/job';
@@ -51,9 +52,10 @@ function validateOptions(input: JobInput): void {
     if (input.backoff.type !== 'fixed' && input.backoff.type !== 'exponential') {
       throw new Error("backoff.type must be 'fixed' or 'exponential'");
     }
-    numeric(input.backoff.delay, 'backoff.delay', 0, 24 * 60 * 60 * 1_000);
+    numeric(input.backoff.delay, 'backoff.delay', 0, MAX_BACKOFF_DELAY);
+    numeric(input.backoff.maxDelay, 'backoff.maxDelay', 0, MAX_BACKOFF_DELAY);
   } else {
-    numeric(input.backoff, 'backoff', 0, 24 * 60 * 60 * 1_000);
+    numeric(input.backoff, 'backoff', 0, MAX_BACKOFF_DELAY);
   }
 
   for (const name of BOOLEAN_OPTIONS) {

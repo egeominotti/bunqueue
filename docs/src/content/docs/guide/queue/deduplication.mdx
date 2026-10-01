@@ -192,11 +192,10 @@ queue.add("notification", data, JobOptions {
 <TabItem label="Elixir">
 
 ```elixir
-# The Elixir SDK currently supports idempotency through jobId.
-# TTL deduplication keys are not exposed yet.
+# Same id within 1 hour = no new job. After the TTL, a new job is allowed.
 {:ok, _job} =
   Bunqueue.Queue.add(queue, "notification", %{user_id: "123"},
-    jobId: "notify-123"
+    deduplication: %{id: "notify-123", ttl: 3_600_000}
   )
 ```
 
@@ -309,11 +308,17 @@ queue.add("latest-data", new_data, JobOptions {
 <TabItem label="Elixir">
 
 ```elixir
-# TTL extend/replace strategies are not exposed by the Elixir SDK yet.
-# A stable jobId still collapses repeated adds while the job is unfinished.
-{:ok, first} = Bunqueue.Queue.add(queue, "sync-task", %{action: "sync"}, jobId: "sync-task")
-{:ok, duplicate} = Bunqueue.Queue.add(queue, "sync-task", %{action: "sync"}, jobId: "sync-task")
-true = first.id == duplicate.id
+# extend: keep the existing job, reset its TTL (debouncing)
+{:ok, _job} =
+  Bunqueue.Queue.add(queue, "sync-task", %{action: "sync"},
+    deduplication: %{id: "sync-task", ttl: 60_000, extend: true}
+  )
+
+# replace: remove the pending job, insert a new one with the latest data
+{:ok, _job} =
+  Bunqueue.Queue.add(queue, "latest-data", %{data: new_data},
+    deduplication: %{id: "data-job", ttl: 300_000, replace: true}
+  )
 ```
 
 </TabItem>

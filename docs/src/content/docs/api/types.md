@@ -566,8 +566,10 @@ interface ParentOpts {
 interface BackoffOptions {
   /** Backoff strategy type */
   type: 'fixed' | 'exponential';
-  /** Base delay in milliseconds */
+  /** Base delay in milliseconds (0 to 86,400,000) */
   delay: number;
+  /** Upper bound for one retry delay in milliseconds (0 to 86,400,000). Default: 1 hour */
+  maxDelay?: number;
 }
 ```
 
@@ -576,7 +578,17 @@ All backoff delays include automatic **jitter** to prevent thundering herd:
 - **Exponential**: ±50% jitter around the computed delay
 - **Fixed**: ±20% jitter around the configured delay
 
-Delays are capped at 1 hour by default. This prevents runaway delays at high attempt counts.
+Each retry delay is capped at `maxDelay`, or at 1 hour when `maxDelay` is not set. This prevents runaway delays at high attempt counts. `maxDelay: 0` retries immediately.
+
+```typescript
+// Exponential growth, but never wait more than 30 seconds between attempts
+await queue.add('sync', data, {
+  attempts: 10,
+  backoff: { type: 'exponential', delay: 1000, maxDelay: 30_000 },
+});
+```
+
+The server rejects a `maxDelay` that is not a finite number between 0 and 86,400,000 (24 hours) on `PUSH`, `PUSHB`, HTTP push and atomic flows; atomic flows also reject it in embedded mode. Embedded `Queue.add` and `addBulk`, and scheduler job templates, ignore an invalid `maxDelay` and keep the 1-hour default. `Queue.getJob`, `Queue.getJobs`, `FlowProducer` results and embedded `add()` return `maxDelay` in `job.opts.backoff` when it was set. Jobs delivered to a TCP `Worker` expose only the numeric base `backoff`; the server still applies the cap when it schedules the retry.
 
 ### KeepJobs
 

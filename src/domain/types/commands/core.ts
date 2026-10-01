@@ -1,5 +1,5 @@
 import type { AtomicFlowJobInput } from '../flow';
-import type { JobInput } from '../job';
+import type { BackoffConfig, JobInput } from '../job';
 import type { GroupPullOptions } from '../group';
 import type { BaseCommand } from './base';
 
@@ -11,7 +11,7 @@ export interface PushCommand extends BaseCommand {
   readonly priority?: number;
   readonly delay?: number;
   readonly maxAttempts?: number;
-  readonly backoff?: number | { type: 'fixed' | 'exponential'; delay: number };
+  readonly backoff?: number | BackoffConfig;
   readonly ttl?: number;
   readonly timeout?: number;
   readonly uniqueKey?: string;

@@ -255,7 +255,7 @@ and the user-facing [storage guide](/guide/databases/).
   <div class="bq-diag-head"><b>Cleanup</b><span>every 10s</span></div>
   <div class="bq-diag-layer">1. Refresh delayed counts in each shard</div>
   <div class="bq-diag-layer bq-diag-accent">2. Compact priority queues <i>if stale ratio &gt; 20%, rebuild heap</i></div>
-  <div class="bq-diag-layer">3. Clean orphaned processing entries <i>jobs whose startedAt is &gt; 30min old, regardless of heartbeats</i></div>
+  <div class="bq-diag-layer">3. Clean orphaned processing entries <i>active jobs with no liveness for &gt; 30min: no pull, heartbeat, progress update or lock renewal in that window, and no unexpired lock; re-checked under the processing lock</i></div>
   <div class="bq-diag-layer">4. Clean stale waiting dependencies <i>waiting &gt; 1 hour</i></div>
   <div class="bq-diag-layer">5. Clean expired unique keys</div>
   <div class="bq-diag-layer">6. Clean orphaned job index entries</div>

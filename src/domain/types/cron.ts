@@ -3,6 +3,7 @@
  */
 
 import { normalizeJobPayload } from '../job/payload';
+import type { BackoffConfig } from './jobs/model';
 
 /** Deduplication config for cron-spawned jobs */
 export interface CronDedup {
@@ -18,7 +19,7 @@ export interface CronDedup {
  */
 export interface CronJobOptions {
   readonly maxAttempts?: number;
-  readonly backoff?: number | { type: 'fixed' | 'exponential'; delay: number };
+  readonly backoff?: number | BackoffConfig;
   readonly timeout?: number;
   readonly delay?: number;
   readonly stallTimeout?: number;

@@ -531,10 +531,11 @@ the runtime:
 ### Job options
 
 Every transmitted option is validated server-side. The typed mappers preserve
-the common option set, with one audited exception: Elixir's
-`deduplication: %{id: ...}` maps the nested settings but does not derive the
-owning `uniqueKey`, so supply `uniqueKey` explicitly for now. Naming follows
-each language's idiom: TypeScript and PHP use camelCase keys
+the common option set. `deduplication` sends its `id` as the broker's
+`uniqueKey` and only `ttl`/`extend`/`replace` as the nested `dedup` policy in
+every SDK; Elixir accepts it as a map or keyword list and raises
+`ArgumentError` when the `id` is missing or not a non-empty string. Naming
+follows each language's idiom: TypeScript and PHP use camelCase keys
 (`attempts`, `jobId`, `removeOnComplete`), Python uses snake_case
 (`attempts`, `job_id`, `remove_on_complete`), Go takes a
 `bunqueue.JobOptions` map with the camelCase keys, Rust uses typed
@@ -546,7 +547,7 @@ builders: runtime handling of unknown keys differs by language.
 | `priority`                                   | number                                       | 0       | Higher runs sooner; −1 000 000 … 1 000 000                                                              |
 | `delay`                                      | ms                                           | 0       | Up to 1 year                                                                                            |
 | `attempts`                                   | number                                       | 3       | Max attempts including the first; up to 1000                                                            |
-| `backoff`                                    | number \| `{ type, delay }`                  | 1000    | `type`: `'fixed'` or `'exponential'`; delay up to 1 day                                                 |
+| `backoff`                                    | number \| `{ type, delay, maxDelay? }`       | 1000    | `type`: `'fixed'` or `'exponential'`; `delay` and `maxDelay` (retry cap, default 1 h) up to 1 day       |
 | `ttl`                                        | ms                                           | -       | Expires the job if not processed in time                                                                |
 | `timeout`                                    | ms                                           | -       | Per-job processing timeout, up to 1 day                                                                 |
 | `jobId`                                      | string                                       | -       | Custom id; **idempotent**, re-adding an unfinished id is a no-op                                        |
@@ -1483,7 +1484,7 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 Scheduler job options are honored end to end for each SDK's supported fields.
 TypeScript, Python, PHP, and Go expose the broadest scheduler template and
 repeat flags. Rust omits list plus some flags, while Elixir's scheduler list is
-server-wide and its deduplication shorthand has the `uniqueKey` caveat above.
+server-wide.
 
 `embedded: true` requires the Bun runtime, including when importing
 `bunqueue-client`. On Node.js and Deno, set `embedded: false` and connect to

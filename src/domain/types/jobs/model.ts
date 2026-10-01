@@ -95,7 +95,7 @@ export interface JobInput {
   priority?: number;
   delay?: number;
   maxAttempts?: number;
-  backoff?: number | { type: 'fixed' | 'exponential'; delay: number };
+  backoff?: number | BackoffConfig;
   ttl?: number;
   timeout?: number;
   uniqueKey?: string;

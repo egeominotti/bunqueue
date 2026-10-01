@@ -132,8 +132,8 @@ Emitted via `ctx.dashboardEmit?.(event, data)` (consumed by [bunqueue Cloud Dash
 - `dlq:auto-retried`, `dlq:expired` — `performDlqMaintenance` (`background/dlq.ts`)
 - `cleanup:completed-removed` — bounded automatic SQLite retention
   (`cleanupTasks.ts`)
-- `cleanup:orphans-removed` — `cleanOrphanedProcessingEntries` (`cleanupTasks.ts:69`)
-- `cleanup:stale-deps-removed` — `cleanStaleWaitingDependencies` (`cleanupTasks.ts:91`)
+- `cleanup:orphans-removed` — `cleanOrphanedProcessingEntries` (`cleanupTasks.ts:75`)
+- `cleanup:stale-deps-removed` — `cleanStaleWaitingDependencies` (`cleanupTasks.ts:113`)
 - `queue:removed` — `cleanEmptyQueues` (`emptyQueueCleanup.ts`)
 - `job:dependencies-resolved` — `promoteJobsToQueue` (`dependencyProcessor.ts:105`)
 - `queue:idle`, `queue:threshold`, `worker:overloaded`, `server:memory-warning`, `storage:size-warning` — `monitoringChecks.ts`
@@ -236,7 +236,31 @@ For each queue in `queueNamesCache`, calls `processAutoRetry` (re-queues entries
 
 ### `cleanup` (`cleanupTasks.ts`)
 
-Runs in order each tick: refresh delayed counters per shard; compact any priority queue with `needsCompaction(0.2)` (>20% tombstones); then `cleanOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, `cleanUniqueKeysAndGroups`, `cleanStalledCandidates`, `cleanOrphanedJobIndex`, `cleanOrphanedJobLocks`, `cleanEmptyQueues`. A dependency-gated job older than one hour is removed under its shard write lock after a TOCTOU age re-check. Its SQLite row or pending buffered insert is deleted first, then the reverse dependency index, `jobIndex`, owned unique/custom ID reservations, and dependency-result consumer edges are released together.
+Runs in order each tick: refresh delayed counters per shard; compact any priority queue with `needsCompaction(0.2)` (>20% tombstones); then `cleanOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, `cleanUniqueKeysAndGroups`, `cleanStalledCandidates`, `cleanOrphanedJobIndex`, `cleanOrphanedJobLocks`, `cleanEmptyQueues`.
+
+`cleanOrphanedProcessingEntries` drops an in-memory processing entry (from
+`processingShards`, `jobIndex` and the timeout scheduler, with no state
+transition) only when it has shown **no liveness for 30 minutes**
+(`isOrphanedProcessingEntry`):
+
+- `startedAt` is set (an entry without it is never an orphan here);
+- `now - max(startedAt, lastHeartbeat) > 30 min`. `lastHeartbeat` is refreshed at
+  pull, by token-less `jobHeartbeat`, by progress updates and by every successful
+  lock renewal (`renewJobLock`, the default worker path with `useLocks: true`), so
+  a job that keeps heartbeating or renewing is never aged out however long it runs;
+- the job holds **no unexpired lock** in `jobLocks`. A valid lease is ownership
+  granted to a worker (for example a long `lockDuration` without renewals); the
+  lock-expiration sweep, not cleanup, decides when it lapses. An expired lease
+  does not count as liveness.
+
+The predicate is evaluated in phase 1 and again under the processing write lock
+in phase 2 with a fresh clock, because a heartbeat, progress update or renewal
+can land while the sweep waits for the lock. Before this rule the sweep aged
+entries by `startedAt` alone and removed heartbeating long-running jobs, which
+their workers could then no longer ACK
+(`test/repro-cleanup-heartbeating-active-job.test.ts`).
+
+A dependency-gated job older than one hour is removed under its shard write lock after a TOCTOU age re-check. Its SQLite row or pending buffered insert is deleted first, then the reverse dependency index, `jobIndex`, owned unique/custom ID reservations, and dependency-result consumer edges are released together.
 
 `cleanEmptyQueues` snapshots registered names, reads exact SQLite completion
 counts with 500-name primary-key batches, and precomputes occupied/configured
@@ -273,7 +297,7 @@ Returns immediately if `dashboardEmit` is unset. Otherwise runs `checkQueueIdle`
 
 The lock hierarchy is `jobIndex → completedJobs → shards[N] → processingShards[N]` (see [Concurrency & Locking](./concurrency-and-locking.md)). Within this module:
 
-- `cleanOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, and `cleanOrphanedJobIndex` use a **two-phase** pattern: collect candidates lock-free, then mutate under the owning write lock and re-check membership/age inside the lock.
+- `cleanOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, and `cleanOrphanedJobIndex` use a **two-phase** pattern: collect candidates lock-free, then mutate under the owning write lock and re-check membership/age inside the lock (for processing entries, the full liveness predicate: heartbeat age and unexpired lock).
 - `processPendingDependencies` acquires `shardLocks[i]` **before** reading `waitingDeps`, then runs shards in parallel via `Promise.all`.
 - The stall and lock-expiry delegates (`stallDetection.ts`, `lockManager.ts`) acquire `shardLocks` **before** `processingLocks` (hierarchy order). The lock-expiry sweep revalidates the collected job identity, current lease identity, and expiry under both locks before consuming either recovery budget; overlapping sweeps, renewal, ACK, and a newer delivery generation therefore cannot reclaim the same lease twice. Events are broadcast only after the winning transition.
 - Timeout entries are registered only after processing ownership (and any lease)

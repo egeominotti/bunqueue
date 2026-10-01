@@ -11,3 +11,6 @@ export const JOB_DEFAULTS = {
   removeOnFail: false,
   stackTraceLimit: 10,
 } as const;
+
+/** Upper bound accepted for `backoff`, `backoff.delay` and `backoff.maxDelay` (24 hours). */
+export const MAX_BACKOFF_DELAY = 86_400_000;

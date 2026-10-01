@@ -34,7 +34,7 @@ const configuredJob = await queue.add('job-name', data, {
   delay: 5000, // Wait 5s before processing
   attempts: 5, // Max total executions, first run included (default: 3)
   backoff: 2000, // Exponential base delay in ms (default: 1000, jitter applied, capped at 1h)
-  // OR: backoff: { type: 'exponential', delay: 2000 }  // 'fixed' | 'exponential'
+  // OR: backoff: { type: 'exponential', delay: 2000, maxDelay: 60000 }  // optional per-job cap
   timeout: 30000, // Fail the job if processing takes longer
   jobId: 'custom-id', // Custom ID, makes the add idempotent (see Deduplication)
   removeOnComplete: true, // Delete job data after it completes
@@ -53,7 +53,7 @@ const configuredJob = await queue.add('job-name', data, {
   delay: 5000, // Wait 5s before processing
   attempts: 5, // Max total executions, first run included (default: 3)
   backoff: 2000, // Exponential base delay in ms (default: 1000, jitter applied, capped at 1h)
-  // OR: backoff: { type: 'exponential', delay: 2000 }  // 'fixed' | 'exponential'
+  // OR: backoff: { type: 'exponential', delay: 2000, maxDelay: 60000 }  // optional per-job cap
   timeout: 30000, // Fail the job if processing takes longer
   jobId: 'custom-id', // Custom ID, makes the add idempotent (see Deduplication)
   removeOnComplete: true, // Delete job data after it completes

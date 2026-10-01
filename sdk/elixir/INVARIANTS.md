@@ -32,6 +32,12 @@ is shown in [`README.md`](README.md).
   keys raise `ArgumentError`; accepted keys must never be silently discarded.
 - `jobId` becomes `customId` only inside bulk/flow job input. Scheduler `limit`
   and `tz` become `maxLimit` and `timezone`.
+- `deduplication` is resolved after all other job keys: its required non-empty
+  string `id` becomes `uniqueKey` unless an explicit `uniqueKey` other than
+  `nil` or `""` is present, and only non-nil `ttl`/`extend`/`replace` become
+  `dedup` (omitted when empty). Unknown or duplicate fields, a
+  non-map/keyword value (structs included), or a simultaneous raw `dedup`
+  raise `ArgumentError`.
 - `PUSH` and `PUSHB` send the job name in top-level `"name"` and preserve the
   complete term in `"data"`, including a user-owned map name, scalar, list, or
   `nil`. `Job.from_wire/3` unwraps only legacy maps with a string name inside

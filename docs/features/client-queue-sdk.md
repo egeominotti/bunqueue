@@ -273,7 +273,12 @@ detached placeholders.
 sends `GetJob` and returns null on `!ok`. The single `metadataFromJob` reflection
 path now supplies `attemptsMade`, `attemptsStarted`, `stalledCounter`, progress,
 priority, `processedOn`, `finishedOn`, options, stacktrace, return value, and
-failure reason to both `getJob()` and `getJobs[Async]()`. The live properties,
+failure reason to both `getJob()` and `getJobs[Async]()`. Its options come from
+`buildJobOpts` (`client/jobHelpers.ts`), which reflects an object backoff as
+`{ type, delay, maxDelay? }` and adds `maxDelay` only when the job has one, so
+`job.opts.backoff` round-trips the caller's cap. Jobs delivered to a TCP worker
+are parsed by `worker/jobParser.ts`, which does not read `backoffConfig`; there
+`job.opts.backoff` stays the numeric base delay. The live properties,
 `toJSON()`, and `asJSON()` therefore describe the same broker generation in
 embedded and TCP mode instead of query proxies resetting lifecycle counters to
 zero.

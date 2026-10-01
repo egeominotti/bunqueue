@@ -147,7 +147,8 @@ the shapes and the rules a client MUST get right. All commands below answer
 | `PUSHB` | `queue`, `jobs: [{name, data, ...JobInput}]`      | `{ids: []}` |
 
 Job options on `PUSH` (all optional, exact names): `priority`, `delay`,
-`maxAttempts`, `backoff` (ms or `{type, delay, maxDelay}`), `ttl`, `timeout`,
+`maxAttempts`, `backoff` (ms or `{type, delay, maxDelay?}`; `delay` and
+`maxDelay` are `0..86400000` ms, `maxDelay` defaults to a 1 h cap), `ttl`, `timeout`,
 `jobId`, `uniqueKey`, `dedup {ttl, extend, replace}`, `dependsOn: []`,
 `parentId`, `childrenIds: []`, `tags: []`, `groupId`, `groupMaxSize`, `lifo`,
 `removeOnComplete`, `removeOnFail`, `stallTimeout`, `durable`, `repeat`,
@@ -167,6 +168,11 @@ Client MUSTs:
   silently lost.
 - `jobId` is idempotent: re-pushing an existing custom id returns the
   existing job's `id` instead of enqueuing a duplicate.
+- The broker deduplicates on `uniqueKey` alone; `dedup` is only the
+  `ttl`/`extend`/`replace` policy and is ignored without a `uniqueKey`. A
+  client `deduplication {id, ttl?, extend?, replace?}` option MUST send `id`
+  as `uniqueKey` and only the policy fields as `dedup`, on `PUSH` and on every
+  `PUSHB` entry.
 - `groupId` is the normalized job-group identifier: a non-empty string of at
   most 256 characters. Public clients may accept safe integers but MUST encode
   them as decimal strings on the wire.

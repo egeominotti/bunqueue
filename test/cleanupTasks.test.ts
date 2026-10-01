@@ -80,11 +80,16 @@ describe('CleanupTasks', () => {
       const statsBefore = qm.getStats();
       expect(statsBefore.active).toBe(1);
 
-      // Manually set startedAt to far in the past (beyond 30-minute stall timeout)
+      // Model a real orphan: started AND last heard from beyond the 30-minute
+      // window, with no lock lease. Aging startedAt alone is not enough because
+      // a heartbeating job is alive and must survive cleanup.
       const procIdx = processingShardIndex(pulled!.id);
       const processingJob = ctx.processingShards[procIdx].get(pulled!.id);
       expect(processingJob).toBeDefined();
-      (processingJob as any).startedAt = Date.now() - 31 * 60 * 1000; // 31 minutes ago
+      expect(ctx.jobLocks.has(pulled!.id)).toBe(false);
+      const silentSince = Date.now() - 31 * 60 * 1000; // 31 minutes ago
+      (processingJob as Job).startedAt = silentSince;
+      (processingJob as Job).lastHeartbeat = silentSince;
 
       await cleanup(ctx);
 
@@ -116,11 +121,14 @@ describe('CleanupTasks', () => {
         const pulled = await qm.pull(`queue-${i}`);
         if (pulled) {
           pulledJobs.push(pulled);
-          // Set startedAt to past the stall timeout
+          // Real orphan: no liveness (pull, heartbeat, lock) for over 30 minutes.
+          // Aging startedAt alone would describe a live, heartbeating job.
           const procIdx = processingShardIndex(pulled.id);
           const processingJob = ctx.processingShards[procIdx].get(pulled.id);
           if (processingJob) {
-            (processingJob as any).startedAt = Date.now() - 31 * 60 * 1000;
+            const silentSince = Date.now() - 31 * 60 * 1000;
+            processingJob.startedAt = silentSince;
+            processingJob.lastHeartbeat = silentSince;
           }
         }
       }

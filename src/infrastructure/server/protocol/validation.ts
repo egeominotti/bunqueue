@@ -1,3 +1,4 @@
+import { MAX_BACKOFF_DELAY } from '../../../domain/job/constants';
 import { validateGroupPriority } from '../../../domain/types/group';
 
 export function validateQueueName(name: string): string | null {
@@ -49,13 +50,19 @@ export function validateBackoffField(value: unknown): string | null {
     if (object['type'] !== 'fixed' && object['type'] !== 'exponential') {
       return "backoff.type must be 'fixed' or 'exponential'";
     }
-    return validateNumericField(object['delay'], 'backoff.delay', {
-      min: 0,
-      max: 24 * 60 * 60 * 1000,
-      required: true,
-    });
+    return (
+      validateNumericField(object['delay'], 'backoff.delay', {
+        min: 0,
+        max: MAX_BACKOFF_DELAY,
+        required: true,
+      }) ??
+      validateNumericField(object['maxDelay'], 'backoff.maxDelay', {
+        min: 0,
+        max: MAX_BACKOFF_DELAY,
+      })
+    );
   }
-  return validateNumericField(value, 'backoff', { min: 0, max: 24 * 60 * 60 * 1000 });
+  return validateNumericField(value, 'backoff', { min: 0, max: MAX_BACKOFF_DELAY });
 }
 
 export function validateJobOptions(options: Record<string, unknown>): string | null {

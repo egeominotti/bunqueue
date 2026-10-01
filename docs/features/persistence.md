@@ -236,9 +236,11 @@ All blob columns store MessagePack. Encoding and decoding use the canonical
 `src/shared/msgpack.ts` codec. Its normal path remains msgpackr's fast decoder;
 the rare `__proto__` path materializes maps with safe own-property definitions,
 so arbitrary JSON keys remain distinct across restart without prototype
-pollution. `rowToJob` rehydrates a full `Job`, defaulting BullMQ-compat fields
-that are intentionally not persisted (`backoffConfig`, `stackTraceLimit`,
-dedup/debounce flags, etc.).
+pollution. `rowToJob` rehydrates a full `Job`. Policies without a legacy column
+(`backoffConfig` including `maxDelay`, `repeat`, `stackTraceLimit`,
+`keepLogs`/`sizeLimit`, dedup/debounce flags, `durable`) come from the
+`extended_options` blob (`jobOptionsBlob.ts`); a pre-migration-34 row without
+the blob receives the historical defaults.
 
 ## Business Logic / Control Flow
 

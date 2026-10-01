@@ -212,7 +212,7 @@ Command shapes in `src/domain/types/commands/cron.ts:4-33`.
 
 ## Data Models
 
-Canonical definition is `CronJob` (`src/domain/types/cron.ts:29-55`). See [data-model](../data-model.md) for the full schema. Most relevant fields:
+Canonical definition is `CronJob` (`src/domain/types/cron.ts:31-56`). See [data-model](../data-model.md) for the full schema. Most relevant fields:
 
 | Field                    | Type                           | Notes                                                                                        |
 | ------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------- |
@@ -224,14 +224,14 @@ Canonical definition is `CronJob` (`src/domain/types/cron.ts:29-55`). See [data-
 | `priority`               | `number`                       | spawned-job priority (default `0`).                                                          |
 | `timezone`               | `string \| null`               | IANA tz for `schedule`.                                                                      |
 | `nextRun` / `executions` | `number`                       | mutable runtime state, persisted.                                                            |
-| `maxLimit`               | `number \| null`               | `null`/0/negative ⇒ unlimited (`cron.ts:104-106`).                                           |
+| `maxLimit`               | `number \| null`               | `null`/0/negative ⇒ unlimited (`cron.ts:122-124`).                                           |
 | `uniqueKey` / `dedup`    | dedup config for spawned jobs. |
-| `skipMissedOnRestart`    | `boolean`                      | **default `true`** in `createCronJob` (`cron.ts:109`).                                       |
+| `skipMissedOnRestart`    | `boolean`                      | **default `true`** in `createCronJob` (`cron.ts:127`).                                       |
 | `skipIfNoWorker`         | `boolean`                      | default `false`.                                                                             |
 | `preventOverlap`         | `boolean`                      | default `true`.                                                                              |
 | `jobOptions`             | `CronJobOptions \| null`       | per-cron retry/cleanup policy (issue #86).                                                   |
 
-`CronJobOptions` (`cron.ts:19-27`): `maxAttempts`, `backoff`, `timeout`, `delay`,
+`CronJobOptions` (`cron.ts:20-28`): `maxAttempts`, `backoff`, `timeout`, `delay`,
 `stallTimeout`, `removeOnComplete`, `removeOnFail`. `SchedulerInfo`
 (`scheduler.ts:64-72`): `{ id, name, next, pattern?, every?, limit? }`
 (`limit` = the persisted `maxLimit` run cap, `undefined` when unlimited; #111).

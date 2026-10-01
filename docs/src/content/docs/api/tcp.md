@@ -266,7 +266,7 @@ Add a single job to a queue.
 }
 ```
 
-The `backoff` field also accepts an object form: `{ type: 'fixed' | 'exponential', delay: number }`.
+The `backoff` field also accepts an object form: `{ type: 'fixed' | 'exponential', delay: number, maxDelay?: number }`. `maxDelay` caps each computed retry delay for that job (default: 1 hour when omitted). `delay` and `maxDelay` must be finite numbers between 0 and 86,400,000 ms (1 day); `maxDelay: null` is treated as omitted, and any other invalid value fails the command. The same rule applies to every job in `PUSHB` and `PUSHF`.
 
 **Response:**
 
@@ -1266,7 +1266,7 @@ Create or update a cron/repeating job schedule.
   preventOverlap?: boolean, // Skip a tick while the previous run is still pending/active (default true)
   jobOptions?: {            // Per-job options applied to every generated job
     maxAttempts?: number,
-    backoff?: number | { type: 'fixed' | 'exponential', delay: number },
+    backoff?: number | { type: 'fixed' | 'exponential', delay: number, maxDelay?: number }, // not validated here: an unusable maxDelay is ignored (1 h cap)
     timeout?: number,
     delay?: number,
     stallTimeout?: number,

@@ -36,21 +36,21 @@ protocol command itself.
 
 | Core surface | TypeScript | Python | PHP | Go | Rust | Elixir |
 | --- | --- | --- | --- | --- | --- | --- |
-| Producer, bulk add, job options | Full | Full | Full | Full | Full | Partial¹ |
-| Worker delivery, leases, heartbeat, ACK/FAIL | Full | Full | Full² | Full | Full | Full |
-| State queries and exhaustive pagination | Partial³ | Partial³ | Partial³ | Partial³ | Partial³ | Partial³ |
+| Producer, bulk add, job options | Full | Full | Full | Full | Full | Full |
+| Worker delivery, leases, heartbeat, ACK/FAIL | Full | Full | Full¹ | Full | Full | Full |
+| State queries and exhaustive pagination | Partial² | Partial² | Partial² | Partial² | Partial² | Partial² |
 | Non-serialization `Job` operations | 13/32 | 13/32 | 4/32 | 4/32 | 3/32 | 2/32 |
-| Dedup owner lookup and key release | Partial⁴ | Partial⁴ | — | — | — | — |
+| Dedup owner lookup and key release | Partial³ | Partial³ | — | — | — | — |
 | Dependency pagination/counts and waiting-children transition | Partial | Partial | Partial | Partial | — | — |
-| Rate/concurrency mutation | Full | Full | Partial⁵ | Partial⁵ | Partial⁵ | Full |
+| Rate/concurrency mutation | Full | Full | Partial⁴ | Partial⁴ | Partial⁴ | Full |
 | Rate/concurrency readback and max/TTL status | — | — | — | — | — | — |
 | Rich DLQ entries, statistics, filtered retry | — | — | — | — | — | — |
-| Bulk retry with state/count/timestamp selectors | Partial⁶ | Partial⁶ | — | — | — | — |
+| Bulk retry with state/count/timestamp selectors | Partial⁵ | Partial⁵ | — | — | — | — |
 | Atomic flow tree and chain creation | Full | Full | Full | Full | Full | Full |
 | Flow bulk, fan-in, and tree readback | Full | Full | Read only | Read only | — | — |
-| Queue-scoped worker discovery | Partial⁷ | Partial⁷ | Partial⁷ | Partial⁷ | — | — |
-| Scheduler CRUD and queue-scoped list | Full | Full | Partial⁸ | Partial⁸ | Partial | Partial⁸ |
-| Stats, metrics, and webhooks | Full | Full | Partial⁹ | Partial⁹ | — | — |
+| Queue-scoped worker discovery | Partial⁶ | Partial⁶ | Partial⁶ | Partial⁶ | — | — |
+| Scheduler CRUD and queue-scoped list | Full | Full | Partial⁷ | Partial⁷ | Partial | Partial⁷ |
+| Stats, metrics, and webhooks | Full | Full | Partial⁸ | Partial⁸ | — | — |
 | Queue groups and store-and-forward | — | — | — | — | — | — |
 | Simple all-in-one mode | Full | Full | — | — | — | — |
 | Workflow/saga engine | — | — | — | — | — | — |
@@ -59,29 +59,27 @@ protocol command itself.
 
 Audit notes:
 
-1. Elixir maps `deduplication` to the nested wire object but does not derive
-   the owning `uniqueKey` from its `id`; explicit `uniqueKey` still works.
-2. PHP intentionally processes sequentially; this is a worker model choice,
+1. PHP intentionally processes sequentially; this is a worker model choice,
    not a delivery-correctness gap.
-3. All SDKs can request finite offset/limit pages. None mirrors the Bun
+2. All SDKs can request finite offset/limit pages. None mirrors the Bun
    client's exhaustive `end=-1` contract: TypeScript substitutes a 1,000-row
    cap, Python converts it to a zero limit, and the other clients expose only a
    finite limit. Applications must paginate explicitly.
-4. TypeScript and Python expose an owner lookup but route it through
+3. TypeScript and Python expose an owner lookup but route it through
    `GetJobByCustomId`. Custom IDs and deduplication keys are separate indexes,
    so this can return the wrong answer; neither SDK exposes key release.
-5. PHP, Go, and Rust preserve rate duration/TTL but expose no global
+4. PHP, Go, and Rust preserve rate duration/TTL but expose no global
    concurrency mutation helper.
-6. Failed-job count works. Completed retry drops `count`, neither client
+5. Failed-job count works. Completed retry drops `count`, neither client
    exposes the terminal `timestamp` cutoff, and TypeScript discards the applied
    count from its return type.
-7. These SDKs decode `ListWorkers` but return the server-wide registry rather
+6. These SDKs decode `ListWorkers` but return the server-wide registry rather
    than filtering it to `queue.name`; their count helpers are global too.
-8. PHP, Go, and Elixir return every server scheduler from `CronList`, not just
+7. PHP, Go, and Elixir return every server scheduler from `CronList`, not just
    the current queue. Rust has create/get/remove but no list helper and lacks
    some scheduler flags.
-9. PHP and Go expose stats and webhooks but not metrics; Rust and Elixir expose
-    none of the three typed surfaces.
+8. PHP and Go expose stats and webhooks but not metrics; Rust and Elixir expose
+   none of the three typed surfaces.
 
 The full 32-method Bun `Job` denominator excludes `toJSON` and `asJSON`.
 TypeScript/Python cover progress, logging, state, remove/retry, child values,
@@ -98,6 +96,9 @@ commands. The method/semantics matrix above is the authoritative audit.
 
 The TypeScript and Python duration gap found by this audit is closed by a
 real-broker regression that reads the applied window through `GetQueueLimits`.
+The Elixir `deduplication` gap is closed too: its `id` now becomes `uniqueKey`
+and only `ttl`/`extend`/`replace` travel as `dedup`, proven against a real
+broker by `sdk/elixir/test/deduplication_options_test.exs`.
 The remaining gaps require separate per-SDK TDD changes and the mandatory
 `bun run test:sandbox:sdk` gate.
 

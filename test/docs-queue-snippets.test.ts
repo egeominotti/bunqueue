@@ -107,12 +107,17 @@ describe('Queue guide snippets', () => {
 
   test('TTL deduplication keys are not documented as custom job ids', () => {
     const source = readFileSync(join(DOCS_ROOT, 'queue/deduplication.mdx'), 'utf8');
-    for (const group of groups(source).slice(1, 3)) {
+    const [ttlWindow, strategies] = groups(source).slice(1, 3);
+    for (const group of [ttlWindow, strategies]) {
       const elixir = snippets(group).find((entry) => entry.label === 'Elixir');
       expect(elixir).toBeDefined();
-      expect(elixir?.code).not.toContain('deduplication:');
-      expect(elixir?.code).toContain('jobId:');
+      expect(elixir?.code).toContain('deduplication: %{id: ');
+      expect(elixir?.code).not.toContain('jobId:');
+      expect(elixir?.code).not.toMatch(/not exposed/i);
     }
+    const elixirStrategies = snippets(strategies).find((entry) => entry.label === 'Elixir');
+    expect(elixirStrategies?.code).toContain('extend: true');
+    expect(elixirStrategies?.code).toContain('replace: true');
     const management = groups(source)[3];
     expect(management).toBeDefined();
     const canonicalExamples = snippets(management).filter((entry) =>

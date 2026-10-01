@@ -132,7 +132,7 @@ See [data-model](../data-model.md) for full definitions. The central shape is `J
 - Failure: `stacktrace` (capped at `stackTraceLimit`, default `10`).
 - `timeline: JobTimelineEntry[]` — capped at `MAX_TIMELINE_ENTRIES = 20` and persisted as a MessagePack BLOB on lifecycle transitions, so it survives SQLite recovery.
 
-`JobInput` (`src/domain/types/jobs/model.ts:92-137`) is the wire/SDK input; `createJob` (`src/domain/job/create.ts:77-118`) fills defaults from `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`). Note `removeOnComplete`/`removeOnFail` are coerced via `toBoolean` because the wire boundary is not runtime-type-safe (#90, `src/domain/job/create.ts:34-45`).
+`JobInput` (`src/domain/types/jobs/model.ts:92-137`) is the wire/SDK input; `createJob` (`src/domain/job/create.ts:93-134`) fills defaults from `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`). Note `removeOnComplete`/`removeOnFail` are coerced via `toBoolean` because the wire boundary is not runtime-type-safe (#90, `src/domain/job/create.ts:50-62`). `parseBackoff` (`src/domain/job/create.ts:5-31`) turns the object form of `backoff` into `backoffConfig` and keeps `maxDelay` only when it is a finite number in `0..MAX_BACKOFF_DELAY` (24 h); anything else is dropped so the default cap applies, because embedded `Queue.add`/`addBulk` and cron admission do not run the server validator (atomic flows do, through `validateAtomicFlowBatch`, in both modes). A `null` backoff is treated as absent.
 
 `JobState` enum values: `waiting`, `prioritized`, `delayed`, `active`, `completed`, `failed` (`src/domain/types/jobs/model.ts:4-11`). The additional logical states `waiting-children` (dependency gate) and `paused` (queue-level) are represented via shard membership (`waitingDeps`/`waitingChildren`) and `QueueState.paused`, not the enum.
 
@@ -282,7 +282,7 @@ before a late SQLite insert. Selective permanent removal then transitions
 `failed` to absent without retrying and releases terminal indexes, custom-ID,
 dependency-result, result/log, and parent flow-failure ownership. 4. Broadcast `failed`; if retried, also broadcast `Retried` (prev `failed`). 5. Flow propagation when NOT retried: `failParentOnFailure` → `onChildTerminalFailure`; `removeDependencyOnFailure`/`ignoreDependencyOnFailure`/`continueParentOnFailure` → `onChildDependencyOption`.
 
-`calculateBackoff` (`src/domain/job/state.ts:37-54`): fixed = `delay * (0.8 + rand*0.4)` (±20% jitter); exponential / default = `base * 2^attempts * (0.5 + rand)` (±50% jitter), capped at `backoffConfig.maxDelay ?? DEFAULT_MAX_BACKOFF` (1 h).
+`calculateBackoff` (`src/domain/job/state.ts:37-54`): fixed = `delay * (0.8 + rand*0.4)` (±20% jitter); exponential / default = `base * 2^attempts * (0.5 + rand)` (±50% jitter), capped at `backoffConfig.maxDelay ?? DEFAULT_MAX_BACKOFF` (1 h). The same cap governs stall retries. `maxDelay` is carried into repeat successors (`buildRepeatSuccessor` copies `backoffConfig`) and cron-spawned jobs (`CronJobOptions.backoff`).
 
 ### Batch ack (`ackHelpers.ts`)
 
@@ -407,6 +407,7 @@ These operations read no environment variables directly; behavior is driven by p
 | -------------------------------------------- | -------------------- | --------------------------------------------------------------- |
 | `JobInput.maxAttempts`                       | `3` (`JOB_DEFAULTS`) | Retry ceiling (`canRetry`).                                     |
 | `JobInput.backoff`                           | `1000` ms            | Base retry delay; object form selects `fixed`/`exponential`.    |
+| `JobInput.backoff.maxDelay`                  | `3_600_000` ms       | Per-job cap on one retry delay; accepts `0..86_400_000` ms.     |
 | `JobInput.priority`                          | `0`                  | Higher = dequeued sooner; >0 sets `prioritized` timeline state. |
 | `JobInput.delay`                             | `0`                  | Adds to `runAt`; >0 → `delayed`.                                |
 | `JobInput.ttl`                               | `null`               | Expiry; expired jobs skipped on pull.                           |
@@ -414,7 +415,8 @@ These operations read no environment variables directly; behavior is driven by p
 | `JobInput.removeOnComplete` / `removeOnFail` | `false`              | Drop job on success / failure.                                  |
 | `JobInput.durable`                           | `false`              | SQLite: bypass the ~10 ms buffer; PostgreSQL is transactional.  |
 | `JobInput.stackTraceLimit`                   | `10`                 | Max stored stack lines.                                         |
-| `DEFAULT_MAX_BACKOFF`                        | `3_600_000` ms       | Backoff cap.                                                    |
+| `DEFAULT_MAX_BACKOFF`                        | `3_600_000` ms       | Backoff cap when `backoff.maxDelay` is absent.                  |
+| `MAX_BACKOFF_DELAY`                          | `86_400_000` ms      | Upper bound for `backoff`, `backoff.delay`, `backoff.maxDelay`. |
 | `MAX_TIMELINE_ENTRIES`                       | `20`                 | Timeline cap.                                                   |
 | `pullJob` `timeoutMs`                        | `0` (no wait)        | Long-poll deadline; Worker `pollTimeout` max 30 000 ms.         |
 | `DEFAULT_LOCK_TTL`                           | `30_000` ms          | Lock duration (used by `pullWithLock`, not the raw pull).       |

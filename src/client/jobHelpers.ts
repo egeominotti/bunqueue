@@ -74,8 +74,13 @@ export function buildParentOpts(job: InternalJob): { id: string; queue: string }
 
 /** Build JobOptions from internal job */
 export function buildJobOpts(job: InternalJob): JobOptions {
-  const backoff = job.backoffConfig
-    ? { type: job.backoffConfig.type, delay: job.backoffConfig.delay }
+  const config = job.backoffConfig;
+  const backoff = config
+    ? {
+        type: config.type,
+        delay: config.delay,
+        ...(typeof config.maxDelay === 'number' ? { maxDelay: config.maxDelay } : {}),
+      }
     : job.backoff;
 
   return {

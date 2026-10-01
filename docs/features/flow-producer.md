@@ -146,7 +146,8 @@ admitted, so an invalid or full group rejects the complete flow.
 not trusted. It checks:
 
 - strict runtime types for queue names, string IDs, link arrays, booleans, tags,
-  internal metadata, JSON-serializable payloads, and numeric option bounds;
+  internal metadata, JSON-serializable payloads, and numeric option bounds
+  (including `backoff.delay` and `backoff.maxDelay`, each `0..86_400_000` ms);
 - a 10 MB per-job and 64 MB aggregate flow-data bound;
 - unique IDs, dependencies, children, and parent/metadata back-references;
 - duplicate edges and graph cycles;
