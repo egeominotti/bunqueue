@@ -112,6 +112,15 @@ head:
   values), and the Rust and Elixir READMEs claimed `Hello` is sent on connect.
   The store-and-forward guides now state that a re-forward is deduplicated only
   while the remote job is live; completion or the DLQ releases its custom id.
+- **CI: wider timing margins for a PostgreSQL deduplication test.** The
+  extended-TTL convergence test left the extending push about 40 ms before a
+  100 ms TTL expired and the contender about 110 ms, including the convergence
+  wait, before the 180 ms extended TTL ended. Slow PostgreSQL 17 runners hit
+  both cases and admitted a new job. The windows are now 1000 ms and 2200 ms,
+  the contender is timed from the moment the first push returned instead of
+  after the convergence wait, and the test still proves the extension outlives
+  the original TTL. Regression:
+  `test/postgres-dedup-cache-convergence.test.ts`.
 
 ### Security
 

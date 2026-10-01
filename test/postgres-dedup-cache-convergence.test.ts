@@ -149,6 +149,14 @@ describe('PostgreSQL deduplication cache convergence', () => {
     }
   });
 
+  // Timings are scaled for CI latency. The extension must land before the
+  // first TTL (1000 ms) expires, and the contender must arrive after that
+  // expiry but before the extended TTL (2200 ms from the extension) ends. With
+  // 100/180 ms windows, slow CI runners let the key expire either before the
+  // extending push or before the contender. The contender's start is anchored
+  // to the moment the first push returned, so it always lands at least 300 ms
+  // after the original TTL, and a slow convergence (up to about a second)
+  // does not shorten its margin before the extended TTL.
   test.skipIf(!postgresUrl)('preserves an extended TTL across brokers', async () => {
     const value = namespace('ttl-extend');
     const queue = 'ttl-extend';
@@ -160,24 +168,27 @@ describe('PostgreSQL deduplication cache convergence', () => {
       const old = await first.push(queue, {
         data: { generation: 1 },
         uniqueKey: 'extend-key',
-        dedup: { ttl: 100 },
+        dedup: { ttl: 1_000 },
       });
-      await Bun.sleep(60);
+      const firstPushReturnedAt = Date.now();
+      await Bun.sleep(200);
       const extended = await second.push(queue, {
         data: { generation: 2 },
         uniqueKey: 'extend-key',
-        dedup: { ttl: 180, extend: true },
+        dedup: { ttl: 2_200, extend: true },
       });
       expect(extended.id).toBe(old.id);
-      expect(extended.deduplicationTtl).toBe(180);
+      expect(extended.deduplicationTtl).toBe(2_200);
       expect(
         await eventually(
           () =>
-            first.getJobs(queue)[0]?.deduplicationTtl === 180 &&
-            second.getJobs(queue)[0]?.deduplicationTtl === 180
+            first.getJobs(queue)[0]?.deduplicationTtl === 2_200 &&
+            second.getJobs(queue)[0]?.deduplicationTtl === 2_200
         )
       ).toBe(true);
-      await Bun.sleep(70);
+      // At least 300 ms past the original TTL: it started before push 1 returned.
+      const untilPastOriginalTtl = firstPushReturnedAt + 1_300 - Date.now();
+      if (untilPastOriginalTtl > 0) await Bun.sleep(untilPastOriginalTtl);
 
       const contender = await first.push(queue, {
         data: { generation: 3 },
