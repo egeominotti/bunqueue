@@ -232,7 +232,18 @@ Key invariant: **if `limiter.groupKey` is set, the `WorkerRateLimiter` is disabl
 
 `GroupConcurrencyLimiter` (`src/client/worker/groupConcurrency.ts`) tracks `activeByGroup: Map<groupValue, count>`:
 
-- `getGroupValue(job)` reads `job.data[groupKey]`; `null`/`undefined`/missing → `null` (not subject to the limit); non-strings are stringified.
+- `getGroupValue(job)` reads `job.data[groupKey]`; `null`/`undefined`/missing → `null` (not subject to the limit); strings are used as-is and other values are stringified with template-literal conversion (numbers, booleans, bigint, arrays and ordinary objects keep their historical keys, e.g. `42`, `true`, `1,b`, `[object Object]`).
+- `getGroupValue` is **total** (never throws): the ACK frontier, buffered
+  admission (`canProcess`) and the `increment`/`decrement` pair all call it on
+  producer-controlled data. A value whose conversion throws — e.g.
+  `{ toString: 'x' }`, valid JSON/msgpack, a null-prototype object, a symbol, or
+  an array containing such a value — falls back to
+  `Object.prototype.toString.call(value)` (`[object Object]`, `[object Symbol]`,
+  `[object Array]`); if that or the property read itself throws, the constant
+  `[bunqueue:unprintable-group-value]` is used. The fallback is deterministic,
+  so the same job always maps to the same group and counts stay balanced; the
+  limit still applies to such jobs (they may share a group with other values
+  that stringify to the same tag).
 - `canProcess(job)` → `current < maxPerGroup` (jobs without a group always pass).
 - `getNextEligibleJob()` (`worker/runtime/buffer.ts`) scans for the first group
   with capacity. `startJob()` in `runtime/execution.ts` owns the exactly-once

@@ -8,6 +8,29 @@
 import type { RateLimiterOptions } from '../types';
 import type { Job as InternalJob } from '../../domain/types/job';
 
+/** Group key used when a group value can be neither read nor converted to a string. */
+const UNPRINTABLE_GROUP_VALUE = '[bunqueue:unprintable-group-value]';
+
+/**
+ * Convert a producer-supplied group value into a stable Map key without ever
+ * throwing. Template-literal conversion runs first so existing keys stay
+ * identical (numbers, booleans, bigint, arrays, ordinary objects). A value whose
+ * conversion throws, such as `{ toString: 'x' }` decoded from JSON or msgpack, a
+ * null-prototype object or a symbol, falls back to its intrinsic
+ * `Object.prototype.toString` tag, and finally to a constant.
+ */
+function toGroupKey(value: unknown): string {
+  try {
+    return `${value as string}`;
+  } catch {
+    try {
+      return Object.prototype.toString.call(value);
+    } catch {
+      return UNPRINTABLE_GROUP_VALUE;
+    }
+  }
+}
+
 export class GroupConcurrencyLimiter {
   private readonly groupKey: string;
   private readonly maxPerGroup: number;
@@ -35,13 +58,19 @@ export class GroupConcurrencyLimiter {
   /**
    * Extract the group key value from a job's data.
    * Returns null if the job data doesn't contain the group key field.
+   * Total: never throws, because the ACK frontier, admission and group
+   * accounting all call it on producer-controlled data.
    */
   getGroupValue(job: InternalJob): string | null {
-    const data = job.data as Record<string, unknown> | null | undefined;
-    if (!data || typeof data !== 'object') return null;
-    const value = data[this.groupKey];
-    if (value === undefined || value === null) return null;
-    return typeof value === 'string' ? value : `${value as number}`;
+    try {
+      const data = job.data as Record<string, unknown> | null | undefined;
+      if (!data || typeof data !== 'object') return null;
+      const value = data[this.groupKey];
+      if (value === undefined || value === null) return null;
+      return typeof value === 'string' ? value : toGroupKey(value);
+    } catch {
+      return UNPRINTABLE_GROUP_VALUE;
+    }
   }
 
   /**

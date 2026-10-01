@@ -34,6 +34,11 @@ type Workflow = {
   on: Record<string, unknown>;
 };
 
+// Actions are pinned by commit SHA, so steps are identified by action name.
+function actionName(step: { uses?: string }): string | undefined {
+  return step.uses?.split('@')[0];
+}
+
 function dependencies(job: Job | undefined): string[] {
   if (!job?.needs) return [];
   return Array.isArray(job.needs) ? job.needs : [job.needs];
@@ -150,7 +155,7 @@ describe('release graph SDK gate', () => {
 
   test('Docker publication exposes both the release version and latest tags', () => {
     const metadata = ci.jobs.docker?.steps?.find(
-      (step) => step.uses === 'docker/metadata-action@v5'
+      (step) => actionName(step) === 'docker/metadata-action'
     );
     const tags = String(metadata?.with?.tags ?? '');
 
@@ -161,13 +166,13 @@ describe('release graph SDK gate', () => {
   test('Docker publication authenticates and tags both registries', () => {
     const steps = ci.jobs.docker?.steps ?? [];
     const hubLogin = steps.find((step) => step.with?.registry === 'docker.io');
-    expect(hubLogin?.uses).toBe('docker/login-action@v3');
+    expect(actionName(hubLogin ?? {})).toBe('docker/login-action');
     expect(hubLogin?.with?.username).toBe('${{ secrets.DOCKERHUB_USERNAME }}');
     expect(hubLogin?.with?.password).toBe('${{ secrets.DOCKERHUB_TOKEN }}');
     expect(steps.find((step) => step.name === 'Log in to Container Registry')?.with?.password).toBe(
       '${{ secrets.GITHUB_TOKEN }}'
     );
-    const metadata = steps.find((step) => step.uses === 'docker/metadata-action@v5');
+    const metadata = steps.find((step) => actionName(step) === 'docker/metadata-action');
     expect(String(metadata?.with?.images).trim().split('\n')).toEqual([
       '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}',
       'docker.io/egeominotti/bunqueue',
@@ -178,7 +183,7 @@ describe('release graph SDK gate', () => {
     expect(publish?.run).toContain('for arch in amd64 arm64');
     expect(publish?.run).toContain('docker load');
     expect(publish?.run).toContain('docker buildx imagetools create');
-    expect(steps.some((step) => step.uses === 'docker/build-push-action@v6')).toBe(false);
+    expect(steps.some((step) => actionName(step) === 'docker/build-push-action')).toBe(false);
     expect(steps.indexOf(hubLogin!)).toBeLessThan(steps.indexOf(publish!));
   });
 
@@ -193,7 +198,8 @@ describe('release graph SDK gate', () => {
     ]);
     expect(ci.jobs.docker.if).toContain("needs.docker-test.result == 'success'");
     const tags = String(
-      ci.jobs.docker.steps?.find((step) => step.uses === 'docker/metadata-action@v5')?.with?.tags
+      ci.jobs.docker.steps?.find((step) => actionName(step) === 'docker/metadata-action')?.with
+        ?.tags
     );
     expect(tags).toContain("type=raw,value=latest,enable=${{ matrix.variant == 'alpine' }}");
     expect(tags).toContain(
@@ -203,7 +209,7 @@ describe('release graph SDK gate', () => {
       step.name?.startsWith('Validate health')
     );
     const upload = ci.jobs['docker-test'].steps?.findIndex(
-      (step) => step.uses === 'actions/upload-artifact@v4'
+      (step) => actionName(step) === 'actions/upload-artifact'
     );
     expect(smoke).toBeGreaterThan(-1);
     expect(upload).toBeGreaterThan(smoke!);
@@ -228,7 +234,7 @@ describe('release graph SDK gate', () => {
       targets.map((target) => `bun-${target}`).sort()
     );
     const release = ci.jobs.release?.steps?.find(
-      (step) => step.uses === 'softprops/action-gh-release@v2'
+      (step) => actionName(step) === 'softprops/action-gh-release'
     );
     expect(release?.with?.fail_on_unmatched_files).toBe(true);
     const files = String(release?.with?.files).trim().split('\n');
@@ -285,7 +291,13 @@ describe('release graph SDK gate', () => {
     expect(releaseText).not.toContain('|| bun install');
     expect(releaseText).toContain('test "$GITHUB_REF" = refs/heads/main');
     expect(releaseText).toContain('git rev-parse origin/main');
-    expect(releaseText).toContain('bun publish --provenance --access public');
+    // Bun has no npm provenance and ignores NODE_AUTH_TOKEN: publish the
+    // verified tarball with NPM_CONFIG_TOKEN (test/repro-sdk-release-auth.test.ts).
+    expect(releaseText).toContain(
+      'bun publish --access public "/tmp/typescript-package/bunqueue-client-$SDK_VERSION.tgz"'
+    );
+    expect(releaseText).toContain('NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}');
+    expect(releaseText).not.toContain('--provenance');
     expect(releaseText).not.toContain('npm publish');
   });
 });

@@ -1,5 +1,6 @@
 import type { ConnectionOptions, WorkerOptions } from '../../types';
 import { assertGroupPullOptions } from '../../../domain/types/group';
+import { rejectLegacyConnectionOptions } from '../../legacyConnectionOptions';
 import { resolveToken } from '../../resolveToken';
 import { TcpConnectionPool } from '../../tcpPool';
 import { WORKER_CONSTANTS } from '../constants';
@@ -9,6 +10,7 @@ export function resolveWorkerOptions(
   options: WorkerOptions,
   embedded: boolean
 ): ExtendedWorkerOptions {
+  rejectLegacyConnectionOptions('Worker', options, embedded);
   assertGroupPullOptions(options.group);
   const batch = options.batch;
   if (batch) {

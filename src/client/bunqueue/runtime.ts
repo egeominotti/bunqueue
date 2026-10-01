@@ -1,4 +1,6 @@
 import type { FlowJobData, Job, Processor, QueueOptions, WorkerOptions } from '../types';
+import { rejectLegacyConnectionOptions } from '../legacyConnectionOptions';
+import { FORCE_EMBEDDED } from '../queue/helpers';
 import { Queue } from '../queue/queue';
 import { Worker } from '../worker/worker';
 import { PriorityAger } from './aging';
@@ -31,6 +33,7 @@ export abstract class BunqueueRuntime<T, R> {
   protected readonly dlqrl: DlqRateLimitManager<T>;
 
   constructor(name: string, options: BunqueueOptions<T, R>) {
+    rejectLegacyConnectionOptions('Bunqueue', options, options.embedded ?? FORCE_EMBEDDED);
     const modes = [options.processor, options.routes, options.batch].filter(Boolean).length;
     if (modes === 0) throw new Error('Bunqueue requires "processor", "routes", or "batch"');
     if (modes > 1) throw new Error('Bunqueue: use only one of "processor", "routes", or "batch"');

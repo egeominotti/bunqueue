@@ -386,8 +386,9 @@ const worker = new Worker('jobs', processor, {
 ```typescript
 import { Queue, Worker } from 'bunqueue-client';
 
-const queue = new Queue('jobs', { host: 'queue.internal', port: 6789 });
-const worker = new Worker('jobs', processor, { host: 'queue.internal', port: 6789 });
+const connection = { host: 'queue.internal', port: 6789 };
+const queue = new Queue('jobs', { connection });
+const worker = new Worker('jobs', processor, { connection });
 ```
 
 </TabItem>

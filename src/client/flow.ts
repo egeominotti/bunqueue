@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { rejectLegacyConnectionOptions } from './legacyConnectionOptions';
 import { getSharedManager } from './manager';
 import { TcpConnectionPool, getSharedPool, releaseSharedPool } from './tcpPool';
 import { jobId } from '../domain/types/job';
@@ -77,6 +78,7 @@ export class FlowProducer extends EventEmitter {
   constructor(opts: FlowProducerOptions = {}) {
     super();
     this.embedded = opts.embedded ?? FORCE_EMBEDDED;
+    rejectLegacyConnectionOptions('FlowProducer', opts, this.embedded);
 
     if (this.embedded) {
       this.tcp = null;

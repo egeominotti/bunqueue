@@ -201,6 +201,16 @@ cargo add bunqueue-client
 </TabItem>
 </Tabs>
 
+:::caution[Upgrading bunqueue-client from 0.1.x]
+`bunqueue-client` 0.2.0 is a breaking release: its default entry is now the
+canonical `bunqueue/client` API. Connection settings move into
+`connection: { host, port, token, tls }` (top-level keys now throw), TCP-mode
+control and query calls need their `*Async` variants, and `Job` is type-only.
+Follow the
+[migration guide](https://github.com/egeominotti/bunqueue/blob/main/sdk/typescript/README.md#migrating-from-01x),
+or keep the 0.1.x API unchanged with `import { Queue, Worker } from 'bunqueue-client/legacy'`.
+:::
+
 ### 3. Produce jobs
 
 <Tabs syncKey="sdk">

@@ -4,6 +4,7 @@ import type {
   GetDependenciesOpts,
   QueueOptions,
 } from '../../types';
+import { rejectLegacyConnectionOptions } from '../../legacyConnectionOptions';
 import { getSharedManager } from '../../manager';
 import { resolveToken } from '../../resolveToken';
 import { TcpConnectionPool, getSharedPool, releaseSharedPool } from '../../tcpPool';
@@ -30,6 +31,7 @@ export class QueueState<T> {
     this.queueKey = this.prefixKey + name;
     this.opts = opts;
     this.embedded = opts.embedded ?? FORCE_EMBEDDED;
+    rejectLegacyConnectionOptions('Queue', opts, this.embedded);
 
     if (this.embedded) {
       getSharedManager(opts.dataPath);

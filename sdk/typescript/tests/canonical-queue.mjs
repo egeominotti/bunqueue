@@ -104,3 +104,29 @@ await withBroker(async (connection) => {
     wire.close();
   }
 });
+
+// Refused connects before the broker listens only fail those attempts: the
+// queued add() waits for the canonical reconnect instead of "Connection lost".
+let lateQueue;
+await withBroker(
+  async (_connection, early) => {
+    try {
+      const job = await early.added;
+      assert.equal(typeof job.id, 'string');
+      assert.equal(await lateQueue.countAsync(), 1);
+      console.log('PASS canonical Queue: command queued before the broker listens');
+    } finally {
+      await lateQueue.disconnect();
+    }
+  },
+  {
+    beforeStart: async (connection) => {
+      lateQueue = new Queue(`canonical-late-${randomUUID()}`, { embedded: false, connection });
+      const added = lateQueue.add('early', { n: 1 });
+      added.catch(() => {});
+      // Let the initial connect and at least one backoff retry be refused.
+      await new Promise((resolveWait) => setTimeout(resolveWait, 300));
+      return { added };
+    },
+  }
+);

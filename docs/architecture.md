@@ -2,7 +2,9 @@
 
 Production container packaging provides Alpine, Debian, Debian slim, and
 distroless variants of the same compiled server. Native image checks precede
-publication to Docker Hub and GHCR; the default remains Alpine. See
+publication to Docker Hub and GHCR; the default remains Alpine. Images,
+binaries, the npm tarball, and the GitHub release tag of one CI run all come
+from a single release source commit (the release tag's commit on a rebuild). See
 [Docker images](./features/docker-images.md) for the build stages and data flow.
 
 The default `bunqueue-client` package is generated from the same `src/client`
@@ -687,7 +689,11 @@ factory applies PostgreSQL-native statement, lock, idle-transaction, and
 application-name parameters. `postgres/eventCommitGc.ts` adaptively drains
 orphaned commit envelopes in bounded database turns,
 while `postgres-queue-manager/projectionRefreshes.ts` coalesces authoritative
-per-job repair with job- and queue-scoped generation fencing; completion
+per-job repair with job- and queue-scoped generation fencing. Every path that
+drops a pending per-job retry because it installs authoritative state (consumed
+direct ticket, local claim, queue refresh) also clears that job's
+projection-refresh health key, so readiness cannot stay degraded without a
+retry; completion
 projections retain the queue identity read from PostgreSQL so queue-wide
 replacement cannot miss or resurrect a result. `postgres/eventRetention.ts`
 centralizes the exact-count lookup, non-blocking inline lock, ordered candidate

@@ -8,6 +8,7 @@
 !.oxlintrc.json
 !.oxfmtrc.json
 !Dockerfile.test
+!Dockerfile
 !src/
 !src/**
 !test/

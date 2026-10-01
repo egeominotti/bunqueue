@@ -597,7 +597,7 @@ new Worker(
 ```typescript
 // producer.ts
 import { Queue } from 'bunqueue-client';
-const queue = new Queue('tasks', { host: 'localhost', port: 6789 });
+const queue = new Queue('tasks', { connection: { host: 'localhost', port: 6789 } });
 await queue.addBulk(items.map((i) => ({ name: 'process', data: i })));
 
 // worker.ts (run as many copies as you want)

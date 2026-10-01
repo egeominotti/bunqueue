@@ -1,28 +1,29 @@
 import ts from 'typescript';
 import { dirname, relative } from 'node:path';
 
-/** Resolve emitted declaration imports without changing their canonical targets. */
+/**
+ * Resolve emitted declaration imports without changing their canonical targets.
+ * `runtimeModules` maps a Bun-only module (such as `bun:sqlite`) to the source
+ * of a portable declaration stand-in that is emitted beside the other types.
+ */
 export function portableDeclarationImports(
-  options: ts.CompilerOptions
+  options: ts.CompilerOptions,
+  runtimeModules: ReadonlyMap<string, string> = new Map()
 ): ts.TransformerFactory<ts.SourceFile | ts.Bundle> {
   return (context) => {
     const rewriteSource = (source: ts.SourceFile): ts.SourceFile => {
       const moduleName = (specifier: ts.StringLiteral): ts.StringLiteral => {
-        if (!specifier.text.startsWith('.')) return specifier;
-        const resolved = ts.resolveModuleName(
-          specifier.text,
-          source.fileName,
-          options,
-          ts.sys
-        ).resolvedModule;
-        if (!resolved)
+        const replacement = runtimeModules.get(specifier.text);
+        if (!replacement && !specifier.text.startsWith('.')) return specifier;
+        const resolvedFileName =
+          replacement ??
+          ts.resolveModuleName(specifier.text, source.fileName, options, ts.sys).resolvedModule
+            ?.resolvedFileName;
+        if (!resolvedFileName)
           throw new Error(
             `Cannot resolve declaration import ${specifier.text} from ${source.fileName}`
           );
-        let path = relative(dirname(source.fileName), resolved.resolvedFileName).replaceAll(
-          '\\',
-          '/'
-        );
+        let path = relative(dirname(source.fileName), resolvedFileName).replaceAll('\\', '/');
         path = path
           .replace(/(?:\.d)?\.mts$/, '.mjs')
           .replace(/(?:\.d)?\.cts$/, '.cjs')

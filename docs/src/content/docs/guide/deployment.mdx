@@ -339,14 +339,14 @@ For the prebuilt server, use Docker Hub (available from 2.9.5):
 docker run -d --name bunqueue \
   -p 6789:6789 -p 6790:6790 \
   -v bunqueue-data:/app/data \
-  egeominotti/bunqueue:2.9.5
+  egeominotti/bunqueue:2.9.6
 ```
 
-The same release is available as `ghcr.io/egeominotti/bunqueue:2.9.5`.
+The same release is available as `ghcr.io/egeominotti/bunqueue:2.9.6`.
 Both registries provide Linux amd64 and arm64 images. The volume preserves SQLite
 data across container replacement. Pin a version or digest for deployments.
 
-Choose `2.9.5-alpine`, `2.9.5-debian`, `2.9.5-slim`, or `2.9.5-distroless`.
+Choose `2.9.6-alpine`, `2.9.6-debian`, `2.9.6-slim`, or `2.9.6-distroless`.
 The moving tags are `alpine`, `debian`, `slim`, and `distroless`. Unsuffixed version
 tags and `latest` continue to select Alpine. All variants support amd64 and arm64,
 run as UID/GID `1001:1001`, and share the same ports and persistent data path.
@@ -363,7 +363,7 @@ or enable HTTPS, override the probe with the matching URL. For distroless, use a
 derived Dockerfile with JSON exec form:
 
 ```dockerfile
-FROM egeominotti/bunqueue:2.9.5-distroless
+FROM egeominotti/bunqueue:2.9.6-distroless
 HEALTHCHECK CMD ["/app/bunqueue", "healthcheck", "https://broker.example:8443/health"]
 ```
 

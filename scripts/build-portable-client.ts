@@ -90,6 +90,8 @@ for (const path of [
   resolve(root, 'scripts/client-portable/transform.ts'),
   resolve(root, 'scripts/client-portable/declarations.ts'),
   resolve(root, 'scripts/client-portable/declaration-imports.ts'),
+  resolve(root, 'scripts/client-portable/declaration-guard.ts'),
+  resolve(root, 'sdk/typescript/src/canonical-transport/bun-sqlite-types.ts'),
   resolve(root, 'sdk/typescript/package.json'),
   resolve(root, 'package.json'),
   resolve(root, 'tsconfig.json'),

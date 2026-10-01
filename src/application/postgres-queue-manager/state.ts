@@ -145,7 +145,12 @@ export abstract class PostgresQueueManagerState extends QueueManager {
 
   protected async fetchPostgresJob(id: JobId): Promise<PostgresStoredJob | null> {
     const queue = this.postgresSnapshot.get(id)?.job.queue ?? '';
-    return (await this.projectionRefreshes.refreshNow(id, queue)).row;
+    try {
+      return (await this.projectionRefreshes.refreshNow(id, queue)).row;
+    } catch (error) {
+      this.projectionRefreshes.request(id, queue); // the reported failure keeps a retry
+      throw error;
+    }
   }
 
   protected async refreshJobs(ids: readonly JobId[], queue?: string): Promise<void> {

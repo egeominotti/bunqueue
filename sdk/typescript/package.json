@@ -1,6 +1,6 @@
 {
   "name": "bunqueue-client",
-  "version": "0.1.10",
+  "version": "0.2.0",
   "description": "Cross-runtime TypeScript client for the bunqueue job queue server \u2014 Node.js, Bun, Deno and Cloudflare Workers",
   "license": "MIT",
   "type": "module",
@@ -59,11 +59,11 @@
     "cloudflare-workers"
   ],
   "dependencies": {
-    "msgpackr": "^1.11.8",
-    "bun-types": "1.4.0",
-    "@types/node": "26.0.1"
+    "msgpackr": "^1.11.8"
   },
   "devDependencies": {
+    "@types/node-20": "npm:@types/node@20.19.43",
+    "@types/node-22": "npm:@types/node@22.20.4",
     "fast-check": "4.9.0",
     "oxfmt": "0.64.0",
     "oxlint": "1.79.0",

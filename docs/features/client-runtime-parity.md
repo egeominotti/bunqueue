@@ -21,11 +21,23 @@ The portable build substitutes only the following boundaries:
 
 - `client/tcp/transport.ts`: Node-compatible sockets, TLS, byte framing,
   backpressure, and socket lifecycle. Reconnection, command ownership,
-  responses, subscriptions, and public health state remain canonical.
+  responses, subscriptions, and public health state remain canonical. Close
+  semantics match Bun's socket handlers: `onClose` fires only for a socket
+  whose TCP connection opened during the attempt (including one whose TLS
+  verification then failed). A refused attempt, or one abandoned before TCP
+  opened, only rejects the connect, so queued commands wait for the canonical
+  reconnect instead of failing with `Connection lost`.
 - `client/manager.ts` and `application/dlqManager.ts`: delegates to the actual
-  embedded backend when running on Bun. A separate conditional chunk keeps
-  `bun:sqlite` out of Node/Deno startup. Embedded mode retains its Bun
-  requirement; the network client does not pretend to emulate SQLite.
+  embedded backend when running on Bun. `canonical-transport/embedded.ts`
+  loads the separately bundled `dist/embedded.js` synchronously on first
+  embedded use through Bun's `require()` (via `createRequire(import.meta.url)`),
+  so the published output has no top-level `await` and CommonJS re-bundles
+  succeed. Node, Deno, and Workers never evaluate it and keep `bun:sqlite` out
+  of startup. `shutdownManager()` and `peekSharedManager()` never load the
+  engine: no shared manager can exist before `getSharedManager()` loaded it.
+  A CommonJS re-bundle without the engine file reports a clear error. Embedded
+  mode retains its Bun requirement; the network client does not pretend to
+  emulate SQLite.
 - A closed AST transform maps environment, timer, file, hashing, UUIDv7,
   hardware-concurrency, and worker-thread primitives. Every remaining `Bun`
   identifier fails the build, including computed access, destructuring and
@@ -95,10 +107,29 @@ worktree before any parity tests run.
 
 Published declarations resolve relative ESM imports explicitly, including directory
 indexes. Build freshness also records compiler configuration and dependency locks.
-A strict NodeNext consumer regression runs without `skipLibCheck` and
-checks payload errors. The package includes authentic Bun and Node type definitions
-because the shared public graph exposes embedded manager and SQLite types; these
-are type dependencies and do not load the Bun backend in Node or Deno.
+
+The published declaration graph is self-contained. The shared public graph
+exposes embedded manager types, whose engine declarations import Bun's SQLite
+handle; `scripts/client-portable/declarations.ts` points those `bun:sqlite`
+imports at the structural stand-in
+`sdk/typescript/src/canonical-transport/bun-sqlite-types.ts`, and the canonical
+sandbox process types use portable `ReturnType<typeof setTimeout>` and a
+minimal thread interface instead of Bun's `Timer` and Web `Worker` globals.
+`dist/index.d.ts` carries no `bun-types` reference, and the package has no
+`bun-types` or `@types/node` dependency. `scripts/client-portable/declaration-guard.ts`
+fails the build unless `dist/index.d.ts` and `dist/legacy.d.ts` type-check as a
+strict NodeNext consumer with Node types only, no DOM library, and
+`skipLibCheck: false`, and no Bun declaration file enters that program.
+`test/client-parity-consumer-types.test.ts` repeats the check against the
+packed tarball with the pinned `@types/node` 20 and 22 development aliases
+(skipped when `sdk/typescript` dependencies are not installed) and asserts that
+`Bun` is undeclared. `test/client-parity-cjs-bundle.test.ts` rejects top-level
+`await` in any published file, re-bundles `dist/index.js` as CommonJS, loads it
+in Bun and (when present) Node, and checks lazy embedded loading.
+`test/tcp-parity-transport.test.ts` and `test/tcp-parity-late-broker.test.ts`
+hold the native and portable transports to the same close semantics, and
+`sdk/typescript/tests/canonical-queue.mjs` repeats the late-broker scenario in
+Bun, Node, and Deno.
 
 ```sh
 bun run build:client

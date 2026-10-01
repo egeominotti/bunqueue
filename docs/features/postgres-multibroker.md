@@ -292,6 +292,16 @@ their map entries are reclaimed as soon as refresh or local supersession
 settles, so fencing metadata does not grow with historical job IDs.
 A failed projection is reported through storage health and retried, while the
 already committed public operation keeps its database-defined success result.
+The failure is recorded under the per-job key `projection-refresh:<jobId>` and
+every path that drops the pending retry must also settle that key. A successful
+refresh clears it. So do the paths that install authoritative state themselves:
+a consumed direct-mutation ticket (set-based lease renewal and batched
+completion), a local claim, and an authoritative queue refresh that supersedes
+the job. A cancelled or fenced-out ticket leaves the error visible because its
+caller always follows with an authoritative repair refresh, and the newer
+generation that fenced it reports its own outcome. A failed synchronous job read
+(`getJob`, `getJobState`) still rejects, but it re-queues a background retry, so
+readiness never stays degraded waiting for an unrelated later journal event.
 Deferred compatibility writes
 use a dedicated serial queue that retains failures until an observed flush.
 Concurrent flush callers at the same sequence share one checkpoint and observe
@@ -596,7 +606,11 @@ applied locally without a second database read only while their pre-write
 generation ticket, active state, and opaque token still match. A terminal
 transition, journal request, or newer direct mutation invalidates that ticket;
 the delayed response is discarded and the affected jobs share one authoritative
-projection query. Failed fences use the same coalesced repair. This
+projection query. Failed fences use the same coalesced repair. Reserving the
+ticket drops any pending background retry for that job, so consuming it also
+clears the job's `projection-refresh` storage-health key: a renewal that lands
+inside the retry window of a transient refresh failure restores readiness
+instead of leaving `/health` and `/ready` at 503 until the job's next event. This
 matters when a pooled worker pulls through one broker and renews through another.
 Disconnect cleanup releases only a never-renewed lease owned by that exact client;
 a remotely renewed lease remains fenced. Both awaited and deferred disconnect
@@ -830,10 +844,14 @@ Intentional boundaries:
 
 - Schema or connection initialization failure prevents network listeners from
   binding and closes the partially created pool.
-- Lifecycle, event-stream, queue-refresh, heartbeat, recovery, DLQ, and cron
-  health are tracked independently. Only a success from the same subsystem
-  clears its prior failure; only a complete successful journal scan clears a
-  prior journal failure. Any stored runtime error marks HTTP health/readiness
+- Lifecycle, event-stream, queue-refresh, per-job projection-refresh,
+  heartbeat, recovery, DLQ, and cron health are tracked independently. Only a
+  success from the same subsystem clears its prior failure; only a complete
+  successful journal scan clears a prior journal failure. A per-job
+  projection-refresh failure is cleared by any path that installs that job's
+  authoritative state (refresh, consumed direct ticket, local claim, or queue
+  refresh); until then every recorded failure keeps either a pending retry or
+  a follow-up repair refresh. Any stored runtime error marks HTTP health/readiness
   and the WebSocket health snapshot degraded and sets
   `bunqueue_storage_degraded=1`, even when `diskFull` is false. Client-facing
   status, dashboard, MCP, and Cloud payloads redact the internal PostgreSQL

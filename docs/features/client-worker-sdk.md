@@ -155,7 +155,13 @@ See [data-model](../data-model.md) for the full `Job` shape. Key types used here
 `concurrency=1`, `autorun=true`, `heartbeatInterval=10000`,
 `batchSize=min(opts,1000)` default 10, `pollTimeout=min(opts,30000)` default 0,
 `useLocks=true`, `drainDelay=50`, `lockDuration=30000`,
-`maxStalledCount=1`. `worker/runtime/state.ts` owns
+`maxStalledCount=1`. It first calls `rejectLegacyConnectionOptions()`
+(`client/legacyConnectionOptions.ts`): in TCP mode a defined top-level `host`,
+`port`, `token`, or `tls` (the flat bunqueue-client 0.1.x shape, never read)
+throws before any pool, timer, or subscription exists, naming the keys to move
+into `connection`. `SandboxedWorker` runs the same guard unless an embedded
+`manager` is injected, because without `connection` it would silently run
+embedded. `worker/runtime/state.ts` owns
 `queueKey = (prefixKey ?? '') + name`, transport construction, ACK-batcher
 wiring, reconnect registration, and the `autorun` decision.
 
@@ -365,13 +371,17 @@ process alive; `autoStart` can watch the queue after an idle stop.
   `runtime/polling.ts` permits bounded pull-ahead when the buffer is blocked.
   Automatic and manual dispatch increment the group exactly once and release
   it in their terminal cleanup; `duration` remains unused in group mode.
+  Group-value extraction never throws (see
+  [Rate Limiting & Concurrency](./rate-limiting-and-concurrency.md)), so a
+  producer-supplied value such as `{ toString: 'x' }` cannot break the pull
+  loop, the ACK frontier, or the `concurrency` setter.
 
 ## Edge Cases & Failure Modes
 
 - **Pull errors**: `handlePullError` in `worker/runtime/polling.ts` emits
   `error` with `consecutiveErrors` / `context:'pull'` and backs off
   exponentially from 100ms to 30s. A successful pick resets the counter.
-- **ACK batching/backpressure** (`ackBatcher.ts`, `ackFrontier.ts`): flush triggers at the configured batch size, capped in TCP mode by an event-driven reachable-outcome frontier, or after `interval` (`DEFAULT_ACK_INTERVAL=50ms`). The frontier is the ACKs already pending plus started delivery generations that can still ACK plus scalar buffered deliveries that can start without first settling a pending ACK. Buffered eligibility observes runtime concurrency, rate capacity, and simulated per-group reservations; a sealed native batch contributes its exact started members rather than its configured maximum. A generation transfers synchronously from the unqueued set into the pending batch, while failure, an applied manual transition, pause, rate-limit changes, concurrency changes, and close re-evaluate a reduced frontier. ACKs assigned to an in-flight flush no longer contribute to later batches. The buffer is bounded at `MAX_PENDING_ACKS=10000`; `queue()` blocks (awaits in-flight, then flushes) rather than dropping acks. `sendBatchWithRetry` retries transient failures up to `maxRetries=3` with exponential backoff (`100,200,400ms`). A valid structured `ignoredIndices` response settles only those exact pending positions as `false` without retry or error; malformed/unknown evidence is rejected. On true exhaustion it logs `(N acks lost)` and rejects each pending promise. `stop()` clears any still-queued acks _without settling their promises_ (callers are expected to `flush()` + `waitForInFlight()` first, as `Worker.close()` does); a batch already mid-retry when `stop()` lands is rejected with `AckBatcher stopped`.
+- **ACK batching/backpressure** (`ackBatcher.ts`, `ackFrontier.ts`): flush triggers at the configured batch size, capped in TCP mode by an event-driven reachable-outcome frontier, or after `interval` (`DEFAULT_ACK_INTERVAL=50ms`). The frontier is the ACKs already pending plus started delivery generations that can still ACK plus scalar buffered deliveries that can start without first settling a pending ACK. Buffered eligibility observes runtime concurrency, rate capacity, and simulated per-group reservations; a sealed native batch contributes its exact started members rather than its configured maximum. A generation transfers synchronously from the unqueued set into the pending batch, while failure, an applied manual transition, pause, rate-limit changes, concurrency changes, and close re-evaluate a reduced frontier. ACKs assigned to an in-flight flush no longer contribute to later batches. Evaluating the dynamic ceiling never throws out of `queue()` or `notifyCapacityChanged()`: once an ACK is pushed into the pending batch it stays owned by the batcher, so if the ceiling callback throws, the batcher falls back to the static `batchSize` (the `interval` timer is still armed), reports the error through `onThresholdError` (the Worker emits `error` with `context: 'ack-threshold'` only when an `error` listener exists; a throwing observer is ignored), and never rejects the ACK promise — so a successful job is never turned into a FAIL, and the `concurrency`/`pause`/`rateLimit` setters and failure-path frontier retirements cannot throw from it. The buffer is bounded at `MAX_PENDING_ACKS=10000`; `queue()` blocks (awaits in-flight, then flushes) rather than dropping acks. `sendBatchWithRetry` retries transient failures up to `maxRetries=3` with exponential backoff (`100,200,400ms`). A valid structured `ignoredIndices` response settles only those exact pending positions as `false` without retry or error; malformed/unknown evidence is rejected. On true exhaustion it logs `(N acks lost)` and rejects each pending promise. `stop()` clears any still-queued acks _without settling their promises_ (callers are expected to `flush()` + `waitForInFlight()` first, as `Worker.close()` does); a batch already mid-retry when `stop()` lands is rejected with `AckBatcher stopped`.
 - **Graceful close** (`worker/runtime/lifecycle.ts`): `close(false)` stops
   timers, moves buffered leased jobs back to waiting, waits only for active
   processors, flushes ACKs, unregisters, and closes the pool. `close(true)`

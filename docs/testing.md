@@ -508,7 +508,9 @@ configuration also includes `docs/vercel.json`, the CI workflow files, and the
 two Compose manifests, plus the small per-SDK mutation configuration files
 consumed by structural regressions. The PostgreSQL manifest is required by the
 credential-safety test. The image includes `Dockerfile.test` itself so tests can
-verify that this contract stays synchronized with the workflow files. It does
+verify that this contract stays synchronized with the workflow files, and the
+production `Dockerfile` so the release preflight regression checks the real
+variant build inputs instead of a missing file. It does
 not install SDK toolchains or copy credentials into the core test image.
 `Dockerfile.test.dockerignore` limits the build context to those inputs.
 
@@ -532,7 +534,14 @@ prove that a 60-second empty long-poll does not own lifecycle admission, late
 synchronous writes fail at the gate, and disconnect cleanup remains harmless.
 Projection regressions inject failures after a durable push or ACK and assert
 both that public success is preserved and that bounded background repair
-restores a healthy local snapshot. Additional deterministic cases keep a direct
+restores a healthy local snapshot. Projection-health regressions
+(`test/repro-postgres-direct-projection-clears-health.test.ts` without a
+database, `test/postgres-projection-health-recovery.test.ts` against
+PostgreSQL) record a refresh failure whose retry is still pending, then prove
+that a lease renewal, batched completion, local claim, or queue refresh that
+supersedes it clears the per-job health key so `/ready` returns 200, that a
+cancelled or fenced-out ticket leaves the error to its repair refresh, and that
+a failed job read re-queues a retry. Additional deterministic cases keep a direct
 claim token across delayed journal replay, retry every captured client lease
 after a transient release error, bound repeated startup-buffer overflow, stop
 queue refresh under continuous event-version churn, serialize each maintenance
@@ -719,7 +728,8 @@ alongside `latest` and the variant aliases, so production deployments can pin
 the same version as npm without losing the moving convenience tag.
 The same multi-platform build (`linux/amd64` and `linux/arm64`) publishes these
 tags to both `ghcr.io/egeominotti/bunqueue` and `docker.io/egeominotti/bunqueue`.
-Native image staging tags and the full-SHA variant index exist only on GHCR.
+Native image staging tags and the full-SHA variant index exist only on GHCR and
+are named after the release source commit (`source_sha`).
 Docker Hub receives a copy of the completed GHCR index with public version and
 variant aliases. Neither registry receives new timestamp tags. The publication
 regression executes the workflow shell with a recording Docker stub to verify
@@ -731,13 +741,33 @@ or push failure fails the Docker job and blocks the downstream GitHub release.
 Normal pushes skip already released versions. A manual CI run on main with
 `rebuild_docker=true` repeats the quality and binary gates and republishes Docker
 images for the current package version without editing its GitHub release/tag.
+
+Every published artifact of a run comes from one commit. The version gate
+outputs `source_sha`: the pushed commit for a new version, or, when the tag
+`v<version>` already exists (rebuild or npm publication), that tag's commit,
+with annotated tags dereferenced through their peeled `^{}` ref. The gate
+fetches the tag commit and fails unless its `package.json` carries the same
+version; an unresolvable commit or non-40-hex value also fails. The binary
+build, image test, Docker publication, npm, and release jobs check out exactly
+`source_sha`, and the binary build asserts `git rev-parse HEAD` because an empty
+checkout ref would silently use the triggering commit. Images carry
+`org.opencontainers.image.revision`/`version` labels that are verified before
+export, and the GitHub release passes `target_commitish: source_sha` so a commit
+landing on main during the pipeline cannot move the new tag. The quality gate
+keeps testing the triggering commit; a rebuilt tag was gated at its release.
+Rebuilding runs the current workflow against the tagged tree, so a tag missing
+newer build inputs fails loudly: `v2.9.5`, for instance, has no Docker variant
+stages or image test and stops at the image-test preflight.
+`test/repro-release-source-commit.test.ts` executes the gate, label check,
+preflight, and staging-tag scripts against Git/Docker stubs.
 The four-variant native amd64/arm64 image test matrix must pass in full before
 publication. It exports the tested images; publishing loads those exact archives
 instead of rebuilding. See [Docker images](./features/docker-images.md) for the
 offline smoke checks, tag mapping, and artifact lifecycle.
 The optional manual `npm_version` input must exactly match `package.json` and
 also requests the Docker rebuild path. The root npm job waits for the binary
-and Docker gates, verifies that the registry returns 404 for that version,
+and Docker gates, checks out `source_sha` (the existing tag's commit when that
+version is already tagged), verifies that the registry returns 404 for that version,
 rechecks the packed consumer contract, and publishes its saved tarball with
 `bun publish --access public` using the existing `NPM_TOKEN` Actions secret.
 The pinned Bun version does not support npm provenance, so this job does not
@@ -755,9 +785,31 @@ download table and `SHA256SUMS`. Missing binaries or unmatched release assets
 fail publication rather than producing an incomplete release. Cross-compilation
 alone does not establish native runtime compatibility on each target.
 `test/repro-release-sdk-gate.test.ts` locks both the version and `latest` tags.
-The TypeScript package publisher is manual, runs the same reusable
-six-SDK gate, uses frozen installs and pinned Bun, publishes with `bun publish`,
-and creates its tag only after the registry accepts the package.
+The TypeScript package publisher (`.github/workflows/sdk-release.yml`) is
+manual, runs the same reusable six-SDK gate, uses frozen installs and pinned
+Bun, and creates its `sdk-ts-v<version>` tag only after the registry accepts the
+package. It packs `/tmp/typescript-package/bunqueue-client-<version>.tgz`,
+validates the requested version, requires Git exit status 2 for an absent tag
+and an explicit registry 404 for an unpublished version (network or
+authentication errors stop it), then runs `bun pm whoami` and
+`bun publish --dry-run` on that tarball and publishes the same tarball with
+`bun publish --access public`. Like the root npm job it passes `NPM_TOKEN` as
+`NPM_CONFIG_TOKEN` to those two steps only, and it requests no npm provenance
+and no `id-token` permission. `test/repro-sdk-release-auth.test.ts` locks this.
+
+Every third-party `uses:` in `.github/workflows/` is pinned to a full 40-hex
+commit SHA with the resolved release in a trailing comment (for example
+`actions/checkout@<sha> # v4.4.0`); only local reusable workflows
+(`./.github/workflows/*.yml`) use paths. Pins stay on the major version
+previously referenced and are resolved with
+`git ls-remote --tags https://github.com/<owner>/<repo>`, dereferencing annotated
+tags through `^{}`. `dtolnay/rust-toolchain` selects its toolchain by ref name,
+so it is pinned to a `master` commit with an explicit `toolchain:` input
+(`1.85.0` or `stable`, matching the former refs). To update a pin, resolve the
+new release the same way and change the SHA and comment together in every
+workflow; `test/repro-workflow-action-pinning.test.ts` rejects mutable refs,
+missing release comments, divergent pins of one action, and implicit Rust
+toolchains.
 
 The finite release-DAG relationships are parsed and mutation-checked by
 `test/repro-release-sdk-gate.test.ts`; actionlint validates the full GitHub

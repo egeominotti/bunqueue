@@ -33,14 +33,20 @@ async function isListening(port) {
   });
 }
 
-/** Every canonical runtime campaign owns a fresh broker and temporary SQLite. */
-export async function withBroker(run) {
+/**
+ * Every canonical runtime campaign owns a fresh broker and temporary SQLite.
+ * `beforeStart` runs against the reserved address before the broker listens;
+ * its result is passed to `run` as the second argument.
+ */
+export async function withBroker(run, { beforeStart } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'bunqueue-canonical-'));
   let broker;
   let exited;
   let logs = '';
   try {
     const port = await freePort();
+    const connection = { host: '127.0.0.1', port, poolSize: 1 };
+    const early = beforeStart ? await beforeStart(connection) : undefined;
     broker = spawn('bun', ['src/main.ts'], {
       cwd: root,
       env: {
@@ -67,7 +73,7 @@ export async function withBroker(run) {
         throw new Error(`Broker startup failed: ${logs}`);
       await sleep(25);
     }
-    await run({ host: '127.0.0.1', port, poolSize: 1 });
+    await run(connection, early);
   } catch (error) {
     if (logs) console.error(logs);
     throw error;

@@ -3,6 +3,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { rejectLegacyConnectionOptions } from './legacyConnectionOptions';
 import { getSharedManager } from './manager';
 import { EventType, type JobEvent } from '../domain/types/queue';
 import { TcpEventSubscription } from './queue-events/tcpSubscription';
@@ -71,6 +72,9 @@ export class QueueEvents<R = unknown, P = unknown> extends EventEmitter {
 
   constructor(name: string, options: QueueEventsOptions = {}) {
     super();
+    // Without `connection` this class falls back to embedded mode, so flat keys
+    // are rejected unless the caller explicitly selected embedded mode.
+    rejectLegacyConnectionOptions('QueueEvents', options, options.embedded === true);
     this.name = name;
     this.options = options;
     this.queueKey = (options.prefixKey ?? '') + name;

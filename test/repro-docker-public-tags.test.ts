@@ -8,9 +8,11 @@ const workflow = Bun.YAML.parse(
   await Bun.file(`${import.meta.dir}/../.github/workflows/ci.yml`).text()
 ) as { jobs: { docker: { steps: Step[] } } };
 const steps = workflow.jobs.docker.steps;
+// Actions are pinned by commit SHA, so steps are identified by action name.
+const action = (step: Step) => step.uses?.split('@')[0];
 
 test('public Docker metadata contains only release and variant aliases', () => {
-  const metadata = steps.find((step) => step.uses === 'docker/metadata-action@v5');
+  const metadata = steps.find((step) => action(step) === 'docker/metadata-action');
   const tags = metadata?.with?.tags ?? '';
   expect(tags).not.toContain('type=sha');
   expect(tags).not.toContain('{{date');
@@ -40,7 +42,7 @@ test.each(['', 'push ', 'buildx imagetools create '])(
           FAIL_PREFIX: failurePrefix,
           REGISTRY: 'ghcr.io',
           IMAGE_NAME: 'egeominotti/bunqueue',
-          GITHUB_SHA: 'a'.repeat(40),
+          SOURCE_SHA: 'a'.repeat(40),
           VARIANT: 'debian',
           TAGS: [
             'ghcr.io/egeominotti/bunqueue:2.9.5-debian',

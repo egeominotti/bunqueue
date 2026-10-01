@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import type { Job } from '../../types';
+import { rejectLegacyConnectionOptions } from '../../legacyConnectionOptions';
 import { getSharedManager } from '../../manager';
 import { getSharedPool, type TcpConnectionPool } from '../../tcpPool';
 import { type QueueOps, createEmbeddedOps, createTcpOps } from '../queueOps';
@@ -54,6 +55,9 @@ export abstract class SandboxedState<T = unknown> extends EventEmitter {
 
   constructor(queueName: string, options: SandboxedWorkerOptions) {
     super();
+    // Without `connection` this class runs embedded, so flat keys are rejected
+    // unless an embedded manager was injected explicitly.
+    rejectLegacyConnectionOptions('SandboxedWorker', options, options.manager !== undefined);
     this.queueName = queueName;
     this.workerId = `sandboxed-worker-${queueName}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 

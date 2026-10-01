@@ -3,6 +3,8 @@
  * Manages lifecycle of internal Queue, Worker, and Store.
  */
 
+import { rejectLegacyConnectionOptions } from '../legacyConnectionOptions';
+import { FORCE_EMBEDDED } from '../queue/helpers';
 import { Queue } from '../queue/queue';
 import { Worker } from '../worker/worker';
 import { WorkflowStore } from './store';
@@ -31,6 +33,7 @@ export class Engine {
   private readonly emitter: WorkflowEmitter;
 
   constructor(opts: EngineOptions = {}) {
+    rejectLegacyConnectionOptions('Engine', opts, opts.embedded ?? FORCE_EMBEDDED);
     const queueName = opts.queueName ?? DEFAULT_QUEUE_NAME;
 
     this.queue = new Queue(queueName, {

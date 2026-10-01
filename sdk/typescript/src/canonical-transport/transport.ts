@@ -49,6 +49,9 @@ export function createConnection(
     const tls = buildClientTls(target.tls);
     const parser = new FrameParser();
     let settled = false;
+    // TCP reached the peer during this attempt (Bun's `open`); TLS may still fail.
+    let tcpOpened = false;
+    // The attempt resolved and the client owns the socket.
     let opened = false;
     let socket: Socket;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -88,8 +91,9 @@ export function createConnection(
       },
     };
 
-    socket.on(tls === undefined ? 'connect' : 'secureConnect', () => {
+    const open = () => {
       if (settled) {
+        // A late socket from an abandoned attempt never reaches the client.
         socket.destroy();
         return;
       }
@@ -99,7 +103,13 @@ export function createConnection(
       socket.setNoDelay(true);
       socket.setKeepAlive(true, 15000);
       resolve({ socket: wrapper, cleanup });
+    };
+    // TLS sockets also emit the TCP-level `connect` before `secureConnect`.
+    socket.on('connect', () => {
+      if (!settled) tcpOpened = true;
+      if (tls === undefined) open();
     });
+    if (tls !== undefined) socket.on('secureConnect', open);
     socket.on('data', (data: Buffer) => {
       let frames: Uint8Array[];
       try {
@@ -129,7 +139,11 @@ export function createConnection(
     socket.on('close', () => {
       fail(new Error('Connection closed'));
       cleanup();
-      events.onClose();
+      // Like Bun, only a socket whose TCP connection opened reports a close. A
+      // refused attempt, or one abandoned before TCP opened, only fails the
+      // connect: the canonical client keeps queued commands and retries instead
+      // of running its lost-connection path.
+      if (tcpOpened) events.onClose();
     });
     timer = setTimeout(() => {
       fail(new Error(`Connection timeout to ${description}`));

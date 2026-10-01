@@ -24,6 +24,7 @@ interface PendingProjection {
 
 export interface PostgresDirectProjectionTicket {
   readonly id: JobId;
+  readonly queue: string;
   readonly generation: symbol;
 }
 
@@ -62,12 +63,18 @@ export class PostgresProjectionRefreshes {
   beginDirect(id: JobId, queue: string): PostgresDirectProjectionTicket {
     const generation = this.beginGeneration(id, queue);
     this.pending.delete(id);
-    return { id, generation };
+    return { id, queue, generation };
   }
 
+  /**
+   * Settle a still-current direct mutation whose committed row the caller applies now.
+   * That row supersedes any failed refresh whose retry `beginDirect` dropped, so the
+   * stale refresh error is cleared here instead of waiting for an unrelated later event.
+   */
   consumeDirect(ticket: PostgresDirectProjectionTicket): boolean {
     if (this.generations.get(ticket.id) !== ticket.generation) return false;
     this.endGeneration(ticket.id, ticket.generation);
+    this.report(ticket.queue, ticket.id, null);
     return true;
   }
 
@@ -75,10 +82,13 @@ export class PostgresProjectionRefreshes {
     this.endGeneration(ticket.id, ticket.generation);
   }
 
+  /** Drop older work after a claim or queue refresh installed authoritative state for `id`. */
   supersede(id: JobId): void {
+    const queue = this.generationQueues.get(id) ?? '';
     this.pending.delete(id);
     this.generations.delete(id);
     this.generationQueues.delete(id);
+    this.report(queue, id, null);
   }
 
   supersedeQueue(queue: string): void {

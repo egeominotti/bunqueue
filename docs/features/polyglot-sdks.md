@@ -15,6 +15,15 @@ observability behavior must agree with `docs/protocol.md`.
 | Rust | yes | bounded threads | yes | yes | callback |
 | Elixir | yes | `Task.async_stream` | yes | yes | callback |
 
+The TypeScript SDK (`bunqueue-client` 0.2.0) ships the canonical
+`bunqueue/client` API as its default entry, a breaking change from 0.1.x; the
+0.1.x API stays unchanged at `bunqueue-client/legacy`, and
+`sdk/typescript/README.md#migrating-from-01x` is the migration guide. The
+package has one runtime dependency (`msgpackr`), no top-level `await` (CommonJS
+bundlers accept it), and self-contained declarations that need only the
+consumer's `@types/node`. See [Canonical client parity](client-runtime-parity.md)
+for the portable transport, embedded loader, and declaration gates.
+
 ## Core feature parity audit
 
 The source-level audit on **2026-08-01** compared the public Bun client with
@@ -258,7 +267,16 @@ the same planner and snapshot-validator surface.
 The manual TypeScript SDK publisher accepts only the current `origin/main`
 commit. Selecting a feature branch or a stale main commit in the Actions UI
 fails before dependencies are installed, packaged artifacts are created, or
-registry credentials are used.
+registry credentials are used. It packs `bunqueue-client-<version>.tgz` once,
+requires the requested version to match `sdk/typescript/package.json`, treats
+only Git exit status 2 as an absent `sdk-ts-v<version>` tag and only a registry
+404 as an unpublished version, then verifies `bun pm whoami` and
+`bun publish --dry-run` on that tarball before publishing the same tarball.
+The pinned Bun CLI reads the token only from `NPM_CONFIG_TOKEN` (it ignores the
+`setup-node` `.npmrc`), so `NPM_TOKEN` is passed under that name to the dry-run
+and publication steps only. Bun produces no npm provenance, so none is
+requested and the job holds no `id-token` permission. The tag is pushed only
+after publication succeeds. See [Testing](../testing.md#ci).
 
 Each SDK also owns an opt-in sustained profile that reuses one connection while
 repeatedly adding, querying, and resetting configurable batches. Weekly CI runs

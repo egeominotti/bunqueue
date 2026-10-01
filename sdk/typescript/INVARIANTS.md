@@ -22,6 +22,18 @@ queue engine. The historical SDK implementation is isolated at `/legacy`.
 - Bun, Node 20/22, and Deno canonical scenarios are mandatory. Protocol
   conformance uses the default entry; compatibility tests use `/legacy`
   explicitly and never substitute for canonical parity coverage.
+- The portable socket adapter reports a close only for a socket whose TCP
+  connection opened, exactly like Bun's handlers. A refused attempt, or one
+  abandoned before TCP opened, only rejects the connect; queued commands wait
+  for the canonical reconnect and never fail with `Connection lost`.
+- Published JavaScript has no top-level `await` and must re-bundle as
+  CommonJS. The Bun-only engine loads synchronously on first embedded use and
+  is never evaluated by Node, Deno, or Workers.
+- Published declarations are self-contained: no `bun-types` reference, no Bun
+  or DOM-only globals, no `bun:*` modules. The only runtime dependency is
+  `msgpackr`; consumers bring their own `@types/node`.
+- In TCP mode, top-level `host`, `port`, `token`, or `tls` options throw;
+  connection settings live only in `connection`.
 - The contracts below describe the retained low-level transport and historical
   compatibility API where it exposes additional SDK-specific helpers.
 

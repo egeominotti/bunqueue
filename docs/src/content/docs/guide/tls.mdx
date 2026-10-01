@@ -82,13 +82,19 @@ const queue3 = new Queue('jobs', {
 import { Queue, Worker } from 'bunqueue-client';
 
 // Public CA (Let's Encrypt etc.): verify with system CAs
-const queue = new Queue('jobs', { host: 'queue.example.com', port: 6789, tls: true });
+const queue = new Queue('jobs', {
+  connection: { host: 'queue.example.com', port: 6789, tls: true },
+});
 
 // Private CA or self-signed: trust a specific CA file
-const queue2 = new Queue('jobs', { host: '10.0.0.5', port: 6789, tls: { caFile: './ca.pem' } });
+const queue2 = new Queue('jobs', {
+  connection: { host: '10.0.0.5', port: 6789, tls: { caFile: './ca.pem' } },
+});
 
 // Dev only: skip verification
-const queue3 = new Queue('jobs', { host: 'localhost', port: 6789, tls: { rejectUnauthorized: false } });
+const queue3 = new Queue('jobs', {
+  connection: { host: 'localhost', port: 6789, tls: { rejectUnauthorized: false } },
+});
 ```
 
 </TabItem>

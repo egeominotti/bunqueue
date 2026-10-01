@@ -130,6 +130,10 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
       maxBatchSize: this.embedded
         ? undefined
         : (pendingCount) => pendingCount + this.reachableUnqueuedAckCount(),
+      onThresholdError: (error) => {
+        if (this.listenerCount('error') === 0) return;
+        this.emit('error', Object.assign(error, { context: 'ack-threshold' }));
+      },
     });
 
     if (this.embedded) {

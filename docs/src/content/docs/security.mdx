@@ -89,7 +89,9 @@ const queue = new Queue('emails', {
 ```typescript
 import { Queue } from 'bunqueue-client';
 
-const queue = new Queue('emails', { host: 'q.internal', token: process.env.BUNQUEUE_TOKEN });
+const queue = new Queue('emails', {
+  connection: { host: 'q.internal', token: process.env.BUNQUEUE_TOKEN },
+});
 ```
 
 </TabItem>

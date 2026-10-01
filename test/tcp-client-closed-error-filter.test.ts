@@ -11,9 +11,10 @@
  * We deliberately do NOT test process.on('unhandledRejection') event firing
  * here because Bun's test runner treats fire-and-forget rejections as test
  * failures, conflicting with the global event-loop semantics we'd be probing.
- * That interaction is covered by the TCP integration suite
- * (test-sandboxed-worker.ts) which exercises the full close-and-rejectAll
- * path against a live server and now exits cleanly with code 0.
+ * That interaction is covered in child processes by
+ * repro-client-closed-filter-swallows-app-rejections.test.ts and by the TCP
+ * integration suite (test-sandboxed-worker.ts), which exercises the full
+ * close-and-rejectAll path against a live server and exits cleanly with code 0.
  */
 
 import { describe, test, expect } from 'bun:test';

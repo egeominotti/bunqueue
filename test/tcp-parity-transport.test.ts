@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { createServer, type Socket } from 'node:net';
+import { createServer as createTlsServer } from 'node:tls';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { once } from 'node:events';
 import { pack, unpack } from 'msgpackr';
 import { FrameParser } from '../src/infrastructure/server/protocol/frameParser';
@@ -82,26 +86,93 @@ describe('portable canonical TCP transport', () => {
     expect(tlsRequiresVerification({ rejectUnauthorized: false })).toBe(false);
   });
 
-  test('rejects a refused connection without retaining a socket', async () => {
+  // A connection that never opened only fails the attempt. Reporting it as a
+  // close would run the client's lost-connection path and reject every queued
+  // command instead of letting the canonical reconnect loop retry.
+  test.each([
+    ['native', nativeConnection],
+    ['portable', createConnection],
+  ] as const)('%s fails a refused connection without reporting a close', async (_name, connect) => {
     const server = createServer();
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const port = (server.address() as { port: number }).port;
     server.close();
     await once(server, 'close');
-    let resolveClosed!: () => void;
-    const closed = new Promise<void>((resolve) => {
-      resolveClosed = resolve;
-    });
+    const events: string[] = [];
     await expect(
-      createConnection({ host: '127.0.0.1', port }, 1000, {
+      connect({ host: '127.0.0.1', port }, 1000, {
         onData: () => {},
-        onClose: resolveClosed,
-        onError: () => {},
+        onClose: () => events.push('close'),
+        onError: (error) => events.push(`error:${error.message}`),
       })
     ).rejects.toThrow(`Failed to connect to 127.0.0.1:${port}`);
-    await closed;
+    // Node emits the socket close on a later tick; give it ample time to surface.
+    await Bun.sleep(100);
+    expect(events).toEqual([]);
   });
+
+  // Bun opens the TCP socket before TLS verification fails, so its close is
+  // reported; the portable transport must report exactly one close as well.
+  test.each([
+    ['native', nativeConnection],
+    ['portable', createConnection],
+  ] as const)(
+    '%s reports one close when TLS verification fails after TCP opened',
+    async (_name, connect) => {
+      const directory = mkdtempSync(join(tmpdir(), 'bq-transport-tls-'));
+      const cert = join(directory, 'cert.pem');
+      const key = join(directory, 'key.pem');
+      const generated = Bun.spawnSync([
+        'openssl',
+        'req',
+        '-x509',
+        '-newkey',
+        'rsa:2048',
+        '-keyout',
+        key,
+        '-out',
+        cert,
+        '-days',
+        '1',
+        '-nodes',
+        '-subj',
+        '/CN=localhost',
+      ]);
+      if (generated.exitCode !== 0) throw new Error(generated.stderr.toString());
+      const server = createTlsServer({ cert: readFileSync(cert), key: readFileSync(key) }, (s) =>
+        s.on('error', () => {})
+      );
+      server.listen(0, '127.0.0.1');
+      await once(server, 'listening');
+      const port = (server.address() as { port: number }).port;
+      const events: string[] = [];
+      let reportClose!: () => void;
+      const reported = new Promise<void>((resolve) => {
+        reportClose = resolve;
+      });
+      try {
+        // The self-signed certificate is not trusted by default.
+        await expect(
+          connect({ host: '127.0.0.1', port, tls: true }, 2000, {
+            onData: () => {},
+            onClose: () => {
+              events.push('close');
+              reportClose();
+            },
+            onError: (error) => events.push(`error:${error.message}`),
+          })
+        ).rejects.toThrow('127.0.0.1');
+        // Bun closes after a graceful end(); wait for it, then for any duplicate.
+        await Promise.race([reported, Bun.sleep(5000)]);
+        await Bun.sleep(50);
+        expect(events).toEqual(['close']);
+      } finally {
+        server.close();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
 
   test('rejects oversized frames and closes the peer connection', async () => {
     const sockets = new Set<Socket>();

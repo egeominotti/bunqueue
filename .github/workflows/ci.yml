@@ -34,13 +34,13 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: 1.26.5
           cache: false
@@ -58,9 +58,9 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -77,9 +77,9 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -130,9 +130,9 @@ jobs:
       BUNQUEUE_TEST_POSTGRES_URL: postgresql://bunqueue:bunqueue@127.0.0.1:5432/bunqueue
       BUNQUEUE_TEST_POSTGRES_VERSION_PREFIX: ${{ matrix.postgres.expected }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -147,9 +147,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -164,9 +164,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -181,9 +181,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -195,7 +195,7 @@ jobs:
 
       - name: Upload the method-by-method public API matrix
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: core-public-api-e2e-matrix
           path: artifacts/core-e2e/
@@ -210,12 +210,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # full history: the sitemap derives real per-page lastmod from git log
           fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -249,9 +249,9 @@ jobs:
     name: WebSocket/SSE Integration Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
@@ -313,6 +313,10 @@ jobs:
   # Version gate — only build binaries / cut a release when package.json
   # version is NEW (avoids rebuilding 8×~90MB binaries + a fresh release on
   # every docs/chore commit to main, which never bumps the version).
+  # It also fixes the exact source commit of every published artifact:
+  # the pushed commit for a new version, or the existing release tag's commit
+  # for a manual Docker rebuild / npm publication of an already tagged version.
+  # Every build, test, package, and publish job checks out `source_sha`.
   # ============================================
   version-gate:
     name: Version gate
@@ -324,10 +328,11 @@ jobs:
       github.ref == 'refs/heads/main'
     outputs:
       version: ${{ steps.gate.outputs.version }}
+      source_sha: ${{ steps.gate.outputs.source_sha }}
       should_release: ${{ steps.gate.outputs.should_release }}
       should_build: ${{ steps.gate.outputs.should_build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Decide whether this version is already released
         id: gate
@@ -341,21 +346,50 @@ jobs:
             echo "::error::Requested npm version does not match package.json"
             exit 1
           fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-            echo "should_build=$REBUILD_DOCKER" >> "$GITHUB_OUTPUT"
-            echo "::notice::v$VERSION already released; Docker rebuild requested: $REBUILD_DOCKER"
+          TAG="v$VERSION"
+          if TAG_REFS=$(git ls-remote --exit-code --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}"); then
+            # Rebuild/republish an existing release only from its tagged commit.
+            # Annotated tags list a peeled `^{}` line naming the commit; a
+            # lightweight tag names the commit directly.
+            SOURCE_SHA=$(awk -v ref="refs/tags/$TAG^{}" '$2 == ref { print $1 }' <<< "$TAG_REFS")
+            if [[ -z "$SOURCE_SHA" ]]; then
+              SOURCE_SHA=$(awk -v ref="refs/tags/$TAG" '$2 == ref { print $1 }' <<< "$TAG_REFS")
+            fi
+            if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Unable to resolve the commit of release tag $TAG"
+              exit 1
+            fi
+            git fetch --no-tags --depth=1 origin "$SOURCE_SHA"
+            TAG_VERSION=$(git show "$SOURCE_SHA:package.json" |
+              node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+            if [[ "$TAG_VERSION" != "$VERSION" ]]; then
+              echo "::error::Release tag $TAG points to $SOURCE_SHA, whose package.json version is $TAG_VERSION"
+              exit 1
+            fi
+            SHOULD_RELEASE=false
+            SHOULD_BUILD=$REBUILD_DOCKER
+            echo "::notice::$TAG already released at $SOURCE_SHA; rebuild requested: $REBUILD_DOCKER"
           else
             status=$?
             if [ "$status" -ne 2 ]; then
               echo "::error::Unable to check release tag (git exited $status)"
               exit "$status"
             fi
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::v$VERSION is new — building binaries and cutting a release."
+            SOURCE_SHA=$GITHUB_SHA
+            SHOULD_RELEASE=true
+            SHOULD_BUILD=true
+            echo "::notice::$TAG is new — building binaries and cutting a release from $SOURCE_SHA."
           fi
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Release source is not a full commit SHA: $SOURCE_SHA"
+            exit 1
+          fi
+          {
+            echo "version=$VERSION"
+            echo "source_sha=$SOURCE_SHA"
+            echo "should_release=$SHOULD_RELEASE"
+            echo "should_build=$SHOULD_BUILD"
+          } >> "$GITHUB_OUTPUT"
 
   # ============================================
   # Build Binaries (only on a new version)
@@ -387,26 +421,35 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version-gate.outputs.source_sha }}
 
-      - uses: oven-sh/setup-bun@v2
+      # An empty ref would silently fall back to the triggering commit.
+      - name: Verify the release source commit and version
+        id: version
+        env:
+          SOURCE_SHA: ${{ needs.version-gate.outputs.source_sha }}
+          EXPECTED_VERSION: ${{ needs.version-gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          VERSION=$(node -p "require('./package.json').version")
+          test "$VERSION" = "$EXPECTED_VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Get version from package.json
-        id: version
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Build executable
         run: bun build --compile --minify --target=${{ matrix.target }} src/main.ts --outfile ${{ matrix.artifact }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
@@ -431,33 +474,64 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version-gate.outputs.source_sha }}
+      # A rebuild of an older tag uses this workflow with that tag's tree. A tree
+      # without the variant Dockerfile would ignore VARIANT and publish one image
+      # under four variant names, so it must stop here instead.
+      - name: Require variant-aware image build inputs in the release source
+        env:
+          SOURCE_SHA: ${{ needs.version-gate.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if ! grep -Eq '^ARG VARIANT=' Dockerfile ||
+            ! grep -Eq '^FROM [$][{]VARIANT[}]-base ' Dockerfile ||
+            [ ! -f scripts/test-docker-image.ts ]; then
+            echo "::error::Release source $SOURCE_SHA predates the Docker variant build inputs this workflow requires"
+            exit 1
+          fi
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Build native candidate
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: linux/${{ matrix.arch }}
           build-args: VARIANT=${{ matrix.variant }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.version-gate.outputs.source_sha }}
+            org.opencontainers.image.version=${{ needs.version-gate.outputs.version }}
           load: true
           tags: bunqueue-candidate:${{ matrix.variant }}-${{ matrix.arch }}
           cache-from: type=gha,scope=docker-${{ matrix.variant }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=docker-${{ matrix.variant }}-${{ matrix.arch }}
+      - name: Verify release provenance labels
+        env:
+          IMAGE: bunqueue-candidate:${{ matrix.variant }}-${{ matrix.arch }}
+          SOURCE_SHA: ${{ needs.version-gate.outputs.source_sha }}
+          VERSION: ${{ needs.version-gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE")
+          version=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$IMAGE")
+          test "$revision" = "$SOURCE_SHA"
+          test "$version" = "$VERSION"
       - name: Validate health, authentication, persistence, and cleanup
         run: bun scripts/test-docker-image.ts bunqueue-candidate:${{ matrix.variant }}-${{ matrix.arch }}
       - name: Preserve image validation evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: docker-evidence-${{ matrix.variant }}-${{ matrix.arch }}
           path: artifacts/docker-images/
           retention-days: 7
       - name: Export tested image
         run: docker save bunqueue-candidate:${{ matrix.variant }}-${{ matrix.arch }} -o /tmp/image-${{ matrix.arch }}.tar
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: docker-${{ matrix.variant }}-${{ matrix.arch }}
           path: /tmp/image-${{ matrix.arch }}.tar
@@ -479,26 +553,28 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version-gate.outputs.source_sha }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: docker-${{ matrix.variant }}-*
           path: /tmp/docker-images
           merge-multiple: true
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -506,7 +582,7 @@ jobs:
 
       - name: Generate tags
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -521,13 +597,16 @@ jobs:
         env:
           VARIANT: ${{ matrix.variant }}
           TAGS: ${{ steps.meta.outputs.tags }}
+          # Staging tags name the commit the images were built from, which is
+          # the release tag's commit on a rebuild, not the dispatching commit.
+          SOURCE_SHA: ${{ needs.version-gate.outputs.source_sha }}
         run: |
           set -euo pipefail
           for arch in amd64 arm64; do
             docker load -i "/tmp/docker-images/image-$arch.tar"
           done
           registry="$REGISTRY/$IMAGE_NAME"
-          image_index="$registry:$GITHUB_SHA-$VARIANT"
+          image_index="$registry:$SOURCE_SHA-$VARIANT"
           ghcr_tags=(--tag "$image_index")
           hub_tags=()
           while IFS= read -r tag; do
@@ -541,7 +620,7 @@ jobs:
           test "${#hub_tags[@]}" -gt 0
           refs=()
           for arch in amd64 arm64; do
-            ref="$registry:$GITHUB_SHA-$VARIANT-$arch"
+            ref="$registry:$SOURCE_SHA-$VARIANT-$arch"
             docker tag "bunqueue-candidate:$VARIANT-$arch" "$ref"
             docker push "$ref"
             refs+=("$ref")
@@ -565,11 +644,13 @@ jobs:
     env:
       REQUESTED_VERSION: ${{ inputs.npm_version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version-gate.outputs.source_sha }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
@@ -593,7 +674,7 @@ jobs:
           bun publish --dry-run "/tmp/npm-package/bunqueue-$REQUESTED_VERSION.tgz"
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: npm-bunqueue-${{ inputs.npm_version }}
           path: /tmp/npm-package/*.tgz
@@ -619,14 +700,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version-gate.outputs.source_sha }}
 
       - name: Resolve version
         id: version
         run: echo "version=${{ needs.version-gate.outputs.version }}" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: artifacts/
           pattern: bunqueue-*
@@ -663,9 +746,13 @@ jobs:
           ls -la
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: v${{ steps.version.outputs.version }}
+          # Without this, GitHub creates the new tag at the default branch's
+          # HEAD when the release finishes, which moves if main advanced during
+          # the pipeline. The tag must name the commit the assets were built from.
+          target_commitish: ${{ needs.version-gate.outputs.source_sha }}
           name: Release v${{ steps.version.outputs.version }}
           generate_release_notes: true
           draft: false

@@ -15,7 +15,7 @@ COPY --chown=bun:bun package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile --ignore-scripts
 
 COPY --chown=bun:bun tsconfig.json tsconfig.test.json tsconfig.build.json .oxlintrc.json .oxfmtrc.json ./
-COPY --chown=bun:bun Dockerfile.test ./
+COPY --chown=bun:bun Dockerfile.test Dockerfile ./
 COPY --chown=bun:bun src ./src
 COPY --chown=bun:bun test ./test
 COPY --chown=bun:bun examples/postgres-multibroker ./examples/postgres-multibroker

@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { resolve } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { assertPortableDeclarations } from './declaration-guard';
 import { portableDeclarationImports } from './declaration-imports';
 
 export function emitClientDeclarations(root: string, out: string): void {
@@ -9,11 +10,17 @@ export function emitClientDeclarations(root: string, out: string): void {
   if (config.error)
     throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
+  // Engine declarations import Bun's SQLite handle; the published graph points
+  // them at a structural stand-in instead of requiring Bun's global types.
+  const runtimeModules = new Map([
+    ['bun:sqlite', resolve(root, 'sdk/typescript/src/canonical-transport/bun-sqlite-types.ts')],
+  ]);
   const program = ts.createProgram(
     [
       resolve(root, 'sdk/typescript/src/index.ts'),
       resolve(root, 'sdk/typescript/src/legacy.ts'),
       resolve(root, 'src/client/workflow/index.ts'),
+      ...runtimeModules.values(),
     ],
     {
       ...parsed.options,
@@ -26,7 +33,7 @@ export function emitClientDeclarations(root: string, out: string): void {
     }
   );
   const result = program.emit(undefined, undefined, undefined, true, {
-    afterDeclarations: [portableDeclarationImports(program.getCompilerOptions())],
+    afterDeclarations: [portableDeclarationImports(program.getCompilerOptions(), runtimeModules)],
   });
   const diagnostics = [
     ...program.getSyntacticDiagnostics(),
@@ -44,10 +51,11 @@ export function emitClientDeclarations(root: string, out: string): void {
   mkdirSync(out, { recursive: true });
   writeFileSync(
     resolve(out, 'index.d.ts'),
-    '/// <reference types="bun-types" />\nexport * from \'./types/sdk/typescript/src/index.js\';\n'
+    "export * from './types/sdk/typescript/src/index.js';\n"
   );
   writeFileSync(
     resolve(out, 'legacy.d.ts'),
     "export * from './types/sdk/typescript/src/legacy.js';\n"
   );
+  assertPortableDeclarations(root, [resolve(out, 'index.d.ts'), resolve(out, 'legacy.d.ts')]);
 }

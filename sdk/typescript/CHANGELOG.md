@@ -5,7 +5,51 @@ All notable changes to `bunqueue-client` (TypeScript SDK) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-01
+
+### BREAKING CHANGES
+
+This is a breaking minor release. Follow the
+[migration guide](./README.md#migrating-from-01x), or switch the import to
+`bunqueue-client/legacy`, which keeps the 0.1.x API unchanged.
+
+- The default `bunqueue-client` entry is now the canonical `bunqueue/client`
+  API (see Changed below); the 0.1.x API moved to `bunqueue-client/legacy`.
+- Connection settings must be passed as `connection: { host, port, token, tls }`.
+  Top-level `host`, `port`, `token`, or `tls` now throw an `Error` naming the
+  keys, in `Queue`, `Worker`, `FlowProducer`, `QueueEvents`, `Bunqueue`,
+  `SandboxedWorker`, `QueueGroup.getQueue()/getWorker()`, and the workflow
+  `Engine`, instead of silently connecting to `localhost:6789` without the
+  token or TLS.
+- In TCP mode `pause()`, `resume()`, `drain()`, `obliterate()`, `remove()`,
+  and the synchronous rate-limit, concurrency, stall, and DLQ setters send
+  their command without waiting for the broker. Await `pauseAsync()`,
+  `resumeAsync()`, `drainAsync()`, `obliterateAsync()`, `removeAsync()`, and
+  the other `*Async` variants before enqueuing follow-up work.
+- Synchronous reads (`isPaused()`, `count()`, `getJobs()`, `getWaiting()` and
+  the other state lists, `getCountsPerPriority()`, `getDlq()`, `getDlqStats()`,
+  `getStallConfig()`, `getDlqConfig()`, `clean()`) are embedded-only and return
+  defaults in TCP mode; use their `*Async` variants. `getJobCounts()` returns
+  a `Promise` in TCP mode.
+- `Job` is exported as a type only (`import type { Job }`); there is no `Job`
+  constructor and no `job.raw`.
+- Removed type exports: `BunqueueConnection`, `TlsOption`, `BackoffOptions`,
+  `DeduplicationOptions`, `RepeatOptions`, `SchedulerOptions`, `FlowOptions`,
+  `GetFlowOptions`, `BulkJobEntry`, `JobCounts`, `JobStateName`, `JobRaw`,
+  `CircuitState`, `TelemetryErrorOperation`, `WorkerEventMap`,
+  `AckBatchOptions`, `Command`, `Response`, and the `*Response` wire types.
+  The migration guide lists each replacement.
+- `AuthError`, `BunqueueError`, `CommandError`, `CommandTimeoutError`,
+  `ConnectionClosedError`, and `SerializationError` remain exported for the
+  low-level `Connection`/`ConnectionPool`, but `Queue`, `Worker`,
+  `FlowProducer`, and `QueueEvents` reject with plain `Error` instances.
+- `@types/node` is no longer installed with the package. The declarations
+  import `events` and `node:net`, so TypeScript consumers must provide
+  `@types/node` themselves (20 or newer), including Workers projects that
+  type-check with `skipLibCheck: false`.
+- After any client `close()`, an unhandled rejection in your application is
+  no longer swallowed: without your own `unhandledRejection` handler the
+  process reports it and exits with code 1, as Bun and Node do by default.
 
 ### Changed
 
@@ -36,6 +80,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A command issued before the broker listens now waits for the canonical
+  reconnect under Node, Deno, and Workers, as it does under Bun. The portable
+  transport reported every refused connection attempt as a lost connection,
+  which rejected queued commands with `Connection lost` within milliseconds
+  and made Workers emit repeated errors.
+- The published JavaScript no longer uses top-level `await`, so CommonJS
+  bundlers such as `esbuild --bundle --format=cjs` accept it again. Under Bun
+  the embedded engine now loads synchronously on first embedded use; Node,
+  Deno, and Workers still never load it.
+- The published declarations no longer reference `bun-types`, Bun globals, or
+  `bun:sqlite`, and `bun-types`/`@types/node` are no longer runtime
+  dependencies. Strict NodeNext projects with `@types/node` 20 or 22 now
+  type-check with `skipLibCheck: false` (with or without the DOM library), and
+  `Bun` is no longer declared in Node projects. The build fails if a Bun or
+  DOM-only type reaches the published declaration graph again.
 - Wake the saturated Worker pull loop when an ACK or FAIL releases a
   concurrency slot, retaining the existing 20 ms fallback while avoiding a
   full polling delay between completion waves.
@@ -72,6 +131,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   object types while retaining standard objects, arrays, dates, and binary.
 
 ## [0.1.10] - 2026-07-30
+
+Never published to npm; these changes first ship in 0.2.0.
 
 ### Added
 

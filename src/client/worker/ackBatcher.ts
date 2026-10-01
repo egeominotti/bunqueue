@@ -14,6 +14,8 @@ export interface AckBatcherConfig {
   interval: number;
   embedded: boolean;
   maxBatchSize?: (pendingCount: number) => number;
+  /** Receives an error thrown by `maxBatchSize`; the static `batchSize` applies instead. */
+  onThresholdError?: (error: Error) => void;
   maxRetries?: number;
   retryDelayMs?: number;
 }
@@ -203,9 +205,32 @@ export class AckBatcher {
     await Promise.all(this.inFlightFlushes);
   }
 
+  /**
+   * Never throws: `queue()` evaluates this after an ACK is already buffered, and
+   * `notifyCapacityChanged()` runs from worker setters and failure paths. A
+   * throwing dynamic ceiling falls back to the static `batchSize`, so the ACK
+   * stays owned by this batcher and is still flushed by size or by the timer.
+   */
   private effectiveBatchSize(): number {
-    const maximum = this.config.maxBatchSize?.(this.pendingAcks.length);
-    return maximum === undefined ? this.config.batchSize : Math.min(this.config.batchSize, maximum);
+    const dynamicMaximum = this.config.maxBatchSize;
+    if (dynamicMaximum === undefined) return this.config.batchSize;
+    let maximum: number;
+    try {
+      maximum = dynamicMaximum(this.pendingAcks.length);
+    } catch (errorValue) {
+      this.reportThresholdError(errorValue);
+      return this.config.batchSize;
+    }
+    return Math.min(this.config.batchSize, maximum);
+  }
+
+  private reportThresholdError(errorValue: unknown): void {
+    try {
+      const error = errorValue instanceof Error ? errorValue : new Error(String(errorValue));
+      this.config.onThresholdError?.(error);
+    } catch {
+      // Reporting is best effort: it must never strand or reject a buffered ACK.
+    }
   }
 
   private flushIfThresholdReached(): boolean {

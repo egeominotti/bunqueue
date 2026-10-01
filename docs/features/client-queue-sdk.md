@@ -221,7 +221,13 @@ by responsibility under `src/client/types/`:
 ## Business Logic / Control Flow
 
 **Construction** (`queue/runtime/state.ts`): `embedded = opts.embedded ??
-FORCE_EMBEDDED` (`FORCE_EMBEDDED` lives in `queue/helpers.ts`). Embedded mode
+FORCE_EMBEDDED` (`FORCE_EMBEDDED` lives in `queue/helpers.ts`). In TCP mode,
+`rejectLegacyConnectionOptions()` (`client/legacyConnectionOptions.ts`) then
+throws before any pool is created if the options carry a defined top-level
+`host`, `port`, `token`, or `tls` (the flat bunqueue-client 0.1.x shape): those
+keys are never read, so the queue would otherwise connect to `localhost:6789`
+without the intended token or TLS. The message names the keys and points to
+`connection: { host, port, token, tls }`. Embedded mode
 warms `getSharedManager(opts.dataPath)` and leaves `tcpPool` / `addBatcher`
 null. TCP mode reuses the shared pool for the default unauthenticated
 four-connection case, otherwise creates a dedicated `TcpConnectionPool`. The
@@ -327,7 +333,15 @@ zero.
 
 Constructor `QueueOptions` (`client/types/connection.ts`): `embedded` (default
 falls back to `BUNQUEUE_EMBEDDED=1`), `dataPath` (embedded; overrides env),
-`defaultJobOptions`, `connection`, `autoBatch`, `prefixKey`.
+`defaultJobOptions`, `connection`, `autoBatch`, `prefixKey`. Connection settings
+exist only inside `connection`; top-level `host`/`port`/`token`/`tls` throw in
+TCP mode. The same guard runs in `FlowProducer`, `QueueEvents` (unless
+`embedded: true`, because it otherwise falls back to embedded without
+`connection`), `Bunqueue`, `SandboxedWorker` (unless an embedded `manager` is
+injected), the workflow `Engine`, and `Worker` (via `resolveWorkerOptions`);
+`QueueGroup.getQueue()/getWorker()` inherit it. `TcpConnectionPool` and
+`Forwarder` (`to: { host, port }`) take connection settings directly and are
+unaffected.
 
 `ConnectionOptions` defaults applied in `queue/runtime/state.ts` are
 `poolSize = 4` (`4` + no token ⇒ shared pool), `host = 'localhost'`, and
