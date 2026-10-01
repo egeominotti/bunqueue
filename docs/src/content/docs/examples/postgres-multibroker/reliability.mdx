@@ -51,8 +51,8 @@ being claimed until broker C resumes it.
 
 The simulated payment fails with `attempts: 1`, reaches the shared DLQ, and is
 inspected through broker C. Only after `allowRetry` represents an operator or
-provider recovery does the example call `retryDlqAsync(id)`. Broker B executes
-the new attempt; broker A observes completion and an empty DLQ.
+provider recovery does the example call `retryDlqAsync(id)`. A worker on broker
+B or C executes the new attempt; broker A observes completion and an empty DLQ.
 
 <Aside type="caution" title="Exactly-once effects require application idempotency">
   bunqueue fences stale lease owners and prevents two valid queue completions for one processing

@@ -141,10 +141,14 @@ memory must therefore be read as a deployment topology, not as one PHP Worker.
 This workload intentionally makes handlers shorter than the SDK polling
 interval. It exposes the control loop rather than application compute.
 
-The TypeScript Worker calculates `free = concurrency - active.size`. When no
-slot is free it sleeps for 20 ms before checking again. Go uses the same 20 ms
-fixed wait. Python waits 50 ms. Completed handlers cannot wake these sleeps, so
-new jobs are not pulled immediately when slots become free.
+At the measured revision, the TypeScript Worker calculated
+`free = concurrency - active.size`. When no slot was free it slept for 20 ms
+before checking again. Go used the same 20 ms fixed wait. Python waited 50 ms.
+Completed handlers could not wake these sleeps, so new jobs were not pulled
+immediately when slots became free. Since this campaign, the TypeScript
+(`bunqueue-client/legacy`) and Python Workers wake on ACK/FAIL and keep these
+timers only as fallbacks; Go still uses the fixed 20 ms wait. The worker table
+has not been re-measured.
 
 With 16 slots and a 1 ms handler, the approximate refill ceilings are:
 

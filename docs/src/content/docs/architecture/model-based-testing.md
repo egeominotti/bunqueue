@@ -8,20 +8,23 @@ head:
       content: https://bunqueue.dev/og/architecture/model-based-testing.png
 ---
 
-bunqueue's example tests are supplemented by four `fast-check` models. The
+bunqueue's example tests are supplemented by six `fast-check` models. The
 main asynchronous command model starts the real standalone broker on dynamic
 ports, uses the public MessagePack TCP protocol, writes a fresh SQLite
 database, and may terminate the broker with `SIGKILL` before reconnecting.
-Focused models exercise S3 backup/restore, worker-monitoring aggregates and
-enterprise telemetry conservation/cardinality.
+Focused models exercise workflow-engine histories, FlowProducer graphs, S3
+backup/restore, worker-monitoring aggregates and enterprise telemetry
+conservation/cardinality.
 
 ```bash
 bun run test:model
 ```
 
 The default broker campaign runs 150 generated histories of up to 80 commands.
-The backup campaign adds 50 histories of up to 30 commands, the worker
-monitoring campaign adds 500 histories of up to 80 actions, and the enterprise
+The workflow-engine campaign adds 40 histories of up to 12 commands, the
+FlowProducer model adds 60 generated cross-queue flow sets, the backup
+campaign adds 50 histories of up to 30 commands, the worker monitoring
+campaign adds 500 histories of up to 80 actions, and the enterprise
 telemetry campaign adds 500 backup-state histories plus 1,000 queue-selection
 cases.
 `bun test` includes it, so `bun run test:sandbox` executes the same model inside

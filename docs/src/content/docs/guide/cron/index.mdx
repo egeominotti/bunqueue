@@ -140,7 +140,7 @@ err := queue.UpsertJobScheduler("daily-report",
 
 // A normal worker processes the scheduled jobs
 worker := bunqueue.NewWorker("reports", func(job *bunqueue.Job) (any, error) {
-    fmt.Println("Running report:", job.Data()["type"])
+    fmt.Println("Running report:", job.Data().(map[string]any)["type"])
     return nil, nil
 }, bunqueue.WorkerOptions{})
 worker.Run()

@@ -43,7 +43,7 @@ structural graph change.
 `register()` refuses a definition that could not behave as written:
 
 - duplicate step names
-- declaring one branch path name twice
+- declaring one branch path name twice (thrown earlier, by `path()` while building)
 - a step name colliding with a loop's `name:index` namespace
 - user step names beginning with reserved `__` or `sub:` prefixes
 - two `waitFor` gates on the same event, since one signal would open both
@@ -113,7 +113,7 @@ Background maintenance timers are process-wide. Call `shutdownManager()` from `b
 | `waiting` | Parked at a `waitFor` |
 | `compensating` | Unwinding |
 | `completed` | Finished successfully |
-| `failed` | Terminal; the unwind finished or was not applicable |
+| `failed` | Terminal; the unwind finished, was not applicable, or was abandoned (`rollbackStatus: 'stuck'`) |
 | `compensation-stuck` | **Non-terminal.** A reversal failed; awaiting an operator |
 
 ### `RollbackStatus`

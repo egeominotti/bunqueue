@@ -74,7 +74,7 @@ const everyFailedJob = await queue.getFailedAsync(0, -1);
 job = queue.get_job("job-id")       # None when missing
 state = queue.get_state("job-id")
 # "waiting" | "prioritized" | "delayed" | "active" | "completed"
-# | "failed" | "waiting-children"
+# | "failed" | "waiting-children" | "unknown"
 
 # Counts per state
 counts = queue.get_job_counts()
@@ -91,7 +91,7 @@ failed = queue.get_jobs("failed", 0, 50)
 $job = $queue->getJob('job-id');       // null when missing
 $state = $queue->getState('job-id');
 // 'waiting' | 'prioritized' | 'delayed' | 'active' | 'completed'
-// | 'failed' | 'waiting-children'
+// | 'failed' | 'waiting-children' | 'unknown'
 
 // Counts per state
 $counts = $queue->getJobCounts();
@@ -108,7 +108,7 @@ $failed = $queue->getJobs('failed', 0, 50);
 job, _ := queue.GetJob("job-id")       // nil when missing
 state, _ := queue.GetState("job-id")
 // "waiting" | "prioritized" | "delayed" | "active" | "completed"
-// | "failed" | "waiting-children"
+// | "failed" | "waiting-children" | "unknown"
 
 // Counts per state
 counts, _ := queue.GetJobCounts()

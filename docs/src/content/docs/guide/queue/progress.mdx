@@ -151,8 +151,8 @@ let result = queue.wait_for_job("job-id", 30_000)?;
 </TabItem>
 </Tabs>
 
-*`getJobDependencies`, `getDependencies`, and `QueueEvents` are available in the
-Bun `bunqueue` package. Bun QueueEvents supports both embedded and TCP brokers;
+*`getJobDependencies`, `getDependencies`, and `QueueEvents` are available in
+both TypeScript packages. Bun QueueEvents supports both embedded and TCP brokers;
 use the same connection and `prefixKey` as the Queue. External SDKs expose
 `waitForJob` for the common wait-for-result case and can use SSE/WebSocket for
 live queue events.*

@@ -228,7 +228,7 @@ const { jobIds } = await flow.addTree({
 </TabItem>
 <TabItem label="Node.js / Deno">
 
-`addTree` (parent-first hierarchies) is available in the Bun `bunqueue` package only. In Node.js / Deno, `add` builds the inverse tree, where children complete before their parent.
+`addTree` (parent-first hierarchies) works the same in `bunqueue-client`: run the Bun example on a `FlowProducer` imported from `bunqueue-client` with a TCP connection. `add` builds the inverse tree, where children complete before their parent.
 
 </TabItem>
 <TabItem label="Python">

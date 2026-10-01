@@ -99,6 +99,7 @@ def process(job):
 worker = Worker("tasks", process, concurrency=5)
 
 queue.add("hello", {"message": "world"})
+worker.run()  # blocks while the background loop processes jobs
 ```
 
 </TabItem>
@@ -201,7 +202,7 @@ await queue.add(
   { url: 'https://api.example.com' },
   {
     attempts: 5, // try up to 5 times
-    backoff: 2000, // wait 2s, 4s, 8s... between tries
+    backoff: 2000, // wait ~4s, ~8s, ~16s... between tries
   }
 );
 
@@ -219,13 +220,13 @@ await queue.add(
   { url: 'https://api.example.com' },
   {
     attempts: 5, // try up to 5 times
-    backoff: 2000, // wait 2s, 4s, 8s... between tries
+    backoff: 2000, // wait ~4s, ~8s, ~16s... between tries
   }
 );
 
 // After all attempts fail:
-const failed = await queue.getDlq(); // inspect what died and why
-await queue.retryDlq(); // send everything back for another run
+const failed = await queue.getDlqAsync(); // inspect what died and why
+await queue.retryDlqAsync(); // send everything back for another run
 ```
 
 </TabItem>
@@ -234,7 +235,7 @@ await queue.retryDlq(); // send everything back for another run
 ```python
 queue.add("flaky-call", {"url": "https://api.example.com"},
           attempts=5,    # try up to 5 times
-          backoff=2000)  # wait 2s, 4s, 8s... between tries
+          backoff=2000)  # wait ~4s, ~8s, ~16s... between tries
 
 # After all attempts fail:
 failed = queue.get_dlq()   # inspect what died and why
@@ -247,7 +248,7 @@ queue.retry_dlq()          # send everything back for another run
 ```php
 $queue->add('flaky-call', ['url' => 'https://api.example.com'], [
     'attempts' => 5,   // try up to 5 times
-    'backoff' => 2000, // wait 2s, 4s, 8s... between tries
+    'backoff' => 2000, // wait ~4s, ~8s, ~16s... between tries
 ]);
 
 // After all attempts fail:
@@ -261,7 +262,7 @@ $queue->retryDlq();          // send everything back for another run
 ```go
 queue.Add("flaky-call", map[string]any{"url": "https://api.example.com"}, bunqueue.JobOptions{
     "attempts": 5,    // try up to 5 times
-    "backoff":  2000, // wait 2s, 4s, 8s... between tries
+    "backoff":  2000, // wait ~4s, ~8s, ~16s... between tries
 })
 
 // After all attempts fail:
@@ -277,7 +278,7 @@ use bunqueue_client::{Backoff, JobOptions};
 
 queue.add("flaky-call", data, JobOptions {
     attempts: Some(5),                          // try up to 5 times
-    backoff: Some(Backoff::Milliseconds(2000)), // wait 2s, 4s, 8s... between tries
+    backoff: Some(Backoff::Milliseconds(2000)), // wait ~4s, ~8s, ~16s... between tries
     ..Default::default()
 })?;
 
@@ -293,7 +294,7 @@ queue.retry_dlq(None, None)?;       // send everything back for another run
 {:ok, _job} =
   Bunqueue.Queue.add(queue, "flaky-call", %{url: "https://api.example.com"},
     attempts: 5,   # try up to 5 times
-    backoff: 2000  # wait 2s, 4s, 8s... between tries
+    backoff: 2000  # wait ~4s, ~8s, ~16s... between tries
   )
 
 # After all attempts fail:
@@ -652,7 +653,7 @@ queue.AddBulk(entries)
 
 // worker (run as many copies as you want)
 worker := bunqueue.NewWorker("tasks", func(job *bunqueue.Job) (any, error) {
-    return map[string]any{"processed": job.Data()["id"]}, nil
+    return map[string]any{"processed": job.Data().(map[string]any)["id"]}, nil
 }, bunqueue.WorkerOptions{Concurrency: 50})
 worker.Run()
 ```
@@ -729,7 +730,7 @@ worker.on('failed', (job, error) => console.error('worker error', error.message)
 <TabItem label="Node.js / Deno">
 
 ```typescript
-// Worker-side events (QueueEvents streaming is a Bun bunqueue feature)
+// Worker-side events (QueueEvents from 'bunqueue-client' streams queue-wide events too)
 worker.on('completed', (job, result) => console.log('worker finished', job.id));
 worker.on('failed', (job, error) => console.error('worker error', error.message));
 worker.on('error', (err) => console.error(err)); // always attach
@@ -788,7 +789,7 @@ queue = Bunqueue.queue("emails", event_handler: &IO.inspect/1)
 </TabItem>
 </Tabs>
 
-_`QueueEvents` streaming is available in the Bun `bunqueue` package only; see the [SDK guide](/guide/sdks/#worker-events)._
+_`QueueEvents` streaming is available in the Bun `bunqueue` package and in `bunqueue-client` (Node.js, Deno); the other SDKs have no `QueueEvents` stream. See the [SDK guide](/guide/sdks/#worker-events)._
 
 Dashboards, metrics and Prometheus in the [monitoring guide](/guide/monitoring/).
 

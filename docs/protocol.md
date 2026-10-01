@@ -249,10 +249,10 @@ request correlation and MUST NOT resolve an in-flight command with it.
 | `ACK`              | `id`, `token`, `result?`                                                             | `{}` or `{data: {applied: false, reason: "already-finalized"}}` |
 | `ACKB`             | `ids: []`, `tokens: []`, `results?`                                                  | `{}` or `{data: {ignoredIds, ignoredIndices}}`                  |
 | `FAIL`             | `id`, `token`, `error`, `stack?: string[]`, `unrecoverable?: bool`                   | `{}` or `{data: {applied: false, reason: "already-finalized"}}` |
-| `Heartbeat`        | `id` (= workerId), `activeJobs`, `processed`, `failed`                               | `{data: {pong}}`                                                |
+| `Heartbeat`        | `id` (= workerId), `activeJobs`, `processed`, `failed`                               | `{data: {ok: true}}`                                            |
 | `JobHeartbeatB`    | `ids: []`, `tokens: []`                                                              | `{data: {ok, count}}` — renews the jobs' locks                  |
 | `RegisterWorker`   | `workerId`, `name`, `queues: []`, `concurrency`, `hostname`, `pid`, `startedAt`      | `{data: {...}}`                                                 |
-| `UnregisterWorker` | `workerId`                                                                           | `{}`                                                            |
+| `UnregisterWorker` | `workerId`                                                                           | `{data: {removed: true}}`                                       |
 | `ExtendLock`       | `id`, `token`, `duration`                                                            | `{}`                                                            |
 | `Progress`         | `id`, `progress` (0..100 by client convention; not server-enforced), `message?`      | `{}` — job MUST be active                                       |
 | `AddLog`           | `id`, `message`, `level?` (default `info`)                                           | `{data: {added}}` — **wrapped**; read back via `GetLogs`        |

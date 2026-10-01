@@ -239,7 +239,7 @@ Telemetry agent for the bunqueue Cloud dashboard. Cloud mode activates only when
 | `BUNQUEUE_HOST`      | string | `localhost` | Server host for the MCP server in TCP mode; also a CLI fallback for `--host` |
 | `BUNQUEUE_PORT`      | number | `6789`      | Server port for the MCP server in TCP mode                                   |
 | `BUNQUEUE_POOL_SIZE` | number | `2`         | Connection pool size for the MCP server in TCP mode                          |
-| `BUNQUEUE_EMBEDDED`  | string | (none)      | Set to `1` to force embedded mode for the client library                     |
+| `BUNQUEUE_EMBEDDED`  | string | (none)      | Set to `1` to make embedded mode the client default; `embedded: false` wins  |
 | `NO_COLOR`           | string | (none)      | Set to `1` to disable colored CLI output                                     |
 
 ```bash
@@ -298,14 +298,14 @@ S3_BACKUP_PREFIX=production/
 ```yaml
 services:
   bunqueue:
-    image: bunqueue:latest
+    image: egeominotti/bunqueue:2.9.6
     ports:
       - '6789:6789'
       - '6790:6790'
     volumes:
-      - bunqueue-data:/data
+      - bunqueue-data:/app/data
     environment:
-      - BUNQUEUE_DATA_PATH=/data/queue.db
+      - BUNQUEUE_DATA_PATH=/app/data/queue.db
       - LOG_FORMAT=json
       - AUTH_TOKENS=${AUTH_TOKENS}
       - S3_BACKUP_ENABLED=1

@@ -35,7 +35,7 @@ worker.on('failed', (job, error) => {
 });
 
 worker.on('progress', (job, progress) => {
-  console.log(`Progress: ${job.id} - ${progress}%`);
+  console.log(`Progress: ${job?.id} - ${progress}%`);
 });
 
 worker.on('error', (error) => console.error(error)); // always attach
@@ -54,7 +54,7 @@ worker.on('failed', (job, error) => {
 });
 
 worker.on('progress', (job, progress) => {
-  console.log(`Progress: ${job.id} - ${progress}%`);
+  console.log(`Progress: ${job?.id} - ${progress}%`);
 });
 
 worker.on('error', (error) => console.error(error)); // always attach

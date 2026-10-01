@@ -108,7 +108,7 @@ To manage a production server, point the MCP server at it:
 }
 ```
 
-All 73 tools work in both modes.
+All 73 tools are available in both modes. One exception in behavior: [HTTP handler](#http-handlers) workers always run embedded inside the MCP process, so in TCP mode they do not consume jobs from the remote server's queues.
 
 ## HTTP Handlers
 

@@ -197,7 +197,7 @@ const emails = new Queue<EmailJob>('emails', {
   dataPath: './data/app.db',
   defaultJobOptions: {
     attempts: 5,           // try up to 5 times
-    backoff: 2000,         // wait 2s, then 4s, 8s... between tries (exponential backoff)
+    backoff: 2000,         // wait ~4s, then 8s, 16s... between tries (exponential backoff)
     removeOnComplete: true, // drop finished jobs to keep the queue lean
   },
 });
@@ -228,7 +228,7 @@ const emails = new Queue<EmailJob>('emails', {
   embedded: false,
   defaultJobOptions: {
     attempts: 5,           // try up to 5 times
-    backoff: 2000,         // wait 2s, then 4s, 8s... between tries (exponential backoff)
+    backoff: 2000,         // wait ~4s, then 8s, 16s... between tries (exponential backoff)
     removeOnComplete: true, // drop finished jobs to keep the queue lean
   },
 });
@@ -258,7 +258,7 @@ emails = Queue("emails")
 # Retry options are passed per add
 retry_opts = {
     "attempts": 5,              # try up to 5 times
-    "backoff": 2000,            # wait 2s, then 4s, 8s... between tries (exponential backoff)
+    "backoff": 2000,            # wait ~4s, then 8s, 16s... between tries (exponential backoff)
     "remove_on_complete": True, # drop finished jobs to keep the queue lean
 }
 
@@ -295,7 +295,7 @@ defer emails.Close()
 // Retry options are passed per add
 retryOpts := bunqueue.JobOptions{
     "attempts":         5,    // try up to 5 times
-    "backoff":          2000, // wait 2s, then 4s, 8s... between tries (exponential backoff)
+    "backoff":          2000, // wait ~4s, then 8s, 16s... between tries (exponential backoff)
     "removeOnComplete": true, // drop finished jobs to keep the queue lean
 }
 
@@ -353,7 +353,7 @@ Partner endpoints go down and return 5xx errors. Treat every delivery as a job w
 const webhooks = new Queue('webhooks', {
   embedded: true,
   dataPath: './data/app.db',
-  defaultJobOptions: { attempts: 8, backoff: 5000 }, // 5s, 10s, 20s, 40s...
+  defaultJobOptions: { attempts: 8, backoff: 5000 }, // ~10s, 20s, 40s, 80s...
 });
 
 // Jobs that exhaust all 8 attempts go to the DLQ.
@@ -390,7 +390,7 @@ await webhooks.add('order.created', {
 ```typescript
 const webhooks = new Queue('webhooks', {
   embedded: false,
-  defaultJobOptions: { attempts: 8, backoff: 5000 }, // 5s, 10s, 20s, 40s...
+  defaultJobOptions: { attempts: 8, backoff: 5000 }, // ~10s, 20s, 40s, 80s...
 });
 
 // Jobs that exhaust all 8 attempts go to the DLQ.
@@ -455,7 +455,7 @@ webhooks.add("order.created", {
     "endpoint": "https://partner.com/webhooks",
     "event": "order.created",
     "payload": {"orderId": "ORD-123"},
-}, attempts=8, backoff=5000)  # 5s, 10s, 20s, 40s...
+}, attempts=8, backoff=5000)  # ~10s, 20s, 40s, 80s...
 ```
 
 </TabItem>
@@ -474,7 +474,7 @@ defer webhooks.Close()
 // Bun, TypeScript and Python clients.
 
 worker := bunqueue.NewWorker("webhooks", func(job *bunqueue.Job) (any, error) {
-    data := job.Data()
+    data := job.Data().(map[string]any)
     payload, _ := json.Marshal(data["payload"])
     ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
     defer cancel() // never hang on a dead endpoint
@@ -498,7 +498,7 @@ webhooks.Add("order.created", map[string]any{
     "endpoint": "https://partner.com/webhooks",
     "event":    "order.created",
     "payload":  map[string]any{"orderId": "ORD-123"},
-}, bunqueue.JobOptions{"attempts": 8, "backoff": 5000}) // 5s, 10s, 20s, 40s...
+}, bunqueue.JobOptions{"attempts": 8, "backoff": 5000}) // ~10s, 20s, 40s, 80s...
 ```
 
 </TabItem>
@@ -637,7 +637,7 @@ images := bunqueue.NewQueue("images", bunqueue.Options{})
 defer images.Close()
 
 worker := bunqueue.NewWorker("images", func(job *bunqueue.Job) (any, error) {
-    data := job.Data()
+    data := job.Data().(map[string]any)
     variants := data["variants"].([]any)
     source, err := downloadImage(data["sourceUrl"].(string))
     if err != nil {
@@ -705,7 +705,7 @@ support that design:
 ```typescript
 const payments = new Queue('payments', {
   embedded: true,
-  dataPath: './data/payments.db', // durable writes need a SQLite file
+  dataPath: './data/app.db', // durable writes need a SQLite file; one dataPath per process
   defaultJobOptions: { attempts: 3, backoff: 5000, timeout: 60_000 },
 });
 
@@ -808,7 +808,7 @@ payments := bunqueue.NewQueue("payments", bunqueue.Options{})
 defer payments.Close()
 
 worker := bunqueue.NewWorker("payments", func(job *bunqueue.Job) (any, error) {
-    data := job.Data()
+    data := job.Data().(map[string]any)
     // Pass data["idempotencyKey"] to your provider as its idempotency key:
     // a provider-side guard against double charges.
     intent, err := chargeProvider(data)
@@ -976,7 +976,7 @@ scheduled.UpsertJobScheduler("health-check",
 )
 
 worker := bunqueue.NewWorker("scheduled", func(job *bunqueue.Job) (any, error) {
-    if job.Data()["task"] == "cleanup" {
+    if job.Data().(map[string]any)["task"] == "cleanup" {
         return map[string]any{"deleted": cleanupOldRecords()}, nil
     }
     return checkSystemHealth()
@@ -1207,7 +1207,7 @@ worker := bunqueue.NewWorker("orders", func(job *bunqueue.Job) (any, error) {
     if err != nil {
         return nil, err
     }
-    return shipOrder(job.Data()["orderId"].(string), results)
+    return shipOrder(job.Data().(map[string]any)["orderId"].(string), results)
 }, bunqueue.WorkerOptions{})
 worker.Run()
 ```
@@ -1240,7 +1240,7 @@ The options you saw above, all set per job or via `defaultJobOptions`:
 | `timeout` | Max processing time before the job is failed | none |
 | `priority` | Higher numbers run sooner | 0 |
 | `delay` | Wait this many ms before the job is runnable | 0 |
-| `jobId` | Custom ID, adding the same ID twice returns the existing job | auto |
+| `jobId` | Custom ID, adding the same ID while that job is unfinished returns the existing job | auto |
 | `durable` | SQLite: bypass its 10ms buffer; PostgreSQL is already transactional | false |
 | `removeOnComplete` | Delete the job once it succeeds | false |
 

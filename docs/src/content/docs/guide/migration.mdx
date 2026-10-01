@@ -168,7 +168,7 @@ Then, in your code:
 
 - **Classes**: `Queue`, `Worker`, `QueueEvents`, `FlowProducer`, same constructors minus the Redis connection.
 - **Job options**: `priority`, `delay`, `attempts`, `backoff` (including the `{ type, delay }` object form), `jobId`, `removeOnComplete`, `removeOnFail`, `repeat`.
-- **`jobId` deduplication**: adding the same `jobId` twice returns the existing job instead of creating a duplicate, exactly like BullMQ.
+- **`jobId` deduplication**: adding the same `jobId` while that job is still live (waiting, prioritized, delayed, waiting-children or active) returns the existing job instead of creating a duplicate. Once it has completed or reached the DLQ, the ID can be reused for a fresh job.
 - **Events**: `worker.on('completed' | 'failed' | 'progress', ...)` fire with the same signatures.
 - **Job states**: the full BullMQ v5 state machine, including `prioritized` and `waiting-children`.
 - **Flows**: `FlowProducer.add()`, `addBulk()`, `getFlow()`,

@@ -205,7 +205,7 @@ accumulating credits that would cause repeated empty pulls.
     <div class="bq-diag-row">
       <div class="bq-diag-cell">1. Auto-retry eligible entries <i>nextRetryAt &lt;= now &amp;&amp; retryCount &lt; maxAutoRetries</i></div>
       <div class="bq-diag-cell">2. Purge expired entries <i>expiresAt &lt;= now</i></div>
-      <div class="bq-diag-cell">3. Enforce maxEntries per queue <i>10k default, FIFO eviction when full</i></div>
+      <div class="bq-diag-cell">maxEntries per queue <i>10k default, enforced on every DLQ insert and DLQ config change (not by this task), FIFO eviction when full</i></div>
     </div>
   </div>
 </div>

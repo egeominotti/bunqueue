@@ -54,7 +54,7 @@ await flow.add({
 
 const worker = new Worker('main', async (job) => {
   const failed = await job.getFailedChildrenValues();
-  // { 'workers:job-abc': 'Error: step-a failed', ... }
+  // { 'workers:job-abc': 'step-a failed', ... }
 
   if (Object.keys(failed).length > 0) {
     await job.removeUnprocessedChildren();  // cancel children still waiting
@@ -86,7 +86,7 @@ await flow.add({
 
 const worker = new Worker('main', async (job) => {
   const failed = await queue.getFailedChildrenValues(job.id);
-  // { 'workers:job-abc': 'Error: step-a failed', ... }
+  // { 'workers:job-abc': 'step-a failed', ... }
 
   if (Object.keys(failed).length > 0) {
     await queue.removeUnprocessedChildren(job.id);  // cancel children still waiting
@@ -120,7 +120,7 @@ flow.add({
 
 def process(job):
     failed = queue.get_failed_children_values(job.id)
-    # {"workers:job-abc": "Error: step-a failed", ...}
+    # {"workers:job-abc": "step-a failed", ...}
 
     if failed:
         queue.remove_unprocessed_children(job.id)  # cancel children still waiting
@@ -161,7 +161,7 @@ And with `ignoreDependencyOnFailure`, when the parent should continue with parti
 ```typescript
 const worker = new Worker('reports', async (job) => {
   const ignored = await job.getIgnoredChildrenFailures();
-  // { 'workers:job-abc': 'Error: enrichment API timeout' }
+  // { 'workers:job-abc': 'enrichment API timeout' }
   return { partial: Object.keys(ignored).length > 0 };
 }, { embedded: true });
 ```
@@ -174,7 +174,7 @@ const queue = new Queue('reports');
 
 const worker = new Worker('reports', async (job) => {
   const ignored = await queue.getIgnoredChildrenFailures(job.id);
-  // { 'workers:job-abc': 'Error: enrichment API timeout' }
+  // { 'workers:job-abc': 'enrichment API timeout' }
   return { partial: Object.keys(ignored).length > 0 };
 });
 ```
@@ -187,7 +187,7 @@ queue = Queue("reports")
 
 def process(job):
     ignored = queue.get_ignored_children_failures(job.id)
-    # {"workers:job-abc": "Error: enrichment API timeout"}
+    # {"workers:job-abc": "enrichment API timeout"}
     return {"partial": bool(ignored)}
 
 Worker("reports", process).run()

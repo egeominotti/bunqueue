@@ -447,15 +447,10 @@ bunqueue start
 
 Network issues or server overload.
 
-```typescript
-// Add reconnection logic
-let client = createClient();
-
-client.on('error', async () => {
-  await sleep(1000);
-  client = createClient();
-});
-```
+No reconnection code is needed: the Bun client reconnects automatically, with
+unlimited attempts and exponential backoff from 100 ms up to 30 s, plus up to
+30% jitter. If drops persist, check server load and the network path between
+client and server.
 
 ### Worker stalls on a half-open connection (throughput drops to 0)
 
@@ -492,9 +487,9 @@ returns; auto-reconnect with infinite attempts resumes on its own once it does.
 # Check token is set
 echo $AUTH_TOKENS
 
-# Test with curl
+# Test with curl (/health is public; /stats requires the token)
 curl -H "Authorization: Bearer your-token" \
-  http://localhost:6790/health
+  http://localhost:6790/stats
 ```
 
 ## Performance Issues
@@ -638,8 +633,8 @@ SELECT COUNT(*) FROM jobs WHERE state = 'delayed';
 Too many connections or jobs.
 
 ```bash
-# Check connection count
-bunqueue stats
+# Check connection count (connections.tcp / ws / sse)
+curl http://localhost:6790/health
 
 # Reduce polling frequency
 # Add backoff in clients

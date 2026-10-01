@@ -216,7 +216,7 @@ app.use(async (job, next) => {
   try {
     return await next();
   } catch (err) {
-    return { recovered: true, error: err.message };
+    return { recovered: true, error: (err as Error).message };
   }
 });
 ```
@@ -238,7 +238,7 @@ app.use(async (job, next) => {
   try {
     return await next();
   } catch (err) {
-    return { recovered: true, error: err.message };
+    return { recovered: true, error: (err as Error).message };
   }
 });
 ```
@@ -301,8 +301,9 @@ Accumulate N jobs and process them together, ideal for bulk database inserts:
 <TabItem label="Bun">
 
 ```typescript
-const app = new Bunqueue('db-inserts', {
+const app = new Bunqueue<{ row: unknown }>('db-inserts', {
   embedded: true,
+  concurrency: 50,  // batched jobs hold their slot until the batch flushes
   batch: {
     size: 50,        // flush every 50 jobs
     timeout: 2000,   // or every 2 seconds, whichever comes first
@@ -319,8 +320,9 @@ const app = new Bunqueue('db-inserts', {
 <TabItem label="Node.js / Deno">
 
 ```typescript
-const app = new Bunqueue('db-inserts', {
+const app = new Bunqueue<{ row: unknown }>('db-inserts', {
   embedded: false,
+  concurrency: 50,  // batched jobs hold their slot until the batch flushes
   batch: {
     size: 50,        // flush every 50 jobs
     timeout: 2000,   // or every 2 seconds, whichever comes first
@@ -386,7 +388,7 @@ Five backoff strategies (how long to wait between retry attempts) plus a predica
 <TabItem label="Bun">
 
 ```typescript
-const app = new Bunqueue('api-calls', {
+const app = new Bunqueue<{ url: string }>('api-calls', {
   embedded: true,
   processor: async (job) => {
     const res = await fetch(job.data.url);
@@ -406,7 +408,7 @@ const app = new Bunqueue('api-calls', {
 <TabItem label="Node.js / Deno">
 
 ```typescript
-const app = new Bunqueue('api-calls', {
+const app = new Bunqueue<{ url: string }>('api-calls', {
   embedded: false,
   processor: async (job) => {
     const res = await fetch(job.data.url);
@@ -673,7 +675,7 @@ Create follow-up jobs automatically when a job completes or fails:
 <TabItem label="Bun">
 
 ```typescript
-const app = new Bunqueue('orders', {
+const app = new Bunqueue<{ id?: string; amount?: number }>('orders', {
   embedded: true,
   routes: {
     'place-order': async (job) => ({ orderId: job.data.id, total: 99 }),
@@ -702,7 +704,7 @@ app.trigger({
 <TabItem label="Node.js / Deno">
 
 ```typescript
-const app = new Bunqueue('orders', {
+const app = new Bunqueue<{ id?: string; amount?: number }>('orders', {
   embedded: false,
   routes: {
     'place-order': async (job) => ({ orderId: job.data.id, total: 99 }),
@@ -789,7 +791,7 @@ Expire jobs that waited too long, checked when the worker picks the job up:
 <TabItem label="Bun">
 
 ```typescript
-const app = new Bunqueue('otp', {
+const app = new Bunqueue<{ code: string }>('otp', {
   embedded: true,
   processor: async (job) => verifyOTP(job.data.code),
   ttl: {
@@ -810,7 +812,7 @@ app.setNameTtl('flash-sale', 30000);
 <TabItem label="Node.js / Deno">
 
 ```typescript
-const app = new Bunqueue('otp', {
+const app = new Bunqueue<{ code: string }>('otp', {
   embedded: false,
   processor: async (job) => verifyOTP(job.data.code),
   ttl: {
@@ -1576,7 +1578,7 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 | Option | Default | Description |
 |--------|---------|-------------|
 | `concurrency` | `1` | Parallel jobs |
-| `embedded` | `false` | Use embedded SQLite (`BUNQUEUE_EMBEDDED=1` forces it on) |
+| `embedded` | `false` | Use embedded SQLite (`BUNQUEUE_EMBEDDED=1` makes it the default; an explicit `embedded: false` still wins) |
 | `connection` | localhost:6789 | TCP server connection |
 | `autorun` | `true` | Start worker immediately |
 

@@ -41,7 +41,7 @@ BUNQUEUE_DATA_PATH=/data/bunq.db bunqueue start
 const queue = new Queue('jobs', { embedded: true, dataPath: '/data/jobs.db' });
 ```
 
-_Embedded mode (and `queue.forward()` below) ships in the Bun `bunqueue` package only. From every other language, run the server and connect with a [client SDK](/guide/sdks/), as in Option 3._
+_Embedded mode ships in the Bun `bunqueue` package only. `queue.forward()` below is also available in `bunqueue-client` for Node.js and Deno. From every other language, run the server and connect with a [client SDK](/guide/sdks/), as in Option 3._
 
 For multiple active broker processes, use the PostgreSQL server backend. It is
 database-authoritative: claims, leases, ACK/FAIL, queue limits, Pro-style group

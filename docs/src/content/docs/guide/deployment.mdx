@@ -559,8 +559,9 @@ To restore after a disk loss:
 
 ```bash
 systemctl stop bunqueue
+# The backup CLI reads BUNQUEUE_DATA_PATH and the S3_* variables from its own environment
 bunqueue backup list
-bunqueue backup restore backups/bunq-2026-01-30T12:00:00.db --force
+bunqueue backup restore 'backups/bunqueue-2026-01-30T12-00-00-000Z-<uuid>.db' --force
 systemctl start bunqueue
 ```
 

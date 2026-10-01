@@ -20,8 +20,8 @@ head:
 
 :::caution[Experimental]
 The workflow engine is **experimental**. Its API can change in a patch release, and
-this one already does: a `waitFor` inside a `.path()` and a step named after a loop's
-`name:index` namespace are now rejected at registration instead of being accepted.
+this one already does: a `waitFor` inside a `.path()` (by the builder) and a step named
+after a loop's `name:index` namespace (at registration) are now rejected instead of being accepted.
 Both used to be accepted and neither did what it looked like, so the change is a fix,
 but it is still a change to code that previously registered.
 

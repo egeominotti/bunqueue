@@ -118,7 +118,7 @@ Capping how many jobs run per time window, to protect a downstream service like 
 
 ### Deduplication and idempotency
 
-Giving a job a custom `jobId` so adding it twice does nothing the second time. This makes `add()` safe to call more than once for the same logical task. See the [Queue API](/guide/queue/).
+Giving a job a custom `jobId` so adding it again while the first one is still waiting or running does nothing. This makes `add()` safe to call more than once for the same logical task. See the [Queue API](/guide/queue/).
 
 ## Composing jobs
 

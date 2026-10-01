@@ -228,8 +228,9 @@ instance beyond a trusted network:
 - **At rest, PostgreSQL.** Use provider or volume encryption, require TLS with
   certificate verification, keep the connection URL in a secret manager, and
   grant the bunqueue role only the target database/schema privileges it needs.
-- **Backups.** SQLite S3 backups support server-side encryption; scope their IAM
-  credentials to one bucket. PostgreSQL mode does not use this snapshot flow:
+- **Backups.** SQLite S3 backups have no encryption option of their own; enable
+  default server-side encryption on the bucket and scope their IAM credentials
+  to one bucket. PostgreSQL mode does not use this snapshot flow:
   configure and test normal database backups and point-in-time recovery.
 - **Job payloads.** Do not place secrets in job data. Store a reference and
   resolve it inside the worker:

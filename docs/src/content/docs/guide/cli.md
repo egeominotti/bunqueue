@@ -187,7 +187,7 @@ bunqueue concurrency clear emails
 ## Monitoring
 
 ```bash
-bunqueue ping      # quickest TCP liveness check (works, though not listed in --help)
+bunqueue ping      # quickest TCP liveness check
 bunqueue stats     # waiting/active/delayed/completed/failed/DLQ counts, uptime, rates
 bunqueue metrics   # Prometheus text format, same as GET /prometheus
 bunqueue health    # alias of stats over TCP
@@ -257,7 +257,7 @@ Two subcommands define their own short `-t` (`--timeout`): `pull` and `job wait`
 
 ## Scripting with JSON
 
-Every command supports `--json`. It prints the raw server response (`{ "ok": true, ... }`), so nest your `jq` path under the response field (`.stats`, `.jobs`, `.job`, `.counts`, ...):
+Every command supports `--json`. Server commands print the raw server response (`{ "ok": true, ... }`), so nest your `jq` path under the response field (`.stats`, `.jobs`, `.job`, `.counts`, ...); the local `backup` commands print `{ "success", "message", "data" }` instead:
 
 ```bash
 bunqueue stats --json | jq '.stats.waiting'

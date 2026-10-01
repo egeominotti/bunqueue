@@ -72,7 +72,7 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
 <div class="bq-diag">
   <div class="bq-diag-head"><b>Tables</b><span>SQLite schema</span></div>
   <div class="bq-diag-group">
-    <span class="bq-diag-group-label">jobs, 30 columns</span>
+    <span class="bq-diag-group-label">jobs, 38 columns</span>
     <div class="bq-diag-row">
       <div class="bq-diag-cell bq-diag-accent">id <i>TEXT PRIMARY KEY, UUIDv7</i></div>
       <div class="bq-diag-cell">queue <i>TEXT</i></div>
@@ -83,7 +83,7 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
       <div class="bq-diag-cell">state <i>TEXT</i></div>
       <div class="bq-diag-cell">run_at <i>INTEGER</i></div>
       <div class="bq-diag-cell">attempts <i>INTEGER</i></div>
-      <div class="bq-diag-cell">... <i>23 more fields</i></div>
+      <div class="bq-diag-cell">... <i>31 more fields</i></div>
     </div>
   </div>
   <div class="bq-diag-group">
@@ -107,7 +107,7 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
   <div class="bq-diag-row">
     <div class="bq-diag-cell">job_results <i>job_id TEXT PRIMARY KEY, result BLOB MessagePack, completed_at INTEGER</i></div>
     <div class="bq-diag-cell">dlq <i>id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT, queue TEXT, entry BLOB full DlqEntry MessagePack, entered_at INTEGER</i></div>
-    <div class="bq-diag-cell">cron_jobs <i>name TEXT PRIMARY KEY, queue TEXT, data BLOB, schedule TEXT, repeat_every INTEGER, priority INTEGER, next_run INTEGER, executions INTEGER, max_limit INTEGER, timezone TEXT, unique_key TEXT, dedup BLOB, skip_missed_on_restart INTEGER, skip_if_no_worker INTEGER, prevent_overlap INTEGER, job_options BLOB</i></div>
+    <div class="bq-diag-cell">cron_jobs <i>name TEXT PRIMARY KEY, queue TEXT, job_name TEXT, data BLOB, schedule TEXT, repeat_every INTEGER, priority INTEGER, next_run INTEGER, executions INTEGER, max_limit INTEGER, timezone TEXT, unique_key TEXT, dedup BLOB, skip_missed_on_restart INTEGER, skip_if_no_worker INTEGER, prevent_overlap INTEGER, job_options BLOB</i></div>
     <div class="bq-diag-cell">queue_state <i>name TEXT PRIMARY KEY, paused/rate/concurrency fields plus stall_enabled, stall_interval, max_stalls, stall_grace_period; persists queue controls and custom stall policy across restarts</i></div>
   </div>
 </div>
@@ -126,7 +126,7 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
   <div class="bq-diag-arrow">↓</div>
   <div class="bq-diag-layer">5. Load completed jobs <i>up to the 50k in-memory cap, for clean() and stats</i></div>
   <div class="bq-diag-arrow">↓</div>
-  <div class="bq-diag-layer">6. Load cron jobs <i>populate cron scheduler heap; past next_run is recalculated forward when skipMissedOnRestart is set</i></div>
+  <div class="bq-diag-layer">6. Load cron jobs <i>populate cron scheduler heap; past next_run is recalculated forward when skipMissedOnRestart or skipIfNoWorker is set</i></div>
 </div>
 
 ## S3 Backup Flow

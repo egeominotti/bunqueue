@@ -122,13 +122,13 @@ server instances may share that one database and namespace.
 <TabItem label="Binary">
 
 ```bash
-# download the binary for your platform from GitHub Releases
-curl -LO https://github.com/egeominotti/bunqueue/releases/latest/download/bunqueue-darwin-arm64
-chmod +x bunqueue-darwin-arm64
+# download the archive for your platform from GitHub Releases
+curl -fsSLO https://github.com/egeominotti/bunqueue/releases/latest/download/bunqueue-darwin-arm64.tar.gz
+tar -xzf bunqueue-darwin-arm64.tar.gz
 ./bunqueue-darwin-arm64 start
 ```
 
-Prebuilt binaries for macOS and Linux are attached to every
+Prebuilt binaries for macOS, Linux and Windows are attached to every
 [release](https://github.com/egeominotti/bunqueue/releases); no runtime
 required.
 
@@ -328,7 +328,7 @@ $worker->run();          // blocking loop; or $worker->runOnce() from a cron tic
 
 ```go
 worker := bunqueue.NewWorker("emails", func(job *bunqueue.Job) (any, error) {
-    return sendEmail(job.Data()["to"].(string))
+    return sendEmail(job.Data().(map[string]any)["to"].(string))
 }, bunqueue.WorkerOptions{Concurrency: 8})
 
 worker.Run()
@@ -522,7 +522,7 @@ the runtime:
 | Worker retry backoff      | All six retry a failed pull loop without spinning; TypeScript, Python, PHP, Go, and Rust use bounded backoff, while Elixir uses a short fixed delay                          |
 | Producer fast-fail window | Legacy TypeScript and Python throttle repeated failed connection attempts (500 ms → 5 s); canonical TypeScript uses the shared client's reconnect policy |
 | TCP keepalive             | TypeScript and Python enable an approximately 15 s idle probe where the OS exposes the controls                                                                              |
-| Timeout-driven teardown   | All six discard a stream whose framing state is ambiguous; TypeScript/Python tolerate a configurable consecutive-timeout threshold, PHP/Go/Rust/Elixir tear down immediately |
+| Timeout-driven teardown   | All six discard a stream whose framing state is ambiguous; TypeScript/Python tolerate a consecutive-timeout threshold (configurable via `maxCommandTimeouts` in canonical TypeScript, fixed at 3 in Python), PHP/Go/Rust/Elixir tear down immediately |
 | Backpressure              | TypeScript optionally parks callers at `maxInFlight`; the synchronous clients naturally serialize/bound calls                                                                |
 | Auth ordering             | All six prevent any command racing ahead of `Auth` after a reconnect                                                                                                         |
 
@@ -708,7 +708,7 @@ The table below describes the other SDKs and the historical TypeScript
 | `batchSize`          | usually 10; Elixir defaults to concurrency      | Jobs fetched per `PULLB`, capped by free slots and the server max (1000)                |
 | `pollTimeoutMs`      | usually 5000; Elixir 1000                       | Server-side long-poll; max 30 000                                                       |
 | `lockTtlMs`          | 30 000                                          | Job lease TTL                                                                           |
-| `heartbeatIntervalS` | 10; Go defaults to disabled                     | Worker + per-job lock heartbeats; 0 disables (Go: negative or `DisableHeartbeat: true`) |
+| `heartbeatIntervalS` | 10; Go defaults to disabled                     | Worker + per-job lock heartbeats; 0 disables (Go: zero or negative, or `DisableHeartbeat: true`) |
 | `ackBatch`           | off                                             | Opt-in ACK batching (below; legacy TypeScript and Python)                                      |
 | `autorun`            | true where exposed                              | Legacy TypeScript/Python can start at construction; PHP, Go, Rust, and Elixir start explicitly |
 
@@ -1292,7 +1292,7 @@ Where exposed (Python, PHP, and Go), external-SDK `getFlow(id)`
 returns `null` for a missing root and skips children removed since creation,
 yielding the surviving partial tree. Rust and Elixir currently create atomic
 trees/chains but expose no typed flow reader. Both TypeScript packages
-fails on a missing descendant or malformed/cross-linked topology so corruption
+fail on a missing descendant or malformed/cross-linked topology so corruption
 cannot masquerade as a valid partial graph. See the [Flow guide](/guide/flow/)
 for the exact per-client contract.
 

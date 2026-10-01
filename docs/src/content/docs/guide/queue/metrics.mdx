@@ -52,7 +52,7 @@ const removed = await queue.trimEvents(1000);  // Keep the newest 1,000 events
 <TabItem label="Python">
 
 ```python
-workers = queue.get_workers()        # Active workers on this queue
+workers = queue.get_workers()        # All registered workers (server-wide)
 count = queue.get_workers_count()
 
 stats = queue.get_stats()            # Server-wide stats
@@ -63,7 +63,7 @@ metrics = queue.get_metrics()        # Server-wide metrics
 <TabItem label="PHP">
 
 ```php
-$workers = $queue->getWorkers();     // Active workers on this queue
+$workers = $queue->getWorkers();     // All registered workers (server-wide)
 
 $stats = $queue->getStats();         // Server-wide stats
 ```
@@ -72,7 +72,7 @@ $stats = $queue->getStats();         // Server-wide stats
 <TabItem label="Go">
 
 ```go
-workers, _ := queue.GetWorkers()     // Active workers on this queue
+workers, _ := queue.GetWorkers()     // All registered workers (server-wide)
 
 stats, _ := queue.GetStats()         // Server-wide stats
 ```
@@ -102,7 +102,7 @@ Prometheus endpoint with the standard Erlang HTTP client instead:
 </TabItem>
 </Tabs>
 
-*Worker and stats helpers are not yet exposed in Rust and Elixir; scrape the server's Prometheus-text `/prometheus` endpoint instead. The separate `/metrics` endpoint returns JSON operational metrics. `trimEvents()` and windowed `getMetrics(state, start, end)` exist in the Bun `bunqueue` package only.*
+*Worker and stats helpers are not yet exposed in Rust and Elixir; scrape the server's Prometheus-text `/prometheus` endpoint instead. The separate `/metrics` endpoint returns JSON operational metrics. `trimEvents()` and windowed `getMetrics(state, start, end)` exist in the two TypeScript packages only.*
 
 ## Metric windows
 

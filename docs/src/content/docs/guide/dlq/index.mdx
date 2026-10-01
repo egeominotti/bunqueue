@@ -61,11 +61,11 @@ import { Queue } from 'bunqueue-client';
 
 const queue = new Queue('emails');
 
-// List the dead jobs (over TCP they arrive as plain jobs,
-// without DLQ metadata like the failure reason)
-const jobs = await queue.getDlq();
-for (const job of jobs) {
-  console.log(job.id);
+// See what failed and why (the sync getDlq() is an embedded-only
+// snapshot and returns [] over TCP)
+const entries = await queue.getDlqAsync();
+for (const entry of entries) {
+  console.log(entry.job.id, entry.reason, entry.error);
 }
 
 // Put everything back in the queue for another try

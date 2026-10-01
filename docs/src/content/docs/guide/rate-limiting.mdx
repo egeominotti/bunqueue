@@ -328,7 +328,7 @@ The Elixir SDK supports a custom window as a queue-wide broker limit:
 </TabItem>
 </Tabs>
 
-The Bun worker limit is enforced client-side by each worker, so with 3 identical workers the effective rate is 3x.
+The TypeScript worker limit is enforced client-side by each worker, so with 3 identical workers the effective rate is 3x.
 
 The budget counts **job starts**, not completions. Admission is synchronous at
 the processor dispatch boundary, so `concurrency: 20` cannot overshoot a
@@ -351,9 +351,9 @@ worker.rateLimit(5_000); // do not start another job for at least five seconds
 This override works with or without a configured `limiter`, including workers
 using `groupKey`, and never alters tokens already consumed by previous starts.
 
-*The worker `limiter` option is available in the Bun client. In the network
-SDKs, use the queue-level rate limit shown in each tab or a client-side limiter
-of your own in the processor.*
+*The worker `limiter` option is available in both TypeScript packages. In the
+other SDKs, use the queue-level rate limit shown in each tab or a client-side
+limiter of your own in the processor.*
 
 ## Using AI agents?
 

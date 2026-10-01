@@ -93,9 +93,12 @@ All errors follow a consistent format with appropriate HTTP status codes:
 | `200` | Success        | Operation completed successfully                                                                             |
 | `400` | Bad Request    | Invalid JSON, missing required fields, validation failure (e.g., queue name too long, priority out of range) |
 | `401` | Unauthorized   | Missing or invalid Bearer token                                                                              |
-| `404` | Not Found      | Job, queue, cron, or webhook not found                                                                       |
+| `404` | Not Found      | Unknown route, or job, cron, webhook, or worker not found                                                    |
 | `429` | Rate Limited   | Client exceeded the configured request rate                                                                  |
 | `500` | Internal Error | Unexpected server error (logged server-side)                                                                 |
+| `503` | Unavailable    | Storage degraded (`/health`, `/ready`), WS/SSE connection limit reached, or `METRICS_AUTH` without tokens    |
+
+Some endpoints, such as `DELETE /jobs/:id`, queue control, DLQ, rate-limit/concurrency, configuration, and `POST /jobs/:id/wait`, report command failures with status `200` and `"ok": false`, so always check `ok`.
 
 **Error response body:**
 
@@ -143,7 +146,7 @@ Understanding the job lifecycle is essential for using the API effectively. A jo
 <div class="bq-diag">
   <div class="bq-diag-head"><b>Job lifecycle</b><span>states and transitions</span></div>
   <div class="bq-diag-flow">
-    <div class="bq-diag-cell">push <i>priority = 0</i></div>
+    <div class="bq-diag-cell">push <i>priority &le; 0</i></div>
     <div class="bq-diag-arrow">→</div>
     <div class="bq-diag-cell">waiting</div>
   </div>
@@ -181,7 +184,7 @@ Understanding the job lifecycle is essential for using the API effectively. A jo
 
 **States:**
 
-- **waiting**, Job is queued with priority = 0
+- **waiting**, Job is queued with priority ≤ 0
 - **prioritized**, Job is queued with priority > 0 (processed before waiting jobs)
 - **delayed**, Job waiting for its delay to expire, then moves to waiting/prioritized
 - **active**, Job is being processed by a worker
@@ -224,6 +227,7 @@ curl -X POST http://localhost:6790/queues/emails/jobs \
 | Field              | Type                 | Default      | Description                                                                                                                                                                              |
 | ------------------ | -------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `data`             | `any`                | _(required)_ | Job payload. Any JSON-serializable value. Max 10MB.                                                                                                                                      |
+| `name`             | `string`             | `"default"`  | Job name, stored as the top-level `job.name`.                                                                                                                                            |
 | `priority`         | `number`             | `0`          | Higher value = processed sooner. Range: -1,000,000 to 1,000,000.                                                                                                                         |
 | `delay`            | `number`             | `0`          | Milliseconds before the job becomes available for processing. Max: 1 year.                                                                                                               |
 | `maxAttempts`      | `number`             | `3`          | Maximum retry attempts before the job moves to the DLQ. Range: 1-1000. `attempts` is accepted as an alias.                                                                               |
@@ -284,7 +288,7 @@ curl -X POST http://localhost:6790/queues/emails/jobs/bulk \
   }'
 ```
 
-Each item in `jobs` supports all the same fields as a single push and is validated with the same rules (option bounds and `dependsOn` existence; a `dependsOn` entry may also reference the `customId` of an earlier job in the same batch). The operation is **atomic**, either all jobs are pushed or none are: if validation fails for any job, the whole batch is rejected with an error naming the offending index (`jobs[i]: ...`).
+Each item in `jobs` supports the same fields as a single push and is validated with the same rules (option bounds and `dependsOn` existence; a `dependsOn` entry may also reference the `customId` of any job in the same batch, in any order). Two differences: the custom ID field is `customId` (not `jobId`), and the `attempts` alias is not accepted (use `maxAttempts`). Validation is all-or-nothing: if any job fails validation, the whole batch is rejected with an error naming the offending index (`jobs[i]: ...`) and nothing is pushed. A runtime admission error after validation, such as a full group (`group.maxSize`) or an unresolved custom-ID dependency, can leave the jobs accepted before it pushed, so check which IDs exist before you resubmit.
 
 **Response** (`200`):
 
@@ -349,7 +353,7 @@ curl http://localhost:6790/queues/emails/jobs?timeout=5000
 **Behavior notes:**
 
 - Paused queues return `null` even if jobs exist
-- The pulled job is tracked for the duration of the HTTP request. If the client disconnects without ACKing, the stall detector will eventually return the job to `waiting` state
+- HTTP is stateless, so a pulled job is not tied to the client connection. If the client never ACKs or fails it, the stall detector eventually recovers the job (retry, or DLQ after `maxStalls`)
 - Rate-limited queues may return `null` even if jobs exist (rate limit exceeded)
 - Per-group concurrency: if the job's `groupId` has reached its concurrency limit, the next job from a different group is returned
 
@@ -480,13 +484,13 @@ GET /jobs/:id/result
 { "ok": true, "id": "019ce9d7-...", "result": { "sent": true, "messageId": "abc-123" } }
 ```
 
-Results are stored in an LRU cache (max 5,000 entries). Oldest results are evicted when the cache is full. For permanent result storage, use the `result` field in your own database.
+Results are stored in an LRU cache (max 10,000 entries by default). Oldest results are evicted when the cache is full. For permanent result storage, use the `result` field in your own database.
 
 ---
 
 ### Cancel a Job
 
-Remove a job from the queue. Works on `waiting`, `delayed`, and `active` jobs.
+Remove a queued job. Works on `waiting`, `prioritized`, `delayed`, and `waiting-children` jobs. Active jobs cannot be cancelled.
 
 ```
 DELETE /jobs/:id
@@ -498,7 +502,7 @@ curl -X DELETE http://localhost:6790/jobs/019ce9d7-...
 
 **Response** (`200`): `{ "ok": true }`
 
-If the job is `active`, it's removed from the processing queue and the worker's next heartbeat or ACK attempt will fail with "job not found". The job is not re-queued.
+If the job does not exist or is not queued (for example, it is `active` or already finished), the response is still `200` with `{ "ok": false, "error": "Job not found or cannot be cancelled" }`.
 
 ---
 
@@ -518,14 +522,14 @@ curl -X POST http://localhost:6790/jobs/019ce9d7-.../ack \
 
 **Request body** (optional):
 
-| Field    | Type     | Description                                         |
-| -------- | -------- | --------------------------------------------------- |
-| `result` | `any`    | Completion result. Stored in LRU cache (5,000 max). |
-| `token`  | `string` | Lock token (if using lock-based processing).        |
+| Field    | Type     | Description                                          |
+| -------- | -------- | ---------------------------------------------------- |
+| `result` | `any`    | Completion result. Stored in LRU cache (10,000 max). |
+| `token`  | `string` | Lock token (if using lock-based processing).         |
 
 **Response** (`200`): `{ "ok": true }`
 
-**Error** (`400`): `{ "ok": false, "error": "Job not found or not active" }`
+**Error** (`400`): `{ "ok": false, "error": "Job not found or not in processing state: <id>" }`
 
 **What happens on ACK:**
 
@@ -575,10 +579,12 @@ curl -X POST http://localhost:6790/jobs/019ce9d7-.../fail \
   -d '{"error": "SMTP connection refused"}'
 ```
 
-| Field   | Type     | Description                                       |
-| ------- | -------- | ------------------------------------------------- |
-| `error` | `string` | Error message. Stored with the job for debugging. |
-| `token` | `string` | Lock token (if using lock-based processing).      |
+| Field           | Type       | Description                                                   |
+| --------------- | ---------- | ------------------------------------------------------------- |
+| `error`         | `string`   | Error message. Stored with the job for debugging.             |
+| `token`         | `string`   | Lock token (if using lock-based processing).                  |
+| `unrecoverable` | `boolean`  | Skip remaining retries and fail terminally (straight to DLQ). |
+| `stack`         | `string[]` | Stack trace lines, stored on the job and its DLQ entry.       |
 
 **Retry behavior:**
 
@@ -587,27 +593,25 @@ curl -X POST http://localhost:6790/jobs/019ce9d7-.../fail \
   <div class="bq-diag-flow">
     <div class="bq-diag-cell">Attempt 1 fails</div>
     <div class="bq-diag-arrow">→</div>
-    <div class="bq-diag-cell">wait 1s <i>backoff</i></div>
+    <div class="bq-diag-cell">wait ~2s <i>backoff * 2</i></div>
     <div class="bq-diag-arrow">→</div>
     <div class="bq-diag-cell">retry</div>
   </div>
   <div class="bq-diag-flow">
     <div class="bq-diag-cell">Attempt 2 fails</div>
     <div class="bq-diag-arrow">→</div>
-    <div class="bq-diag-cell">wait 2s <i>backoff * 2</i></div>
+    <div class="bq-diag-cell">wait ~4s <i>backoff * 4</i></div>
     <div class="bq-diag-arrow">→</div>
     <div class="bq-diag-cell">retry</div>
   </div>
   <div class="bq-diag-flow">
     <div class="bq-diag-cell">Attempt 3 fails</div>
     <div class="bq-diag-arrow">→</div>
-    <div class="bq-diag-cell">wait 4s <i>backoff * 4</i></div>
-    <div class="bq-diag-arrow">→</div>
-    <div class="bq-diag-cell bq-diag-accent">move to DLQ</div>
+    <div class="bq-diag-cell bq-diag-accent">move to DLQ <i>maxAttempts reached</i></div>
   </div>
 </div>
 
-The retry delay is calculated as `min(backoff * 2^attempt, 24 hours)`.
+With a numeric `backoff` (default `1000`, `maxAttempts` `3`), the retry delay is `backoff * 2^attempt`, where `attempt` is the number of failed attempts so far, multiplied by a random jitter factor between 0.5 and 1.5 and capped at 1 hour. With `{ "type": "fixed", "delay": ms }` the delay is `delay` with ±20% jitter.
 
 ---
 
@@ -669,11 +673,17 @@ curl -X POST http://localhost:6790/jobs/019ce9d7-.../promote
 
 ### Move to Waiting
 
-Alias for Promote. Identical behavior.
+Move a job back to `waiting`, dispatching on its current state: an `active` job is released back to the queue, a `delayed` job is promoted, a `failed` job is retried from the DLQ, and a `waiting`/`prioritized` job is a successful no-op. Other states return an error.
 
 ```
 POST /jobs/:id/move-to-wait
 ```
+
+```json
+{ "token": "lock-token" }
+```
+
+`token` is optional; it is required only for an active job that holds a lock.
 
 ---
 
@@ -795,7 +805,7 @@ Progress is stored on the job object and broadcast as a `job:progress` event to 
 
 ### Get Children Values
 
-For jobs that use `dependsOn` (flow/pipeline), retrieve the results of all completed child jobs.
+For a flow parent job (one created with children, for example by FlowProducer), retrieve the stored results of its completed children. Keys are `<queue>:<childId>`, or the bare `childId` when the child job no longer exists.
 
 ```
 GET /jobs/:id/children
@@ -804,7 +814,7 @@ GET /jobs/:id/children
 ```json
 {
   "ok": true,
-  "data": { "values": { "child-job-1": { "result": "..." }, "child-job-2": { "result": "..." } } }
+  "data": { "values": { "emails:child-job-1": { "sent": true }, "emails:child-job-2": { "sent": true } } }
 }
 ```
 
@@ -988,7 +998,7 @@ curl "http://localhost:6790/queues/emails/jobs/list?status=failed,completed"
 | Parameter | Type     | Default | Description                                                                                                                                                                             |
 | --------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `status`  | `string` | all     | State filter: `waiting`, `prioritized`, `delayed`, `active`, `completed`, `failed`, `waiting-children`. Aliases: `state`, `states`. Repeatable and comma-separated for multiple states. |
-| `limit`   | `number` | all     | Max jobs to return                                                                                                                                                                      |
+| `limit`   | `number` | `100`   | Max jobs to return                                                                                                                                                                      |
 | `offset`  | `number` | `0`     | Skip first N jobs                                                                                                                                                                       |
 
 **Response** (`200`):
@@ -1036,16 +1046,16 @@ For real-time count updates without polling, subscribe to `queue:counts` via [We
 
 ---
 
-### Get Total Count
+### Get Queued Count
 
-Returns the total number of jobs (all states) in a queue.
+Returns the number of queued jobs (`waiting`, `prioritized`, and `delayed`) in a queue. Active, completed, and failed jobs are not counted.
 
 ```
 GET /queues/:queue/count
 ```
 
 ```json
-{ "ok": true, "count": 192 }
+{ "ok": true, "count": 180 }
 ```
 
 ---
@@ -1396,7 +1406,7 @@ PUT /queues/:queue/stall-config
 
 | Field           | Default | Description                                                   |
 | --------------- | ------- | ------------------------------------------------------------- |
-| `stallInterval` | `30000` | How often to check for stalled jobs (ms)                      |
+| `stallInterval` | `30000` | A job is stalled after this many ms without a heartbeat       |
 | `maxStalls`     | `3`     | Max times a job can stall before moving to DLQ                |
 | `gracePeriod`   | `5000`  | Grace period after job starts before stall detection kicks in |
 
@@ -1487,6 +1497,7 @@ curl -X POST http://localhost:6790/crons \
 | Field            | Type      | Required | Description                                                                                                                                       |
 | ---------------- | --------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`           | `string`  | Yes      | Unique identifier. Re-using a name updates the existing cron.                                                                                     |
+| `jobName`        | `string`  | No       | Name assigned to generated jobs (default `"default"`).                                                                                            |
 | `queue`          | `string`  | Yes      | Target queue for the generated jobs.                                                                                                              |
 | `data`           | `any`     | Yes      | Job payload pushed on each execution.                                                                                                             |
 | `schedule`       | `string`  | *        | Cron expression (`"*/5 * * * *"`, `"0 2 * * *"`).                                                                                                 |
@@ -1547,18 +1558,18 @@ curl -X POST http://localhost:6790/webhooks \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com/hooks/bunqueue",
-    "events": ["completed", "failed"],
+    "events": ["job.completed", "job.failed"],
     "queue": "emails",
     "secret": "whsec_abc123"
   }'
 ```
 
-| Field    | Type       | Required | Description                                                                                  |
-| -------- | ---------- | -------- | -------------------------------------------------------------------------------------------- |
-| `url`    | `string`   | Yes      | HTTPS endpoint URL. Validated against SSRF (localhost, private IPs, cloud metadata blocked). |
-| `events` | `string[]` | Yes      | Event types to subscribe to (`completed`, `failed`, `pushed`, `started`).                    |
-| `queue`  | `string`   | No       | Filter to specific queue. Omit for all queues.                                               |
-| `secret` | `string`   | No       | HMAC signing secret for verifying webhook authenticity.                                      |
+| Field    | Type       | Required | Description                                                                                                         |
+| -------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `url`    | `string`   | Yes      | HTTP or HTTPS endpoint URL. Validated against SSRF (localhost, private IPs, cloud metadata blocked).                |
+| `events` | `string[]` | Yes      | Event types: `job.pushed`, `job.started`, `job.completed`, `job.failed`, `job.progress`. Other values are rejected. |
+| `queue`  | `string`   | No       | Filter to specific queue. Omit for all queues.                                                                      |
+| `secret` | `string`   | No       | HMAC signing secret for verifying webhook authenticity.                                                             |
 
 **Response** (`200`):
 
@@ -1566,9 +1577,10 @@ curl -X POST http://localhost:6790/webhooks \
 {
   "ok": true,
   "data": {
-    "webhookId": "wh-abc123",
+    "webhookId": "019ce9d7-7a10-7000-8000-4f2a9b1c3d5e",
     "url": "https://...",
-    "events": ["completed", "failed"],
+    "events": ["job.completed", "job.failed"],
+    "queue": "emails",
     "createdAt": 1700000000000
   }
 }
@@ -1688,7 +1700,7 @@ GET /health
 }
 ```
 
-Memory values in MB. Uptime in seconds. Returns `"status": "degraded"` when disk is full.
+Memory values in MB. Uptime in seconds. When storage is degraded (for example, disk full), it returns HTTP `503` with `"ok": false`, `"status": "degraded"`, and a `storage` object (`diskFull`, `error`, `since`).
 
 ---
 
@@ -1890,15 +1902,16 @@ GET /events
 GET /events/queues/:queue
 ```
 
-SSE broadcasts all job events in the legacy format (`{ eventType, queue, jobId, ... }`). For authenticated SSE, use `@microsoft/fetch-event-source` (native `EventSource` doesn't support custom headers).
+SSE sends typed events. Each job event has an `id:` (used for `Last-Event-ID` resume), an `event:` name identical to the WebSocket pub/sub names (`job:completed`, `job:failed`, ...), and a JSON `data:` payload `{ queue, jobId, timestamp, error?, progress?, prev?, delay? }`. Dashboard and periodic events (`queue:counts`, `queue:paused`, `stats:snapshot` every 5s, `health:status` every 10s, `storage:status` every 30s, ...) use the same stream with their pub/sub payloads; `/events/queues/:queue` filters only job events. The first message is an unnamed `{ "connected": true, "clientId": "..." }`, and a `:heartbeat` comment is sent every 30 seconds. Because events are named, listen with `addEventListener`; `onmessage` only receives the unnamed connection message. For authenticated SSE, use `@microsoft/fetch-event-source` (native `EventSource` doesn't support custom headers).
 
 ```javascript
 const events = new EventSource('http://localhost:6790/events');
-events.onmessage = (e) => {
-  const data = JSON.parse(e.data);
-  if (data.connected) return;
-  console.log(`[${data.eventType}] ${data.queue} ${data.jobId}`);
-};
+for (const name of ['job:completed', 'job:failed']) {
+  events.addEventListener(name, (e) => {
+    const data = JSON.parse(e.data);
+    console.log(`[${e.type}] ${data.queue} ${data.jobId}`);
+  });
+}
 ```
 
 ### WebSocket Pub/Sub
@@ -2012,10 +2025,7 @@ ws.send(JSON.stringify({ cmd: 'Pause', queue: 'emails', reqId: '2' }));
 
 #### Authentication
 
-Two options:
-
-1. **Header auth:** Send `Authorization: Bearer <token>` during the WebSocket handshake
-2. **Command auth:** Send `{ "cmd": "Auth", "token": "my-secret" }` after connecting
+When `AUTH_TOKENS` is configured, the upgrade request must carry `Authorization: Bearer <token>`. A handshake without a valid token is rejected with `401` before the socket opens, so sending `{ "cmd": "Auth", "token": "..." }` after connecting cannot replace header auth. The browser's native `WebSocket` API cannot set this header.
 
 #### Connection Cleanup
 
@@ -2323,7 +2333,7 @@ This is the most impactful event for dashboards. Job lifecycle activity schedule
 | `GET`  | `/queues/:q/workers`         | Workers for a queue             |
 | `GET`  | `/queues/:q/jobs/list`       | List jobs by state              |
 | `GET`  | `/queues/:q/counts`          | Job counts per state            |
-| `GET`  | `/queues/:q/count`           | Total job count                 |
+| `GET`  | `/queues/:q/count`           | Queued job count                |
 | `GET`  | `/queues/:q/priority-counts` | Counts per priority             |
 | `GET`  | `/queues/:q/paused`          | Check if paused                 |
 | `POST` | `/queues/:q/pause`           | Pause queue                     |
@@ -2414,7 +2424,7 @@ This is the most impactful event for dashboards. Job lifecycle activity schedule
 
 | Protocol  | Path                | Description                                        |
 | --------- | ------------------- | -------------------------------------------------- |
-| SSE       | `/events`           | All events (legacy format)                         |
+| SSE       | `/events`           | All events (typed SSE events)                      |
 | SSE       | `/events/queues/:q` | Queue-filtered events                              |
 | WebSocket | `/ws`               | Pub/sub + commands (86 explicit events, wildcards) |
 | WebSocket | `/ws/queues/:q`     | Queue-filtered pub/sub                             |

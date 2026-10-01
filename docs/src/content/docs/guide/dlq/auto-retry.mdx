@@ -46,7 +46,7 @@ queue.setDlqConfig({
 <TabItem label="Node.js / Deno">
 
 ```typescript
-await queue.setDlqConfig({
+await queue.setDlqConfigAsync({
   autoRetry: true,
   autoRetryInterval: 60000, // base delay: 1 minute
   maxAutoRetries: 3,

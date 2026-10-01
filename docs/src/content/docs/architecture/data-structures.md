@@ -132,7 +132,7 @@ Used for queue-local temporal indexes (jobs ordered by `createdAt`, then job ID)
     <div class="bq-diag-arrow">→</div>
     <div class="bq-diag-cell">2. Walk forward at level 0 <i>O(k)</i></div>
     <div class="bq-diag-arrow">→</div>
-    <div class="bq-diag-cell bq-diag-accent">3. Collect while createdAt &lt; threshold</div>
+    <div class="bq-diag-cell bq-diag-accent">3. Collect while createdAt &lt;= threshold</div>
   </div>
   <p class="bq-diag-note">Total: O(log q + k), where q is the number of indexed jobs in that queue and k is the number returned. Removal uses the job-ID map plus a queue-local skip-list delete: O(log q).</p>
 </div>
@@ -182,7 +182,7 @@ Used for sharding and distribution in the memory/SQLite engine.
   <div class="bq-diag-flow">
     <div class="bq-diag-cell">hash = FNV_OFFSET <i>0x811c9dc5</i></div>
     <div class="bq-diag-arrow">→</div>
-    <div class="bq-diag-cell bq-diag-accent">for each byte: hash = hash XOR byte, hash = hash * FNV_PRIME <i>0x01000193</i></div>
+    <div class="bq-diag-cell bq-diag-accent">for each UTF-16 code unit: hash = hash XOR charCode, hash = hash * FNV_PRIME <i>0x01000193</i></div>
     <div class="bq-diag-arrow">→</div>
     <div class="bq-diag-cell">return hash <i>unsigned 32-bit</i></div>
   </div>

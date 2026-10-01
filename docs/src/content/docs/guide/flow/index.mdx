@@ -183,7 +183,7 @@ worker := bunqueue.NewWorker("reports", func(job *bunqueue.Job) (any, error) {
         }
         return map[string]any{"report": values}, nil
     }
-    return fetchData(job.Data()["source"].(string))
+    return fetchData(job.Data().(map[string]any)["source"].(string))
 }, bunqueue.WorkerOptions{})
 worker.Run()
 ```

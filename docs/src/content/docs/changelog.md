@@ -146,6 +146,28 @@ head:
   the `bunx bunqueue-dashboard` command and links to the guide, the live demo
   and the repository. "Dashboard" is the first link in the header and mobile
   menu, and the sidebar lists the guide under Run in Production.
+- Audit the guide, API and architecture pages against the source and fix every
+  error that could be verified. Examples that did not compile or run now do:
+  Go `job.Data()` indexing without a type assertion, Go `worker.Run()` used as
+  if it returned an error, untyped TypeScript job data, the Python minimal
+  worker exiting before it processed a job, and Node.js DLQ calls that return
+  nothing over TCP (`getDlqAsync`, `purgeDlqAsync`, `setDlqConfigAsync`).
+  Retry delays in examples and the HTTP reference now follow the real formula
+  (the first retry waits about twice the base `backoff`, with jitter, capped
+  at one hour). The HTTP and TCP references gain the real webhook
+  event names, named SSE events, `/count` and Cancel semantics, the
+  10,000-entry results cache, `/health` returning 503 when storage is
+  degraded, bulk push keeping jobs accepted before a runtime admission error,
+  and the missing `PUSHF`, `SubscribeEvents` and `UnsubscribeEvents` commands.
+  Two security notes are corrected: a WebSocket connection must send its token
+  in the upgrade request's header, because the server refuses the upgrade
+  without it (an `Auth` message after connecting never gets that far), and S3
+  backups rely on the bucket's default encryption because bunqueue has no
+  encryption option of its own. Type and architecture pages now match the
+  exports, the 38-column `jobs` table and six model campaigns;
+  `BUNQUEUE_EMBEDDED` is documented as a default rather than an override; the
+  Compose example uses the published image and its `/app/data` volume; and the
+  binary install downloads the published archive.
 
 ## [2.9.5] - 2026-09-09
 

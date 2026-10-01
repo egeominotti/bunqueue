@@ -367,7 +367,7 @@ Two things reset the stall timer: the worker's automatic heartbeat (every `heart
 
 ## What happens when a job stalls
 
-1. **Retry**: the path depends on how the stall was detected. Heartbeat-stall recovery re-queues the job with its stall count incremented and `runAt` pushed out by the job's exponential backoff, without waking blocked pullers, so pickup waits for the backoff plus the next poll. Lock-expiry recovery re-queues without backoff and notifies waiting workers immediately.
+1. **Retry**: the path depends on how the stall was detected. Heartbeat-stall recovery re-queues the job with its stall count incremented and `runAt` pushed out by the job's retry backoff (exponential unless configured as fixed), without waking blocked pullers, so pickup waits for the backoff plus the next poll. Lock-expiry recovery re-queues without backoff and notifies waiting workers immediately.
 2. **DLQ**: the job becomes terminal when either its cumulative stall count reaches `maxStalls` or the interrupted delivery consumes its final normal `attempts` slot. The attempts check wins ties: since each stall also consumes an attempt, with the defaults (`maxStalls: 3`, `attempts: 3`) a repeatedly stalling job lands in the DLQ as `max_attempts_exceeded`. The `stalled` classification appears only when `maxStalls` is lower than the job's remaining `attempts` budget.
 
 ## Listening for stalls
@@ -551,7 +551,7 @@ let jobs = queue.get_dlq(None)?;
 `SandboxedWorker` depends on experimental Bun Workers. For production, use the standard `Worker`. See [Worker vs SandboxedWorker](/guide/worker/sandboxed/#worker-vs-sandboxedworker).
 :::
 
-`SandboxedWorker` also sends heartbeats automatically in both modes; in embedded mode `heartbeatInterval` defaults to `5000` ms. If its jobs run longer than `stallInterval`, either raise `stallInterval`, call `progress()` periodically, or disable stall detection with `queue.setStallConfig({ enabled: false })`.
+`SandboxedWorker` also sends heartbeats automatically in both modes from the parent thread (`heartbeatInterval` defaults to `5000` ms embedded and `10000` ms over TCP), so a sandboxed job may run longer than `stallInterval` without stalling while that thread stays responsive. For long jobs, raise the `SandboxedWorker` `timeout` option (a per-job limit, default `30000` ms), which terminates the thread when exceeded.
 
 :::tip[Related Guides]
 - [Dead Letter Queue](/guide/dlq/) - Where stalled jobs end up after max stalls

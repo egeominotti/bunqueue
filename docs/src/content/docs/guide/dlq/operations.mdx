@@ -38,13 +38,10 @@ await queue.getDlqAsync({ limit: 10, offset: 20 });                   // paginat
 </TabItem>
 <TabItem label="Node.js / Deno">
 
-The SDK's `getDlq()` returns jobs only. Use the HTTP endpoint for full entry
-metadata, then filter the returned page in the client:
-
 ```typescript
-const response = await fetch('http://localhost:6790/queues/emails/dlq?limit=100&offset=0');
-const { entries, total } = await response.json();
-const stalled = entries.filter((entry) => entry.reason === 'stalled');
+await queue.getDlqAsync({ reason: 'stalled' });                       // filtered server-side
+await queue.getDlqAsync({ olderThan: Date.now() - 86400000 });        // older than 24h
+await queue.getDlqAsync({ limit: 10, offset: 20 });                   // pagination
 ```
 
 </TabItem>
@@ -294,7 +291,7 @@ const n = await queue.purgeDlqAsync();       // same, but waits and returns the 
 <TabItem label="Node.js / Deno">
 
 ```typescript
-const purged = await queue.purgeDlq();       // permanently deletes all entries, returns the count
+const purged = await queue.purgeDlqAsync();  // permanently deletes all entries, returns the count
 ```
 
 </TabItem>

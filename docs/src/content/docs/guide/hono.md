@@ -48,7 +48,7 @@ app.post('/api/send-email', async (c) => {
   const body = await c.req.json();
   const job = await emails.add('send', body, {
     attempts: 3, // retry up to 3 times on failure
-    backoff: 5000, // wait 5s (then longer) between retries
+    backoff: 5000, // exponential from a 5s base: ~10s, then ~20s between retries
   });
   return c.json({ queued: true, jobId: job.id });
 });
@@ -224,7 +224,7 @@ process.on('SIGTERM', shutdown);
 ## Gotchas
 
 - **One `Queue` instance per queue name, created at startup.** Creating queues inside handlers works but wastes memory and setup time on every request.
-- **Long jobs need a `timeout`.** The default processing timeout comes from the job options; set `timeout: 300_000` for a 5 minute report job so it is not killed early.
+- **Bound long jobs with a `timeout`.** Jobs have no processing timeout by default; set one in the job options (for example `timeout: 300_000` for a 5 minute report job), and keep it above the longest legitimate run so a slow job is not failed early.
 - **CPU-heavy processors block the event loop**, the single thread Bun uses for all I/O. See [CPU-Intensive Workers](/guide/cpu-intensive-workers/) for yield patterns.
 
 :::tip[Related]

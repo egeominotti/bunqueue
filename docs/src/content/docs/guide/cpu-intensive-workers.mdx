@@ -134,7 +134,7 @@ worker := bunqueue.NewWorker("heavy", func(job *bunqueue.Job) (any, error) {
     HeartbeatIntervalS: 10, // Go leaves heartbeats off unless enabled
 })
 
-if err := worker.Run(); err != nil { log.Fatal(err) }
+worker.Run() // blocks until worker.Stop()
 ```
 
 Keep `HeartbeatIntervalS` positive for long-running jobs. For native code that

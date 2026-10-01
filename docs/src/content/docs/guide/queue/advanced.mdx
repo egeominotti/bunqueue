@@ -392,7 +392,7 @@ central =
 </TabItem>
 </Tabs>
 
-_Only the Bun-runtime `bunqueue` package provides the `forward()` drain loop.
+_Only the two TypeScript packages provide the `forward()` drain loop.
 Its source may be embedded or TCP, but only an embedded source provides the
 in-process SQLite offline buffer. Direct network writes do not retain jobs
 locally while the central broker is unavailable._

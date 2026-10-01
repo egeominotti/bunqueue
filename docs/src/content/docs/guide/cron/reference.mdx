@@ -70,7 +70,7 @@ Options on the repeat object of `upsertJobScheduler`:
 | ------------------- | --------------------- | --------------------- | ------------------------ | --------------------- | ------------------------------- | ------------------- | --------------------- |
 | cron pattern        | `pattern`             | `pattern`             | `pattern`                | `pattern`             | `Pattern`                       | `pattern`           | `pattern`             |
 | interval            | `every`               | `every`               | `every`                  | `every`               | `EveryMs`                       | `every_ms`          | `every`               |
-| timezone            | `timezone`            | `tz`                  | `tz`                     | `tz`                  | `Timezone`                      | `timezone`          | `tz` or `timezone`    |
+| timezone            | `timezone`            | `timezone`            | `tz`                     | `tz`                  | `Timezone`                      | `timezone`          | `tz` or `timezone`    |
 | skip with no worker | `skipIfNoWorker`      | `skipIfNoWorker`      | `skip_if_no_worker`      | `skipIfNoWorker`      | `SkipIfNoWorker`                | `skip_if_no_worker` | `skipIfNoWorker`      |
 | missed-run policy   | `skipMissedOnRestart` | `skipMissedOnRestart` | `skip_missed_on_restart` | `skipMissedOnRestart` | `SkipMissedOnRestart` (`*bool`) | server default only | `skipMissedOnRestart` |
 | overlap policy      | `preventOverlap`      | `preventOverlap`      | `prevent_overlap`        | `preventOverlap`      | `PreventOverlap` (`*bool`)      | server default only | `preventOverlap`      |
@@ -78,8 +78,9 @@ Options on the repeat object of `upsertJobScheduler`:
 Rust's scheduler type currently omits `skipMissedOnRestart` and
 `preventOverlap`; both therefore use the server default `true`. Go uses pointer
 booleans for those two fields so explicit `false` is distinct from omission.
-`addCron` and `every` convenience helpers exist in TypeScript and Python only;
-PHP, Go, Rust, and Elixir use the scheduler API directly.
+`addCron` and `every` convenience helpers exist only in Python and the legacy
+`bunqueue-client/legacy` Queue; the Bun and Node.js / Deno `Queue`, PHP, Go,
+Rust, and Elixir use the scheduler API directly.
 
 At least one timing field is required. If both `pattern` and a valid `every`
 value are supplied, `pattern` takes precedence for backward compatibility.

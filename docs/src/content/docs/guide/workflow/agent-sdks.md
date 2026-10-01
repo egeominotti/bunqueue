@@ -260,7 +260,7 @@ const flow = new Workflow('purge-with-approval')
   }, { retry: 1 });
 ```
 
-`retry: 1` matters here. A deliberate throw should be believed the first time, not retried five times with backoff before the rollback starts.
+`retry: 1` matters here. A deliberate throw should be believed the first time, not retried with backoff until the default three attempts are spent before the rollback starts.
 
 ## Mastra
 

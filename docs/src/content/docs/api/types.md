@@ -11,7 +11,7 @@ head:
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">api reference · types</span>
   <h1 class="bq-hero-h1 bq-bench-h1">Every TypeScript type, <em>spelled out.</em></h1>
-  <p class="bq-hero-sub">bunqueue is written in TypeScript and provides comprehensive type definitions. All public types are exported from <code>bunqueue/client</code>.</p>
+  <p class="bq-hero-sub">bunqueue is written in TypeScript and provides comprehensive type definitions. Exported types are imported from <code>bunqueue/client</code>; some shapes below (for example <code>JobStateType</code>, <code>JobCounts</code>, <code>RepeatOptions</code>, and <code>AttemptRecord</code>) are documented for reference but not exported.</p>
 </div>
 
 ## Job Types
@@ -580,7 +580,7 @@ Delays are capped at 1 hour by default. This prevents runaway delays at high att
 
 ### KeepJobs
 
-Exported for BullMQ compatibility. Not accepted by per-job `removeOnComplete`/`removeOnFail` (those are boolean only); the equivalent shape is accepted by `WorkerOptions.removeOnComplete`/`removeOnFail`.
+Defined for BullMQ compatibility but not re-exported from `bunqueue/client`. Not accepted by per-job `removeOnComplete`/`removeOnFail` (those are boolean only); the equivalent shape is accepted by `WorkerOptions.removeOnComplete`/`removeOnFail`.
 
 ```typescript
 interface KeepJobs {
@@ -715,6 +715,7 @@ interface JobCounts {
   failed: number;
   delayed: number;
   paused: number;
+  'waiting-children': number;
 }
 ```
 
@@ -778,13 +779,13 @@ Jobs added with `durable: true` bypass the batcher and are sent as individual PU
 
 ```typescript
 interface ConnectionOptions {
-  /** Server hostname (default: 'localhost', ignored if socketPath is set) */
+  /** Server hostname (default: 'localhost') */
   host?: string;
 
-  /** TCP port (default: 6789, ignored if socketPath is set) */
+  /** TCP port (default: 6789) */
   port?: number;
 
-  /** Unix socket path (takes priority over host/port) */
+  /** Declared but not read by the client: connections always use host/port */
   socketPath?: string;
 
   /** Enable TLS to the server: true (system CAs) or custom options (default: off) */
@@ -795,8 +796,7 @@ interface ConnectionOptions {
 
   /**
    * Connection pool size for parallel operations.
-   * Source JSDoc default: 1. Runtime default for Queue/FlowProducer: 4.
-   * Set >1 to enable connection pooling.
+   * Default: 4 for Queue/FlowProducer; Worker defaults to min(concurrency, 8).
    */
   poolSize?: number;
 
@@ -1329,7 +1329,7 @@ interface SandboxedWorkerOptions {
   /** Poll interval in ms when no workers are idle (default: 10) */
   pollInterval?: number;
 
-  /** Heartbeat interval in ms for TCP lock renewal (default: 10000 for TCP, 0 for embedded) */
+  /** Job heartbeat interval in ms (default: 10000 for TCP, 5000 for embedded; 0 disables) */
   heartbeatInterval?: number;
 
   /** TCP connection options (omit for embedded mode) */
@@ -1523,6 +1523,9 @@ interface DlqStats {
 
   /** Entries grouped by failure reason */
   byReason: Record<FailureReason, number>;
+
+  /** Entries grouped by queue name */
+  byQueue: Record<string, number>;
 
   /** Entries awaiting auto-retry */
   pendingRetry: number;

@@ -50,9 +50,9 @@ function frameCommand(cmd: object): Uint8Array {
   return frame;
 }
 
-// Decode a framed response
+// Decode a framed response (skip the 4-byte length prefix)
 function decodeFrame(frame: Uint8Array): object {
-  return unpack(frame);
+  return unpack(frame.subarray(4));
 }
 ```
 
@@ -391,7 +391,7 @@ Pull the next available job from a queue. Supports optional long polling and loc
   timeout?: number,    // Long poll timeout in ms (0-60000, default: 0)
   owner?: string,      // Client identifier for lock-based pull
   lockTtl?: number,    // Lock TTL in ms (default: 30000)
-  detach?: boolean,    // Don't auto-release the job when this connection closes (CLI usage)
+  detach?: boolean,    // Don't auto-release the job when this connection closes (CLI usage; ignored with owner)
   group?: { concurrency?: number, limit?: { max: number, duration: number } }
 }
 ```
@@ -436,9 +436,6 @@ Batch pull multiple jobs from a queue.
 { ok: true, jobs: Job[] }
 ```
 
-Results are ordered by `createdAt` ascending (oldest first), with the job ID as
-a deterministic tie-breaker, before `offset` and `limit` are applied.
-
 **Response (with owner, includes lock tokens):**
 
 ```typescript
@@ -458,7 +455,8 @@ Acknowledge a job as completed.
   cmd: 'ACK',
   id: string,           // Job ID
   result?: any,         // Optional result data
-  token?: string        // Lock token (required if pulled with owner)
+  token?: string,       // Lock token (required if pulled with owner)
+  removeOnComplete?: boolean // true: remove the job after completion for this call
 }
 ```
 
@@ -538,7 +536,8 @@ Mark a job as failed. The job will be retried with exponential backoff if it has
   error?: string,        // Error message
   stack?: string[],      // Failure stack trace lines, persisted server-side, capped at job.stackTraceLimit (#74)
   unrecoverable?: boolean, // Skip all remaining retries and fail terminally (straight to DLQ)
-  token?: string         // Lock token (required if pulled with owner)
+  token?: string,        // Lock token (required if pulled with owner)
+  removeOnFail?: boolean // true: remove the job on terminal failure for this call
 }
 ```
 
@@ -722,7 +721,7 @@ Returns an error if no job with that custom ID exists.
 
 #### Count
 
-Get the total number of jobs in a queue (all states).
+Get the number of queued jobs in a queue (`waiting`, `prioritized`, and `delayed`; active, completed, and failed jobs are not counted).
 
 **Request:**
 
@@ -772,7 +771,8 @@ Get the return values from all child jobs of a parent job. Used with FlowProduce
 { ok: true, data: { values: Record<string, any> } }
 ```
 
-Returns an empty `values` object if the job has no children or if an error occurs.
+Keys are `<queue>:<childId>`, or the bare `childId` when the child job no longer exists. Returns an empty `values` object if the job has no
+children; a lookup failure returns the normal `{ ok: false, error }` response.
 
 ---
 
@@ -1023,7 +1023,7 @@ Check whether a queue is currently paused.
 
 #### Drain
 
-Remove all waiting jobs from a queue.
+Remove all waiting and delayed jobs from a queue. Active jobs are not affected.
 
 **Request:**
 
@@ -1343,8 +1343,9 @@ List all registered cron job schedules.
     repeatEvery: number | null,
     nextRun: number,
     executions: number,
-    maxLimit: number | undefined,
-    timezone: string | undefined
+    maxLimit: number | null,
+    timezone: string | null,
+    priority: number
   }>
 }
 ```
@@ -1374,8 +1375,9 @@ Get a single cron job by name.
     repeatEvery: number | null,
     nextRun: number,
     executions: number,
-    maxLimit: number | undefined,
-    timezone: string | undefined
+    maxLimit: number | null,
+    timezone: string | null,
+    priority: number
   }
 }
 ```
@@ -1684,8 +1686,8 @@ Register a worker with the server for monitoring.
     name: string,
     queues: string[],
     concurrency: number,
-    hostname: string | undefined,
-    pid: number | undefined,
+    hostname: string,    // 'unknown' when not supplied
+    pid: number,         // 0 when not supplied
     status: 'active',
     registeredAt: number,
     lastSeen: number,
@@ -1742,8 +1744,8 @@ List all registered workers and their stats.
       name: string,
       queues: string[],
       concurrency: number,
-      hostname: string | undefined,
-      pid: number | undefined,
+      hostname: string,
+      pid: number,
       status: 'active' | 'stale',   // stale = no heartbeat within WORKER_TIMEOUT_MS (default 30s)
       registeredAt: number,
       lastSeen: number,
@@ -1772,7 +1774,7 @@ Register a webhook to receive event notifications. URLs are validated to prevent
 {
   cmd: 'AddWebhook',
   url: string,           // Webhook URL (https required for production)
-  events: string[],      // Event types to subscribe to
+  events: string[],      // 'job.pushed' | 'job.started' | 'job.completed' | 'job.failed' | 'job.progress'
   queue?: string,        // Filter by queue (optional)
   secret?: string        // Signing secret for payload verification
 }
@@ -1787,7 +1789,7 @@ Register a webhook to receive event notifications. URLs are validated to prevent
     webhookId: string,
     url: string,
     events: string[],
-    queue: string | undefined,
+    queue: string | null,
     createdAt: number
   }
 }
@@ -1835,7 +1837,7 @@ List all registered webhooks.
       id: string,
       url: string,
       events: string[],
-      queue: string | undefined,
+      queue: string | null,
       createdAt: number,
       lastTriggered: number | null,
       successCount: number,
@@ -2310,6 +2312,7 @@ Job data payloads are limited to **10 MB** when serialized.
 | -------------- | ------------------------------------------------------------------------ | -------------------------------------------- |
 | **Core**       | `PUSH`                                                                   | Add a job to a queue                         |
 |                | `PUSHB`                                                                  | Batch push multiple jobs                     |
+|                | `PUSHF`                                                                  | Atomically commit a flow graph               |
 |                | `PULL`                                                                   | Pull next job (supports long poll and locks) |
 |                | `PULLB`                                                                  | Batch pull jobs                              |
 |                | `ACK`                                                                    | Acknowledge job completion                   |
@@ -2322,7 +2325,7 @@ Job data payloads are limited to **10 MB** when serialized.
 |                | `GetJobCounts`                                                           | Count jobs by state                          |
 |                | `GetCountsPerPriority`                                                   | Count jobs by priority                       |
 |                | `GetJobByCustomId`                                                       | Look up job by custom ID                     |
-|                | `Count`                                                                  | Total job count for a queue                  |
+|                | `Count`                                                                  | Queued job count for a queue                 |
 |                | `GetProgress`                                                            | Get job progress                             |
 |                | `GetChildrenValues`                                                      | Get child job return values                  |
 |                | `GetQueueLimits`                                                         | Read live queue rate/concurrency status      |
@@ -2346,7 +2349,7 @@ Job data payloads are limited to **10 MB** when serialized.
 |                | `Pause`                                                                  | Pause a queue                                |
 |                | `Resume`                                                                 | Resume a queue                               |
 |                | `IsPaused`                                                               | Check if queue is paused                     |
-|                | `Drain`                                                                  | Remove all waiting jobs                      |
+|                | `Drain`                                                                  | Remove all waiting/delayed jobs              |
 |                | `Obliterate`                                                             | Remove all queue data                        |
 |                | `Clean`                                                                  | Remove old jobs                              |
 |                | `ListQueues`                                                             | List all queues                              |
@@ -2404,6 +2407,8 @@ Job data payloads are limited to **10 MB** when serialized.
 |                | `DashboardQueues`                                                        | All queues with stats                        |
 |                | `DashboardQueue`                                                         | Single queue detail                          |
 | **System**     | `CompactMemory`                                                          | Trigger memory compaction                    |
+| **Events**     | `SubscribeEvents`                                                        | Stream one queue's events on this connection |
+|                | `UnsubscribeEvents`                                                      | Stop this connection's event stream          |
 | **Auth**       | `Auth`                                                                   | Authenticate connection                      |
 
 :::tip[Related]

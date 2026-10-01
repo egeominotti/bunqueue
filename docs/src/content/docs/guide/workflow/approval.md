@@ -71,7 +71,7 @@ A rejection is an abort, not a completion. Throw on it, and everything the run d
 }, { retry: 1 })
 ```
 
-Note `retry: 1`. A deliberate throw should be believed the first time, not retried five times with backoff.
+Note `retry: 1`. A deliberate throw should be believed the first time, not retried with backoff until the default three attempts are spent.
 
 ## Multi-stage sign-off
 
