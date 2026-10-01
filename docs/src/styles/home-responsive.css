@@ -1,30 +1,63 @@
-/* Narrow layouts keep setup choices and runtime names readable. */
+/* Tablet and phone layouts. Every multi-column homepage block collapses here. */
+@media (max-width: 1024px) {
+  .home-lifecycle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 36px;
+  }
+  .bq-home .home-lifecycle li:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .bq-home .home-used-by-list li {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .home-used-by-name {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 767px) {
   .bq-home {
     padding-inline: 16px;
   }
   .bq-home .home-hero {
-    grid-template-columns: 1fr;
-    padding-block: 36px;
-    gap: 36px;
-  }
-  .home-facts {
-    grid-template-columns: 1fr;
-    gap: 16px;
+    padding-block: 36px 48px;
   }
   .bq-home .home-hero h1 {
-    font-size: clamp(2rem, 10vw, 2.75rem);
+    font-size: clamp(2.7rem, 13vw, 3.6rem);
   }
-  .home-engine-license {
+  .bq-home .home-ledger {
+    margin-top: 40px;
+  }
+  .bq-home .home-facts,
+  .home-lifecycle,
+  .home-storage-path,
+  .bq-home .home-used-by-list li,
+  .bq-home .home-migration,
+  .bq-home .home-faq {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .bq-home .home-used-by-list li {
+    gap: 6px;
+  }
+  .bq-home .home-lifecycle li,
+  .bq-home .home-lifecycle li + li {
+    padding: 22px 0 0;
+    border-left: 0;
+  }
+  /* Stacked options already read in order; a connector would cross the text. */
+  .home-storage-path::before {
     display: none;
   }
-  .home-topology-engine div {
-    min-width: 0;
+  .bq-home .home-storage-mark {
+    margin-bottom: 14px;
   }
 }
 
-@media (max-width: 380px) {
-  .home-language-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 420px) {
+  .home-actions,
+  .bq-home :is(.home-button, .home-button-secondary) {
+    width: 100%;
   }
 }

@@ -1,0 +1,241 @@
+/* Homepage sections around the quickstart: projects, lifecycle, storage, migration, FAQ, closing. */
+
+/* Public projects: rows, not cards. The repository name is the entry's headline. */
+.home-used-by-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--home-line);
+}
+
+.bq-home .home-used-by-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  align-items: baseline;
+  gap: 8px 40px;
+  margin: 0;
+  padding-block: 22px;
+  border-bottom: 1px solid var(--home-line);
+}
+
+.home-used-by-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+
+.home-used-by-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--state-retry);
+  font: 500 0.88rem var(--bq-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-used-by-stars svg {
+  flex-shrink: 0;
+}
+
+.bq-home .home-used-by-repo {
+  color: var(--sl-color-text);
+  font-family: var(--home-display);
+  font-size: 1.6rem;
+  font-stretch: 75%;
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.home-used-by-repo span {
+  color: var(--home-muted);
+  font-weight: 450;
+}
+
+.bq-home .home-used-by-repo:hover {
+  color: var(--home-accent);
+}
+
+.bq-home .home-used-by-list p {
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+
+.bq-home .home-used-by-list p:first-of-type {
+  color: var(--sl-color-text);
+}
+
+/* Lifecycle: four stages in order, each keyed to its job state color. */
+.home-lifecycle {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.bq-home .home-lifecycle li {
+  --state: var(--state-waiting);
+  margin: 0;
+  padding: 26px 28px 4px 0;
+  border-top: 3px solid var(--state);
+}
+
+.bq-home .home-lifecycle li + li {
+  padding-left: 28px;
+  border-left: 1px solid var(--home-line);
+}
+
+.home-lifecycle li[data-state='active'] { --state: var(--state-active); }
+.home-lifecycle li[data-state='retry'] { --state: var(--state-retry); }
+.home-lifecycle li[data-state='completed'] { --state: var(--state-completed); }
+
+.home-lifecycle-stage {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--state);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.bq-home .home-lifecycle p {
+  margin-top: 10px;
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+
+/* Storage: a growth path from memory to a shared PostgreSQL store. */
+.home-storage-path {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.home-storage-path::before {
+  content: '';
+  position: absolute;
+  top: 19px;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--home-line);
+}
+
+.bq-home .home-storage-path li {
+  position: relative;
+  margin: 0;
+}
+
+.bq-home .home-storage-mark {
+  display: inline-block;
+  margin-bottom: 22px;
+  padding: 7px 12px;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  background: var(--sl-color-bg);
+  color: var(--home-accent);
+  font: 0.95rem var(--bq-mono);
+}
+
+.bq-home .home-storage-path p {
+  margin-top: 10px;
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+
+/* Migration */
+.bq-home .home-migration {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 64px;
+}
+
+.bq-home .home-migration h2 + p {
+  max-width: 48ch;
+  margin-top: 20px;
+}
+
+.bq-home .home-migration-notes {
+  font-size: 0.94rem;
+}
+
+.home-migration-notes > div {
+  padding-block: 20px;
+  border-top: 1px solid var(--home-line);
+}
+
+.home-migration-notes > div:last-child {
+  border-bottom: 1px solid var(--home-line);
+}
+
+.home-migration-notes dt {
+  color: var(--sl-color-text);
+  font-weight: 600;
+}
+
+.bq-home .home-migration-notes dd {
+  margin: 6px 0 0;
+  color: var(--home-muted);
+  line-height: 1.6;
+}
+
+/* FAQ: heading column beside the questions. */
+.bq-home .home-faq {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 64px;
+}
+
+.home-faq details {
+  padding-block: 22px;
+  border-bottom: 1px solid var(--home-line);
+}
+
+.home-faq details:first-of-type {
+  border-top: 1px solid var(--home-line);
+}
+
+.home-faq summary {
+  cursor: pointer;
+  color: var(--sl-color-text);
+  font-weight: 500;
+}
+
+.home-faq summary::marker {
+  color: var(--home-accent);
+}
+
+.bq-home .home-faq details p {
+  max-width: 70ch;
+  margin-top: 14px;
+  font-size: 0.96rem;
+  line-height: 1.65;
+}
+
+/* Closing */
+.bq-home .home-closing {
+  display: grid;
+  justify-items: start;
+  gap: 18px;
+  margin-bottom: 72px;
+  padding: 64px 0 0;
+  border-top: 1px solid var(--home-line);
+}
+
+.bq-home .home-closing h2 {
+  font-size: clamp(2.8rem, 6.5vw, 5.5rem);
+  line-height: 0.95;
+}
+
+.bq-home .home-closing p {
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+}

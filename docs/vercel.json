@@ -1,6 +1,7 @@
 {
   "framework": "astro",
   "outputDirectory": "dist",
+  "trailingSlash": true,
   "headers": [
     {
       "source": "/(.*).md",

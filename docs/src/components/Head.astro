@@ -1,5 +1,6 @@
 ---
 import Default from '@astrojs/starlight/components/Head.astro';
+import condensedDisplayFont from '@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wdth-normal.woff2?url';
 import { createdForId, lastmodForId } from '../lib/gitLastmod';
 
 /**
@@ -13,6 +14,9 @@ const SITE = 'https://bunqueue.dev';
 const { entry, id } = Astro.locals.starlightRoute;
 
 const canonical = new URL(Astro.url.pathname, SITE).href;
+// The homepage headline is set in the condensed width axis. Preloading it keeps the
+// headline from reflowing from fallback-font width once the font arrives.
+const isHomepage = id === '' || id === 'index';
 const heads = entry.data.head ?? [];
 const headContent = (property) =>
   heads.find((h) => h.attrs?.property === property)?.attrs?.content;
@@ -144,6 +148,7 @@ if (segments.length > 0) {
 ---
 
 <Default><slot /></Default>
+{isHomepage && <link rel="preload" href={condensedDisplayFont} as="font" type="font/woff2" crossorigin />}
 <link rel="alternate" type="application/rss+xml" title="bunqueue blog" href="/rss.xml" />
 {/* X falls back to og:image, but naming the image explicitly is what the Card
     Validator checks. Per-page, so it cannot live in the global head array

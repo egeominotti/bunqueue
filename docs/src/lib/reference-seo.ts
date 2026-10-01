@@ -157,9 +157,11 @@ export function applyReferenceSeo(html: string, page: ReferencePage, version: st
     'og:url': page.url,
     'og:type': 'website',
     'og:site_name': 'bunqueue',
+    'og:image': new URL('/og-image.png', page.url).href,
     'twitter:card': 'summary',
     'twitter:title': title,
     'twitter:description': description,
+    'twitter:image': new URL('/og-image.png', page.url).href,
   };
   const clean = headContent(html)
     .replace(/<title\b[^>]*>[\s\S]*?<\/title>/gi, '')

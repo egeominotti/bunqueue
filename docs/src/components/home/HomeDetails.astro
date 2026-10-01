@@ -1,9 +1,16 @@
 ---
-const features = [
-  { title: 'Make failed work retryable.', body: 'Retries with backoff, stall recovery and a dead letter queue you can inspect and replay.', href: '/guide/worker/errors/', link: 'Retries & recovery' },
-  { title: 'Control what runs next.', body: 'Priorities, delayed jobs, rate limits, concurrency controls and FIFO groups.', href: '/guide/queue/', link: 'Queue controls' },
-  { title: 'Schedule and coordinate.', body: 'Cron schedules and parent-child job flows. A separate workflow engine adds in-process orchestration on Bun.', href: '/guide/flow/', link: 'Flows & dependencies' },
-  { title: 'See what is happening.', body: 'Job queries, Prometheus metrics, health probes and events. Connect AI tools through the native MCP server.', href: '/guide/monitoring/', link: 'Monitoring & operations' },
+// Capabilities follow a job's lifecycle; each stage reuses its state color from the hero.
+const stages = [
+  { state: 'waiting', stage: 'Before it runs', title: 'Control what runs next.', body: 'Priorities, delayed jobs, rate limits, concurrency controls and FIFO groups.', href: '/guide/queue/', link: 'Queue controls' },
+  { state: 'active', stage: 'While it runs', title: 'See what is happening.', body: 'Progress updates, heartbeats and stall detection, plus job queries, Prometheus metrics, health probes and events. Connect AI tools through the native MCP server.', href: '/guide/monitoring/', link: 'Monitoring and operations' },
+  { state: 'retry', stage: 'When it fails', title: 'Make failed work retryable.', body: 'Retries with backoff, stall recovery and a dead letter queue you can inspect and replay.', href: '/guide/worker/errors/', link: 'Retries and recovery' },
+  { state: 'completed', stage: 'After it completes', title: 'Coordinate what comes next.', body: 'Parent-child flows continue once their children complete, and cron schedules queue the next run. A separate workflow engine adds in-process orchestration on Bun.', href: '/guide/flow/', link: 'Flows and dependencies' },
+];
+
+const storage = [
+  { mark: ':memory:', title: 'Try it in memory', body: 'The default. Nothing to provision. Jobs are ephemeral and disappear when the process exits.' },
+  { mark: 'queue.db', title: 'Persist to SQLite', body: 'One file, owned by one process. Run embedded on Bun or connect clients to a standalone server.' },
+  { mark: 'postgres://', title: 'Run multiple brokers', body: 'Use PostgreSQL as the shared store for several active servers. Operate the database and routing yourself.' },
 ];
 
 const questions = [
@@ -37,57 +44,49 @@ const faqSchema = {
 
 <section class="home-section" aria-labelledby="features-title">
   <div class="home-section-intro">
-    <h2 id="features-title">The useful parts. All included.</h2>
-    <p>Start with a queue and a worker. Add the controls your workload needs.</p>
+    <h2 id="features-title">Every stage of a job, covered.</h2>
+    <p>Start with a queue and a worker. Add the controls your workload needs. Every feature is included.</p>
   </div>
-  <div class="home-features">
-    {features.map((feature) => (
-      <article>
-        <h3>{feature.title}</h3>
-        <p>{feature.body}</p>
-        <a class="home-text-link" href={feature.href}>{feature.link} <span aria-hidden="true">↗</span></a>
-      </article>
+  <ol class="home-lifecycle" role="list">
+    {stages.map((item) => (
+      <li data-state={item.state}>
+        <span class="home-lifecycle-stage">{item.stage}</span>
+        <h3>{item.title}</h3>
+        <p>{item.body}</p>
+        <a class="home-text-link" href={item.href}>{item.link}</a>
+      </li>
     ))}
-  </div>
+  </ol>
   <p class="home-note">Official clients share the Queue/Worker/Flow core. Check the <a href="/guide/sdks/#query-control-and-operations">SDK capability matrix</a> for language-specific APIs.</p>
 </section>
 
-<section class="home-section home-storage" aria-labelledby="storage-title">
+<section class="home-section" aria-labelledby="storage-title">
   <div class="home-section-intro">
     <h2 id="storage-title">Start small. Keep your options.</h2>
-    <p>Choose storage when you need it. Your application keeps the same queue API.</p>
+    <p>Choose storage when you need it. Your application keeps the same queue API at every step.</p>
   </div>
-  <div class="home-storage-options">
-    <article>
-      <span class="home-storage-mark" aria-hidden="true">:memory:</span>
-      <h3>Try it in memory</h3>
-      <p>The default. Nothing to provision. Jobs are ephemeral and disappear when the process exits.</p>
-    </article>
-    <article>
-      <span class="home-storage-mark" aria-hidden="true">queue.db</span>
-      <h3>Persist to SQLite</h3>
-      <p>One file, owned by one process. Run embedded on Bun or connect clients to a standalone server.</p>
-    </article>
-    <article>
-      <span class="home-storage-mark" aria-hidden="true">postgres://</span>
-      <h3>Run multiple brokers</h3>
-      <p>Use PostgreSQL as the shared store for several active servers. Operate the database and routing yourself.</p>
-    </article>
-  </div>
-  <a class="home-text-link" href="/guide/databases/">Storage, durability &amp; deployment trade-offs <span aria-hidden="true">↗</span></a>
+  <ol class="home-storage-path" role="list">
+    {storage.map((option) => (
+      <li>
+        <code class="home-storage-mark">{option.mark}</code>
+        <h3>{option.title}</h3>
+        <p>{option.body}</p>
+      </li>
+    ))}
+  </ol>
+  <a class="home-text-link" href="/guide/databases/">Storage, durability and deployment trade-offs</a>
 </section>
 
 <section class="home-section home-migration" aria-labelledby="migration-title">
   <div>
-    <span class="home-eyebrow">Coming from BullMQ?</span>
-    <h2 id="migration-title">A familiar way to work.</h2>
+    <h2 id="migration-title">Coming from BullMQ?</h2>
     <p>Keep the Queue and Worker mental model. bunqueue uses its own engine and protocol, with SQLite or PostgreSQL for persistence.</p>
-    <a class="home-text-link" href="/guide/migration/">Read the migration guide <span aria-hidden="true">→</span></a>
+    <a class="home-text-link" href="/guide/migration/">Read the migration guide</a>
   </div>
-  <div class="home-migration-notes">
-    <p><strong>Moving a Node.js app?</strong><span>Use <code>bunqueue-client</code> and connect to a bunqueue server. Your application stays on Node.js.</span></p>
-    <p><strong>Check the differences first.</strong><span>Review compatibility and scheduling behavior in the <a href="/guide/comparison/">full comparison</a>. Explore the <a href="/guide/benchmarks/">benchmark methodology</a> for performance evidence.</span></p>
-  </div>
+  <dl class="home-migration-notes">
+    <div><dt>Moving a Node.js app?</dt><dd>Use <code>bunqueue-client</code> and connect to a bunqueue server. Your application stays on Node.js.</dd></div>
+    <div><dt>Check the differences first.</dt><dd>Review compatibility and scheduling behavior in the <a href="/guide/comparison/">full comparison</a>. Explore the <a href="/guide/benchmarks/">benchmark methodology</a> for performance evidence.</dd></div>
+  </dl>
 </section>
 
 <section class="home-section home-faq" aria-labelledby="faq-title">
@@ -102,14 +101,14 @@ const faqSchema = {
         <p>{answer}</p>
       </details>
     ))}
-    <a class="home-text-link" href="/faq/">More answers in the FAQ <span aria-hidden="true">↗</span></a>
+    <a class="home-text-link" href="/faq/">More answers in the FAQ</a>
   </div>
 </section>
 
 <section class="home-closing" aria-labelledby="closing-title">
   <h2 id="closing-title">Your jobs. Your infrastructure.</h2>
   <p>Free and open source, from the first local job to production.</p>
-  <a class="home-button" href="/guide/introduction/">Explore the documentation <span aria-hidden="true">→</span></a>
+  <a class="home-button" href="/guide/introduction/">Explore the documentation</a>
 </section>
 
 <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />

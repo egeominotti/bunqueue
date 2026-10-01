@@ -9,11 +9,25 @@
 }
 
 .bq-home .home-section-intro {
-  max-width: 670px;
-  margin-bottom: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 16px 64px;
+  margin-bottom: 40px;
 }
 
 .bq-home .home-section-intro p {
+  max-width: 52ch;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+/* In two-column sections the intro sits in a narrow column, so it stacks. */
+.bq-home :is(.home-faq) .home-section-intro {
+  display: block;
+}
+
+.bq-home :is(.home-faq) .home-section-intro p {
   margin-top: 16px;
 }
 
@@ -37,13 +51,14 @@
 .home-step-number {
   display: inline-grid;
   place-items: center;
-  width: 29px;
-  height: 29px;
-  margin-right: 8px;
-  border: 1px solid var(--home-line);
-  border-radius: 8px;
-  color: var(--home-accent);
-  font: 0.85rem var(--bq-mono);
+  width: 30px;
+  height: 30px;
+  margin-right: 10px;
+  border-radius: 50%;
+  color: var(--home-accent-ink);
+  background: var(--home-accent);
+  font: 700 0.9rem var(--home-display);
+  letter-spacing: 0;
 }
 
 .bq-home .home-connection {
@@ -136,113 +151,6 @@
   --ec-brdRad: 8px;
 }
 
-.home-features {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 36px 64px;
-}
-
-.home-features article {
-  border-left: 2px solid var(--home-line);
-  padding-left: 24px;
-}
-
-.bq-home .home-features p {
-  margin-top: 10px;
-  font-size: 0.96rem;
-}
-
-.home-storage-options {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 36px;
-}
-
-.home-storage-mark {
-  display: block;
-  margin-bottom: 22px;
-  color: var(--home-accent);
-  font: 1.1rem var(--bq-mono);
-}
-
-.bq-home .home-storage-options p {
-  margin-top: 12px;
-  font-size: 0.92rem;
-}
-
-.bq-home .home-migration {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  gap: 64px;
-}
-
-.home-eyebrow {
-  display: block;
-  margin-bottom: 16px;
-  color: var(--home-accent);
-  font-size: 0.87rem;
-  font-weight: 600;
-}
-
-.bq-home .home-migration h2 + p {
-  margin-top: 20px;
-}
-
-.home-migration-notes {
-  padding: 28px;
-  border: 1px solid var(--home-line);
-  border-radius: 12px;
-  background: var(--home-surface);
-  font-size: 0.92rem;
-}
-
-.home-migration-notes :is(strong, span) {
-  display: block;
-}
-
-.home-migration-notes strong {
-  margin-bottom: 8px;
-  color: var(--sl-color-text);
-}
-
-.bq-home .home-migration-notes p + p {
-  margin-top: 24px;
-}
-
-.home-faq details {
-  padding-block: 22px;
-  border-bottom: 1px solid var(--home-line);
-}
-
-.home-faq summary {
-  cursor: pointer;
-  color: var(--sl-color-text);
-  font-weight: 500;
-}
-
-.home-faq summary::marker {
-  color: var(--home-accent);
-}
-
-.bq-home .home-faq details p {
-  max-width: 850px;
-  margin-top: 16px;
-  font-size: 0.96rem;
-}
-
-.home-closing {
-  padding: 48px;
-  margin-bottom: 64px;
-  border: 1px solid var(--home-line);
-  border-radius: 12px;
-  background: var(--home-tint);
-}
-
-.bq-home .home-closing p {
-  margin-block: 16px 28px;
-}
-
 body:has(.bq-home) .header-cta {
   color: #21101a;
 }
@@ -270,15 +178,13 @@ body:has(.bq-home) .header-cta {
   .bq-home .home-section {
     padding-block: 48px;
   }
-  .home-setup-grid,
-  .home-features,
-  .home-storage-options,
-  .bq-home .home-migration {
+  .bq-home .home-section-intro {
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 28px;
+  }
+  .home-setup-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 32px;
-  }
-  .home-closing {
-    padding: 28px 20px;
   }
 }
 

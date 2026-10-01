@@ -118,6 +118,7 @@ export default defineConfig({
         { icon: 'github', label: 'GitHub', href: 'https://github.com/egeominotti/bunqueue' },
         { icon: 'npm', label: 'npm', href: 'https://www.npmjs.com/package/bunqueue' },
       ],
+      routeMiddleware: './src/routeData.ts',
       components: {
         Header: './src/components/Header.astro',
         Head: './src/components/Head.astro',

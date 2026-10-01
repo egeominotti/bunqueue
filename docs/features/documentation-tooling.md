@@ -104,25 +104,71 @@ the test suite.
 
 ## Homepage onboarding
 
-The homepage at `docs/src/content/docs/index.mdx` introduces the MIT license,
-the self-hosted Bun server, and network clients before storage or advanced
-features. Its existing `#quickstart` anchor contains a complete local server
-path with explicit TCP/HTTP ports and Node.js, Deno and Python examples. A
-separate tab shows Bun embedded mode with `embedded: true` on both clients.
-The SQLite server example binds to loopback and explicitly enables persistence;
-the embedded example describes its ephemeral default.
+The homepage at `docs/src/content/docs/index.mdx` opens with the cross-language
+value proposition, shows public projects that use bunqueue, and then reaches
+the quickstart before storage or advanced features. Its existing `#quickstart`
+anchor contains a complete local server path with explicit TCP/HTTP ports and
+Node.js, Deno and Python examples. A separate tab shows Bun embedded mode with
+`embedded: true` on both clients. The SQLite server example binds to loopback
+and explicitly enables persistence; the embedded example describes its
+ephemeral default. `test/docs-homepage-snippets.test.ts` compiles both
+TypeScript quickstarts, so the page must keep exactly two `typescript` fences.
 
-`components/home/HomeHero.astro` owns the runtime topology and initial value
-proposition. `HomeDetails.astro` owns capabilities, storage choices, BullMQ
-migration links and FAQs. The FAQ answers and JSON-LD share one data source.
+`components/home/HomeHero.astro` owns the headline ("Add a background job in
+one language. Process it in another.", which keeps the primary keyword in the
+H1), the MIT link, the two calls to action and the three
+included-with-bunqueue facts.
+`HomeLedger.astro` renders the hero's simulated `orders` queue: five jobs, each
+added from one client language and processed by a worker in another, move
+through `waiting`, `delayed`, `active`, `retry` and `completed`. The
+server-rendered snapshot already shows every state, so it is the picture that
+stays when `prefers-reduced-motion: reduce` is set at load; pausing, or turning
+reduced motion on while the page is open, freezes the rows in their current
+state. Otherwise a small script
+advances the rows every 900 ms, fills each active row by its progress, fails
+`charge-card` once before its retry, and recycles completed rows with new job
+names. It runs only while the ledger is on screen, the tab is visible, reduced
+motion is off (re-evaluated when the preference changes) and the viewer has not
+pressed the Pause button, which satisfies WCAG 2.2.2 for auto-updating
+content. The rows are decorative (`aria-hidden`) and carry `data-nosnippet`, so
+simulated job names never appear in search snippets; the caption states that
+the data is simulated and stays indexable.
+
+`HomeUsedBy.astro`, directly below the hero, lists public GitHub repositories
+that import bunqueue in their own source. Each row names the repository, its
+GitHub star count, its purpose and how it uses bunqueue, with no logos or
+implied endorsement, and the section links to GitHub's dependents graph. Star
+counts are a dated snapshot in the component (rounded down to one decimal in
+thousands) and are refreshed by hand; the build makes no GitHub requests. Add a
+project only after confirming that its default branch depends on bunqueue.
+
+`HomeDetails.astro` owns capabilities, storage choices, BullMQ migration links
+and FAQs. Capabilities follow a job's lifecycle (before it runs, while it runs,
+when it fails, after it completes), and each stage reuses the matching state
+color from the ledger. Storage is presented as a path from `:memory:` through
+SQLite to PostgreSQL. The FAQ answers and JSON-LD share one data source.
 `HomeDockerQuickstart.astro` provides the default server setup, with four Linux
 variant tabs, copyable Docker commands, loopback port mappings, a persistent
 named volume and an HTTP readiness check. Starlight's Code component supplies
 copy controls. The Bun CLI remains available in its own tab. Moving image tags
 are identified explicitly; deployment guidance recommends a version or digest.
-Homepage styles are scoped through `.bq-home` in `styles/home.css` and
-`styles/home-setup.css`, with narrow layouts in `styles/home-responsive.css`,
-using the existing self-hosted fonts and pink identity.
+
+Homepage styles are scoped through `.bq-home`. `styles/home.css` defines the
+tokens, including one color per job state for dark and light themes, the type
+scale and the hero; `styles/home-ledger.css` styles the simulation;
+`styles/home-setup.css` covers section intros and the quickstart;
+`styles/home-sections.css` covers projects, lifecycle, storage, migration, FAQ
+and closing; `styles/home-responsive.css` holds the tablet and phone layouts.
+The h1 and h2 headings use the self-hosted Bricolage Grotesque at 75% width
+(its `wdth.css` axis file is imported by `HomeHero.astro`, and
+`components/Head.astro` preloads the latin width-axis file on the homepage only
+so the headline does not reflow when the font arrives); h3 headings keep its
+normal width. Body copy inherits Starlight's Inter, IBM Plex Mono is reserved
+for job data and code, and the pink identity marks the active state and
+primary actions. Internal links carry no arrow; the "Source on GitHub" button
+and the GitHub dependents link carry `↗`. Lists styled without markers keep
+`role="list"` so VoiceOver still announces them as lists.
+
 The shared footer also states the distinction between engine and client runtimes.
 The generated homepage social card uses its page title and a free/open-source
 eyebrow, including when the hero is rendered through an Astro component.
@@ -147,9 +193,22 @@ themes. No queue lifecycle or SDK implementation changes are involved.
 adds canonical URLs and page-specific titles/descriptions to the build output,
 and supplies those URLs to the sitemap integration. It leaves the tracked
 generated sources untouched and rejects current pages containing `noindex`.
+It also gives every current reference page `og:image` and `twitter:image`
+(the site-wide `/og-image.png`), because TypeDoc emits no social image.
 Historical reference trees retain their generated `noindex, follow` metadata;
 the hosting configuration only adds `noindex` to raw Markdown mirrors.
 `docs/src/lib/sitemap.ts` owns sitemap priorities and real Git modification dates.
+
+`docs/vercel.json` sets `trailingSlash: true`, so a page URL without its slash
+answers with a 308 redirect to the canonical URL instead of a duplicate 200;
+paths with a file extension, such as TypeDoc `.html` pages, are not redirected.
+`docs/src/routeData.ts` is Starlight route middleware: when a page title already
+contains "bunqueue", it drops Starlight's ` | bunqueue` suffix so the brand is
+not repeated and the title stays within search-result width. Meta descriptions
+are kept at 160 characters or fewer. The changelog limits its page outline to
+release (`##`) headings, which keeps its desktop and mobile tables of contents
+small. The `www.bunqueue.dev` to `bunqueue.dev` redirect is a Vercel domain
+setting rather than repository configuration and should be permanent (308).
 
 `test/docs-seo.test.ts` covers the hosting policy, deterministic current-only
 page discovery, escaped/idempotent metadata, and actual temporary build output.

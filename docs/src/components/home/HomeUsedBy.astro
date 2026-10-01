@@ -1,0 +1,59 @@
+---
+// Public repositories that import bunqueue in their own source. Descriptions say how
+// each project uses it, without implying an endorsement by its maintainers. Star counts
+// are a snapshot from the GitHub API (2026-10-01), shown rounded down; refresh them by hand.
+const projects = [
+  {
+    repo: 'context-labs/HALO',
+    stars: 1180,
+    summary: 'Hierarchical Agent Loop Optimizer.',
+    usage: 'Runs Langfuse, Phoenix and file imports plus HALO analysis tasks as bunqueue jobs.',
+  },
+  {
+    repo: 'MagicCube/agentara',
+    stars: 515,
+    summary: 'A 24/7 personal assistant built on Claude Code and OpenAI Codex.',
+    usage: 'Dispatches tasks with per-session serial execution and cron schedules.',
+  },
+  {
+    repo: 'dosco/aithy',
+    stars: 107,
+    summary: 'A personal AI agent that works safely on your machine.',
+    usage: 'Embedded queues for agent dispatch, memory consolidation, expiry and automations.',
+  },
+  {
+    repo: 'phuctm97/openkitten',
+    stars: 34,
+    summary: 'A Telegram-first AI agent.',
+    usage: 'Schedules recurring runs and exposes queue status through MCP tools.',
+  },
+];
+
+const formatStars = (stars: number) =>
+  stars >= 1000 ? `${Math.floor(stars / 100) / 10}k` : String(stars);
+---
+
+<section class="home-section home-used-by" aria-labelledby="used-by-title">
+  <div class="home-section-intro">
+    <h2 id="used-by-title">Already running in the open.</h2>
+    <p>Open-source projects that use bunqueue for their background work.</p>
+  </div>
+  <ul class="home-used-by-list" role="list">
+    {projects.map(({ repo, stars, summary, usage }) => (
+      <li>
+        <div class="home-used-by-name">
+          <a class="home-used-by-repo" href={`https://github.com/${repo}`}>
+            <span>{repo.split('/')[0]}/</span>{repo.split('/')[1]}
+          </a>
+          <span class="home-used-by-stars" title={`${stars.toLocaleString('en-US')} GitHub stars`}>
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg>
+            {formatStars(stars)}<span class="sr-only"> GitHub stars</span>
+          </span>
+        </div>
+        <p>{summary}</p>
+        <p>{usage}</p>
+      </li>
+    ))}
+  </ul>
+  <a class="home-text-link" href="https://github.com/egeominotti/bunqueue/network/dependents">All public dependents on GitHub <span aria-hidden="true">↗</span></a>
+</section>

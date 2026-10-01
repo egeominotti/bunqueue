@@ -1,6 +1,10 @@
 ---
 title: 'bunqueue Changelog: Version History & Release Notes'
 description: 'Complete version history for bunqueue Bun job queue. Track new features, bug fixes, performance improvements, and breaking changes.'
+# One entry per release keeps the page outline usable and its HTML light.
+tableOfContents:
+  minHeadingLevel: 2
+  maxHeadingLevel: 2
 head:
   - tag: meta
     attrs:
@@ -112,6 +116,27 @@ head:
   provenance.
 - **Every third-party GitHub Action is pinned to a full commit SHA**, with a
   comment naming its release, in all workflows.
+
+### Documentation
+
+- Redesign the homepage. The hero leads with adding a job in one language and
+  processing it in another, shown by a simulated queue whose jobs move through
+  waiting, delayed, active, retry and completed (static when reduced motion is
+  requested). Capabilities follow the job lifecycle with matching state
+  colors, storage reads as a path from memory to SQLite to PostgreSQL, and
+  headings use condensed Bricolage Grotesque. The quickstart content is
+  unchanged.
+- List public open-source projects that use bunqueue directly below the hero
+  (context-labs/HALO, MagicCube/agentara, dosco/aithy and phuctm97/openkitten)
+  with their GitHub star counts and a link to GitHub's dependents graph.
+- The hero simulation has a Pause button, stops when reduced motion is turned
+  on while the page is open, and is excluded from search snippets.
+- Search metadata: the homepage H1 names background jobs again and its meta
+  description fits search results. Fifteen descriptions longer than 160
+  characters were shortened, 19 titles no longer repeat "bunqueue" in the
+  suffix, URLs without a trailing slash redirect with 308 to the canonical
+  page, current API reference pages gain a social image, and the changelog
+  outline lists releases only.
 
 ## [2.9.5] - 2026-09-09
 

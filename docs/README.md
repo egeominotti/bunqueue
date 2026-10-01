@@ -159,10 +159,14 @@ reproducible reports under `benchmarks/`.
 
 Documentation tooling spans `docs/scripts/` and `docs/src/lib/`. The Open Graph
 generator separates cover definitions from rendering; `reference-seo.ts` adds
-current API canonicals and metadata, while `sitemap.ts` owns sitemap priorities.
+current API canonicals, metadata and social images, while `sitemap.ts` owns
+sitemap priorities and `src/routeData.ts` removes a repeated brand suffix from
+page titles.
 Shared documentation navigation, reading styles and homepage onboarding live in
-`docs/src/components/` and `docs/src/styles/`, including the Docker variant
-selector in `home/HomeDockerQuickstart.astro`; see
+`docs/src/components/` and `docs/src/styles/`, including the simulated hero
+queue in `home/HomeLedger.astro`, the Docker variant selector in
+`home/HomeDockerQuickstart.astro` and the public-project list in
+`home/HomeUsedBy.astro`; see
 [Documentation Tooling](./features/documentation-tooling.md).
 
 The Queue query split (`operations/query.ts`, `queryStates.ts`, and

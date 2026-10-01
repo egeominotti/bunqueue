@@ -1,0 +1,197 @@
+---
+import '../../styles/home-ledger.css';
+
+// Initial snapshot. It stays on screen when reduced motion is set at load, so it shows
+// every state the simulation can reach. Pausing freezes whatever state is current.
+const rows = [
+  { id: 2041, name: 'send-receipt', from: 'Node.js', to: 'Go', state: 'completed', detail: '18 ms', progress: 1 },
+  { id: 2042, name: 'resize-avatar', from: 'Python', to: 'Rust', state: 'active', detail: '62%', progress: 0.62 },
+  { id: 2043, name: 'charge-card', from: 'PHP', to: 'Elixir', state: 'retry', detail: 'attempt 2 of 3 in 2 s', progress: 0 },
+  { id: 2044, name: 'nightly-report', from: 'Deno', to: 'Bun', state: 'delayed', detail: 'starts in 6 s', progress: 0 },
+  { id: 2045, name: 'sync-crm', from: 'Go', to: 'Node.js', state: 'waiting', detail: 'priority 10', progress: 0 },
+];
+---
+
+<figure class="home-ledger" aria-labelledby="home-ledger-caption">
+  <div class="home-ledger-frame" data-nosnippet>
+    <div class="home-ledger-head">
+      <span class="home-ledger-queue" aria-hidden="true">orders</span>
+      <span class="home-ledger-total" aria-hidden="true"><span data-ledger-completed>1,204</span> completed</span>
+      <button class="home-ledger-toggle" type="button" hidden>Pause</button>
+    </div>
+    <div aria-hidden="true">
+      <div class="home-ledger-columns">
+        <span>Job</span><span>Added from</span><span>Processed by</span><span>State</span>
+      </div>
+      <ol class="home-ledger-rows" id="home-ledger-rows">
+        {rows.map((row) => (
+          <li data-state={row.state} style={`--progress: ${row.progress}`}>
+            <span class="home-ledger-id">#{row.id}</span>
+            <span class="home-ledger-name">{row.name}</span>
+            <span class="home-ledger-route">
+              <span class="home-ledger-from">{row.from}</span>
+              <span class="home-ledger-to">{row.to}</span>
+            </span>
+            <span class="home-ledger-state">{row.state}</span>
+            <span class="home-ledger-detail">{row.detail}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
+  <figcaption id="home-ledger-caption">
+    A simulated queue: jobs are added in one language and processed by workers written in another,
+    with retries, delays and priorities handled by the server.
+  </figcaption>
+</figure>
+
+<script>
+  type State = 'waiting' | 'delayed' | 'active' | 'retry' | 'completed';
+  interface Job {
+    el: HTMLLIElement;
+    state: State;
+    progress: number;
+    countdown: number;
+    failsOnce: boolean;
+    startedAt: number;
+  }
+
+  const POOL: ReadonlyArray<readonly [string, string, string]> = [
+    ['send-receipt', 'Node.js', 'Go'],
+    ['resize-avatar', 'Python', 'Rust'],
+    ['charge-card', 'PHP', 'Elixir'],
+    ['nightly-report', 'Deno', 'Bun'],
+    ['sync-crm', 'Go', 'Node.js'],
+    ['transcode-video', 'Elixir', 'Python'],
+    ['index-document', 'Rust', 'Deno'],
+    ['welcome-email', 'Bun', 'PHP'],
+  ];
+  const TICK_MS = 900;
+
+  function start(root: HTMLElement): void {
+    const items = [...root.querySelectorAll<HTMLLIElement>('.home-ledger-rows li')];
+    const completedLabel = root.querySelector<HTMLElement>('[data-ledger-completed]');
+    let completed = 1204;
+    let nextId = 2046;
+    let poolIndex = 5;
+    let tick = 0;
+
+    const set = (job: Job, selector: string, text: string) => {
+      const target = job.el.querySelector<HTMLElement>(selector);
+      if (target) target.textContent = text;
+    };
+    const show = (job: Job, state: State, detail: string) => {
+      job.state = state;
+      job.el.dataset.state = state;
+      job.el.style.setProperty('--progress', String(job.progress));
+      set(job, '.home-ledger-state', state);
+      set(job, '.home-ledger-detail', detail);
+    };
+    const jobs: Job[] = items.map((el) => ({
+      el,
+      state: el.dataset.state as State,
+      progress: Number(el.style.getPropertyValue('--progress')) || 0,
+      countdown: el.dataset.state === 'retry' ? 2 : el.dataset.state === 'delayed' ? 6 : 3,
+      failsOnce: false,
+      startedAt: 0,
+    }));
+
+    const recycle = (job: Job) => {
+      const [name, from, to] = POOL[poolIndex++ % POOL.length];
+      set(job, '.home-ledger-id', `#${nextId++}`);
+      set(job, '.home-ledger-name', name);
+      set(job, '.home-ledger-from', from);
+      set(job, '.home-ledger-to', to);
+      job.progress = 0;
+      job.failsOnce = name === 'charge-card';
+      if (name === 'nightly-report') {
+        job.countdown = 5;
+        show(job, 'delayed', `starts in ${job.countdown} s`);
+      } else {
+        job.countdown = 1 + (poolIndex % 2);
+        show(job, 'waiting', `priority ${(poolIndex * 3) % 10}`);
+      }
+    };
+
+    const step = (job: Job) => {
+      switch (job.state) {
+        case 'completed':
+          if (--job.countdown <= 0) recycle(job);
+          return;
+        case 'delayed':
+          job.countdown -= 1;
+          if (job.countdown > 0) show(job, 'delayed', `starts in ${job.countdown} s`);
+          else show(job, 'waiting', 'due now');
+          return;
+        case 'retry':
+          if (--job.countdown <= 0) {
+            job.startedAt = tick;
+            show(job, 'active', '0%');
+          } else show(job, 'retry', `attempt 2 of 3 in ${job.countdown} s`);
+          return;
+        case 'waiting':
+          if (--job.countdown <= 0) {
+            job.startedAt = tick;
+            show(job, 'active', '0%');
+          }
+          return;
+        case 'active': {
+          job.progress = Math.min(1, job.progress + 0.2 + ((tick * 7) % 5) / 40);
+          if (job.failsOnce && job.progress >= 0.4) {
+            job.failsOnce = false;
+            job.progress = 0;
+            job.countdown = 3;
+            show(job, 'retry', `attempt 2 of 3 in ${job.countdown} s`);
+            return;
+          }
+          if (job.progress < 1) {
+            show(job, 'active', `${Math.round(job.progress * 100)}%`);
+            return;
+          }
+          completed += 1;
+          if (completedLabel) completedLabel.textContent = completed.toLocaleString('en-US');
+          job.countdown = 3;
+          show(job, 'completed', `${(tick - job.startedAt) * 9 + 11} ms`);
+        }
+      }
+    };
+
+    // The animation runs only while it is on screen, the tab is visible, motion is
+    // allowed and the viewer has not paused it (WCAG 2.2.2 requires that control).
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const toggle = root.querySelector<HTMLButtonElement>('.home-ledger-toggle');
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let visible = false;
+    let paused = false;
+    const sync = () => {
+      const on = visible && !paused && !document.hidden && !motion.matches;
+      if (toggle) toggle.hidden = motion.matches;
+      if (on && timer === null) {
+        timer = setInterval(() => {
+          tick += 1;
+          jobs.forEach(step);
+        }, TICK_MS);
+      } else if (!on && timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    toggle?.addEventListener('click', () => {
+      paused = !paused;
+      toggle.textContent = paused ? 'Play' : 'Pause';
+      toggle.setAttribute('aria-label', paused ? 'Play the simulated queue' : 'Pause the simulated queue');
+      sync();
+    });
+    toggle?.setAttribute('aria-label', 'Pause the simulated queue');
+    new IntersectionObserver((entries) => {
+      visible = entries[entries.length - 1].isIntersecting;
+      sync();
+    }).observe(root);
+    document.addEventListener('visibilitychange', sync);
+    motion.addEventListener('change', sync);
+    sync();
+  }
+
+  const root = document.querySelector<HTMLElement>('.home-ledger');
+  if (root) start(root);
+</script>

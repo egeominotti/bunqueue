@@ -1,6 +1,6 @@
 ---
 title: 'Free, Open Source Job Queue for Your Stack'
-description: 'bunqueue is a free, MIT-licensed job queue for Node.js, Deno, Python, PHP, Go, Rust, Elixir and Bun. Run the included Bun-powered server yourself, or use embedded mode on Bun. No Redis required.'
+description: 'Free, MIT-licensed job queue for Node.js, Deno, Python, PHP, Go, Rust, Elixir and Bun. Self-host the Bun-powered server or embed it. No Redis required.'
 template: splash
 head:
   - tag: meta
@@ -33,9 +33,12 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 import HomeHero from '@components/home/HomeHero.astro';
 import HomeDetails from '@components/home/HomeDetails.astro';
 import HomeDockerQuickstart from '@components/home/HomeDockerQuickstart.astro';
+import HomeUsedBy from '@components/home/HomeUsedBy.astro';
 
 <div class="bq-home not-content">
   <HomeHero />
+
+  <HomeUsedBy />
 
   <section class="home-section" id="quickstart" aria-labelledby="start-title">
     <div class="home-section-intro">
@@ -67,7 +70,7 @@ bunx bunqueue start --host 127.0.0.1 --data-path ./bunqueue.db
             <p class="home-note">This is a local process on your machine. The server is included in the MIT-licensed package.</p>
               </TabItem>
             </Tabs>
-            <a class="home-text-link" href="/guide/server/">Docker &amp; deployment options <span aria-hidden="true">↗</span></a>
+            <a class="home-text-link" href="/guide/server/">Docker and deployment options</a>
           </div>
 
           <div class="home-client-step">
@@ -169,7 +172,7 @@ python jobs.py
               </TabItem>
             </Tabs>
             <p class="home-note">You should see <code>{'Processing: hello@example.com'}</code>. Your application and worker use the same queue name and TCP address.</p>
-            <a class="home-text-link" href="/guide/sdks/">PHP, Go, Rust, Elixir &amp; all SDK guides <span aria-hidden="true">↗</span></a>
+            <a class="home-text-link" href="/guide/sdks/">PHP, Go, Rust, Elixir and all SDK guides</a>
           </div>
         </div>
         <aside class="home-callout">
@@ -220,7 +223,7 @@ await queue.add('welcome', { to: 'hello@example.com' });
 bun jobs.ts
 ```
 
-            <a class="home-text-link" href="/guide/quickstart/">Read the full quickstart <span aria-hidden="true">↗</span></a>
+            <a class="home-text-link" href="/guide/quickstart/">Read the full quickstart</a>
           </div>
         </div>
       </TabItem>

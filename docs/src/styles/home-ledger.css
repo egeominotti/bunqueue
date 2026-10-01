@@ -1,0 +1,223 @@
+/* Hero queue simulation. State colors match the job lifecycle sections below. */
+.home-ledger {
+  margin: 56px 0 0;
+}
+
+.home-ledger-frame {
+  overflow: hidden;
+  border: 1px solid var(--home-line);
+  border-radius: 14px;
+  background: var(--home-surface);
+  font: 0.86rem/1.4 var(--bq-mono);
+}
+
+.home-ledger-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--home-line);
+}
+
+.home-ledger-queue {
+  color: var(--sl-color-text);
+  font-weight: 500;
+}
+
+.home-ledger-queue::before {
+  content: 'queue ';
+  color: var(--home-muted);
+}
+
+.home-ledger-total {
+  margin-left: auto;
+  color: var(--home-muted);
+}
+
+.bq-home .home-ledger-toggle {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--home-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sl-color-text);
+  font: 500 0.8rem var(--sl-font);
+  cursor: pointer;
+}
+
+.bq-home .home-ledger-toggle:hover {
+  border-color: var(--home-accent);
+}
+
+.bq-home .home-ledger-toggle[hidden] {
+  display: none;
+}
+
+.home-ledger-total span {
+  color: var(--state-completed);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-ledger-columns,
+.home-ledger-rows li {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(9rem, 1fr) minmax(5rem, 0.7fr) minmax(5rem, 0.7fr) 6.5rem minmax(10rem, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 0 22px;
+}
+
+.home-ledger-columns {
+  padding-block: 10px;
+  color: var(--home-muted);
+  font: 0.76rem var(--sl-font-system);
+}
+
+.home-ledger-columns span:first-child {
+  grid-column: 1 / span 2;
+}
+
+.home-ledger-columns span:last-child {
+  grid-column: 5 / span 2;
+}
+
+.home-ledger-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bq-home .home-ledger-rows li {
+  position: relative;
+  isolation: isolate;
+  margin: 0;
+  min-height: 52px;
+  border-top: 1px solid var(--home-line);
+  --state: var(--state-waiting);
+}
+
+/* The row fills as its job progresses, so the active job reads at a glance. */
+.home-ledger-rows li::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--state) 13%, transparent);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left;
+  transition:
+    transform 800ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    background-color 300ms ease;
+}
+
+.home-ledger-rows li[data-state='delayed'] { --state: var(--state-delayed); }
+.home-ledger-rows li[data-state='active'] { --state: var(--state-active); }
+.home-ledger-rows li[data-state='retry'] { --state: var(--state-retry); }
+.home-ledger-rows li[data-state='completed'] { --state: var(--state-completed); }
+
+.home-ledger-id,
+.home-ledger-detail {
+  color: var(--home-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-ledger-name {
+  overflow: hidden;
+  color: var(--sl-color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-ledger-route {
+  display: contents;
+}
+
+.home-ledger-from,
+.home-ledger-to {
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-system);
+}
+
+.home-ledger-to::before {
+  content: '→ ';
+  color: var(--home-muted);
+}
+
+.home-ledger-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--state);
+  font-weight: 500;
+}
+
+.home-ledger-state::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--state);
+}
+
+.home-ledger-rows li[data-state='active'] .home-ledger-state::before {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--state) 25%, transparent);
+}
+
+.home-ledger figcaption {
+  max-width: 64ch;
+  margin-top: 16px;
+  color: var(--home-muted);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .home-ledger-columns {
+    display: none;
+  }
+  .home-ledger-rows li {
+    grid-template-columns: 4rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      'id name state'
+      'id route detail';
+    gap: 2px 12px;
+    padding-block: 12px;
+  }
+  .home-ledger-id { grid-area: id; align-self: start; }
+  .home-ledger-name { grid-area: name; }
+  .home-ledger-state { grid-area: state; justify-self: end; }
+  .home-ledger-detail { grid-area: detail; justify-self: end; font-size: 0.78rem; }
+  .home-ledger-route {
+    grid-area: route;
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+    font-size: 0.8rem;
+  }
+  .home-ledger-route span {
+    color: var(--home-muted);
+  }
+}
+
+@media (max-width: 480px) {
+  .home-ledger-head,
+  .home-ledger-rows li {
+    padding-inline: 14px;
+  }
+  .home-ledger-rows li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name state'
+      'route detail';
+  }
+  .home-ledger-id {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-ledger-rows li::before {
+    transition: none;
+  }
+}
