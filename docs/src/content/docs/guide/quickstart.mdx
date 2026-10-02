@@ -122,7 +122,7 @@ queue.Add("welcome", map[string]any{
 
 // The worker: pulls jobs and runs your function on each one
 worker := bunqueue.NewWorker("emails", func(job *bunqueue.Job) (any, error) {
-    data := job.Data()
+    data := any(job.Data()).(map[string]any)
     fmt.Printf("Sending %v to %v\n", data["subject"], data["to"])
     return map[string]any{"sent": true}, nil
 }, bunqueue.WorkerOptions{})

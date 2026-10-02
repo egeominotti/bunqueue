@@ -170,9 +170,14 @@ Elixir) that connects to `127.0.0.1:6789`, adds one job and prints it from the
 worker, and "See it work" with the expected worker output. The Bun embedded path
 sets `embedded: true` on both clients. The SQLite server example binds to
 loopback and explicitly enables persistence; the embedded example describes its
-ephemeral default. The SDK programs follow each SDK's README and source
-(constructor options, job data access, blocking `run`); recheck them when an SDK
-changes its public API. `test/docs-homepage-snippets.test.ts`
+ephemeral default. The SDK programs target the released SDK packages
+(constructor options, job data access, blocking `run`), except Elixir, which
+uses a path dependency on a bunqueue checkout until its Hex release. Every Go
+example on the site that indexes job data does it through
+`any(job.Data()).(map[string]any)`, which compiles against both the released
+`Data() map[string]any` and the unreleased `Data() any`; examples that pass
+`job.Data()` along whole compile against both as is. Recheck the programs when
+an SDK release changes its public API. `test/docs-homepage-snippets.test.ts`
 compiles both TypeScript quickstarts, so the page must keep exactly two
 `typescript` fences.
 

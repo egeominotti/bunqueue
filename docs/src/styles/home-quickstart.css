@@ -132,6 +132,32 @@
   margin-top: 20px;
 }
 
+/* Tab strips inside a step scroll horizontally and clip overflow, so their focus
+   rings sit inside. The mode switch keeps the homepage's outward ring: its selected
+   tab is filled with the accent color, so an inset ring would disappear. */
+.bq-home .home-step-body .tablist-wrapper [role='tab']:focus-visible {
+  outline-offset: -2px;
+}
+
+/* custom.css keeps every tab strip on one row (!important); on phones the eight SDK
+   tabs and the base-image pills wrap instead, like the hero tabs do. */
+@media (max-width: 520px) {
+  /* Wrapped strips do not scroll, so the phone edge fade from custom.css would only
+     hide the last label of each row. */
+  .bq-home .home-step-body > starlight-tabs > .tablist-wrapper,
+  .bq-home .home-docker-variants starlight-tabs .tablist-wrapper {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .bq-home .home-step-body > starlight-tabs > .tablist-wrapper [role='tablist'],
+  .bq-home .home-docker-variants starlight-tabs [role='tablist'] {
+    min-width: 0;
+    flex-wrap: wrap !important;
+    row-gap: 4px;
+    column-gap: 18px;
+  }
+}
+
 /* The mode switch above the steps reads as a segmented control. */
 .bq-home #quickstart > starlight-tabs > .tablist-wrapper [role='tablist'] {
   display: inline-flex;

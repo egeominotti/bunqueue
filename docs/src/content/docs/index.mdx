@@ -273,7 +273,7 @@ func main() {
 	}
 
 	worker := bunqueue.NewWorker("emails", func(job *bunqueue.Job) (any, error) {
-		fmt.Println("Processing:", job.Data().(map[string]any)["to"])
+		fmt.Println("Processing:", any(job.Data()).(map[string]any)["to"])
 		return map[string]any{"sent": true}, nil
 	}, bunqueue.WorkerOptions{Host: "127.0.0.1", Port: 6789})
 	worker.Run()
@@ -309,7 +309,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "emails",
         |job| {
             println!("Processing: {}", job.data()["to"].as_str().unwrap_or_default());
-            Ok(Value::from("sent"))
+            Ok(Value::Map(vec![(Value::from("sent"), Value::from(true))]))
         },
         WorkerOptions { connection, ..Default::default() },
     );
@@ -325,8 +325,12 @@ cargo run
                 </TabItem>
                 <TabItem label="Elixir">
 
+```bash
+git clone https://github.com/egeominotti/bunqueue && mix new jobs && cd jobs
+```
+
 ```elixir title="mix.exs"
-# Hex release upcoming; add a bunqueue checkout as a path dependency today
+# Hex release upcoming; use the bunqueue checkout next to this project
 defp deps do
   [{:bunqueue_client, path: "../bunqueue/sdk/elixir"}]
 end

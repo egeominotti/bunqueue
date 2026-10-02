@@ -158,6 +158,16 @@ head:
   numbered steps (start the server, connect your app and worker, see it work)
   with the expected output. Step 2 has a complete program for every official
   SDK: Node.js, Bun, Deno, Python, PHP, Go, Rust and Elixir.
+- **The Go examples compile against the released SDK.** Every Go example on the
+  site that indexes job data (homepage, quickstart, SDK guide, examples, use
+  cases, cron and flow guides) now does it through
+  `any(job.Data()).(map[string]any)`, which builds against `sdk/go` v0.1.0
+  (`Data()` returns `map[string]any`) and the unreleased `Data() any`. The
+  type assertions used to fail with "is not an interface" for anyone who
+  installed the released module.
+- **README: bunqueue Academy.** A new section lists the released episodes with
+  their length and guide, the header links the video course, and the dashboard
+  section links its 8-minute tour.
 
 ## [2.9.6] - 2026-10-01
 

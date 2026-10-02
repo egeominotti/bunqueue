@@ -653,7 +653,7 @@ queue.AddBulk(entries)
 
 // worker (run as many copies as you want)
 worker := bunqueue.NewWorker("tasks", func(job *bunqueue.Job) (any, error) {
-    return map[string]any{"processed": job.Data().(map[string]any)["id"]}, nil
+    return map[string]any{"processed": any(job.Data()).(map[string]any)["id"]}, nil
 }, bunqueue.WorkerOptions{Concurrency: 50})
 worker.Run()
 ```

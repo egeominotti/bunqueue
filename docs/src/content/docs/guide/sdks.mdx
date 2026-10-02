@@ -328,7 +328,7 @@ $worker->run();          // blocking loop; or $worker->runOnce() from a cron tic
 
 ```go
 worker := bunqueue.NewWorker("emails", func(job *bunqueue.Job) (any, error) {
-    return sendEmail(job.Data().(map[string]any)["to"].(string))
+    return sendEmail(any(job.Data()).(map[string]any)["to"].(string))
 }, bunqueue.WorkerOptions{Concurrency: 8})
 
 worker.Run()

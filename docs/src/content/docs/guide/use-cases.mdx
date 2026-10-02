@@ -474,7 +474,7 @@ defer webhooks.Close()
 // Bun, TypeScript and Python clients.
 
 worker := bunqueue.NewWorker("webhooks", func(job *bunqueue.Job) (any, error) {
-    data := job.Data().(map[string]any)
+    data := any(job.Data()).(map[string]any)
     payload, _ := json.Marshal(data["payload"])
     ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
     defer cancel() // never hang on a dead endpoint
@@ -637,7 +637,7 @@ images := bunqueue.NewQueue("images", bunqueue.Options{})
 defer images.Close()
 
 worker := bunqueue.NewWorker("images", func(job *bunqueue.Job) (any, error) {
-    data := job.Data().(map[string]any)
+    data := any(job.Data()).(map[string]any)
     variants := data["variants"].([]any)
     source, err := downloadImage(data["sourceUrl"].(string))
     if err != nil {
@@ -808,7 +808,7 @@ payments := bunqueue.NewQueue("payments", bunqueue.Options{})
 defer payments.Close()
 
 worker := bunqueue.NewWorker("payments", func(job *bunqueue.Job) (any, error) {
-    data := job.Data().(map[string]any)
+    data := any(job.Data()).(map[string]any)
     // Pass data["idempotencyKey"] to your provider as its idempotency key:
     // a provider-side guard against double charges.
     intent, err := chargeProvider(data)
@@ -976,7 +976,7 @@ scheduled.UpsertJobScheduler("health-check",
 )
 
 worker := bunqueue.NewWorker("scheduled", func(job *bunqueue.Job) (any, error) {
-    if job.Data().(map[string]any)["task"] == "cleanup" {
+    if any(job.Data()).(map[string]any)["task"] == "cleanup" {
         return map[string]any{"deleted": cleanupOldRecords()}, nil
     }
     return checkSystemHealth()
@@ -1207,7 +1207,7 @@ worker := bunqueue.NewWorker("orders", func(job *bunqueue.Job) (any, error) {
     if err != nil {
         return nil, err
     }
-    return shipOrder(job.Data().(map[string]any)["orderId"].(string), results)
+    return shipOrder(any(job.Data()).(map[string]any)["orderId"].(string), results)
 }, bunqueue.WorkerOptions{})
 worker.Run()
 ```
