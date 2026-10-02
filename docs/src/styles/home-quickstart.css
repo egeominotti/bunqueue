@@ -1,0 +1,201 @@
+/* Quickstart: numbered steps joined by a line. Each step pairs a short explanation,
+   which stays in view on wide screens, with the commands and code it describes. */
+.home-steps {
+  margin: 0;
+  padding: 8px 0 0;
+  list-style: none;
+}
+
+.bq-home .home-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.42fr);
+  gap: 24px 56px;
+  margin: 0;
+  padding: 36px 0 44px;
+}
+
+/* The connector runs from one step number to the next. */
+.home-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 80px;
+  bottom: -36px;
+  left: 17px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(var(--home-accent), var(--home-line) 60%);
+  opacity: 0.55;
+}
+
+.home-step-head {
+  position: relative;
+  align-self: start;
+  min-width: 0;
+  padding-left: 58px;
+}
+
+@media (min-width: 1025px) {
+  .home-step-head {
+    position: sticky;
+    top: calc(var(--sl-nav-height, 4rem) + 24px);
+  }
+}
+
+.home-step-number {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--home-accent-ink);
+  background: var(--home-accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--home-accent) 14%, transparent);
+  font: 700 0.95rem var(--home-display);
+  letter-spacing: 0;
+}
+
+.bq-home .home-step-head h3 {
+  font-size: 1.45rem;
+}
+
+.bq-home .home-step-head > p {
+  max-width: 38ch;
+  margin-top: 10px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.home-step-body {
+  min-width: 0;
+}
+
+.bq-home .home-step-lead {
+  margin-top: 18px;
+  color: var(--sl-color-text);
+  font-size: 0.93rem;
+}
+
+.bq-home .home-step-body > .expressive-code:first-child,
+.bq-home .home-step-body > starlight-tabs:first-child {
+  margin-top: 0;
+}
+
+/* Expected result of step 3, styled as terminal output in both themes. */
+.home-output {
+  overflow: hidden;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  background: var(--home-surface);
+}
+
+.home-output-label {
+  display: block;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--home-line);
+  color: var(--home-muted);
+  font: 600 0.72rem var(--bq-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bq-home .home-output-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 16px;
+  color: var(--sl-color-text);
+  font: 0.88rem var(--bq-mono);
+}
+
+.bq-home .home-output-line code {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.home-output-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--state-completed);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--state-completed) 22%, transparent);
+}
+
+.bq-home .home-output + .home-callout {
+  margin-top: 20px;
+}
+
+/* The mode switch above the steps reads as a segmented control. */
+.bq-home #quickstart > starlight-tabs > .tablist-wrapper [role='tablist'] {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--home-line);
+  border-radius: 10px;
+  background: var(--home-surface);
+}
+
+.bq-home #quickstart > starlight-tabs > .tablist-wrapper [role='tab'] {
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--home-muted);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.bq-home #quickstart > starlight-tabs > .tablist-wrapper [role='tab'][aria-selected='true'] {
+  color: var(--home-accent-ink);
+  background: var(--home-accent);
+}
+
+/* Docker base images are a minor choice inside step 1, so they read as pills. */
+.bq-home .home-docker-variants {
+  margin-top: 18px;
+}
+
+.bq-home .home-docker-variants starlight-tabs [role='tablist'] {
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 0;
+}
+
+.bq-home .home-docker-variants starlight-tabs [role='tab'] {
+  padding: 5px 14px;
+  border: 1px solid var(--home-line);
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
+.bq-home .home-docker-variants starlight-tabs [role='tab'][aria-selected='true'] {
+  border-color: var(--home-accent);
+  background: color-mix(in srgb, var(--home-accent) 12%, transparent);
+}
+
+@media (max-width: 1024px) {
+  .bq-home .home-step {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    padding-bottom: 32px;
+  }
+  .home-step-body {
+    padding-left: 58px;
+  }
+}
+
+@media (max-width: 767px) {
+  .home-step-body {
+    padding-left: 0;
+  }
+  .home-step:not(:last-child)::before {
+    display: none;
+  }
+}

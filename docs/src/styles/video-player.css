@@ -1,0 +1,151 @@
+/* Click-to-load YouTube player (VideoPlayer.astro), used by the homepage, /academy/ and guides.
+   Global on purpose: the iframe is created at runtime, so scoped styles would miss it. */
+.bq-yt {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--bq-yt-line, rgb(255 255 255 / 0.1));
+  border-radius: 12px;
+  background: #0a0a0d;
+  box-shadow: 0 24px 60px -32px rgb(0 0 0 / 0.55);
+}
+
+.bq-yt-button {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.bq-yt-button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition:
+    transform 300ms ease,
+    filter 300ms ease;
+}
+
+.bq-yt-button:hover img {
+  transform: scale(1.015);
+  filter: brightness(1.08);
+}
+
+.bq-yt-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff63ad, #d3156d);
+  box-shadow: 0 12px 36px -8px rgb(211 21 109 / 0.7);
+  transform: translate(-50%, -50%);
+  transition: transform 200ms ease;
+}
+
+.bq-yt-play::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 54%;
+  border-top: 13px solid transparent;
+  border-bottom: 13px solid transparent;
+  border-left: 21px solid #fff;
+  transform: translate(-50%, -50%);
+}
+
+.bq-yt-button:hover .bq-yt-play {
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+/* The frame clips overflow, so the ring sits inside it. The homepage sets a 5px
+   outward offset on every focusable element; override it here or the ring is cut off. */
+.bq-yt-button:focus-visible,
+.bq-home .bq-yt-button:focus-visible {
+  outline: 2px solid #f472b6;
+  outline-offset: -4px;
+}
+
+.bq-yt-duration {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.78);
+  color: #fff;
+  font: 600 0.8rem/1.4 var(--sl-font-system, system-ui, sans-serif);
+  letter-spacing: 0.02em;
+}
+
+.bq-yt iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* A video under a guide hero, with a one-line caption. */
+.bq-video-figure {
+  max-width: 54rem;
+  margin: 2rem 0 2.5rem;
+}
+
+.bq-video-figure figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin-top: 0.85rem;
+  color: var(--sl-color-gray-3);
+  font-size: 0.88rem;
+}
+
+.bq-video-figure figcaption a {
+  color: var(--bq-brand, #f472b6);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bq-video-figure figcaption a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.bq-video-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--bq-brand, #f472b6);
+  color: var(--sl-color-black, #000);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 767px) {
+  .bq-yt-play {
+    width: 60px;
+    height: 60px;
+  }
+  .bq-yt-play::before {
+    border-top-width: 11px;
+    border-bottom-width: 11px;
+    border-left-width: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bq-yt-button img,
+  .bq-yt-play {
+    transition: none;
+  }
+}

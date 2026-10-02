@@ -13,12 +13,15 @@ head:
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
+import GuideEpisode from '@components/academy/GuideEpisode.astro';
 
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · worker</span>
   <h1 class="bq-hero-h1 bq-bench-h1">Pull, process, <em>ack.</em></h1>
   <p class="bq-hero-sub">A worker is a loop you do not have to write. It asks the queue for work, runs your function, reports the outcome, and keeps the job alive while it runs.</p>
 </div>
+
+<GuideEpisode number={3} />
 
 Give the Worker a queue name and a processor. Whatever the processor returns becomes the job result; whatever it throws becomes a failed attempt.
 

@@ -157,20 +157,29 @@ the test suite.
 ## Homepage onboarding
 
 The homepage at `docs/src/content/docs/index.mdx` opens with the cross-language
-value proposition, introduces the web dashboard, shows public projects that use
-bunqueue, and then reaches the quickstart before storage or advanced features.
-Its existing `#quickstart` anchor contains a complete local server path with
-explicit TCP/HTTP ports and Node.js, Deno and Python examples. A separate tab
-shows Bun embedded mode with `embedded: true` on both clients. The SQLite server
-example binds to loopback and explicitly enables persistence; the embedded
-example describes its ephemeral default. `test/docs-homepage-snippets.test.ts`
+value proposition, presents the bunqueue Academy video course, introduces the
+web dashboard, shows public projects that use bunqueue, and then reaches the
+quickstart before storage or advanced features.
+Its existing `#quickstart` anchor opens with a segmented switch between two
+paths, each laid out as three numbered steps joined by a connector line: the
+explanation sits in a left column (sticky on wide screens) and the commands and
+code on the right. The server path is "Start the server" (Docker or Bun CLI,
+explicit loopback TCP/HTTP ports), "Connect your app and worker" with a complete
+program for every official SDK (Node.js, Bun, Deno, Python, PHP, Go, Rust and
+Elixir) that connects to `127.0.0.1:6789`, adds one job and prints it from the
+worker, and "See it work" with the expected worker output. The Bun embedded path
+sets `embedded: true` on both clients. The SQLite server example binds to
+loopback and explicitly enables persistence; the embedded example describes its
+ephemeral default. The SDK programs follow each SDK's README and source
+(constructor options, job data access, blocking `run`); recheck them when an SDK
+changes its public API. `test/docs-homepage-snippets.test.ts`
 compiles both TypeScript quickstarts, so the page must keep exactly two
 `typescript` fences.
 
 `components/home/HomeHero.astro` owns the headline ("Add a background job in
 one language. Process it in another.", which keeps the primary keyword in the
-H1), the MIT link, the two calls to action and the three
-included-with-bunqueue facts.
+H1), the MIT link, a "New" announcement that jumps to the `#academy` section,
+the two calls to action and the three included-with-bunqueue facts.
 `HomeLedger.astro` renders the hero's simulated `orders` queue: five jobs, each
 added from one client language and processed by a worker in another, move
 through `waiting`, `delayed`, `active`, `retry` and `completed`. The
@@ -187,22 +196,57 @@ content. The rows are decorative (`aria-hidden`) and carry `data-nosnippet`, so
 simulated job names never appear in search snippets; the caption states that
 the data is simulated and stays indexable.
 
-`HomeDashboard.astro`, directly below the hero, introduces the separately
+`HomeAcademy.astro`, directly below the hero (anchor `#academy`), presents
+bunqueue Academy, the free video course on the `@bunqueue` YouTube channel: the
+60-second overview (episode 00) in a player beside the copy, counters derived
+from the episode data (episodes out, total running time, episodes still to
+come), calls to action for `/academy/` and the YouTube playlist, a grid of the
+released lessons linking to their `/academy/#episode-NN` anchors, and a
+"Coming next" row. Its styles live in `styles/home-academy.css`.
+
+Every episode is declared once in `src/data/academy.ts`: number, title, topic,
+summary, the guide it follows and, once public, its YouTube video ID and running
+time. An episode without a `videoId` is announced as coming soon and never
+embedded. Publishing an episode means adding its `videoId` and `duration`, an
+`uploadDate` when it differs from `ACADEMY_UPLOAD_DATE` (the structured-data
+default), and its thumbnail as a local 960x540 JPEG in `public/academy/NN.jpg`
+(episode number, zero-padded); nothing checks the thumbnail at build time.
+The `/academy/` page (`content/docs/academy.mdx`, linked as "Video Course" in
+the sidebar and as "Academy" in the header) renders the full list through
+`components/academy/AcademyCourse.astro`, which also emits `ItemList` +
+`VideoObject` structured data for the released episodes.
+`components/academy/GuideEpisode.astro` places an episode under the hero of the
+guide it follows (introduction, quickstart, queue, worker, cron, DLQ and flow
+overviews) and renders nothing until that episode has a `videoId`.
+
+All videos use `components/VideoPlayer.astro`, a click-to-load player: the page
+ships only the local thumbnail and a button, and the privacy-enhanced
+`youtube-nocookie.com` iframe is created on the first click, so no third-party
+request happens before the reader chooses to play. Players above the fold
+(under a guide hero, the first episode on `/academy/`, the dashboard guide) load
+their thumbnail eagerly. Its styles live in the global `styles/video-player.css`,
+because the iframe is created at runtime and scoped styles would not reach it; it
+also styles the captioned `.bq-video-figure` used under guide heroes. The play
+button's focus ring is drawn inside the clipped frame, overriding the homepage's
+outward focus offset so keyboard focus stays visible.
+
+`HomeDashboard.astro`, below the Academy section, introduces the separately
 released [bunqueue dashboard](https://github.com/egeominotti/bunqueue-dashboard):
-a framed Overview screenshot, the `bunx bunqueue-dashboard` command with its
-default ports, four capability rows, and links to `/guide/dashboard/`, the live
-demo and the repository. The screenshot is the static WebP
-`public/dashboard/overview.webp` (converted from the dashboard repository's
-own screenshots), so the build makes no request to another site. It is dark UI
-in both themes, so its frame stays neutral. Its styles live in
+the 7:46 full-tour video in the click-to-load player (thumbnail
+`public/dashboard/tour-thumbnail.jpg`), the `bunx bunqueue-dashboard` command
+with its default ports, four capability rows, and links to `/guide/dashboard/`,
+the live demo and the repository. Its styles live in
 `styles/home-dashboard.css`, which includes the section's own tablet and phone
 breakpoints.
 
-The guide page `guide/dashboard.mdx` uses `components/DashboardArchitecture.astro`,
+The guide page `guide/dashboard.mdx` opens with the same full-tour video (anchor
+`#tour`), then uses `components/DashboardArchitecture.astro`,
 a static diagram of browser, dashboard process and server whose figcaption
 carries the full description and which stacks through a container query when
 its own width falls below 760px (the table of contents narrows the column),
 and the `.bq-shot` figure style from `docs-reading.css` for captioned
+screenshots; the Overview screenshot is the static WebP
+`public/dashboard/overview.webp`, converted from the dashboard repository's own
 screenshots. Facts on that page come from the
 dashboard repository's README, user guide and known-issues page; recheck them
 when the dashboard changes its defaults, ports or fail-closed operations.
@@ -221,7 +265,7 @@ when it fails, after it completes), and each stage reuses the matching state
 color from the ledger. Storage is presented as a path from `:memory:` through
 SQLite to PostgreSQL. The FAQ answers and JSON-LD share one data source.
 `HomeDockerQuickstart.astro` provides the default server setup, with four Linux
-variant tabs, copyable Docker commands, loopback port mappings, a persistent
+base-image variants presented as pill tabs inside step 1, copyable Docker commands, loopback port mappings, a persistent
 named volume and an HTTP readiness check. Starlight's Code component supplies
 copy controls. The Bun CLI remains available in its own tab. Moving image tags
 are identified explicitly; deployment guidance recommends a version or digest.
@@ -229,9 +273,13 @@ are identified explicitly; deployment guidance recommends a version or digest.
 Homepage styles are scoped through `.bq-home`. `styles/home.css` defines the
 tokens, including one color per job state for dark and light themes, the type
 scale and the hero; `styles/home-ledger.css` styles the simulation;
-`styles/home-setup.css` covers section intros and the quickstart;
+`styles/home-setup.css` covers section intros and shared setup elements
+(connection facts, notes, callouts, tabs); `styles/home-quickstart.css` covers
+the quickstart steps, the segmented mode switch, the base-image pills and the
+expected-output panel;
 `styles/home-sections.css` covers projects, lifecycle, storage, migration, FAQ
-and closing; `styles/home-dashboard.css` covers the dashboard section;
+and closing; `styles/home-academy.css` covers the Academy section and
+`styles/home-dashboard.css` the dashboard section;
 `styles/home-responsive.css` holds the tablet and phone layouts.
 The h1 and h2 headings use the self-hosted Bricolage Grotesque at 75% width
 (its `wdth.css` axis file is imported by `HomeHero.astro`, and

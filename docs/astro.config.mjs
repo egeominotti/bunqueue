@@ -185,6 +185,7 @@ export default defineConfig({
             { label: 'Introduction', link: '/guide/introduction/' },
             { label: 'Installation', link: '/guide/installation/' },
             { label: 'Quick Start', link: '/guide/quickstart/' },
+            { label: 'Video Course', link: '/academy/', badge: { text: 'New', variant: 'tip' } },
             { label: 'Simple Mode', link: '/guide/simple-mode/' },
             { label: 'Use Cases & Patterns', link: '/guide/use-cases/' },
             { label: 'Migrate from BullMQ', link: '/guide/migration/' },

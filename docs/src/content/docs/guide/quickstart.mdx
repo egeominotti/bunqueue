@@ -9,12 +9,15 @@ head:
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
+import GuideEpisode from '@components/academy/GuideEpisode.astro';
 
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · quickstart</span>
   <h1 class="bq-hero-h1 bq-bench-h1">Working queue in <em>a minute.</em></h1>
   <p class="bq-hero-sub">Create a queue, add jobs, process them with a Worker, and turn on persistence. On Bun everything runs embedded in a single process with zero configuration; from any other language, start the server once and connect.</p>
 </div>
+
+<GuideEpisode number={1} />
 
 ## The smallest working queue
 

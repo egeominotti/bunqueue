@@ -1,0 +1,202 @@
+/* bunqueue Academy: copy beside the overview player, released episodes in a grid below. */
+.bq-home .home-academy {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 48px 64px;
+}
+
+.bq-home .home-academy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  color: var(--home-accent);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.home-academy-badge span {
+  padding-left: 12px;
+  border-left: 1px solid var(--home-line);
+  color: var(--home-muted);
+  font-weight: 400;
+}
+
+.bq-home .home-academy-copy h2 + p {
+  max-width: 46ch;
+  margin-top: 20px;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.bq-home .home-academy-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--home-muted);
+  font-size: 0.9rem;
+}
+
+.bq-home .home-academy-stats li {
+  margin: 0;
+}
+
+.home-academy-stats strong {
+  color: var(--sl-color-text);
+  font-weight: 650;
+}
+
+.bq-home .home-academy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.bq-home .home-academy-feature {
+  --bq-yt-line: var(--home-line);
+}
+
+.home-academy-episodes {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px 24px;
+  margin: 0;
+  padding: 28px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--home-line);
+}
+
+.bq-home .home-academy-episodes li {
+  margin: 0;
+}
+
+.bq-home .home-academy-episodes a {
+  display: grid;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-academy-thumb {
+  position: relative;
+  display: block;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid var(--home-line);
+  border-radius: 10px;
+  background: #0a0a0d;
+  aspect-ratio: 16 / 9;
+}
+
+.home-academy-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms ease;
+}
+
+.home-academy-episodes a:hover .home-academy-thumb img {
+  transform: scale(1.03);
+}
+
+.home-academy-episodes a:hover .home-academy-title {
+  color: var(--home-accent);
+}
+
+.home-academy-time {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgb(0 0 0 / 0.78);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.home-academy-number {
+  color: var(--home-accent);
+  font: 600 0.75rem var(--bq-mono, ui-monospace, monospace);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.home-academy-title {
+  color: var(--sl-color-text);
+  font-family: var(--home-display);
+  font-size: 1.2rem;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  transition: color 150ms ease;
+}
+
+.home-academy-topic {
+  color: var(--home-muted);
+  font-size: 0.9rem;
+}
+
+.bq-home .home-academy-next {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: -8px;
+  font-size: 0.86rem;
+}
+
+.home-academy-next > span:first-child {
+  margin-right: 4px;
+  color: var(--sl-color-text);
+  font-weight: 600;
+}
+
+.home-academy-next-item {
+  padding: 4px 12px;
+  border: 1px dashed var(--home-line);
+  border-radius: 999px;
+  color: var(--home-muted);
+}
+
+@media (max-width: 1024px) {
+  .bq-home .home-academy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-academy-episodes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .bq-home .home-academy {
+    gap: 32px;
+  }
+  .home-academy-episodes {
+    gap: 22px 16px;
+  }
+  .home-academy-title {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-academy-episodes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-academy-thumb img,
+  .home-academy-title {
+    transition: none;
+  }
+}

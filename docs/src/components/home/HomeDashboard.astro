@@ -1,7 +1,9 @@
 ---
 // The web dashboard lives in its own repository and ships separately. This section sits
-// directly below the hero so the operator console is visible before the quickstart.
+// below the Academy section so the operator console is visible before the quickstart; its
+// 8-minute tour video replaces a static screenshot.
 import '../../styles/home-dashboard.css';
+import VideoPlayer from '../VideoPlayer.astro';
 
 const capabilities = [
   { title: 'See it live', body: 'Server health, throughput, per-queue status, workers and a streaming activity feed.' },
@@ -25,16 +27,14 @@ const capabilities = [
     </div>
   </div>
 
-  <figure class="home-dashboard-shot">
-    <img
-      src="/dashboard/overview.webp"
-      width="1600"
-      height="1196"
-      loading="lazy"
-      decoding="async"
-      alt="The bunqueue dashboard Overview page: a connected-server banner, job counters, a per-queue health grid and a live activity feed."
+  <div class="home-dashboard-shot">
+    <VideoPlayer
+      videoId="1bQRFXGClcc"
+      title="bunqueue dashboard: full tour"
+      thumbnail="/dashboard/tour-thumbnail.jpg"
+      duration="7:46"
     />
-  </figure>
+  </div>
 
   <ul class="home-dashboard-list" role="list">
     {capabilities.map(({ title, body }) => (

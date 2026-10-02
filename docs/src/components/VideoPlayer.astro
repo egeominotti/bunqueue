@@ -1,0 +1,54 @@
+---
+// Click-to-load YouTube player. The page ships only a local thumbnail and a button; the
+// privacy-enhanced (youtube-nocookie.com) iframe is created on the first click, so no
+// third-party request happens before the reader chooses to play.
+import '../styles/video-player.css';
+
+interface Props {
+  videoId: string;
+  /** Accessible name of the video, also used as the iframe title. */
+  title: string;
+  /** Local 16:9 thumbnail, at least 960x540. */
+  thumbnail: string;
+  /** Running time as shown on YouTube, for example "7:46". */
+  duration: string;
+  /** Optional playlist the embed continues into. */
+  playlistId?: string;
+  /** Load the thumbnail eagerly when the player is above the fold. */
+  eager?: boolean;
+}
+
+const { videoId, title, thumbnail, duration, playlistId, eager = false } = Astro.props;
+const params = new URLSearchParams({ autoplay: '1', rel: '0' });
+if (playlistId) params.set('list', playlistId);
+const src = `https://www.youtube-nocookie.com/embed/${videoId}?${params}`;
+---
+
+<div class="bq-yt not-content" data-src={src} data-title={title}>
+  <button type="button" class="bq-yt-button" aria-label={`Play ${title} (${duration})`}>
+    <img src={thumbnail} width="960" height="540" loading={eager ? 'eager' : 'lazy'} decoding="async" alt="" />
+    <span class="bq-yt-play" aria-hidden="true"></span>
+    <span class="bq-yt-duration" aria-hidden="true">{duration}</span>
+  </button>
+</div>
+
+<script>
+  function activate(container: HTMLElement): void {
+    const iframe = document.createElement('iframe');
+    iframe.src = container.dataset.src ?? '';
+    iframe.title = container.dataset.title ?? 'Video';
+    iframe.allow =
+      'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    iframe.allowFullscreen = true;
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    container.replaceChildren(iframe);
+    container.classList.add('is-playing');
+    iframe.focus();
+  }
+
+  for (const container of document.querySelectorAll<HTMLElement>('.bq-yt')) {
+    container
+      .querySelector('.bq-yt-button')
+      ?.addEventListener('click', () => activate(container), { once: true });
+  }
+</script>

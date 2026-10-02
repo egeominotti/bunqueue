@@ -13,12 +13,15 @@ head:
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
+import GuideEpisode from '@components/academy/GuideEpisode.astro';
 
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · dead letter queue</span>
   <h1 class="bq-hero-h1 bq-bench-h1">Failed jobs, kept in the <em>DLQ.</em></h1>
   <p class="bq-hero-sub">When a job runs out of retries, bunqueue can retain it in the Dead Letter Queue with the terminal error and attempt metadata, so you can inspect it and retry it deliberately.</p>
 </div>
+
+<GuideEpisode number={5} />
 
 The Dead Letter Queue (DLQ) is a holding area for jobs that failed permanently,
 for example after exhausting all retry attempts. Unless `removeOnFail` is set,

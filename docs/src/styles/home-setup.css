@@ -31,36 +31,6 @@
   margin-top: 16px;
 }
 
-.home-setup-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: 40px;
-  padding-top: 28px;
-}
-
-.home-setup-grid > div {
-  min-width: 0;
-}
-
-.bq-home .home-setup-grid h3 + p {
-  margin-top: 14px;
-  margin-bottom: 20px;
-  font-size: 0.95rem;
-}
-
-.home-step-number {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  margin-right: 10px;
-  border-radius: 50%;
-  color: var(--home-accent-ink);
-  background: var(--home-accent);
-  font: 700 0.9rem var(--home-display);
-  letter-spacing: 0;
-}
-
 .bq-home .home-connection {
   margin-block: 26px;
   font-size: 0.83rem;
@@ -169,7 +139,8 @@ body:has(.bq-home) .header-cta {
     display: grid;
     min-width: 0;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 16px;
+    gap: 4px;
+    width: 100%;
   }
   .bq-home #quickstart > starlight-tabs > .tablist-wrapper [role='tab'] {
     white-space: normal;
@@ -181,10 +152,6 @@ body:has(.bq-home) .header-cta {
   .bq-home .home-section-intro {
     grid-template-columns: minmax(0, 1fr);
     margin-bottom: 28px;
-  }
-  .home-setup-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
   }
 }
 

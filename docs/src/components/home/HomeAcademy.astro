@@ -1,0 +1,74 @@
+---
+// bunqueue Academy, the free video course. It sits directly below the hero so new readers
+// can watch the 60-second overview before they read anything else.
+import '../../styles/home-academy.css';
+import AcademyPlayer from '../academy/AcademyPlayer.astro';
+import {
+  ACADEMY_PLAYLIST_URL,
+  episodeAnchor,
+  episodeLabel,
+  episodeThumbnail,
+  releasedEpisodes,
+  totalRuntime,
+  upcomingEpisodes,
+} from '../../data/academy';
+
+const [overview, ...lessons] = releasedEpisodes;
+---
+
+<section class="home-section home-academy" id="academy" aria-labelledby="academy-title">
+  <div class="home-academy-copy">
+    <span class="home-academy-badge">bunqueue Academy <span>Free video course</span></span>
+    <h2 id="academy-title">Learn bunqueue, one episode at a time.</h2>
+    <p>
+      A free course on YouTube, from your first queue to production. Every episode follows a guide in
+      these docs, with chapters and English subtitles.
+    </p>
+    <ul class="home-academy-stats" role="list">
+      <li><strong>{releasedEpisodes.length}</strong> episodes out</li>
+      <li><strong>{totalRuntime()}</strong> of video</li>
+      <li><strong>{upcomingEpisodes.length}</strong> more on the way</li>
+    </ul>
+    <div class="home-academy-actions">
+      <a class="home-button" href="/academy/">Start the course</a>
+      <a class="home-button-secondary" href={ACADEMY_PLAYLIST_URL}>
+        YouTube playlist <span aria-hidden="true">↗</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="home-academy-feature">
+    <AcademyPlayer episode={overview} />
+  </div>
+
+  <ol class="home-academy-episodes" role="list">
+    {
+      lessons.map((episode) => (
+        <li>
+          <a href={`/academy/#${episodeAnchor(episode)}`}>
+            <span class="home-academy-thumb">
+              <img src={episodeThumbnail(episode)} width="960" height="540" loading="lazy" decoding="async" alt="" />
+              <span class="home-academy-time">{episode.duration}</span>
+            </span>
+            <span class="home-academy-number">Episode {episodeLabel(episode)}</span>
+            <span class="home-academy-title">{episode.title}</span>
+            <span class="home-academy-topic">{episode.topic}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+
+  {
+    upcomingEpisodes.length > 0 && (
+      <p class="home-academy-next">
+        <span>Coming next</span>
+        {upcomingEpisodes.map((episode) => (
+          <span class="home-academy-next-item">
+            {episodeLabel(episode)} · {episode.title}
+          </span>
+        ))}
+      </p>
+    )
+  }
+</section>

@@ -14,6 +14,7 @@ Key facts:
 - [Introduction](https://bunqueue.dev/guide/introduction/): What bunqueue is, memory/SQLite defaults, PostgreSQL scaling, feature overview
 - [Installation](https://bunqueue.dev/guide/installation/): Install via npm/bun, TypeScript types included
 - [Quick Start](https://bunqueue.dev/guide/quickstart/): Create a queue, add jobs, process with a Worker in 5 minutes
+- [bunqueue Academy](https://bunqueue.dev/academy/): Free video course on YouTube, one episode per guide (queues, workers, cron, DLQ and flows so far)
 - [Configuration File](https://bunqueue.dev/guide/configuration/): Typed bunqueue.config.ts for server settings
 - [Environment Variables](https://bunqueue.dev/guide/env-vars/): Ports, data path, auth tokens, S3, timeouts, TLS
 

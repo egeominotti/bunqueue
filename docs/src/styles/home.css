@@ -98,6 +98,42 @@
   text-decoration: underline;
 }
 
+.home-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+}
+
+/* Announcement pill for bunqueue Academy; it jumps to the section below the hero. */
+.bq-home .home-announce {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px 5px 5px;
+  border: 1px solid color-mix(in srgb, var(--home-accent) 45%, var(--home-line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--home-accent) 10%, transparent);
+  color: var(--sl-color-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 150ms ease;
+}
+
+.bq-home .home-announce:hover {
+  border-color: var(--home-accent);
+}
+
+.home-announce-tag {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--home-accent);
+  color: var(--home-accent-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .bq-home .home-hero h1 {
   margin-top: 28px;
   font-size: clamp(3rem, 5.9vw, 5.6rem);

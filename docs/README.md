@@ -165,7 +165,9 @@ page titles.
 Shared documentation navigation, reading styles and homepage onboarding live in
 `docs/src/components/` and `docs/src/styles/`, including the simulated hero
 queue in `home/HomeLedger.astro`, the Docker variant selector in
-`home/HomeDockerQuickstart.astro`, the web dashboard introduction in
+`home/HomeDockerQuickstart.astro`, the bunqueue Academy video course in
+`home/HomeAcademy.astro` (episodes declared in `src/data/academy.ts`, played
+through the click-to-load `VideoPlayer.astro`), the web dashboard introduction in
 `home/HomeDashboard.astro` and the public-project list in
 `home/HomeUsedBy.astro`; see
 [Documentation Tooling](./features/documentation-tooling.md).

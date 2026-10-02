@@ -1,0 +1,167 @@
+/* /academy/ page: one row per released episode (player beside the copy), then the
+   episodes still in production. Uses the docs tokens so both themes stay readable. */
+.bq-academy {
+  --bq-yt-line: var(--sl-color-hairline);
+  margin-top: 3rem;
+}
+
+.bq-academy-list {
+  display: grid;
+  gap: 3.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bq-academy-episode {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 2.5rem;
+  margin: 0;
+  scroll-margin-top: calc(var(--sl-nav-height, 4rem) + 1.5rem);
+}
+
+.bq-academy-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.6rem;
+  color: var(--bq-brand);
+  font: 600 0.75rem var(--bq-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bq-academy-eyebrow span {
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--sl-color-hairline);
+  color: var(--sl-color-gray-3);
+  letter-spacing: 0.04em;
+}
+
+.bq-academy-body h2 {
+  margin: 0;
+  color: var(--sl-color-white);
+  font-family: var(--bq-display);
+  font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+.bq-academy-topic {
+  margin: 0.35rem 0 0;
+  color: var(--bq-brand);
+  font-weight: 600;
+}
+
+.bq-academy-summary {
+  max-width: 48ch;
+  margin: 0.9rem 0 0;
+  color: var(--sl-color-gray-2);
+  line-height: 1.7;
+}
+
+.bq-academy-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 1.2rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.bq-academy-links a,
+.bq-academy-upcoming a {
+  color: var(--bq-brand);
+  text-decoration: none;
+}
+
+.bq-academy-links a:hover,
+.bq-academy-upcoming a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.bq-academy-upcoming {
+  margin-top: 4.5rem;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--sl-color-hairline);
+}
+
+.bq-academy-upcoming h2 {
+  margin: 0;
+  color: var(--sl-color-white);
+  font-family: var(--bq-display);
+  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.bq-academy-upcoming > p {
+  max-width: 60ch;
+  margin: 0.75rem 0 0;
+  color: var(--sl-color-gray-2);
+  line-height: 1.7;
+}
+
+.bq-academy-upcoming-list {
+  display: grid;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--sl-color-hairline);
+}
+
+.bq-academy-upcoming-list li {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 1rem;
+  margin: 0;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  scroll-margin-top: calc(var(--sl-nav-height, 4rem) + 1.5rem);
+}
+
+.bq-academy-upcoming-number {
+  color: var(--sl-color-gray-3);
+  font: 600 0.85rem var(--bq-mono);
+}
+
+.bq-academy-upcoming-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.bq-academy-upcoming-copy strong {
+  color: var(--sl-color-white);
+}
+
+.bq-academy-upcoming-copy span {
+  color: var(--sl-color-gray-3);
+  font-size: 0.92rem;
+}
+
+.bq-academy-upcoming-list a {
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 64rem) {
+  .bq-academy-episode {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+}
+
+@media (max-width: 38rem) {
+  .bq-academy-upcoming-list li {
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+  }
+  .bq-academy-upcoming-list a {
+    grid-column: 2;
+  }
+}

@@ -35,53 +35,65 @@ import HomeDetails from '@components/home/HomeDetails.astro';
 import HomeDockerQuickstart from '@components/home/HomeDockerQuickstart.astro';
 import HomeUsedBy from '@components/home/HomeUsedBy.astro';
 import HomeDashboard from '@components/home/HomeDashboard.astro';
+import HomeAcademy from '@components/home/HomeAcademy.astro';
 
 <div class="bq-home not-content">
   <HomeHero />
+
+  <HomeAcademy />
 
   <HomeDashboard />
 
   <HomeUsedBy />
 
-  <section class="home-section" id="quickstart" aria-labelledby="start-title">
+  <section class="home-section home-quickstart" id="quickstart" aria-labelledby="start-title">
     <div class="home-section-intro">
       <h2 id="start-title">Your first job, end to end.</h2>
-      <p>Choose how to run the queue. Both options are free, with the same core queue features.</p>
+      <p>Pick how you run the queue, then follow three steps. Both paths are free, with the same core queue features.</p>
     </div>
 
     <Tabs>
       <TabItem label="Server + your language">
-        <div class="home-setup-grid">
-          <div class="home-server-step">
-            <h3><span class="home-step-number">1</span> Run your own server</h3>
-            <Tabs>
-              <TabItem label="Docker">
-                <HomeDockerQuickstart />
-              </TabItem>
-              <TabItem label="Bun CLI">
-            <p>In a terminal with <a href="/guide/installation/">Bun installed</a>, start the included server. Keep it running.</p>
+        <ol class="home-steps" role="list">
+          <li class="home-step">
+            <div class="home-step-head">
+              <span class="home-step-number" aria-hidden="true">1</span>
+              <h3>Start the server</h3>
+              <p>Run it with Docker, or with the Bun CLI if Bun is installed. Keep it running.</p>
+              <dl class="home-connection">
+                <div><dt>Client connection</dt><dd>127.0.0.1:6789 <span>TCP</span></dd></div>
+                <div><dt>HTTP API</dt><dd>127.0.0.1:6790 <span>HTTP</span></dd></div>
+              </dl>
+              <a class="home-text-link" href="/guide/server/">Docker and deployment options</a>
+            </div>
+            <div class="home-step-body">
+              <Tabs>
+                <TabItem label="Docker">
+                  <HomeDockerQuickstart />
+                </TabItem>
+                <TabItem label="Bun CLI">
+              <p class="home-step-lead">In a terminal with <a href="/guide/installation/">Bun installed</a>, start the included server.</p>
 
 ```bash
 bunx bunqueue start --host 127.0.0.1 --data-path ./bunqueue.db
 ```
 
-            <dl class="home-connection">
-              <div><dt>Client connection</dt><dd>127.0.0.1:6789 <span>TCP</span></dd></div>
-              <div><dt>HTTP API</dt><dd>127.0.0.1:6790 <span>HTTP</span></dd></div>
-              <div><dt>Storage</dt><dd>./bunqueue.db <span>SQLite</span></dd></div>
-            </dl>
-            <p class="home-note">This is a local process on your machine. The server is included in the MIT-licensed package.</p>
-              </TabItem>
-            </Tabs>
-            <a class="home-text-link" href="/guide/server/">Docker and deployment options</a>
-          </div>
+              <p class="home-note">Jobs persist in <code>./bunqueue.db</code>, a local SQLite file. The server is included in the MIT-licensed package.</p>
+                </TabItem>
+              </Tabs>
+            </div>
+          </li>
 
-          <div class="home-client-step">
-            <h3><span class="home-step-number">2</span> Connect your app and worker</h3>
-            <p>Open another terminal. Install a client, save the example, then run it.</p>
-
-            <Tabs>
-              <TabItem label="Node.js">
+          <li class="home-step">
+            <div class="home-step-head">
+              <span class="home-step-number" aria-hidden="true">2</span>
+              <h3>Connect your app and worker</h3>
+              <p>Open another terminal. Install a client, save the example, then run it.</p>
+              <a class="home-text-link" href="/guide/sdks/">SDK guides and connection options</a>
+            </div>
+            <div class="home-step-body">
+              <Tabs>
+                <TabItem label="Node.js">
 
 ```bash
 npm install bunqueue-client
@@ -113,8 +125,41 @@ await queue.add('welcome', { to: 'hello@example.com' });
 node jobs.mjs
 ```
 
-              </TabItem>
-              <TabItem label="Deno">
+                </TabItem>
+                <TabItem label="Bun">
+
+```bash
+bun add bunqueue-client
+```
+
+```javascript title="jobs.mjs"
+import { Queue, Worker } from 'bunqueue-client';
+
+const options = {
+  embedded: false,
+  connection: { host: '127.0.0.1', port: 6789 },
+};
+const queue = new Queue('emails', options);
+
+const worker = new Worker(
+  'emails',
+  async (job) => {
+    console.log('Processing:', job.data.to);
+    return { sent: true };
+  },
+  options
+);
+
+worker.on('error', (error) => console.error(error));
+await queue.add('welcome', { to: 'hello@example.com' });
+```
+
+```bash
+bun jobs.mjs
+```
+
+                </TabItem>
+                <TabItem label="Deno">
 
 ```bash
 deno add npm:bunqueue-client
@@ -146,8 +191,8 @@ await queue.add('welcome', { to: 'hello@example.com' });
 deno run --allow-net --allow-env --allow-sys=hostname jobs.ts
 ```
 
-              </TabItem>
-              <TabItem label="Python">
+                </TabItem>
+                <TabItem label="Python">
 
 ```bash
 pip install bunqueue-client
@@ -172,37 +217,199 @@ Worker("emails", process, **connection).run()
 python jobs.py
 ```
 
-              </TabItem>
-            </Tabs>
-            <p class="home-note">You should see <code>{'Processing: hello@example.com'}</code>. Your application and worker use the same queue name and TCP address.</p>
-            <a class="home-text-link" href="/guide/sdks/">PHP, Go, Rust, Elixir and all SDK guides</a>
-          </div>
-        </div>
-        <aside class="home-callout">
-          <strong>Connecting to another machine?</strong>
-          <p>Use your server's hostname in both clients. Port <code>6789</code> is for TCP clients; <code>6790</code> is for HTTP. Follow the <a href="/guide/server/">deployment guide</a> for network binding, TLS and authentication.</p>
-        </aside>
+                </TabItem>
+                <TabItem label="PHP">
+
+```bash
+composer require bunqueue/client
+```
+
+```php title="jobs.php"
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+use Bunqueue\Job;
+use Bunqueue\Queue;
+use Bunqueue\Worker;
+
+$connection = ['host' => '127.0.0.1', 'port' => 6789];
+
+$queue = new Queue('emails', $connection);
+$queue->add('welcome', ['to' => 'hello@example.com']);
+$queue->close();
+
+$worker = new Worker('emails', function (Job $job) {
+    echo 'Processing: ', $job->data()['to'], PHP_EOL;
+    return ['sent' => true];
+}, $connection);
+$worker->run();
+```
+
+```bash
+php jobs.php
+```
+
+                </TabItem>
+                <TabItem label="Go">
+
+```bash
+go mod init jobs && go get github.com/egeominotti/bunqueue/sdk/go
+```
+
+```go title="main.go"
+package main
+
+import (
+	"fmt"
+
+	bunqueue "github.com/egeominotti/bunqueue/sdk/go"
+)
+
+func main() {
+	queue := bunqueue.NewQueue("emails", bunqueue.Options{Host: "127.0.0.1", Port: 6789})
+	defer queue.Close()
+	if _, err := queue.Add("welcome", map[string]any{"to": "hello@example.com"}, nil); err != nil {
+		panic(err)
+	}
+
+	worker := bunqueue.NewWorker("emails", func(job *bunqueue.Job) (any, error) {
+		fmt.Println("Processing:", job.Data().(map[string]any)["to"])
+		return map[string]any{"sent": true}, nil
+	}, bunqueue.WorkerOptions{Host: "127.0.0.1", Port: 6789})
+	worker.Run()
+}
+```
+
+```bash
+go run .
+```
+
+                </TabItem>
+                <TabItem label="Rust">
+
+```bash
+cargo new jobs && cd jobs && cargo add bunqueue-client
+```
+
+```rust title="src/main.rs"
+use bunqueue_client::{ConnectionOptions, JobOptions, Queue, Value, Worker, WorkerOptions};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let connection = ConnectionOptions {
+        host: "127.0.0.1".into(),
+        port: 6789,
+        ..Default::default()
+    };
+
+    let queue = Queue::new("emails", connection.clone());
+    let data = Value::Map(vec![(Value::from("to"), Value::from("hello@example.com"))]);
+    queue.add("welcome", data, JobOptions::default())?;
+
+    let worker = Worker::new(
+        "emails",
+        |job| {
+            println!("Processing: {}", job.data()["to"].as_str().unwrap_or_default());
+            Ok(Value::from("sent"))
+        },
+        WorkerOptions { connection, ..Default::default() },
+    );
+    worker.run()?;
+    Ok(())
+}
+```
+
+```bash
+cargo run
+```
+
+                </TabItem>
+                <TabItem label="Elixir">
+
+```elixir title="mix.exs"
+# Hex release upcoming; add a bunqueue checkout as a path dependency today
+defp deps do
+  [{:bunqueue_client, path: "../bunqueue/sdk/elixir"}]
+end
+```
+
+```elixir title="jobs.exs"
+connection = [host: "127.0.0.1", port: 6789]
+
+queue = Bunqueue.queue("emails", connection)
+{:ok, _job} = Bunqueue.Queue.add(queue, "welcome", %{to: "hello@example.com"})
+
+worker =
+  Bunqueue.Worker.new(
+    "emails",
+    fn job ->
+      IO.puts("Processing: #{job.data["to"]}")
+      {:ok, %{sent: true}}
+    end,
+    connection: connection
+  )
+
+Bunqueue.Worker.run(worker)
+```
+
+```bash
+mix deps.get && mix run jobs.exs
+```
+
+                </TabItem>
+              </Tabs>
+            </div>
+          </li>
+
+          <li class="home-step">
+            <div class="home-step-head">
+              <span class="home-step-number" aria-hidden="true">3</span>
+              <h3>See it work</h3>
+              <p>The worker picks up the job your app just added. Both use the same queue name and TCP address.</p>
+            </div>
+            <div class="home-step-body">
+              <div class="home-output">
+                <span class="home-output-label">Worker output</span>
+                <p class="home-output-line"><span class="home-output-dot" aria-hidden="true"></span><code>{'Processing: hello@example.com'}</code></p>
+              </div>
+              <aside class="home-callout">
+                <strong>Connecting to another machine?</strong>
+                <p>Use your server's hostname in both clients. Port <code>6789</code> is for TCP clients; <code>6790</code> is for HTTP. Follow the <a href="/guide/server/">deployment guide</a> for network binding, TLS and authentication.</p>
+              </aside>
+            </div>
+          </li>
+        </ol>
       </TabItem>
 
       <TabItem label="Embedded in Bun">
-        <div class="home-setup-grid">
-          <div class="home-server-step">
-            <h3>Run everything in your Bun process</h3>
-            <p>Use embedded mode when your app and worker run together on Bun. The queue engine lives inside your application.</p>
+        <ol class="home-steps" role="list">
+          <li class="home-step">
+            <div class="home-step-head">
+              <span class="home-step-number" aria-hidden="true">1</span>
+              <h3>Install bunqueue</h3>
+              <p>Use embedded mode when your app and worker run together on Bun. The queue engine lives inside your application.</p>
+              <dl class="home-connection">
+                <div><dt>Runtime</dt><dd>Bun</dd></div>
+                <div><dt>Separate server</dt><dd>Not needed</dd></div>
+                <div><dt>Connection address</dt><dd>Not needed</dd></div>
+              </dl>
+            </div>
+            <div class="home-step-body">
 
 ```bash
 bun add bunqueue
 ```
 
-            <dl class="home-connection">
-              <div><dt>Runtime</dt><dd>Bun</dd></div>
-              <div><dt>Separate server</dt><dd>Not needed</dd></div>
-              <div><dt>Connection address</dt><dd>Not needed</dd></div>
-            </dl>
-            <p class="home-note">Set <code>embedded: true</code> on both the queue and worker. The example keeps jobs in memory; configure <a href="/guide/databases/">SQLite persistence</a> to recover work after a restart.</p>
-          </div>
-          <div class="home-client-step">
-            <h3>Add a job and process it</h3>
+            </div>
+          </li>
+
+          <li class="home-step">
+            <div class="home-step-head">
+              <span class="home-step-number" aria-hidden="true">2</span>
+              <h3>Add a job and process it</h3>
+              <p>Set <code>embedded: true</code> on both the queue and the worker, then run the file.</p>
+              <a class="home-text-link" href="/guide/quickstart/">Read the full quickstart</a>
+            </div>
+            <div class="home-step-body">
 
 ```typescript title="jobs.ts"
 import { Queue, Worker } from 'bunqueue/client';
@@ -226,9 +433,23 @@ await queue.add('welcome', { to: 'hello@example.com' });
 bun jobs.ts
 ```
 
-            <a class="home-text-link" href="/guide/quickstart/">Read the full quickstart</a>
-          </div>
-        </div>
+            </div>
+          </li>
+
+          <li class="home-step">
+            <div class="home-step-head">
+              <span class="home-step-number" aria-hidden="true">3</span>
+              <h3>See it work</h3>
+              <p>The example keeps jobs in memory. Configure <a href="/guide/databases/">SQLite persistence</a> to recover work after a restart.</p>
+            </div>
+            <div class="home-step-body">
+              <div class="home-output">
+                <span class="home-output-label">Output</span>
+                <p class="home-output-line"><span class="home-output-dot" aria-hidden="true"></span><code>{'Processing: hello@example.com'}</code></p>
+              </div>
+            </div>
+          </li>
+        </ol>
       </TabItem>
     </Tabs>
 

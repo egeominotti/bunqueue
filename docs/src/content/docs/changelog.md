@@ -140,6 +140,25 @@ head:
 - **Python SDK: pytest 9.0.3** for the vulnerable tmpdir handling in earlier
   versions.
 
+### Documentation
+
+- **bunqueue Academy, the free video course, is on the site.** A new
+  [`/academy/`](/academy/) page lists every episode with a player, a summary
+  and the guide it follows, plus the episodes still in production; it is linked
+  from the header and the sidebar. The homepage presents the course directly
+  below the hero, with the 60-second overview, the released lessons and a "New"
+  announcement in the hero.
+- **Videos in the guides.** The introduction, quickstart, queue, worker, cron,
+  dead letter queue and flow guides open with their Academy episode, and the
+  dashboard guide and the homepage dashboard section show the dashboard's
+  full tour. Players load YouTube (privacy-enhanced domain) only when you press
+  play; until then the page serves a local thumbnail.
+- **Homepage quickstart redesigned.** "Your first job, end to end." is now a
+  segmented switch between the server and embedded paths, each in three
+  numbered steps (start the server, connect your app and worker, see it work)
+  with the expected output. Step 2 has a complete program for every official
+  SDK: Node.js, Bun, Deno, Python, PHP, Go, Rust and Elixir.
+
 ## [2.9.6] - 2026-10-01
 
 ### Behavior changes

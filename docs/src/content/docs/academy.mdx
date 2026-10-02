@@ -1,0 +1,33 @@
+---
+title: 'bunqueue Academy: Free Video Course'
+description: 'Free video course on bunqueue, the job queue for Bun: queues, workers, cron, the dead letter queue and flows, one episode per guide.'
+tableOfContents: false
+head:
+  - tag: meta
+    attrs:
+      property: og:image
+      content: https://bunqueue.dev/og/academy.png
+  - tag: meta
+    attrs:
+      name: keywords
+      content: bunqueue academy, bunqueue tutorial, bun job queue tutorial, background jobs video course, bullmq alternative tutorial, bun tutorial, job queue course
+---
+
+import { Aside, LinkButton } from '@astrojs/starlight/components';
+import AcademyCourse from '../../components/academy/AcademyCourse.astro';
+import { ACADEMY_CHANNEL_URL, ACADEMY_PLAYLIST_URL } from '../../data/academy';
+
+<div class="bq-wrap bq-hero">
+  <span class="bq-eyebrow">video course · free</span>
+  <h1 class="bq-hero-h1 bq-bench-h1">Learn bunqueue, <em>one episode at a time.</em></h1>
+  <p class="bq-hero-sub">bunqueue Academy is a free course on YouTube that takes you from your first queue to production. Start with the 60-second overview, then follow the episodes in order: each one walks through a guide in these docs, with the same code.</p>
+</div>
+
+<LinkButton href={ACADEMY_PLAYLIST_URL} icon="external">Watch the playlist on YouTube</LinkButton>
+<LinkButton href={ACADEMY_CHANNEL_URL} variant="secondary" icon="external">Subscribe to @bunqueue</LinkButton>
+
+<Aside type="note" title="How the course works">
+Every episode has chapters and English subtitles, and links back to the guide it follows. The narration uses a synthetic voice (Kokoro text-to-speech) and the music is original.
+</Aside>
+
+<AcademyCourse />

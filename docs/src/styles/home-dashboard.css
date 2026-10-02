@@ -66,20 +66,10 @@
   overflow-wrap: anywhere;
 }
 
-/* The screenshot is dark UI in both themes, so the frame stays neutral. */
+/* The tour video frames itself (VideoPlayer); the wrapper only lends it the section line. */
 .bq-home .home-dashboard-shot {
+  --bq-yt-line: var(--home-line);
   margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--home-line);
-  border-radius: 12px;
-  background: #0a0a0d;
-  box-shadow: 0 24px 60px -32px rgb(0 0 0 / 0.55);
-}
-
-.home-dashboard-shot img {
-  display: block;
-  width: 100%;
-  height: auto;
 }
 
 .home-dashboard-list {

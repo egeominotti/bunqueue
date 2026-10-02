@@ -9,12 +9,15 @@ head:
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
+import GuideEpisode from '@components/academy/GuideEpisode.astro';
 
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · introduction</span>
   <h1 class="bq-hero-h1 bq-bench-h1">A job queue for <em>your language.</em></h1>
   <p class="bq-hero-sub">bunqueue is a free, MIT-licensed job queue for Node.js, Deno, Python, PHP, Go, Rust, Elixir and Bun. The name comes from the core engine, which runs on Bun. Your application and workers use their own runtime through an official client.</p>
 </div>
+
+<GuideEpisode number={0} />
 
 A job queue lets your app hand off slow work (sending emails, processing images, calling APIs) to run in the background instead of blocking a request.
 

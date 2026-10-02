@@ -1,0 +1,27 @@
+---
+// The bunqueue Academy episode that follows a guide, shown under the guide hero. It
+// renders nothing until the episode has a videoId, so a guide can reference an episode
+// that is still in production and pick it up when the data file publishes it.
+import AcademyPlayer from './AcademyPlayer.astro';
+import { academyEpisodes, episodeLabel } from '../../data/academy';
+
+interface Props {
+  number: number;
+}
+
+const episode = academyEpisodes.find((candidate) => candidate.number === Astro.props.number);
+if (!episode) throw new Error(`Unknown bunqueue Academy episode ${Astro.props.number}`);
+---
+
+{
+  episode.videoId && (
+    <figure class="bq-video-figure not-content">
+      <AcademyPlayer episode={episode} eager />
+      <figcaption>
+        <span class="bq-video-tag">Video</span>
+        bunqueue Academy {episodeLabel(episode)}: {episode.title}, {episode.duration}.{' '}
+        <a href="/academy/">All episodes</a>
+      </figcaption>
+    </figure>
+  )
+}

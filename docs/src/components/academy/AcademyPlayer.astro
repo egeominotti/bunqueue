@@ -1,0 +1,23 @@
+---
+// A bunqueue Academy episode in the click-to-load player; the embed continues into the
+// course playlist when the episode ends.
+import VideoPlayer from '../VideoPlayer.astro';
+import { ACADEMY_PLAYLIST_ID, episodeLabel, episodeThumbnail, type AcademyEpisode } from '../../data/academy';
+
+interface Props {
+  episode: AcademyEpisode;
+  /** Load the thumbnail eagerly when the player is above the fold. */
+  eager?: boolean;
+}
+
+const { episode, eager = false } = Astro.props;
+---
+
+<VideoPlayer
+  videoId={episode.videoId ?? ''}
+  title={`bunqueue Academy ${episodeLabel(episode)}: ${episode.title}`}
+  thumbnail={episodeThumbnail(episode)}
+  duration={episode.duration ?? ''}
+  playlistId={ACADEMY_PLAYLIST_ID}
+  eager={eager}
+/>

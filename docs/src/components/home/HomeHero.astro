@@ -2,13 +2,17 @@
 import '@fontsource-variable/bricolage-grotesque/wdth.css';
 import '../../styles/home.css';
 import '../../styles/home-setup.css';
+import '../../styles/home-quickstart.css';
 import '../../styles/home-sections.css';
 import '../../styles/home-responsive.css';
 import HomeLedger from './HomeLedger.astro';
 ---
 
 <section class="home-hero bq-hero" aria-labelledby="home-title">
-  <a class="home-license" href="https://github.com/egeominotti/bunqueue/blob/main/LICENSE">Free and open source <span>MIT licensed</span></a>
+  <div class="home-hero-badges">
+    <a class="home-license" href="https://github.com/egeominotti/bunqueue/blob/main/LICENSE">Free and open source <span>MIT licensed</span></a>
+    <a class="home-announce" href="#academy"><span class="home-announce-tag">New</span> bunqueue Academy, the free video course</a>
+  </div>
   <h1 id="home-title"><span>Add a background job in one language.</span> <span>Process it in another.</span></h1>
   <div class="home-hero-row">
     <p class="home-hero-sub">bunqueue is a free, self-hosted job queue for Node.js, Deno, Python, PHP, Go, Rust, Elixir and Bun. Run the server yourself, or embed the queue in a Bun app.</p>

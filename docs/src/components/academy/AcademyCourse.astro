@@ -1,0 +1,96 @@
+---
+// Every bunqueue Academy episode for the /academy/ page: released episodes with a player,
+// a summary and the guide they follow, then the episodes still in production. It also
+// emits ItemList + VideoObject structured data for the released episodes.
+import '../../styles/academy.css';
+import AcademyPlayer from './AcademyPlayer.astro';
+import {
+  ACADEMY_PLAYLIST_URL,
+  ACADEMY_UPLOAD_DATE,
+  episodeAnchor,
+  episodeLabel,
+  episodeThumbnail,
+  episodeWatchUrl,
+  isoDuration,
+  releasedEpisodes,
+  upcomingEpisodes,
+} from '../../data/academy';
+
+const site = 'https://bunqueue.dev';
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'bunqueue Academy',
+  url: `${site}/academy/`,
+  itemListElement: releasedEpisodes.map((episode, index) => ({
+    '@type': 'ListItem',
+    position: index + 1,
+    item: {
+      '@type': 'VideoObject',
+      name: `bunqueue Academy ${episodeLabel(episode)}: ${episode.title}`,
+      description: episode.summary,
+      thumbnailUrl: `${site}${episodeThumbnail(episode)}`,
+      uploadDate: episode.uploadDate ?? ACADEMY_UPLOAD_DATE,
+      duration: isoDuration(episode.duration ?? '0:00'),
+      embedUrl: `https://www.youtube-nocookie.com/embed/${episode.videoId}`,
+      url: `${site}/academy/#${episodeAnchor(episode)}`,
+    },
+  })),
+};
+---
+
+<div class="bq-academy not-content">
+  <ol class="bq-academy-list" role="list">
+    {
+      releasedEpisodes.map((episode, index) => (
+        <li class="bq-academy-episode" id={episodeAnchor(episode)}>
+          <AcademyPlayer episode={episode} eager={index === 0} />
+          <div class="bq-academy-body">
+            <p class="bq-academy-eyebrow">
+              Episode {episodeLabel(episode)} <span>{episode.duration}</span>
+            </p>
+            <h2>{episode.title}</h2>
+            <p class="bq-academy-topic">{episode.topic}</p>
+            <p class="bq-academy-summary">{episode.summary}</p>
+            <p class="bq-academy-links">
+              <a href={episode.guide}>Read the guide</a>
+              <a href={episodeWatchUrl(episode)}>
+                Watch on YouTube <span aria-hidden="true">↗</span>
+              </a>
+            </p>
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+
+  {
+    upcomingEpisodes.length > 0 && (
+      <section class="bq-academy-upcoming" aria-labelledby="academy-upcoming-title">
+        <h2 id="academy-upcoming-title">Coming next</h2>
+        <p>
+          These episodes are in production. Subscribe to the{' '}
+          <a href={ACADEMY_PLAYLIST_URL}>
+            playlist <span aria-hidden="true">↗</span>
+          </a>{' '}
+          to see them when they are published; until then,
+          each guide covers the same ground.
+        </p>
+        <ol class="bq-academy-upcoming-list" role="list">
+          {upcomingEpisodes.map((episode) => (
+            <li id={episodeAnchor(episode)}>
+              <span class="bq-academy-upcoming-number">{episodeLabel(episode)}</span>
+              <span class="bq-academy-upcoming-copy">
+                <strong>{episode.title}</strong>
+                <span>{episode.summary}</span>
+              </span>
+              <a href={episode.guide}>Read the guide</a>
+            </li>
+          ))}
+        </ol>
+      </section>
+    )
+  }
+</div>
+
+<script type="application/ld+json" set:html={JSON.stringify(structuredData)} />

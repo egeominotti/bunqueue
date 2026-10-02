@@ -14,12 +14,18 @@ head:
 
 import { Aside } from '@astrojs/starlight/components';
 import DashboardArchitecture from '../../../components/DashboardArchitecture.astro';
+import VideoPlayer from '../../../components/VideoPlayer.astro';
 
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">operations · dashboard</span>
   <h1 class="bq-hero-h1 bq-bench-h1">Operate your queue, <em>not just watch it.</em></h1>
   <p class="bq-hero-sub">bunqueue dashboard is a free, MIT-licensed operator console for a bunqueue server. It covers live health, jobs, dead letters, cron, workers, workflows and the server process itself, and it disables any action the server cannot perform safely.</p>
 </div>
+
+<figure class="bq-video-figure not-content" id="tour">
+  <VideoPlayer videoId="1bQRFXGClcc" title="bunqueue dashboard: full tour" thumbnail="/dashboard/tour-thumbnail.jpg" duration="7:46" eager />
+  <figcaption><span class="bq-video-tag">Video</span> Full tour, 7:46: queues, jobs, flows, workflows and server control on a live server. <a href="https://www.youtube.com/watch?v=1bQRFXGClcc">Watch on YouTube <span aria-hidden="true">↗</span></a></figcaption>
+</figure>
 
 <figure class="bq-shot">
   <img src="/dashboard/overview.webp" width="1600" height="1196" loading="eager" decoding="async" alt="The bunqueue dashboard Overview page: a connected-server banner, counters for completed, failed, waiting and active jobs, a per-queue health grid and a live activity feed." />
