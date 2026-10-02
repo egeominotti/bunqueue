@@ -298,7 +298,7 @@ S3_BACKUP_PREFIX=production/
 ```yaml
 services:
   bunqueue:
-    image: egeominotti/bunqueue:2.9.6
+    image: egeominotti/bunqueue:2.9.7
     ports:
       - '6789:6789'
       - '6790:6790'

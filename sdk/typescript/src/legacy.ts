@@ -88,4 +88,4 @@ export type {
 export { Worker } from './worker.js';
 export type { AckBatchOptions, Processor, WorkerEventMap, WorkerOptions } from './worker-types.js';
 
-export const __version__ = '0.2.0';
+export const __version__ = '0.2.1';

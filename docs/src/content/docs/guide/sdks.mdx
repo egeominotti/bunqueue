@@ -48,6 +48,16 @@ negotiated via `Hello` with the `separate-job-name` capability), so a client
 written today keeps working across compatible server upgrades, and services in
 different languages interoperate on the same queues out of the box.
 
+:::caution[Minimum SDK versions]
+With a bunqueue server 2.8.57 or later, use at least TypeScript
+`bunqueue-client` 0.2.0, Python `bunqueue-client` 0.2.0, PHP `bunqueue/client`
+0.2.0, Go `sdk/go` v0.2.0 or Rust `bunqueue-client` 0.2.0. Earlier releases
+speak wire protocol v2: the server returns the job name outside `data`, so they
+report an empty `job.name` (name-based routing, such as Python Simple Mode,
+fails every job) and their flows are not atomic. The
+[2.9.7 changelog](/changelog/) lists what each release changes.
+:::
+
 ## Getting started
 
 ### 1. Run the server

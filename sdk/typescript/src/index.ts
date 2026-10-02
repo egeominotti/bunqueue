@@ -22,4 +22,4 @@ export type {
   TelemetryHandler,
 } from './observability.js';
 export { MAX_FRAME_SIZE, PROTOCOL_VERSION } from './frame.js';
-export const __version__ = '0.2.0';
+export const __version__ = '0.2.1';

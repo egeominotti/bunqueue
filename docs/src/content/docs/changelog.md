@@ -18,7 +18,27 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## Unreleased
+## [2.9.7] - 2026-10-02
+
+### SDK releases
+
+Every official SDK now has a release that speaks wire protocol v3, where job
+names travel outside `data`. The packages published on 2026-07-20 (Python
+0.1.5, PHP 0.1.1, Go v0.1.0, Rust 0.1.1) speak protocol v2: against a server
+2.8.57 or later they lose the job name (`job.name` is empty), which breaks
+name-based routing such as Python Simple Mode, and their flows are not atomic.
+Upgrade every client together:
+
+| SDK | Release | Notes |
+|---|---|---|
+| TypeScript `bunqueue-client` | 0.2.1 | Ships the engine fixes below for embedded mode; `BackoffOptions` accepts `maxDelay`. |
+| Python `bunqueue-client` | 0.2.0 | Includes the never-published 0.1.6. |
+| PHP `bunqueue/client` | 0.2.0 | Breaking: `Job::data()` returns `mixed`. |
+| Go `sdk/go` | v0.2.0 | Breaking: `Job.Data()` returns `any`. |
+| Rust `bunqueue-client` | 0.2.0 | Breaking: unsupported flow options are rejected. |
+
+Each SDK changelog lists the full set of changes. The Elixir SDK is not on Hex
+yet and is used from a checkout.
 
 ### Behavior changes
 
@@ -162,7 +182,7 @@ head:
   site that indexes job data (homepage, quickstart, SDK guide, examples, use
   cases, cron and flow guides) now does it through
   `any(job.Data()).(map[string]any)`, which builds against `sdk/go` v0.1.0
-  (`Data()` returns `map[string]any`) and the unreleased `Data() any`. The
+  (`Data()` returns `map[string]any`) and v0.2.0 (`Data()` returns `any`). The
   type assertions used to fail with "is not an interface" for anyone who
   installed the released module.
 - **README: bunqueue Academy.** A new section lists the released episodes with

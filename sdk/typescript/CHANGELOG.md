@@ -5,6 +5,21 @@ All notable changes to `bunqueue-client` (TypeScript SDK) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-10-02
+
+### Fixed
+
+- Ships the bunqueue 2.9.7 engine and client fixes this package compiles in
+  (they apply to embedded mode and to the canonical Queue/Worker classes):
+  periodic cleanup no longer drops active jobs that are still sending
+  heartbeats or renewing their lock; orphan recovery goes through the stall
+  path and releases the concurrency slot, group slot and unique key; recovery
+  sweeps act only on the current delivery; `backoff.maxDelay` is kept on job
+  creation and caps retry delays; `DelayedError` honors `backoff.maxDelay`,
+  and TCP workers keep the backoff configuration the server sends.
+- `BackoffOptions` accepts `maxDelay`, so `backoff: { type, delay, maxDelay }`
+  type-checks.
+
 ## [0.2.0] - 2026-10-01
 
 ### BREAKING CHANGES

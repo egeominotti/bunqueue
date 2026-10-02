@@ -174,8 +174,8 @@ ephemeral default. The SDK programs target the released SDK packages
 (constructor options, job data access, blocking `run`), except Elixir, which
 uses a path dependency on a bunqueue checkout until its Hex release. Every Go
 example on the site that indexes job data does it through
-`any(job.Data()).(map[string]any)`, which compiles against both the released
-`Data() map[string]any` and the unreleased `Data() any`; examples that pass
+`any(job.Data()).(map[string]any)`, which compiles against both `sdk/go`
+v0.1.0 (`Data() map[string]any`) and v0.2.0 (`Data() any`); examples that pass
 `job.Data()` along whole compile against both as is. Recheck the programs when
 an SDK release changes its public API. `test/docs-homepage-snippets.test.ts`
 compiles both TypeScript quickstarts, so the page must keep exactly two

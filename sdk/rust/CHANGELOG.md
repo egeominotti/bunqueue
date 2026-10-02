@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-10-02
+
+Breaking: flow options the broker cannot honor are rejected. Requires a bunqueue
+server 2.8.57 or later (wire protocol v3).
+
 - Negotiate wire protocol v3 and advertise the `separate-job-name`
   capability in `Hello`.
 - Send ordinary job names through top-level `name`, preserve every user `Value`

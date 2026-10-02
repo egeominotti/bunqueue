@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-02
+
+Breaking: `Job::data()` now returns `mixed` (it was `array`) and invalid options
+are rejected. Requires a bunqueue server 2.8.57 or later (wire protocol v3).
+
 ### Changed
 
 - Treat successful `ACK`/`FAIL` responses with `applied: false` as an

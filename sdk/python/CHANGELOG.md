@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-02
+
+The first release after 0.1.5. It also ships every change listed under 0.1.6,
+which was prepared but never published to PyPI. 0.2.0 speaks wire protocol v3
+(job names travel outside `data`) and rejects flow options it used to ignore,
+so upgrade together with a bunqueue server 2.8.57 or later.
+
 ### Security
 
 - Raise the `test` extra from pytest 8.4.2 to 9.0.3, which fixes
@@ -46,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Forward `duration_ms` from `set_global_rate_limit(max_jobs, duration_ms)` as
   the broker's `duration` field instead of silently using one second.
 
-## [0.1.6] - 2026-07-30
+## [0.1.6] - unpublished (shipped in 0.2.0)
 
 ### Added
 

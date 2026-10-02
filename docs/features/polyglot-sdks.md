@@ -24,6 +24,21 @@ bundlers accept it), and self-contained declarations that need only the
 consumer's `@types/node`. See [Canonical client parity](client-runtime-parity.md)
 for the portable transport, embedded loader, and declaration gates.
 
+### Release state
+
+Protocol v3 (`separate-job-name`) clients were released with server 2.9.7 on
+2026-10-02: TypeScript 0.2.1 (npm, `sdk-release.yml`), PHP 0.2.0 (Packagist reads
+the `egeominotti/bunqueue-php` mirror) and Go `sdk/go/v0.2.0` (a git tag; the Go
+proxy serves it). Python 0.2.0 and Rust 0.2.0 are versioned and built in the
+same release and are published by hand to PyPI and crates.io by the maintainer,
+who holds those credentials. The previous registry releases (Python 0.1.5, PHP
+0.1.1, Go v0.1.0, Rust 0.1.1, 2026-07-20) speak protocol v2 and lose the job
+name against servers 2.8.57 and later; the SDK guide states the minimum
+versions. The Elixir SDK is not on Hex. Only the TypeScript SDK has an automated
+publication workflow (`sdk-release.yml`); the other registries are published by
+hand, so a source change is not live until its registry release, and the
+sandbox SDK gate tests source, not the published packages.
+
 ## Core feature parity audit
 
 The source-level audit on **2026-08-01** compared the public Bun client with
