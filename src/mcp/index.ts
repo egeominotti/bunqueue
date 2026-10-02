@@ -39,6 +39,20 @@
  *   }
  * }
  * ```
+ *
+ * Two transports, independent of the connection mode:
+ * - stdio (default): one client over stdin/stdout, as in the examples above
+ * - http (opt-in): MCP Streamable HTTP for several concurrent clients, one
+ *   session each, sharing a single backend
+ *
+ * @example Streamable HTTP transport (binds 127.0.0.1:6791, path /mcp):
+ * ```sh
+ * BUNQUEUE_MCP_TRANSPORT=http BUNQUEUE_MCP_HTTP_TOKEN=secret bunx --package=bunqueue bunqueue-mcp
+ * # stderr: bunqueue MCP server started (mode: embedded, transport: http,
+ * #         url: http://127.0.0.1:6791/mcp, version: X)
+ * ```
+ * Clients send `Authorization: Bearer secret`. A non-loopback
+ * BUNQUEUE_MCP_HTTP_HOST requires BUNQUEUE_MCP_HTTP_TOKEN.
  */
 
 // The MCP server implementation lives in ./server.ts and is loaded LAZILY via

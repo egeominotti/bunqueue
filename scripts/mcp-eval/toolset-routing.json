@@ -1,0 +1,518 @@
+[
+ {
+  "split": "dev",
+  "q": "enqueue a welcome email job for user 42",
+  "expect": [
+   "add_job"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "submit 500 thumbnail jobs at once",
+  "expect": [
+   "add_jobs_bulk"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "show me everything about job 1873",
+  "expect": [
+   "get_job"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "is job 991 finished or still running?",
+  "expect": [
+   "get_job_state",
+   "get_job"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "what did job 77 return?",
+  "expect": [
+   "get_job_result"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "abort the scheduled export before it starts",
+  "expect": [
+   "cancel_job",
+   "discard_job"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "run the delayed invoice job right now instead of waiting",
+  "expect": [
+   "promote_job"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "report 60 percent done on the video encode job",
+  "expect": [
+   "update_progress"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "collect the outputs of all sub-tasks of the parent report job",
+  "expect": [
+   "get_children_values"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "find the job I created with id order-5521",
+  "expect": [
+   "get_job_by_custom_id"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "block until job 300 completes, at most 10 seconds",
+  "expect": [
+   "wait_for_job"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "fix the email address inside the payload of job 12",
+  "expect": [
+   "update_job_data"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "make job 55 jump ahead of the others",
+  "expect": [
+   "change_job_priority",
+   "promote_job"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "postpone job 8 by one hour",
+  "expect": [
+   "move_to_delayed",
+   "change_delay"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "permanently throw away job 4410",
+  "expect": [
+   "discard_job"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "how far along is the import job 19?",
+  "expect": [
+   "get_progress",
+   "get_job"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "reschedule a delayed job to fire in 5 minutes instead of 1 hour",
+  "expect": [
+   "change_delay",
+   "move_to_delayed"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "take the next job from the emails queue so I can process it myself",
+  "expect": [
+   "pull_job"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "grab 20 jobs from the resize queue in one go",
+  "expect": [
+   "pull_job_batch"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "mark job 31 as done with result ok",
+  "expect": [
+   "ack_job"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "complete jobs 5, 6 and 7 together",
+  "expect": [
+   "ack_job_batch"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "the job crashed with timeout, record the failure",
+  "expect": [
+   "fail_job"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "my handler is still working on job 9, keep it from being considered stalled",
+  "expect": [
+   "job_heartbeat",
+   "extend_lock"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "keep alive ten active jobs I'm processing",
+  "expect": [
+   "job_heartbeat_batch"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "I need more time on job 14 before another worker takes it",
+  "expect": [
+   "extend_lock",
+   "job_heartbeat"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "which queues exist?",
+  "expect": [
+   "list_queues"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "how many jobs are in the payments queue in total",
+  "expect": [
+   "count_jobs",
+   "get_job_counts"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "list the failed jobs in the webhooks queue, page 2",
+  "expect": [
+   "get_jobs"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "breakdown of waiting, active and completed jobs for emails",
+  "expect": [
+   "get_job_counts",
+   "get_queue_stats"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "stop processing the billing queue during maintenance",
+  "expect": [
+   "pause_queue"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "maintenance is over, let billing jobs run again",
+  "expect": [
+   "resume_queue"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "delete every pending job in the newsletter queue but let running ones finish",
+  "expect": [
+   "drain_queue"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "completely wipe the test queue, all states",
+  "expect": [
+   "obliterate_queue"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "remove completed jobs older than 7 days",
+  "expect": [
+   "clean_queue"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "is the reports queue currently halted?",
+  "expect": [
+   "is_paused"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "how many high priority versus low priority jobs are waiting",
+  "expect": [
+   "get_counts_per_priority"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "show the jobs that ran out of retries in orders",
+  "expect": [
+   "get_dlq"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "the bug is fixed, re-run the permanently failed payments",
+  "expect": [
+   "retry_dlq"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "empty the dead letter queue for emails",
+  "expect": [
+   "purge_dlq"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "reprocess the jobs that already succeeded yesterday",
+  "expect": [
+   "retry_completed"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "schedule a sales report every Monday at 9 in Rome time",
+  "expect": [
+   "add_cron"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "what recurring tasks are configured and when do they run next",
+  "expect": [
+   "list_crons"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "show the configuration of the nightly-backup schedule",
+  "expect": [
+   "get_cron"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "stop the hourly cleanup schedule for good",
+  "expect": [
+   "delete_cron"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "throttle the sms queue to 10 jobs per second",
+  "expect": [
+   "set_rate_limit"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "remove the throughput cap on sms",
+  "expect": [
+   "clear_rate_limit"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "never run more than 3 video encodes at the same time",
+  "expect": [
+   "set_concurrency"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "lift the parallelism limit on encodes",
+  "expect": [
+   "clear_concurrency"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "call my endpoint https://example.com/hook whenever a job fails",
+  "expect": [
+   "add_webhook"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "unsubscribe webhook wh_12",
+  "expect": [
+   "remove_webhook"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "temporarily mute the slack notification webhook",
+  "expect": [
+   "set_webhook_enabled"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "which consumers are connected and what are they processing",
+  "expect": [
+   "list_workers"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "overall health: throughput, memory and uptime of the server",
+  "expect": [
+   "get_stats"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "latency and throughput for each queue",
+  "expect": [
+   "get_per_queue_stats"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "show the log lines written by job 88",
+  "expect": [
+   "get_job_logs"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "append 'downloaded 3 files' to the log of job 88",
+  "expect": [
+   "add_job_log"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "is the disk full or is persistence failing?",
+  "expect": [
+   "get_storage_status"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "export metrics for Grafana scraping",
+  "expect": [
+   "get_prometheus_metrics"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "free up memory used by internal caches",
+  "expect": [
+   "compact_memory"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "build a pipeline where all chapter renders must finish before the book is assembled",
+  "expect": [
+   "add_flow",
+   "add_flow_bulk_then"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "run download, then transcode, then upload, one after another",
+  "expect": [
+   "add_flow_chain"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "fan out 50 resize jobs and run a zip job when all are done",
+  "expect": [
+   "add_flow_bulk_then"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "show the dependency tree under parent job 600",
+  "expect": [
+   "get_flow"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "process every job in the notify queue by POSTing it to my API",
+  "expect": [
+   "register_handler"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "stop the HTTP auto-processor on notify",
+  "expect": [
+   "unregister_handler"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "metti in pausa la coda delle email",
+  "expect": [
+   "pause_queue"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "riprova i job finiti nella dead letter queue di ordini",
+  "expect": [
+   "retry_dlq"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "programma un job ogni giorno alle 3 di notte",
+  "expect": [
+   "add_cron"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "quanti job sono in attesa nella coda pagamenti",
+  "expect": [
+   "get_job_counts",
+   "count_jobs"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "limita la coda sms a 5 job al secondo",
+  "expect": [
+   "set_rate_limit"
+  ]
+ },
+ {
+  "split": "dev",
+  "q": "cancella definitivamente tutto dalla coda di test",
+  "expect": [
+   "obliterate_queue"
+  ]
+ },
+ {
+  "split": "test",
+  "q": "mostrami i log del job 88",
+  "expect": [
+   "get_job_logs"
+  ]
+ }
+]

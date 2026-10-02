@@ -1,7 +1,7 @@
 ---
 /**
  * Animated MCP architecture diagram.
- * Shows: AI Agent ─(stdio)─> MCP Server ─> Embedded memory/SQLite | TCP Client ─> Remote Server
+ * Shows: AI Agent ─(stdio or Streamable HTTP)─> MCP Server ─> Embedded memory/SQLite | TCP Client ─> Remote Server
  */
 ---
 
@@ -28,7 +28,7 @@
   <div class="ma-vconn">
     <div class="ma-vline"></div>
     <div class="ma-vdot ma-vdot-down"></div>
-    <span class="ma-conn-label">stdio (JSON-RPC)</span>
+    <span class="ma-conn-label">stdio or HTTP (JSON-RPC)</span>
   </div>
 
   <!-- Row 2: MCP Server -->
@@ -43,7 +43,7 @@
       </div>
       <div class="ma-text">
         <span class="ma-label">bunqueue MCP Server</span>
-        <span class="ma-sub">73 tools · 3 prompts · 5 resources</span>
+        <span class="ma-sub">75 tools · 3 prompts · 5 resources</span>
       </div>
     </div>
     <div class="ma-server-modes">

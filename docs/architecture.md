@@ -215,7 +215,23 @@ be claimed.
   projection ([`src/shared/storageHealth.ts`](../src/shared/storageHealth.ts)).
 - **`cli/`** — `bunqueue` executable: server boot detection + thin TCP client that
   maps verbs to protocol commands.
-- **`mcp/`** — `bunqueue-mcp` binary exposing the queue to AI agents over MCP/stdio.
+- **`mcp/`** — `bunqueue-mcp` binary exposing the queue to AI agents over MCP:
+  stdio by default, or the opt-in Streamable HTTP transport with one `McpServer`
+  per session. `server.ts` owns startup and shutdown and `serverFactory.ts` builds
+  one fully registered server; `transportConfig.ts`, `httpSecurity.ts`,
+  `httpSessions.ts` and `httpTransport.ts` own the HTTP transport (validation,
+  bearer auth, Host/Origin checks, session registry, `Bun.serve` router).
+  `toolSetup.ts`, `toolPolicy.ts`, `toolsets.ts`, `confirmGuard.ts`,
+  `confirmImpact.ts` and `decisionModel.ts` own the opt-in agent features
+  (toolsets, confirmation, SystemOne decision model). `tools/` registers the 75
+  tools plus 3 opt-in workflow tools, with shared zod schemas in `schemas.ts`
+  and `cronOptions.ts`. `backend/embedded/` and `backend/tcp/` implement the
+  `McpBackend` contract from `types/` (`adapter.ts`, `jobOptions.ts`,
+  `inspection.ts`); both share `backend/jobOptions.ts`, `jobOptionsView.ts`,
+  `dlqView.ts`, `dlqFilter.ts`, `limitsView.ts` and `serializers.ts`, and the TCP
+  side checks every reply in `tcp/wire.ts`. `workflow/` reads a workflow
+  Engine's SQLite store and records signals through its `SignalCoordinator`;
+  `httpHandler.ts` runs HTTP-handler workers embedded or against the TCP broker.
 
 ### Structural boundaries
 
@@ -251,7 +267,7 @@ wrappers select the transport, preventing the two implementations from drifting.
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                  CLIENTS                                        │
 │  Queue.add()/addBulk()  FlowProducer  Workflow Engine   Worker.process()        │
-│  CLI verbs              MCP tools (bunqueue-mcp)                                 │
+│  CLI verbs              MCP tools (bunqueue-mcp: stdio | Streamable HTTP)        │
 │        │                                                       ▲                 │
 │        ▼  embedded? in-process call ─────────────────────────│                 │
 │   ┌─────────┐                                            ┌─────────┐             │
@@ -504,6 +520,30 @@ observability remains isolated from durable scheduling state.
    `delayed`); otherwise it moves to the shard's **DLQ** with a `FailureReason`.
 5. State + DLQ row are persisted; `job:failed` (and `job:dead` on exhaustion) is
    emitted. Parent-on-child-failure flow semantics may propagate the failure.
+
+**MCP tool call** (`bunqueue-mcp`)
+
+1. The request arrives over stdio (one `McpServer`) or Streamable HTTP
+   (`Bun.serve`: Host/Origin 403 → path 404 → bearer 401 → method 405, then the
+   session's own `McpServer` and SDK transport; an `initialize` POST opens a
+   session up to the cap). Every session shares one backend and one
+   `HttpHandlerRegistry`.
+2. The SDK validates the arguments against the tool's zod schema, whose bounds
+   mirror the broker's job-option validation, so both backends reject the same
+   input. Under the opt-in features a disabled tool is rejected, and a guarded
+   tool passes the confirmation gate (client elicitation, or a `confirm` target
+   plus an optional decision-model check) first.
+3. `withErrorHandler` runs the tool and records an `McpOperation`; the tool calls
+   one `McpBackend` method. Embedded calls the shared `QueueManager`; TCP sends
+   one command over a `TcpConnectionPool` with a 45 s command timeout and turns
+   `ok: false` into a thrown broker error, a `false` result or a `null` lookup.
+   Flow tools use a `FlowProducer` (`PUSHF` over TCP).
+4. Workflow tools (opt-in) open the Engine's SQLite file per call; a signal is
+   recorded through `SignalCoordinator.record` and, when it claims the resume,
+   one `wf:step` job is enqueued on the Engine's step queue for the
+   application's Engine to run.
+
+See [Native MCP Server](./features/mcp-server.md).
 
 See [Job Lifecycle](./features/job-lifecycle.md) for the full state machine.
 
@@ -877,9 +917,9 @@ lines:
   `compensationSupport.ts`, `compensationClaim.ts`, `unwindPlan.ts` and
   `rollbackControl.ts` own unwind policy, process-local claim handoff and
   operator recovery.
-- `store.ts`, `storeListing.ts`, `storeSignals.ts`,
+- `store.ts`, `storeListing.ts`, `storeSignals.ts`, `storeWaitExpiry.ts`,
   `storeExecutionCodec.ts` and `storeMaintenance.ts` own SQLite state,
-  deterministic listing, signal transactions and retention.
+  deterministic listing, signal and gate-expiry transactions and retention.
 - `stepTypes.ts`, `executionTypes.ts` and `eventTypes.ts` form the public type
   model behind the stable `types.ts` barrel.
 
@@ -1123,7 +1163,7 @@ against on-disk SQLite) and asserts hard invariants — not just "it ran".
 
 ### Interfaces & configuration
 
-- [Native MCP Server](./features/mcp-server.md) — Exposes bunqueue to AI agents over MCP/stdio via the bunqueue-mcp binary, registering 73 tools, 5 resources, and 3 prompts backed by either an embedded QueueManager or a remote TCP server.
+- [Native MCP Server](./features/mcp-server.md) — Exposes bunqueue to AI agents via the bunqueue-mcp binary over MCP stdio (default) or the opt-in Streamable HTTP transport (bearer auth, Host/Origin checks, one server per session), registering 75 tools, 5 resources, and 3 prompts backed by either an embedded QueueManager or a remote TCP server; opt-in toolset disclosure, confirmation of guarded calls, SystemOne decision models (Jev, Clef, Clef-flash, Kev 9B, Laya, DiffusionGemma Jev) and 3 workflow-engine tools (list/inspect executions, deliver signals).
 - [CLI](./features/cli.md) — The bunqueue executable: boots the server or acts as a thin one-shot TCP client that maps CLI verbs to msgpack protocol commands and renders responses.
 - [Configuration & Entrypoint](./features/configuration.md) — Config layer and process entrypoint: resolves config-file/env/default precedence into typed config, dispatches the bunqueue executable, and provides the Logger, VERSION, and Bun-only runtime guards.
 

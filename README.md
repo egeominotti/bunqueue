@@ -237,7 +237,7 @@ Framework Integrations.
   `QueueEvents`, `FlowProducer`, plus `QueuePro`/`WorkerPro` aliases, fair job
   groups, native processor batches, cooperative cancellation, and Observable
   results; [migrating takes minutes](https://bunqueue.dev/guide/migration/)
-- **MCP server included** — 73 tools; AI agents get full queue control out of the box
+- **MCP server included** — 75 tools; AI agents get full queue control out of the box
 - **Everything server-side** — retries with backoff, priorities, cron, rate limits, dead letter queue
 - **Measured, operation-specific performance** — 729K jobs/sec internal
   in-memory batch push, 186K jobs/sec public on-disk Embedded `addBulk`, and
@@ -537,10 +537,11 @@ step timeouts, typed events, SQLite-persisted execution state.
 
 ## Built for AI Agents (MCP Server)
 
-bunqueue ships a native MCP server: 73 tools, 5 resources, 3 prompts. Agents
+bunqueue ships a native MCP server: 75 tools, 5 resources, 3 prompts. Agents
 schedule cron jobs, push and process jobs, retry failures, set rate limits,
 and read stats — no glue code. HTTP handlers let an agent register a URL and
-have an embedded worker call it for every job.
+have a worker call it for every job. Run it over stdio or Streamable HTTP, and
+opt in to toolsets, confirmation of destructive calls and workflow approvals.
 
 ```bash
 bun add bunqueue @modelcontextprotocol/sdk   # the MCP SDK is an optional peer

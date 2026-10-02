@@ -1,7 +1,7 @@
 ---
 /**
  * Animated AI Agent workflow diagram.
- * Shows: AI Agent -> MCP Server (73 tools) -> bunqueue Engine -> Workers / HTTP Handlers
+ * Shows: AI Agent -> MCP Server (75 tools) -> bunqueue Engine -> Workers / HTTP Handlers
  * Floating speech bubble quotes fade in/out. Animated dots on all connectors.
  */
 ---
@@ -39,7 +39,7 @@
     </div>
 
     <!-- Node 2: MCP Server -->
-    <div class="aw-node aw-n2 aw-hero" data-tip="The bundled MCP server translates agent calls into queue operations: 73 tools covering jobs, cron, DLQ, rate limits and monitoring.">
+    <div class="aw-node aw-n2 aw-hero" data-tip="The bundled MCP server translates agent calls into queue operations: 75 tools covering jobs, cron, DLQ, rate limits and monitoring.">
       <div class="aw-glow"></div>
       <div class="aw-icon aw-icon-pink">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -49,7 +49,7 @@
         </svg>
       </div>
       <span class="aw-label">MCP Server</span>
-      <span class="aw-sublabel">73 tools</span>
+      <span class="aw-sublabel">75 tools</span>
     </div>
 
     <!-- Connector 2 -->
@@ -107,13 +107,13 @@
       <div><span class="aw-mlabel">AI Agent</span><span class="aw-msub">Claude, Cursor, Windsurf</span></div>
     </div>
     <div class="aw-mvconn"><div class="aw-mvline"></div><div class="aw-mvdot aw-mvd1"></div></div>
-    <div class="aw-mrow aw-mhero" data-tip="The bundled MCP server translates agent calls into queue operations: 73 tools.">
+    <div class="aw-mrow aw-mhero" data-tip="The bundled MCP server translates agent calls into queue operations: 75 tools.">
       <div class="aw-micon aw-micon-pink">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
       </div>
-      <div><span class="aw-mlabel">MCP Server</span><span class="aw-msub">73 tools</span></div>
+      <div><span class="aw-mlabel">MCP Server</span><span class="aw-msub">75 tools</span></div>
     </div>
     <div class="aw-mvconn"><div class="aw-mvline"></div><div class="aw-mvdot aw-mvd2"></div></div>
     <div class="aw-mrow" data-tip="The queue engine uses memory or configured SQLite locally, and PostgreSQL for a broker fleet.">

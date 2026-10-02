@@ -2,25 +2,42 @@ import type { JobNode } from '../../client/flowTypes';
 import type { CronJob } from '../../domain/types/cron';
 import type { Job } from '../../domain/types/job';
 import type { FlowNodeResult, SerializedCron, SerializedJob } from '../types/adapter';
+import { serializeJobOptions } from './jobOptionsView';
 
-export function serializeMcpJob(job: Job): SerializedJob {
+/** Serialize a job for MCP output; `state` is included when the caller resolved it. */
+export function serializeMcpJob(job: Job, state?: string): SerializedJob {
   return {
     id: String(job.id),
     name: job.name,
     queue: job.queue,
     data: job.data,
     priority: job.priority,
+    ...(state === undefined ? {} : { state }),
     progress: job.progress,
     attempts: job.attempts,
     maxAttempts: job.maxAttempts,
     createdAt: new Date(job.createdAt).toISOString(),
     startedAt: job.startedAt ? new Date(job.startedAt).toISOString() : undefined,
+    ...serializeJobOptions(job),
   };
 }
 
-export function serializeMcpCron(
-  cron: Pick<CronJob, 'name' | 'queue' | 'schedule' | 'repeatEvery' | 'nextRun' | 'executions'>
-): SerializedCron {
+/** The cron fields both backends report (the TCP broker's cron reply carries exactly these). */
+export type McpCronFields = Pick<
+  CronJob,
+  | 'name'
+  | 'queue'
+  | 'schedule'
+  | 'repeatEvery'
+  | 'nextRun'
+  | 'executions'
+  | 'jobName'
+  | 'priority'
+  | 'timezone'
+  | 'maxLimit'
+>;
+
+export function serializeMcpCron(cron: McpCronFields): SerializedCron {
   return {
     name: cron.name,
     queue: cron.queue,
@@ -28,6 +45,10 @@ export function serializeMcpCron(
     repeatEvery: cron.repeatEvery ?? undefined,
     nextRun: cron.nextRun ? new Date(cron.nextRun).toISOString() : null,
     executions: cron.executions,
+    jobName: cron.jobName,
+    priority: cron.priority,
+    timezone: cron.timezone ?? null,
+    maxLimit: cron.maxLimit ?? null,
   };
 }
 

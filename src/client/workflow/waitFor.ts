@@ -135,39 +135,8 @@ export async function runWaitFor(
     if (!existing) exec.steps[waitKey] = { status: 'running', startedAt: waitingSince };
 
     if (clock().now() - waitingSince >= node.timeout) {
-      // Re-read before failing: a signal delivered while this node was executing is
-      // not in our snapshot, and expiring an already-approved run would compensate
-      // (refund, release stock) work the approver just authorised.
-      const fresh = deps.store.get(exec.id);
-      if (fresh && hasSignal(fresh.signals, node.event)) {
-        deps.assertActive();
-        exec.signals = fresh.signals;
-        await deps.advance(exec, idx + 1, wf);
-        return;
-      }
-      deps.assertActive();
-      deps.emitter?.emitSignal('signal:timeout', exec.id, exec.workflowName, node.event);
-      deps.assertActive();
-      const timeoutReason = `Signal "${node.event}" timed out after ${node.timeout}ms`;
-      exec.steps[waitKey] = {
-        status: 'failed',
-        startedAt: waitingSince,
-        completedAt: clock().now(),
-        error: timeoutReason,
-      };
-      exec.state = 'failed';
-      exec.failureReason = timeoutReason;
-      // Persist failure before starting rollback. The lifecycle guard leaves the
-      // durable row waiting if force-close won, so replacement recovery re-evaluates
-      // the same elapsed deadline without starting an old executor's compensation.
-      deps.updateFn(exec);
-      // Compensate here, then signal completion via the WaitForSignalError sentinel
-      // so processStep short-circuits (return null) instead of re-running
-      // compensation through its generic catch path.
-      await deps.compensate(exec, wf);
-      deps.assertActive();
-      deps.emitter?.emitWorkflow('workflow:failed', exec.id, exec.workflowName, 'failed');
-      throw new WaitForSignalError(node.event);
+      await expireGate(deps, exec, wf, { node, idx, waitingSince });
+      return;
     }
     deps.updateFn(exec);
     remaining = node.timeout - (clock().now() - waitingSince);
@@ -197,5 +166,92 @@ export async function runWaitFor(
   }
   deps.assertActive();
   deps.emitter?.emitWorkflow('workflow:waiting', exec.id, exec.workflowName, 'waiting');
+  throw new WaitForSignalError(node.event);
+}
+
+/** The gate whose wait budget is spent. */
+interface ExpiredGate {
+  node: Extract<WorkflowNode, { type: 'waitFor' }>;
+  idx: number;
+  waitingSince: number;
+}
+
+/**
+ * Fail a gate whose budget is spent, unless its signal won the race.
+ *
+ * The signal check and the failing write are ONE claim (`expireWait`, see
+ * storeWaitExpiry.ts), not a re-read followed by a write. The signaller may be another
+ * connection that records the signal while this node runs; between a separate re-read
+ * and the write it was accepted with `resumed: true` and its resume job published, and
+ * then this run was failed and compensated anyway
+ * (test/repro-workflow-signal-timeout-race.test.ts). Each outcome of the claim:
+ *
+ * - `expired`: the row is durably `failed`, so any later signal is rejected as
+ *   "cannot receive the signal". Only now is the timeout a fact, so only now is
+ *   `signal:timeout` emitted; emitting it first told listeners about a timeout the
+ *   signal could still win, and a listener that signalled from inside the event was
+ *   told the run resumed.
+ * - `signalled`: nothing was written. Advance, exactly like a signal found on entry.
+ *   If the signaller claimed the resume it also published a job for this node; that
+ *   duplicate is dropped by admission (admission.ts), because this job holds the
+ *   in-flight claim for the node until `advance` has already moved the cursor, after
+ *   which the duplicate is `stale-cursor`. Standing down instead would be unsafe: a
+ *   duplicate that arrives while the claim is held is discarded, and the run would
+ *   then be advanced by nobody. When the signal was recorded on a `running` row
+ *   (nobody claimed a resume), this advance is the only one there is. The in-flight
+ *   claim is process-local, as it is for every duplicate node job (executor.ts).
+ * - `moved`: another driver already advanced or finished this run. Neither fail nor
+ *   advance it, the same stand-down as a lost park claim below.
+ */
+async function expireGate(
+  deps: WaitForDeps,
+  exec: Execution,
+  wf: Workflow,
+  gate: ExpiredGate
+): Promise<void> {
+  const { node, idx, waitingSince } = gate;
+  const timeoutReason = `Signal "${node.event}" timed out after ${node.timeout}ms`;
+  // Applied to a copy: on `signalled` the caller advances from `exec`, and a failure
+  // left in it would be persisted by the very write that moves the cursor on.
+  const failed: Execution = {
+    ...exec,
+    state: 'failed',
+    failureReason: timeoutReason,
+    steps: {
+      ...exec.steps,
+      [`__waitFor:${node.event}`]: {
+        status: 'failed',
+        startedAt: waitingSince,
+        completedAt: clock().now(),
+        error: timeoutReason,
+      },
+    },
+  };
+  // Persist failure before starting rollback. If force-close won, the fence throws
+  // here, the durable row stays live, and replacement recovery re-evaluates the same
+  // elapsed deadline through this same claim without the old executor compensating.
+  deps.assertActive();
+  const expiry = deps.store.expireWait(failed, node.event, idx);
+  if (expiry.kind === 'moved') throw new WaitForSignalError(node.event);
+  if (expiry.kind === 'signalled') {
+    deps.assertActive();
+    exec.signals = expiry.signals;
+    await deps.advance(exec, idx + 1, wf);
+    return;
+  }
+
+  exec.state = failed.state;
+  exec.steps = failed.steps;
+  exec.failureReason = failed.failureReason;
+  exec.updatedAt = failed.updatedAt;
+  deps.assertActive();
+  deps.emitter?.emitSignal('signal:timeout', exec.id, exec.workflowName, node.event);
+  // Compensate here, then signal completion via the WaitForSignalError sentinel so
+  // processStep short-circuits (return null) instead of re-running compensation
+  // through its generic catch path.
+  deps.assertActive();
+  await deps.compensate(exec, wf);
+  deps.assertActive();
+  deps.emitter?.emitWorkflow('workflow:failed', exec.id, exec.workflowName, 'failed');
   throw new WaitForSignalError(node.event);
 }

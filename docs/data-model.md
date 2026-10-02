@@ -821,10 +821,15 @@ It is emitted only on a connection that acknowledged `SubscribeEvents`, has no
 `reqId`, and shares the same four-byte framing and MessagePack encoding.
 
 `CronInfo` carries `name`, `queue`, nullable `schedule`/`repeatEvery`, the
-authoritative numeric `nextRun`, `executions`, and optional `maxLimit`,
-`timezone`, and `priority`. The `Cron` add response uses `CronResponse`; MCP and
-client adapters must read the nested `cron` object rather than inventing
-top-level scheduling metadata.
+authoritative numeric `nextRun`, `executions`, and optional `jobName`,
+`maxLimit`, `timezone`, and `priority`. The `Cron` add response uses
+`CronResponse`; MCP and client adapters must read the nested `cron` object rather
+than inventing top-level scheduling metadata. The MCP `SerializedCron` reports
+exactly these fields (`jobName` defaulting to `'default'`, `priority` to `0`,
+`timezone`/`maxLimit` to `null`). The add-time policies (`skipIfNoWorker`,
+`preventOverlap`, `skipMissedOnRestart`), `uniqueKey`/`dedup` and `jobOptions`
+are accepted by `Cron` but not echoed by `CronInfo`, so MCP cannot return them
+in either mode.
 
 `JobCounts` (`src/domain/types/responses/model.ts:50-59`) carries all 8 buckets including the virtual
 `'waiting-children'` and `paused`. Builder helpers (`ok`, `batch`, `job`,
@@ -1766,6 +1771,38 @@ the same msgpack-encoded `Command`/`Response` objects.
   stringifying `id`/`parentId`/`dependsOn`/`childrenIds` (BigInt-safe).
 - `bigIntReplacer` + `jsonStringify` (`serialization.ts:57-69`) emit BigInt as
   strings so `JSON.stringify` never throws.
+
+### JSON (MCP tool output)
+
+`bunqueue-mcp` returns every tool result as JSON text. The embedded and TCP
+backends share one projection per shape, so both modes emit identical JSON
+(contracts in `src/mcp/types/adapter.ts`, `types/jobOptions.ts`,
+`types/inspection.ts`):
+
+- `SerializedJob` — `{ id, name, queue, data, priority, state?, progress,
+  attempts, maxAttempts, createdAt, startedAt? }` (string id, ISO times) plus
+  `SerializedJobOptions` from `backend/jobOptionsView.ts`: `backoff` always
+  (a number, or `{ type, delay, maxDelay? }` from `backoffConfig`), and
+  `timeout`, `stallTimeout`, `lifo`, `removeOnComplete`, `removeOnFail`, `tags`,
+  `deduplicationId` (the job's `uniqueKey`) only when set. `PulledJob` adds
+  `token` when a pull with an owner was issued a lock.
+- `JobCounts` — the eight buckets of the wire `JobCounts`, with the shared
+  `pausedView` applied in both modes.
+- `SerializedDlqEntry` (`backend/dlqView.ts`) — the `DlqEntry` with its job
+  serialized (state `failed`), timestamps as ISO strings or `null`, at most the
+  last 10 `AttemptRecord`s (`duration` renamed `durationMs`) plus
+  `attemptCount`, and error texts truncated at 1000 characters.
+  `SerializedDlqStats` is `DlqStats` without the per-queue breakdown.
+- `QueueLimits` (`backend/limitsView.ts`) — the engine/broker limit status
+  (`rateLimit { max, duration }`, `rateLimitTtl`, `concurrencyLimit`, `maxed`)
+  as `{ rateLimit: { max, durationMs } | null, rateLimitTtlMs (null for the -2
+  sentinel), rateLimited, concurrencyLimit, concurrencyMaxed }` plus `queue`,
+  `paused` and the active count.
+- Workflow executions (`src/mcp/workflow/views.ts`, `jsonSafe.ts`) — the
+  decoded `Execution` with BigInt as strings, Date as ISO strings, Map/Set/bytes/
+  Error as `$type`-tagged objects and cycles as `"[Circular]"`.
+
+See [Native MCP Server](./features/mcp-server.md) for the per-tool fields.
 
 See [Persistence](./features/persistence.md),
 [TCP Protocol](./features/tcp-protocol.md).

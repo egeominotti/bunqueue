@@ -6,12 +6,13 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpBackend } from '../adapter';
+import { queueField } from './schemas';
 import { withErrorHandler } from './withErrorHandler';
 
 export function registerMonitoringTools(server: McpServer, backend: McpBackend) {
   server.tool(
     'bunqueue_get_stats',
-    'Get overall queue server statistics including throughput, memory usage, and uptime.',
+    'Get server-wide statistics summed over all queues: current job counts (waiting, delayed, active, completed, dlq), failed-job total, lifetime push/pull/completion totals and uptime. Embedded mode also reports prioritized, waiting-children and cron counts; TCP mode also reports push/pull rates, average latency and processing time, and process memory in MB. Collection sizes are in bunqueue_get_memory_stats.',
     {},
     withErrorHandler('bunqueue_get_stats', async () => {
       const stats = await backend.getStats();
@@ -21,9 +22,9 @@ export function registerMonitoringTools(server: McpServer, backend: McpBackend) 
 
   server.tool(
     'bunqueue_get_queue_stats',
-    'Get detailed statistics for a specific queue including job counts per state.',
+    'Get job counts per state for one queue (same data as bunqueue_get_job_counts): waiting, prioritized, delayed, active, completed, failed (DLQ), paused and waiting-children.',
     {
-      queue: z.string().describe('Queue name'),
+      queue: queueField(),
     },
     withErrorHandler('bunqueue_get_queue_stats', async ({ queue }) => {
       const counts = await backend.getJobCounts(queue);
@@ -95,7 +96,7 @@ export function registerMonitoringTools(server: McpServer, backend: McpBackend) 
 
   server.tool(
     'bunqueue_get_per_queue_stats',
-    'Get detailed statistics broken down per queue (throughput, latency, etc.).',
+    'Get current job counts for every known queue: waiting, prioritized, delayed, active and dlq per queue. No throughput or latency data.',
     {},
     withErrorHandler('bunqueue_get_per_queue_stats', async () => {
       const stats = await backend.getPerQueueStats();

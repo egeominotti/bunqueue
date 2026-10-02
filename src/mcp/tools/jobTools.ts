@@ -7,41 +7,36 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpBackend } from '../adapter';
+import { jobNameField, jobOptionsShape, queueField } from './schemas';
 import { withErrorHandler } from './withErrorHandler';
 
 export function registerJobTools(server: McpServer, backend: McpBackend) {
   server.tool(
     'bunqueue_add_job',
-    'Add a job to a queue. Returns the job ID.',
+    'Add a job to a queue. Returns the job ID (with jobId set: the custom id, or the existing job when that id is still unfinished; with deduplication: the existing job when the key is taken).',
     {
-      queue: z.string().describe('Queue name'),
-      name: z.string().describe('Job name/type'),
+      queue: queueField(),
+      name: jobNameField(),
       data: z.record(z.string(), z.unknown()).describe('Job payload data'),
-      priority: z.number().optional().describe('Priority (higher = processed first)'),
-      delay: z.number().optional().describe('Delay in milliseconds before processing'),
-      attempts: z.number().optional().describe('Max retry attempts (default: 3)'),
+      ...jobOptionsShape(),
     },
-    withErrorHandler(
-      'bunqueue_add_job',
-      async ({ queue, name, data, priority, delay, attempts }) => {
-        const result = await backend.addJob(queue, name, data, { priority, delay, attempts });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      }
-    )
+    withErrorHandler('bunqueue_add_job', async ({ queue, name, data, ...opts }) => {
+      const result = await backend.addJob(queue, name, data, opts);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    })
   );
 
   server.tool(
     'bunqueue_add_jobs_bulk',
-    'Add multiple jobs to a queue in a single operation.',
+    'Add multiple jobs to a queue in a single operation; each job accepts the same options as bunqueue_add_job. Returns one id per job, in order (an existing id for a job suppressed by jobId or deduplication). The batch is ordered, not atomic: invalid options reject the whole call, but a job the broker refuses while admitting leaves the jobs before it added.',
     {
-      queue: z.string().describe('Queue name'),
+      queue: queueField(),
       jobs: z
         .array(
           z.object({
-            name: z.string(),
+            name: jobNameField(),
             data: z.record(z.string(), z.unknown()),
-            priority: z.number().optional(),
-            delay: z.number().optional(),
+            ...jobOptionsShape(),
           })
         )
         .describe('Array of jobs to add'),
@@ -54,7 +49,7 @@ export function registerJobTools(server: McpServer, backend: McpBackend) {
 
   server.tool(
     'bunqueue_get_job',
-    'Get a job by ID. Returns job details including state, progress, and data.',
+    'Get a job by ID: name, queue, data, state, priority, progress, attempts, timestamps, its backoff, and the add options it carries when set (timeout, stallTimeout, lifo, removeOnComplete, removeOnFail, tags, deduplicationId).',
     {
       jobId: z.string().describe('Job ID'),
     },
@@ -72,7 +67,7 @@ export function registerJobTools(server: McpServer, backend: McpBackend) {
 
   server.tool(
     'bunqueue_get_job_state',
-    'Get the current state of a job (waiting, delayed, active, completed, failed).',
+    'Get the current state of a job: waiting, prioritized (waiting with a priority), delayed, active, completed, failed (in the DLQ), waiting-children (a flow parent waiting for its children), or unknown (no such job).',
     {
       jobId: z.string().describe('Job ID'),
     },
@@ -157,7 +152,7 @@ export function registerJobTools(server: McpServer, backend: McpBackend) {
 
   server.tool(
     'bunqueue_get_job_by_custom_id',
-    'Look up a job by its custom ID (set via jobId option during creation).',
+    'Look up an unfinished job by the custom ID it was added with (the jobId option of bunqueue_add_job, bunqueue_add_jobs_bulk, the flow tools, the client SDK or the HTTP API). The custom ID is released when the job completes or fails for good, so this lookup then reports not found; a custom ID is also the job ID, so bunqueue_get_job still finds the finished job.',
     {
       customId: z.string().describe('Custom job ID'),
     },
@@ -175,7 +170,7 @@ export function registerJobTools(server: McpServer, backend: McpBackend) {
 
   server.tool(
     'bunqueue_wait_for_job',
-    'Wait for a job to complete within a timeout. Returns true if completed, false if timed out.',
+    'Wait for a job to complete within a timeout. Returns completed: true as soon as the job has completed (at once if it already had), false if the timeout expires first.',
     {
       jobId: z.string().describe('Job ID to wait for'),
       timeoutMs: z.number().min(100).max(30000).describe('Maximum wait time in milliseconds'),

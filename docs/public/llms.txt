@@ -39,7 +39,7 @@ Key facts:
 - [TCP Protocol](https://bunqueue.dev/api/tcp/): MessagePack wire format, length-prefixed framing, full command reference
 - [TypeScript Types](https://bunqueue.dev/api/types/): Job, Queue, Worker, DLQ, and connection interfaces
 - [Native TLS](https://bunqueue.dev/guide/tls/): Encrypt TCP and HTTP traffic without a reverse proxy
-- [MCP Server for AI Agents](https://bunqueue.dev/guide/mcp/): 73 MCP tools for Claude Desktop, Claude Code, Cursor, Windsurf
+- [MCP Server for AI Agents](https://bunqueue.dev/guide/mcp/): 75 MCP tools for Claude Desktop, Claude Code, Cursor, Windsurf over stdio or Streamable HTTP; opt-in toolsets, destructive-call confirmation, decision models (Jev, Clef, Clef-flash, Kev 9B, Laya) and workflow approval tools
 
 ## Operations & Production
 

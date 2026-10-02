@@ -13,6 +13,11 @@
  * UPDATEs. Making those conditional is also what collapses duplicate or concurrent
  * signals to exactly one resume, at the database rather than relying on the event
  * loop never yielding at the right moment.
+ *
+ * The third transition that pairs with a signal, a timed-out gate failing because its
+ * signal is still absent, lives in storeWaitExpiry.ts. It reads this column inside the
+ * same kind of IMMEDIATE reservation and never writes it, so a late signal and the
+ * timeout are decided first-writer-wins exactly like two concurrent signals.
  */
 
 import type { Database } from 'bun:sqlite';

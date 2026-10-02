@@ -1,5 +1,9 @@
-import type { JobCounts } from '../../types/adapter';
+import type { DlqQuery, JobCounts } from '../../types/adapter';
+import { dlqEntryJob, dlqEntryView, dlqStatsView } from '../dlqView';
+import { dlqFilter } from '../dlqFilter';
+import { queueLimitsView } from '../limitsView';
 import { TcpJobBackend } from './jobs';
+import { numberField, replyData } from './wire';
 
 export class TcpQueueBackend extends TcpJobBackend {
   async getJobs(queue: string, opts?: { state?: string; start?: number; end?: number }) {
@@ -28,6 +32,7 @@ export class TcpQueueBackend extends TcpJobBackend {
       completed: counts.completed ?? 0,
       failed: counts.failed ?? 0,
       paused: counts.paused ?? 0,
+      'waiting-children': counts['waiting-children'] ?? 0,
     };
   }
 
@@ -40,8 +45,7 @@ export class TcpQueueBackend extends TcpJobBackend {
   }
 
   async drainQueue(queue: string) {
-    const response = await this.send({ cmd: 'Drain', queue });
-    return (response.removed as number) ?? 0;
+    return numberField(await this.send({ cmd: 'Drain', queue }), 'count');
   }
 
   async obliterateQueue(queue: string) {
@@ -76,27 +80,41 @@ export class TcpQueueBackend extends TcpJobBackend {
   async getDlq(queue: string, limit?: number) {
     const response = await this.send({ cmd: 'Dlq', queue, count: limit });
     return ((response.jobs as Array<Record<string, unknown>>) ?? []).map((job) =>
-      this.parseJob(job)
+      this.parseJob(job, 'failed')
     );
   }
 
+  /** One extra entry is requested to report `hasMore` without counting the whole DLQ. */
+  async getDlqEntries(queue: string, query: DlqQuery) {
+    const filter = dlqFilter(query);
+    const response = await this.send({ cmd: 'Dlq', queue, filter, count: query.limit + 1 });
+    const raw = Array.isArray(response.entries) ? (response.entries as unknown[]) : [];
+    const entries = raw.slice(0, query.limit).map((entry) => {
+      const job = this.parseJob(dlqEntryJob(entry), 'failed');
+      return dlqEntryView(entry as Record<string, unknown>, job);
+    });
+    return { entries, hasMore: raw.length > query.limit };
+  }
+
+  async getDlqStats(queue: string) {
+    return dlqStatsView(replyData(await this.send({ cmd: 'GetDlqStats', queue })).stats);
+  }
+
   async retryDlq(queue: string, id?: string) {
-    const response = await this.send({ cmd: 'RetryDlq', queue, id });
-    return (response.retried as number) ?? 0;
+    // The broker reads the target as `jobId`; without it the whole DLQ is retried.
+    return numberField(await this.send({ cmd: 'RetryDlq', queue, jobId: id }), 'count');
   }
 
   async purgeDlq(queue: string) {
-    const response = await this.send({ cmd: 'PurgeDlq', queue });
-    return (response.purged as number) ?? 0;
+    return numberField(await this.send({ cmd: 'PurgeDlq', queue }), 'count');
   }
 
   async retryCompleted(queue: string, id?: string) {
-    const response = await this.send({ cmd: 'RetryCompleted', queue, id });
-    return (response.retried as number) ?? 0;
+    return numberField(await this.send({ cmd: 'RetryCompleted', queue, id }), 'count');
   }
 
-  async setRateLimit(queue: string, limit: number) {
-    await this.send({ cmd: 'RateLimit', queue, limit });
+  async setRateLimit(queue: string, limit: number, durationMs?: number) {
+    await this.send({ cmd: 'RateLimit', queue, limit, duration: durationMs });
   }
 
   async clearRateLimit(queue: string) {
@@ -109,5 +127,14 @@ export class TcpQueueBackend extends TcpJobBackend {
 
   async clearConcurrency(queue: string) {
     await this.send({ cmd: 'ClearConcurrency', queue });
+  }
+
+  async getQueueLimits(queue: string) {
+    const [reply, counts, paused] = await Promise.all([
+      this.send({ cmd: 'GetQueueLimits', queue }),
+      this.getJobCounts(queue),
+      this.isPaused(queue),
+    ]);
+    return queueLimitsView(queue, replyData(reply).limits, counts.active, paused);
   }
 }

@@ -561,7 +561,7 @@ TCP_PORT=6789 BUNQUEUE_DATA_PATH=./data/queue.db bunqueue start
 
 ## MCP Server (AI Agent Integration)
 
-bunqueue includes a native MCP server with 73 tools, 5 resources, and 3 diagnostic prompts. AI agents can manage queues, add/pull jobs, monitor stats, and auto-process jobs via HTTP handlers.
+bunqueue includes a native MCP server with 75 tools, 5 resources, and 3 diagnostic prompts. AI agents can manage queues, add/pull jobs, monitor stats, and auto-process jobs via HTTP handlers.
 
 > Since v2.8.0 the MCP SDK is an **optional peer dependency**. To run the MCP server, install it once: `bun add @modelcontextprotocol/sdk`. Queue-only installs (Queue/Worker/Workflow) skip it and stay lighter.
 
@@ -607,4 +607,4 @@ Same API: `add()`, `addBulk()`, `Worker(name, processor, opts)`, `FlowProducer.a
 
 - [reference.md](reference.md) — Full API reference (Queue, Worker, Bunqueue, FlowProducer, QueueGroup)
 - [examples.md](examples.md) — Real-world patterns (email, ETL, webhooks, batch DB, cron, distributed)
-- [mcp.md](mcp.md) — MCP server setup, 73 tools, resources, diagnostic prompts
+- [mcp.md](mcp.md) — MCP server setup, 75 tools, resources, diagnostic prompts

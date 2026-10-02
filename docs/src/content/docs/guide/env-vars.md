@@ -249,6 +249,33 @@ BUNQUEUE_MODE=tcp BUNQUEUE_HOST=your-server.com BUNQUEUE_PORT=7000 bunx --packag
 
 The MCP server also reads `BUNQUEUE_TOKEN` for authentication.
 
+**MCP agent features (all off by default).** These only affect the `bunqueue-mcp` binary; the [MCP Server guide](/guide/mcp/) explains each one: [HTTP transport](/guide/mcp/#serve-over-http), [toolsets](/guide/mcp/#load-only-the-tools-the-agent-needs), [confirmation](/guide/mcp/#confirm-destructive-operations), [decision models](/guide/mcp/#decision-models-jev-clef-clef-flash-kev-9b-laya) and [workflow approvals](/guide/mcp/#workflow-approvals).
+
+| Variable                            | Type   | Default                     | Description                                                                                                       |
+| ----------------------------------- | ------ | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `BUNQUEUE_MCP_TRANSPORT`            | string | `stdio`                     | `stdio`, or `http` to serve MCP Streamable HTTP to several clients                                                |
+| `BUNQUEUE_MCP_HTTP_HOST`            | string | `127.0.0.1`                 | Interface to bind in http mode; a non-loopback address requires `BUNQUEUE_MCP_HTTP_TOKEN`                         |
+| `BUNQUEUE_MCP_HTTP_PORT`            | number | `6791`                      | Port in http mode; `0` picks a free port                                                                          |
+| `BUNQUEUE_MCP_HTTP_PATH`            | string | `/mcp`                      | Endpoint path (exact match)                                                                                       |
+| `BUNQUEUE_MCP_HTTP_TOKEN`           | string | (none)                      | Comma-separated bearer tokens; required on a non-loopback host                                                    |
+| `BUNQUEUE_MCP_HTTP_MAX_SESSIONS`    | number | `100`                       | Concurrent HTTP sessions; beyond it new clients get 503                                                           |
+| `BUNQUEUE_MCP_HTTP_SESSION_TTL_MS`  | number | `1800000`                   | Idle time before an HTTP session is closed (never while a tool call runs)                                         |
+| `BUNQUEUE_MCP_HTTP_ALLOWED_HOSTS`   | string | (none)                      | Extra accepted `Host` values: `name` (any port) or `name:port`, e.g. the name a reverse proxy uses                |
+| `BUNQUEUE_MCP_HTTP_ALLOWED_ORIGINS` | string | (none)                      | Extra accepted `Origin` values, such as `https://app.example.com`                                                 |
+| `BUNQUEUE_MCP_TOOLSETS`             | string | (all tools)                 | `all`, a comma list of toolsets (`queues,dlq`), or `dynamic` optionally followed by toolsets                      |
+| `BUNQUEUE_MCP_CONFIRM`              | string | (off)                       | `destructive` annotates every tool and requires confirmation for the nine guarded tools (ten with workflow tools) |
+| `BUNQUEUE_MCP_DECISION_PROVIDER`    | string | (none)                      | `typesafe` (Jev), `cloudflare` (Clef, Clef-flash) or `systemone` (any compatible endpoint)                        |
+| `BUNQUEUE_MCP_DECISION_MODEL`       | string | `jev-latest` / `clef-flash` | Model id; required for `systemone` (for example `kev-9b` or `laya`)                                               |
+| `BUNQUEUE_MCP_DECISION_API_KEY`     | string | (none)                      | Bearer token; required for `typesafe` and `cloudflare`                                                            |
+| `BUNQUEUE_MCP_DECISION_ACCOUNT_ID`  | string | (none)                      | Cloudflare account id for the `cloudflare` provider                                                               |
+| `BUNQUEUE_MCP_DECISION_URL`         | string | provider default            | Endpoint; required for `systemone`                                                                                |
+| `BUNQUEUE_MCP_DECISION_TIMEOUT_MS`  | number | `10000`                     | Request timeout; one retry on network errors, 429 and overload                                                    |
+| `BUNQUEUE_MCP_DECISION_THRESHOLD`   | number | `0.8`                       | Minimum probability that the user's request asks for a destructive operation                                      |
+| `BUNQUEUE_MCP_WORKFLOW_DB`          | string | (none)                      | The workflow Engine's existing `dataPath` file; enables the three workflow tools                                  |
+| `BUNQUEUE_MCP_WORKFLOW_QUEUE`       | string | `__wf:steps`                | The Engine's `queueName`; read only with `BUNQUEUE_MCP_WORKFLOW_DB`                                               |
+
+The `BUNQUEUE_MCP_HTTP_*` variables are read only when `BUNQUEUE_MCP_TRANSPORT=http`.
+
 **CLI port fallback.** When `--port` is not passed, the CLI reads, in priority order: `TCP_PORT` > `BUNQUEUE_TCP_PORT` > `BQ_TCP_PORT`. Using `TCP_PORT` means the same variable that binds the server also routes the client in the same shell:
 
 ```bash

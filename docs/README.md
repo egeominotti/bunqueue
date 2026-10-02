@@ -130,7 +130,7 @@ Each module has one file documenting its purpose, responsibilities, dependencies
 | Document                                                      | Purpose                                                                                                                                                                           |
 | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [CLI](./features/cli.md)                                      | The `bunqueue` executable: boots the server or acts as a thin one-shot TCP client that maps CLI verbs to msgpack protocol commands and renders responses.                         |
-| [Native MCP Server](./features/mcp-server.md)                 | Exposes bunqueue to AI agents over MCP/stdio via the `bunqueue-mcp` binary, registering tools, resources, and prompts backed by either an embedded engine or a remote TCP server. |
+| [Native MCP Server](./features/mcp-server.md)                 | Exposes bunqueue to AI agents via the `bunqueue-mcp` binary over MCP stdio or the opt-in Streamable HTTP transport, registering 75 tools, resources, and prompts backed by either an embedded engine or a remote TCP server; opt-in toolsets, guarded-call confirmation, SystemOne decision models and workflow-engine execution/signal tools. |
 | [bunqueue Cloud Integration](./features/cloud-integration.md) | Opt-in agent that pushes full server telemetry snapshots to the bunqueue.io dashboard over HTTP and receives whitelisted remote commands over WebSocket.                          |
 
 ---

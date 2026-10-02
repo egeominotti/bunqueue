@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HttpHandlerRegistry } from '../httpHandler';
+import { queueField } from './schemas';
 import { withErrorHandler } from './withErrorHandler';
 
 export function registerHandlerTools(server: McpServer, registry: HttpHandlerRegistry) {
@@ -14,7 +15,7 @@ export function registerHandlerTools(server: McpServer, registry: HttpHandlerReg
     'bunqueue_register_handler',
     'Register an HTTP handler on a queue. Spawns a worker that auto-processes jobs by making HTTP requests. Combine with bunqueue_add_cron for recurring tasks.',
     {
-      queue: z.string().describe('Queue name to attach the handler to'),
+      queue: queueField('Queue name to attach the handler to'),
       url: z.string().url().describe('HTTP endpoint URL to call when a job is processed'),
       method: z
         .enum(['GET', 'POST', 'PUT', 'DELETE'])
@@ -60,7 +61,7 @@ export function registerHandlerTools(server: McpServer, registry: HttpHandlerReg
     'bunqueue_unregister_handler',
     'Remove an HTTP handler from a queue and stop its worker.',
     {
-      queue: z.string().describe('Queue name to remove the handler from'),
+      queue: queueField('Queue name to remove the handler from'),
     },
     withErrorHandler('bunqueue_unregister_handler', async ({ queue }) => {
       const removed = registry.unregister(queue);

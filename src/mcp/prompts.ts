@@ -114,10 +114,11 @@ Produce a report with these sections:
     { queue: z.string().describe('Queue name to debug') },
     async ({ queue }) => {
       try {
-        const [counts, paused, dlqEntries, activeJobs, priorities] = await Promise.all([
+        const [counts, paused, dlqStats, dlqPage, activeJobs, priorities] = await Promise.all([
           backend.getJobCounts(queue),
           backend.isPaused(queue),
-          backend.getDlq(queue, 10),
+          backend.getDlqStats(queue),
+          backend.getDlqEntries(queue, { limit: 10 }),
           backend.getJobs(queue, { state: 'active' }),
           backend.getCountsPerPriority(queue),
         ]);
@@ -144,8 +145,9 @@ ${JSON.stringify(counts, null, 2)}
 ## Active Jobs (${activeJobs.length} currently processing)
 ${JSON.stringify(activeJobs, null, 2)}
 
-## Dead Letter Queue (${dlqEntries.length} entries, showing up to 10)
-${JSON.stringify(dlqEntries, null, 2)}
+## Dead Letter Queue (${dlqStats.total} entries, showing the oldest ${dlqPage.entries.length})
+Entries by failure reason: ${JSON.stringify(dlqStats.byReason)}
+${JSON.stringify(dlqPage.entries, null, 2)}
 
 ## Priority Distribution
 ${JSON.stringify(priorities, null, 2)}
@@ -155,7 +157,7 @@ ${JSON.stringify(priorities, null, 2)}
 Analyze and report:
 1. **Queue Health** — Overall assessment (HEALTHY, DEGRADED, or UNHEALTHY)
 2. **Backlog Analysis** — Waiting-to-active ratio, is the queue growing?
-3. **Failure Analysis** — Failed count, DLQ entries, common patterns
+3. **Failure Analysis** — Failed count, DLQ reasons and error messages, common patterns
 4. **Stuck Jobs** — Active jobs that may be stalled (check startedAt timestamps)
 5. **Priority Issues** — Priority starvation (low-priority jobs not processed)
 6. **Recommendations** — Specific actions to resolve identified issues`,
@@ -189,12 +191,15 @@ Analyze and report:
         const targetQueues = queue ? [queue] : allQueues.slice(0, MAX_QUEUES_IN_REPORT);
         const queueDiagnostics = await Promise.all(
           targetQueues.map(async (q) => {
-            const [counts, paused, dlqEntries] = await Promise.all([
+            const [counts, paused, dlq] = await Promise.all([
               backend.getJobCounts(q),
               backend.isPaused(q),
-              backend.getDlq(q, 5),
+              backend.getDlqStats(q),
             ]);
-            return { name: q, counts, paused, dlqEntries: dlqEntries.length };
+            const dlqByReason = Object.fromEntries(
+              Object.entries(dlq.byReason).filter(([, count]) => count > 0)
+            );
+            return { name: q, counts, paused, dlqEntries: dlq.total, dlqByReason };
           })
         );
 
@@ -244,7 +249,7 @@ Run through this checklist:
 
 ### Step 4: DLQ Analysis
 - Which queues have DLQ entries?
-- Are jobs failing repeatedly? (Use \`bunqueue_get_dlq\` for details)
+- Are jobs failing repeatedly? (Use \`bunqueue_get_dlq\` for the errors, filtered by reason if useful)
 
 ### Step 5: Root Cause & Resolution
 Identify the most likely root cause and provide specific actions using bunqueue tools.`,

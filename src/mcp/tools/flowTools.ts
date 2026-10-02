@@ -7,22 +7,49 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpBackend, FlowJobInput } from '../adapter';
+import {
+  attemptsField,
+  backoffField,
+  customJobIdField,
+  delayField,
+  jobNameField,
+  priorityField,
+  queueField,
+  stallTimeoutField,
+  timeoutField,
+} from './schemas';
 import { withErrorHandler } from './withErrorHandler';
 
-/** Shared schema for job options */
+/**
+ * Options of one flow job. A flow is committed atomically and always written durably;
+ * the broker rejects deduplication inside a flow and does not store tags on flow jobs,
+ * so the object is strict: an unsupported option is an error, never silently dropped.
+ */
 const jobOptsSchema = z
-  .object({
-    priority: z.number().optional().describe('Priority (higher = processed first)'),
-    delay: z.number().optional().describe('Delay in ms before processing'),
-    attempts: z.number().optional().describe('Max retry attempts'),
+  .strictObject({
+    priority: priorityField().optional(),
+    delay: delayField().optional(),
+    attempts: attemptsField().optional(),
+    backoff: backoffField().optional(),
+    timeout: timeoutField().optional(),
+    jobId: customJobIdField(
+      'Custom job id: must be new and contain no ":" (a flow is not idempotent)'
+    ).optional(),
+    removeOnComplete: z.boolean().optional().describe('Delete the job once it completes'),
+    removeOnFail: z
+      .boolean()
+      .optional()
+      .describe('Delete the job instead of moving it to the DLQ when it finally fails'),
+    lifo: z.boolean().optional().describe('Run before older ready jobs of the same priority'),
+    stallTimeout: stallTimeoutField().optional(),
   })
   .optional()
-  .describe('Optional job settings');
+  .describe('Job settings (deduplication, tags and durable are not available in flows)');
 
 /** Shared schema for flow step */
 const flowStepSchema = z.object({
-  name: z.string().describe('Job name/type'),
-  queueName: z.string().describe('Queue to run in'),
+  name: jobNameField(),
+  queueName: queueField('Queue to run in'),
   data: z.record(z.string(), z.unknown()).describe('Job payload data'),
   opts: jobOptsSchema,
 });
@@ -33,8 +60,8 @@ const flowStepSchema = z.object({
  */
 const flowJobSchema: z.ZodType = z.lazy(() =>
   z.object({
-    name: z.string().describe('Job name/type'),
-    queueName: z.string().describe('Queue to run in'),
+    name: jobNameField(),
+    queueName: queueField('Queue to run in'),
     data: z.record(z.string(), z.unknown()).optional().describe('Job payload data'),
     opts: jobOptsSchema,
     children: z.array(flowJobSchema).optional().describe('Child jobs (processed BEFORE parent)'),
@@ -46,8 +73,8 @@ export function registerFlowTools(server: McpServer, backend: McpBackend) {
     'bunqueue_add_flow',
     'Create a job flow tree (BullMQ v5 compatible). Children are processed BEFORE their parent. Use for complex dependency graphs.',
     {
-      name: z.string().describe('Root job name/type'),
-      queueName: z.string().describe('Root queue name'),
+      name: jobNameField('Root job name/type'),
+      queueName: queueField('Root queue name'),
       data: z.record(z.string(), z.unknown()).optional().describe('Root job payload'),
       opts: jobOptsSchema,
       children: z
@@ -100,9 +127,9 @@ export function registerFlowTools(server: McpServer, backend: McpBackend) {
     'Retrieve a flow tree starting from a job. Shows the full dependency graph with children.',
     {
       jobId: z.string().describe('Job ID to get flow tree for'),
-      queueName: z.string().describe('Queue name where the job is located'),
-      depth: z.number().optional().describe('Max traversal depth (default: 10)'),
-      maxChildren: z.number().optional().describe('Max children per level'),
+      queueName: queueField('Queue name where the job is located'),
+      depth: z.number().int().min(1).optional().describe('Max traversal depth (default: 10)'),
+      maxChildren: z.number().int().min(1).optional().describe('Max children per level'),
     },
     withErrorHandler('bunqueue_get_flow', async ({ jobId, queueName, depth, maxChildren }) => {
       const result = await backend.getFlow(jobId, queueName, depth ?? 10, maxChildren);

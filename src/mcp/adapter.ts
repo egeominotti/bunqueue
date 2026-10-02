@@ -12,11 +12,29 @@ export type {
   FlowStepInput,
   JobCounts,
   McpBackend,
+  PulledJob,
   SerializedCron,
   SerializedJob,
   WebhookInfo,
   WorkerInfo,
 } from './types/adapter';
+export type {
+  DlqQuery,
+  QueueLimits,
+  SerializedDlqAttempt,
+  SerializedDlqEntry,
+  SerializedDlqStats,
+} from './types/inspection';
+export type {
+  FailJobOptions,
+  McpBackoff,
+  McpBulkJob,
+  McpDeduplication,
+  McpFlowJobOptions,
+  McpJobOptions,
+  PullLockOptions,
+  SerializedJobOptions,
+} from './types/jobOptions';
 
 export async function createBackend(): Promise<McpBackend> {
   if ((process.env.BUNQUEUE_MODE ?? 'embedded') === 'tcp') {

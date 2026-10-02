@@ -75,7 +75,7 @@ bunqueue ships an MCP server, so AI agents like Claude can add jobs, manage cron
 claude mcp add bunqueue -- bunx --package=bunqueue bunqueue-mcp
 ```
 
-The same command shape works for Claude Desktop, Cursor, Windsurf, and any MCP client over stdio. Setup for each client, plus the full tool list, is in the [MCP Server guide](/guide/mcp/).
+The same command shape works for Claude Desktop, Cursor, Windsurf, and any MCP client over stdio; clients that connect to a URL can use the [Streamable HTTP transport](/guide/mcp/#serve-over-http). Setup for each client, plus the full tool list, is in the [MCP Server guide](/guide/mcp/).
 
 :::note
 `bunqueue-mcp` is a binary inside the `bunqueue` package, not a separate npm package. The MCP SDK is an optional peer dependency: run `bun add @modelcontextprotocol/sdk` once before starting the MCP server.

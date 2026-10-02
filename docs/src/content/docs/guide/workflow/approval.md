@@ -46,7 +46,9 @@ The payload lands in `ctx.signals['manager-approval']` for every step after the 
 
 An approval already accepted before a crash is stored in the execution row and
 is not lost. Because `signal()` is an in-process API, nobody can call it while
-the only engine process is down. After restart, create the engine, register the
+the only engine process is down. (An AI agent can also deliver the approval
+through the MCP server, see [Workflow approvals](/guide/mcp/#workflow-approvals);
+that path still needs the engine running to execute the next step.) After restart, create the engine, register the
 same definition, call `recover()`, and then accept new approvals normally.
 
 `recover()` also reconstructs timed gates because their timer handles are

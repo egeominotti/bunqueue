@@ -224,11 +224,19 @@ again after recovery.
 **waitFor** (`waitFor.ts`): if the signal is already present, advance.
 Otherwise it transactionally parks the execution unless a signal won the race.
 For a timed gate it persists `__waitFor:<event>` with the original start time
-and arms only the remaining delay. At expiry it re-reads signals before
-failing, records the timeout reason, compensates, emits the timeout/failure
-events and throws `WaitForSignalError`. The sentinel is caught by
-`processStep`, so normal parking acks the node job without treating the pause
-as a workflow failure.
+and arms only the remaining delay. At expiry the signal check and the failing
+write are one claim, `WorkflowStore.expireWait` (`storeWaitExpiry.ts`), taken in
+the same IMMEDIATE transaction as `SignalCoordinator.record`, so a signal from
+another connection (a second app process, or the MCP `bunqueue_signal_workflow`
+tool) and the timeout cannot both win. The claim returns `expired` (the row is
+durably `failed`; a later signal is rejected with "cannot receive the signal"),
+`signalled` (nothing written; the worker advances past the gate, and a resume job
+published by the signaller is dropped by admission as a duplicate) or `moved`
+(another driver already advanced or finished the run; the worker stands down).
+Only after `expired` does it emit `signal:timeout`, compensate, emit
+`workflow:failed` and throw `WaitForSignalError`; a signal that wins never sees a
+timeout event. The sentinel is caught by `processStep`, so normal parking acks
+the node job without treating the pause as a workflow failure.
 
 **signal** (`executorLifecycle.ts` → `SignalCoordinator.record`): delivery,
 first-writer-wins payload acceptance and the single resume claim occur inside
@@ -358,7 +366,7 @@ closing the worker and queue.
 - **Compensation never rolls back internal bookkeeping steps** (names prefixed `__`, e.g. `__waitFor:*`).
 - **Sub-builders accept steps only.** `path()`, `parallel()`, `doUntil()` and `doWhile()` throw at build time if the builder produced any non-step node (`onlySteps`, `workflow.ts`). These bodies execute inline inside one job, so a `waitFor` there has no node index to park at and a nested `branch` has no dispatcher. They used to be filtered out silently, which turned an approval gate written inside a path into a no-op the run sailed straight through.
 - **Loop index namespace is reserved.** `register()` rejects a step whose name matches `<loopStep>:<digits>` (`assertNoIndexCollision`). Both silent outcomes are corruption: the loop overwrites the user's step, or — with memoisation — mistakes it for its own completed work and skips the iteration.
-- **The `signals` column is owned by `storeSignals.ts` alone.** `store.update()` never writes it. A worker holds one in-memory `Execution` for a whole node, so rewriting `signals` from that stale snapshot destroyed payloads delivered mid-step and parked runs forever. `recordSignal`/`parkForSignal` read-modify-write it inside a transaction, and the resume is claimed with a conditional state UPDATE so duplicate signals collapse to exactly one resume.
+- **The `signals` column is owned by `storeSignals.ts` alone.** `store.update()` never writes it. A worker holds one in-memory `Execution` for a whole node, so rewriting `signals` from that stale snapshot destroyed payloads delivered mid-step and parked runs forever. `recordSignal`/`parkForSignal` read-modify-write it inside a transaction, and the resume is claimed with a conditional state UPDATE so duplicate signals collapse to exactly one resume. The third transition that pairs with a signal, the expiry of a timed gate (`expireWait`, `storeWaitExpiry.ts`), only reads the column inside its IMMEDIATE transaction and never writes it.
 - **`waitFor` timer handles are chunked** at `2**31-1` ms while the original
   persisted deadline remains unchanged; without chunking, larger timer values
   wrap and fire immediately.
@@ -410,7 +418,7 @@ What *is* portable: the step job payload is only `{ executionId, workflowName, n
 
 So the shape a port must take is: **the server owns execution state**, and each SDK reimplements the DSL and node walk natively, where handlers and conditions are ordinary functions in that language.
 
-The server surface needed mirrors `WorkflowStore`'s ten methods (`save`, `get`, `update`, `recordSignal`, `parkForSignal`, `list`, `listRecoverable`, `cleanup`, `archive`, `getArchivedCount`). Two of those **must stay atomic server-side**: `recordSignal` and `parkForSignal` are a read-modify-write on one row from concurrent connections. An SDK that rebuilds either as a get plus an update reintroduces the lost-update bug where a signal delivered while the run is parking is silently dropped and the execution waits forever (`storeSignals.ts` exists precisely to make that one transaction).
+The server surface needed mirrors `WorkflowStore`'s eleven methods (`save`, `get`, `update`, `recordSignal`, `parkForSignal`, `expireWait`, `list`, `listRecoverable`, `cleanup`, `archive`, `getArchivedCount`). Three of those **must stay atomic server-side**: `recordSignal` and `parkForSignal` are a read-modify-write on one row from concurrent connections, and `expireWait` decides a timed gate's expiry against a concurrent signal. An SDK that rebuilds `recordSignal` or `parkForSignal` as a get plus an update reintroduces the lost-update bug where a signal delivered while the run is parking is silently dropped and the execution waits forever (`storeSignals.ts` exists precisely to make that one transaction); rebuilding `expireWait` that way lets a signal be accepted as resuming a run that the timeout then fails and compensates.
 
 Note that adding those commands to `src/domain/types/command.ts` is not a free first step: `docs/protocol.md` designates that file as the normative source for client authors, and `tsconfig.build.json` emits all of `src/**` into the published package. Command types without handlers would ship to npm as a public promise the server answers with `Unknown command`. Land the types, the handlers, `protocol.md` and the conformance driver together.
 
@@ -558,4 +566,5 @@ integrity totals.
 - [Concurrency & Locking](./concurrency-and-locking.md), [Rate Limiting & Concurrency Control](./rate-limiting-and-concurrency.md) — worker concurrency model.
 - [Webhooks, Events & Job Logs](./webhooks-and-events.md) — queue-level events (distinct from workflow events).
 - [Benchmarking and Performance Evidence](./benchmarks.md) — benchmark contract and maintained runner catalogue.
+- [Native MCP Server](./mcp-server.md) — opt-in workflow tools (`BUNQUEUE_MCP_WORKFLOW_DB`) that list and inspect executions and deliver signals through the same `SignalCoordinator` transaction.
 - [architecture](../architecture.md), [data-model](../data-model.md).

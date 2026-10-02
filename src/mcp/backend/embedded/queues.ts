@@ -1,29 +1,40 @@
 import { jobId as toJobId } from '../../../domain/types/job';
-import type { JobCounts } from '../../types/adapter';
+import { pausedView } from '../../../shared/pausedView';
+import type { DlqQuery, JobCounts } from '../../types/adapter';
+import { dlqFilter } from '../dlqFilter';
+import { dlqEntryView, dlqStatsView } from '../dlqView';
+import { queueLimitsView } from '../limitsView';
 import { serializeMcpJob } from '../serializers';
 import { EmbeddedJobBackend } from './jobs';
 
 export class EmbeddedQueueBackend extends EmbeddedJobBackend {
-  getJobs(queue: string, opts?: { state?: string; start?: number; end?: number }) {
-    const jobs = this.manager.getJobs(queue, {
-      state: opts?.state as 'waiting' | 'delayed' | 'active' | 'completed' | 'failed',
-      start: opts?.start,
-      end: opts?.end,
-    });
-    return Promise.resolve(jobs.map(serializeMcpJob));
+  /**
+   * Any engine state is accepted (waiting, prioritized, delayed, active, completed, failed,
+   * paused, waiting-children). Each job carries its state, as in the TCP GetJobs reply.
+   */
+  async getJobs(queue: string, opts?: { state?: string; start?: number; end?: number }) {
+    const state = opts?.state;
+    const jobs = this.manager.getJobs(queue, { state, start: opts?.start, end: opts?.end });
+    return Promise.all(
+      jobs.map(async (job) =>
+        serializeMcpJob(job, state ?? (await this.manager.getJobState(job.id)))
+      )
+    );
   }
 
+  /** Same paused view as the TCP GetJobCounts handler: no job is counted twice. */
   getJobCounts(queue: string): Promise<JobCounts> {
     const counts = this.manager.getQueueJobCounts(queue);
-    const isPaused = this.manager.isPaused(queue);
+    const view = pausedView(counts.waiting, counts.prioritized, this.manager.isPaused(queue));
     return Promise.resolve({
-      waiting: counts.waiting,
-      prioritized: counts.prioritized,
+      waiting: view.waiting,
+      prioritized: view.prioritized,
       delayed: counts.delayed,
       active: counts.active,
       completed: counts.completed,
       failed: counts.failed,
-      paused: isPaused ? counts.waiting : 0,
+      paused: view.paused,
+      'waiting-children': counts['waiting-children'],
     });
   }
 
@@ -67,7 +78,27 @@ export class EmbeddedQueueBackend extends EmbeddedJobBackend {
   }
 
   getDlq(queue: string, limit?: number) {
-    return Promise.resolve(this.manager.getDlq(queue, limit).map(serializeMcpJob));
+    return Promise.resolve(
+      this.manager.getDlq(queue, limit).map((job) => serializeMcpJob(job, 'failed'))
+    );
+  }
+
+  /** Same selection as the TCP `Dlq` handler: engine filter, then the first limit + 1. */
+  getDlqEntries(queue: string, query: DlqQuery) {
+    const raw = this.manager.getDlqEntries(queue, dlqFilter(query)).slice(0, query.limit + 1);
+    const entries = raw
+      .slice(0, query.limit)
+      .map((entry) =>
+        dlqEntryView(
+          entry as unknown as Record<string, unknown>,
+          serializeMcpJob(entry.job, 'failed')
+        )
+      );
+    return Promise.resolve({ entries, hasMore: raw.length > query.limit });
+  }
+
+  getDlqStats(queue: string) {
+    return Promise.resolve(dlqStatsView(this.manager.getDlqStats(queue)));
   }
 
   retryDlq(queue: string, id?: string) {
@@ -82,8 +113,8 @@ export class EmbeddedQueueBackend extends EmbeddedJobBackend {
     return Promise.resolve(this.manager.retryCompleted(queue, id ? toJobId(id) : undefined));
   }
 
-  setRateLimit(queue: string, limit: number) {
-    this.manager.setRateLimit(queue, limit);
+  setRateLimit(queue: string, limit: number, durationMs?: number) {
+    this.manager.setRateLimit(queue, limit, durationMs);
     return Promise.resolve();
   }
 
@@ -100,5 +131,11 @@ export class EmbeddedQueueBackend extends EmbeddedJobBackend {
   clearConcurrency(queue: string) {
     this.manager.clearConcurrency(queue);
     return Promise.resolve();
+  }
+
+  async getQueueLimits(queue: string) {
+    const status = this.manager.getQueueLimitStatus(queue);
+    const [counts, paused] = await Promise.all([this.getJobCounts(queue), this.isPaused(queue)]);
+    return queueLimitsView(queue, status, counts.active, paused);
   }
 }

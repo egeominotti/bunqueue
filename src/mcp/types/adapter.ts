@@ -1,5 +1,32 @@
 import type { CronJobInput } from '../../domain/types/cron';
 import type { JobLogEntry } from '../../domain/types/worker';
+import type { DlqQuery, QueueLimits, SerializedDlqEntry, SerializedDlqStats } from './inspection';
+import type {
+  FailJobOptions,
+  McpBulkJob,
+  McpFlowJobOptions,
+  McpJobOptions,
+  PullLockOptions,
+  SerializedJobOptions,
+} from './jobOptions';
+
+export type {
+  FailJobOptions,
+  McpBackoff,
+  McpBulkJob,
+  McpDeduplication,
+  McpFlowJobOptions,
+  McpJobOptions,
+  PullLockOptions,
+  SerializedJobOptions,
+} from './jobOptions';
+export type {
+  DlqQuery,
+  QueueLimits,
+  SerializedDlqAttempt,
+  SerializedDlqEntry,
+  SerializedDlqStats,
+} from './inspection';
 
 export interface JobCounts {
   waiting: number;
@@ -8,10 +35,13 @@ export interface JobCounts {
   active: number;
   completed: number;
   failed: number;
+  /** Ready jobs (waiting + prioritized) of a paused queue; they are then 0 in their own buckets. */
   paused: number;
+  /** Flow parents waiting for their children (optional: older backends omit it). */
+  'waiting-children'?: number;
 }
 
-export interface SerializedJob {
+export interface SerializedJob extends SerializedJobOptions {
   id: string;
   name: string;
   queue: string;
@@ -25,6 +55,11 @@ export interface SerializedJob {
   startedAt?: string;
 }
 
+/** A pulled job; `token` is present only when the pull set an owner and a lock was issued. */
+export interface PulledJob extends SerializedJob {
+  token?: string;
+}
+
 export interface SerializedCron {
   name: string;
   queue: string;
@@ -32,6 +67,14 @@ export interface SerializedCron {
   repeatEvery?: number;
   nextRun: string | null;
   executions: number;
+  /** Name given to every job the cron produces ("default" when not set). */
+  jobName: string;
+  /** Priority of every produced job. */
+  priority: number;
+  /** IANA time zone the schedule is evaluated in (null = UTC). */
+  timezone: string | null;
+  /** Total number of runs before the cron stops (null = unlimited). */
+  maxLimit: number | null;
 }
 
 export interface WebhookInfo {
@@ -56,7 +99,7 @@ export interface FlowJobInput {
   name: string;
   queueName: string;
   data?: Record<string, unknown>;
-  opts?: { priority?: number; delay?: number; attempts?: number };
+  opts?: McpFlowJobOptions;
   children?: FlowJobInput[];
 }
 
@@ -64,7 +107,7 @@ export interface FlowStepInput {
   name: string;
   queueName: string;
   data: Record<string, unknown>;
-  opts?: { priority?: number; delay?: number; attempts?: number };
+  opts?: McpFlowJobOptions;
 }
 
 export interface FlowNodeResult {
@@ -80,12 +123,9 @@ export interface McpBackend {
     queue: string,
     name: string,
     data: unknown,
-    opts?: { priority?: number; delay?: number; attempts?: number }
+    opts?: McpJobOptions
   ): Promise<{ jobId: string }>;
-  addJobsBulk(
-    queue: string,
-    jobs: Array<{ name: string; data: unknown; priority?: number; delay?: number }>
-  ): Promise<{ jobIds: string[] }>;
+  addJobsBulk(queue: string, jobs: McpBulkJob[]): Promise<{ jobIds: string[] }>;
   getJob(jobId: string): Promise<SerializedJob | null>;
   getJobState(jobId: string): Promise<string>;
   getJobResult(jobId: string): Promise<unknown>;
@@ -102,13 +142,19 @@ export interface McpBackend {
   getJobByCustomId(customId: string): Promise<SerializedJob | null>;
   waitForJobCompletion(jobId: string, timeoutMs: number): Promise<boolean>;
 
-  pullJob(queue: string, timeoutMs?: number): Promise<SerializedJob | null>;
-  pullJobBatch(queue: string, count: number, timeoutMs?: number): Promise<SerializedJob[]>;
-  ackJob(jobId: string, result?: unknown): Promise<void>;
-  ackJobBatch(jobIds: string[]): Promise<void>;
-  failJob(jobId: string, error?: string): Promise<void>;
-  jobHeartbeat(jobId: string): Promise<boolean>;
-  jobHeartbeatBatch(jobIds: string[]): Promise<number>;
+  pullJob(queue: string, timeoutMs?: number, lock?: PullLockOptions): Promise<PulledJob | null>;
+  pullJobBatch(
+    queue: string,
+    count: number,
+    timeoutMs?: number,
+    lock?: PullLockOptions
+  ): Promise<PulledJob[]>;
+  ackJob(jobId: string, result?: unknown, token?: string): Promise<void>;
+  /** `tokens` is aligned with `jobIds`; an empty entry means "no token". */
+  ackJobBatch(jobIds: string[], tokens?: string[]): Promise<void>;
+  failJob(jobId: string, error?: string, opts?: FailJobOptions): Promise<void>;
+  jobHeartbeat(jobId: string, token?: string): Promise<boolean>;
+  jobHeartbeatBatch(jobIds: string[], tokens?: string[]): Promise<number>;
   extendLock(jobId: string, token: string, duration: number): Promise<boolean>;
 
   getJobs(
@@ -127,13 +173,21 @@ export interface McpBackend {
   getCountsPerPriority(queue: string): Promise<Record<number, number>>;
 
   getDlq(queue: string, limit?: number): Promise<SerializedJob[]>;
+  /** DLQ entries oldest first; `hasMore` when entries beyond `offset + limit` match. */
+  getDlqEntries(
+    queue: string,
+    query: DlqQuery
+  ): Promise<{ entries: SerializedDlqEntry[]; hasMore: boolean }>;
+  getDlqStats(queue: string): Promise<SerializedDlqStats>;
   retryDlq(queue: string, jobId?: string): Promise<number>;
   purgeDlq(queue: string): Promise<number>;
   retryCompleted(queue: string, jobId?: string): Promise<number>;
-  setRateLimit(queue: string, limit: number): Promise<void>;
+  /** `durationMs` is the window `limit` applies to (broker default 1000). */
+  setRateLimit(queue: string, limit: number, durationMs?: number): Promise<void>;
   clearRateLimit(queue: string): Promise<void>;
   setConcurrency(queue: string, limit: number): Promise<void>;
   clearConcurrency(queue: string): Promise<void>;
+  getQueueLimits(queue: string): Promise<QueueLimits>;
 
   addCron(input: CronJobInput): Promise<SerializedCron>;
   getCron(name: string): Promise<SerializedCron | null>;

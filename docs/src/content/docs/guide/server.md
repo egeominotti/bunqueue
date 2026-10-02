@@ -174,7 +174,7 @@ bun add bunqueue @modelcontextprotocol/sdk
 claude mcp add bunqueue -- bunx --package=bunqueue bunqueue-mcp
 ```
 
-Point the MCP server at your instance with `BUNQUEUE_MODE=tcp`, `BUNQUEUE_HOST`, `BUNQUEUE_PORT`, and `BUNQUEUE_TOKEN` (when auth is on). Agents get 73 tools to add jobs, manage queues, schedule crons, and monitor everything. Full setup, including Claude Desktop, Cursor, and Windsurf config, in the [MCP guide](/guide/mcp/).
+Point the MCP server at your instance with `BUNQUEUE_MODE=tcp`, `BUNQUEUE_HOST`, `BUNQUEUE_PORT`, and `BUNQUEUE_TOKEN` (when auth is on). Agents get 75 tools to add jobs, manage queues, schedule crons, and monitor everything. Full setup, including Claude Desktop, Cursor, and Windsurf config, in the [MCP guide](/guide/mcp/).
 
 :::tip[Related Guides]
 

@@ -1,6 +1,6 @@
 ---
 title: "MCP Server: Let AI Agents Drive the Queue"
-description: "Connect Claude, Cursor or any MCP client to bunqueue with one command. Agents get 73 tools to add jobs, schedule crons, retry failures and monitor queues."
+description: "Connect Claude, Cursor or any MCP client to bunqueue with one command. Agents get 75 tools to add jobs, schedule crons, retry failures and monitor queues."
 head:
   - tag: meta
     attrs:
@@ -13,11 +13,11 @@ head:
   - tag: meta
     attrs:
       property: og:description
-      content: 73 MCP tools for AI agents. Schedule jobs, manage queues, auto-process via HTTP handlers, monitor everything. Zero config setup.
+      content: 75 MCP tools for AI agents. Schedule jobs, manage queues, auto-process via HTTP handlers, monitor everything. Zero config setup, stdio or Streamable HTTP.
   - tag: meta
     attrs:
       name: keywords
-      content: MCP, Model Context Protocol, AI agent, job queue, task scheduler, Claude, Claude Code, Claude Desktop, Cursor, Windsurf, bunqueue, cron jobs, HTTP handlers, dead letter queue, rate limiting, AI automation, agentic workflows, LLM tools, AI task queue
+      content: MCP, Model Context Protocol, AI agent, job queue, task scheduler, Claude, Claude Code, Claude Desktop, Cursor, Windsurf, bunqueue, cron jobs, HTTP handlers, dead letter queue, rate limiting, AI automation, agentic workflows, LLM tools, AI task queue, Streamable HTTP, human in the loop
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -30,7 +30,7 @@ import HttpHandlerFlow from '../../../components/HttpHandlerFlow.astro';
   <p class="bq-hero-sub">bunqueue ships a built-in MCP server, so AI agents like Claude and Cursor can add jobs, schedule crons and monitor queues by talking to it. One command to connect, no code to write.</p>
 </div>
 
-MCP (Model Context Protocol) is the open standard that lets AI agents call external tools. bunqueue exposes its whole queue surface as 73 MCP tools, so anything you can do with the SDK or CLI, an agent can do from a chat prompt.
+MCP (Model Context Protocol) is the open standard that lets AI agents call external tools. bunqueue exposes its whole queue surface as 75 MCP tools, so anything you can do with the SDK or CLI, an agent can do from a chat prompt. Three more, for approving [workflow](/guide/workflow/) runs, are available when you opt in.
 
 ## Quick start
 
@@ -55,9 +55,10 @@ Some real prompts and the tools they trigger:
 | You say | The agent calls |
 |---------|-----------------|
 | "Add 3 notification jobs: push, email, sms" | `bunqueue_add_jobs_bulk` |
-| "Schedule session cleanup every hour" | `bunqueue_add_cron` |
-| "Rate limit notifications to 50 per second" | `bunqueue_set_rate_limit` |
+| "Schedule session cleanup every day at 3 AM Rome time" | `bunqueue_add_cron` with `timezone` |
+| "Rate limit notifications to 100 per minute" | `bunqueue_set_rate_limit` with `duration` |
 | "Why are jobs stuck? Check the emails queue" | `bunqueue_debug_queue` prompt, then stats and DLQ tools |
+| "Which billing jobs failed today, and why?" | `bunqueue_get_dlq_stats`, then `bunqueue_get_dlq` filtered by `reason` |
 | "Retry everything in the dead letter queue" | `bunqueue_retry_dlq` |
 | "Create a pipeline: validate payment, send receipt, update inventory" | `bunqueue_add_flow_chain` |
 
@@ -88,6 +89,7 @@ Claude Desktop, Cursor and Windsurf all use the same JSON block. Config file loc
 | **Setup** | Zero config | Set `BUNQUEUE_MODE=tcp` plus host/port |
 | **Best for** | Local dev, single machine | Production queues shared by real workers |
 | **Data** | In-memory, or a SQLite file via `DATA_PATH` | The remote server owns memory/SQLite or PostgreSQL storage |
+| **HTTP handlers** | Process the MCP process's own queue | Process the remote server's queues |
 
 To manage a production server, point the MCP server at it:
 
@@ -108,11 +110,60 @@ To manage a production server, point the MCP server at it:
 }
 ```
 
-All 73 tools are available in both modes. One exception in behavior: [HTTP handler](#http-handlers) workers always run embedded inside the MCP process, so in TCP mode they do not consume jobs from the remote server's queues.
+All 75 tools work the same way in both modes, including [HTTP handlers](#http-handlers): in TCP mode their workers connect to the remote server and process its jobs, and the MCP process never opens a local database, even with `DATA_PATH` set. Two differences remain. `bunqueue_get_stats` reports push and pull rates in TCP mode, and prioritized, waiting-for-children, lifetime and cron totals in embedded mode. And [workflow signals](#workflow-approvals) need TCP mode.
+
+## Serve over HTTP
+
+By default each client starts its own `bunqueue-mcp` process and talks to it over stdio. Set `BUNQUEUE_MCP_TRANSPORT=http` to run one long-lived server that several clients reach over MCP Streamable HTTP. Every client gets its own session (in [`dynamic` mode](#load-only-the-tools-the-agent-needs), with its own loaded toolsets); all sessions share one queue connection and one set of HTTP handlers.
+
+```bash
+BUNQUEUE_MCP_TRANSPORT=http \
+BUNQUEUE_MCP_HTTP_TOKEN=change-me \
+BUNQUEUE_MODE=tcp BUNQUEUE_HOST=your-server.com BUNQUEUE_TOKEN=your-auth-token \
+bunx --package=bunqueue bunqueue-mcp
+# bunqueue MCP server started (mode: tcp, transport: http, url: http://127.0.0.1:6791/mcp, version: ...)
+```
+
+Point any client that supports Streamable HTTP at the URL, with the token as a bearer header:
+
+```bash
+claude mcp add --transport http bunqueue http://127.0.0.1:6791/mcp \
+  --header "Authorization: Bearer change-me"
+```
+
+Or in Claude Code's `.mcp.json` (other clients take the same URL and header, under their own key names):
+
+```json
+{
+  "mcpServers": {
+    "bunqueue": {
+      "type": "http",
+      "url": "http://127.0.0.1:6791/mcp",
+      "headers": { "Authorization": "Bearer change-me" }
+    }
+  }
+}
+```
+
+What the server enforces:
+
+- **It binds `127.0.0.1:6791` by default.** A token is optional on a loopback address and required on any other: with `BUNQUEUE_MCP_HTTP_HOST=0.0.0.0` (or a LAN address) and no `BUNQUEUE_MCP_HTTP_TOKEN`, the server refuses to start. `BUNQUEUE_MCP_HTTP_TOKEN` takes a comma-separated list, so you can rotate tokens one at a time. A missing or wrong token gets 401.
+- **Host and Origin are checked** against DNS-rebinding attacks from web pages. The `Host` header must name the bound address, or `localhost`, `127.0.0.1` or `[::1]` when bound to loopback or `0.0.0.0`, always with the bound port; or match an entry of `BUNQUEUE_MCP_HTTP_ALLOWED_HOSTS` (`name` for any port, or `name:port`). An `Origin` header, when sent, must be the server's own origin or an entry of `BUNQUEUE_MCP_HTTP_ALLOWED_ORIGINS`. Anything else gets 403.
+- **Sessions live in memory.** A restart ends them all and clients reconnect (an unknown session id gets 404). A session idle for `BUNQUEUE_MCP_HTTP_SESSION_TTL_MS` (30 minutes) is closed, never while one of its tool calls is still running. At `BUNQUEUE_MCP_HTTP_MAX_SESSIONS` (100) a new client gets 503 until a session closes. Request bodies are capped at 4 MiB.
+- **There is no built-in TLS.** To reach the server from another machine, keep it on loopback behind a reverse proxy that terminates TLS, and set a token anyway, because the proxy makes the port public:
+
+```text
+# Caddyfile
+mcp.example.com {
+  reverse_proxy 127.0.0.1:6791
+}
+```
+
+Caddy forwards the public `Host`, so start the server with `BUNQUEUE_MCP_HTTP_ALLOWED_HOSTS=mcp.example.com`. Behind nginx, set `proxy_buffering off` so streamed responses are not held back.
 
 ## HTTP Handlers
 
-Agents can schedule jobs, but they cannot run a long-lived worker process to execute them. HTTP handlers close that gap: the agent registers a URL on a queue, and the MCP server spawns an embedded worker that pulls each job and calls that URL. The HTTP response becomes the job result; a non-2xx response or timeout fails the job into the normal retry and dead letter flow.
+Agents can schedule jobs, but they cannot run a long-lived worker process to execute them. HTTP handlers close that gap: the agent registers a URL on a queue, and the MCP server starts a worker that pulls each job and calls that URL. The worker processes the MCP server's own queue in embedded mode and the remote server's queue in TCP mode. The HTTP response becomes the job result; a non-2xx response or timeout fails the job into the normal retry and dead letter flow.
 
 ```bash
 $ claude
@@ -146,33 +197,169 @@ $ claude
 Use handlers when processing is just an HTTP call (API polling, webhook forwarding, health checks). For custom logic (database writes, file processing), deploy a normal [Worker](/guide/worker/) instead; the agent still orchestrates jobs and crons, the worker executes them.
 
 <Aside type="caution">
-  Handlers live inside the MCP server process. When the agent session ends, the process exits and all handlers stop. Re-register them in the next session if needed.
+  Handlers live inside the MCP server process. Over stdio, the process exits when the agent session ends and all handlers stop: re-register them in the next session if needed. Over [HTTP](#serve-over-http), they keep running across sessions until the server stops.
 </Aside>
 
 ## Tool reference
 
-73 tools covering the full queue surface. The agent discovers them automatically, so you rarely need this table; it is here so you know what is on the menu.
+75 tools covering the full queue surface, grouped in the toolsets you can load [one at a time](#load-only-the-tools-the-agent-needs). The agent discovers them automatically, so you rarely need this table; it is here so you know what is on the menu.
 
-| Category | Tools | Examples |
-|----------|-------|----------|
-| Jobs: add and query | 11 | `add_job`, `add_jobs_bulk`, `get_job`, `get_job_result`, `wait_for_job` |
-| Jobs: manage | 6 | `update_job_data`, `change_job_priority`, `move_to_delayed`, `discard_job` |
-| Jobs: consume | 8 | `pull_job`, `ack_job`, `fail_job`, `job_heartbeat`, `extend_lock` |
-| Queue control | 11 | `list_queues`, `pause_queue`, `drain_queue`, `clean_queue`, `get_job_counts` |
-| Dead letter queue | 4 | `get_dlq`, `retry_dlq`, `purge_dlq`, `retry_completed` |
-| Cron scheduling | 4 | `add_cron`, `list_crons`, `get_cron`, `delete_cron` |
-| Rate limits and concurrency | 4 | `set_rate_limit`, `clear_rate_limit`, `set_concurrency`, `clear_concurrency` |
-| Webhooks | 4 | `add_webhook`, `remove_webhook`, `list_webhooks`, `set_webhook_enabled` |
-| Workers | 3 | `register_worker`, `unregister_worker`, `worker_heartbeat` |
-| Monitoring | 11 | `get_stats`, `get_queue_stats`, `get_job_logs`, `get_prometheus_metrics` |
-| Workflows | 4 | `add_flow`, `add_flow_chain`, `add_flow_bulk_then`, `get_flow` |
-| HTTP handlers | 3 | `register_handler`, `unregister_handler`, `list_handlers` |
+| Toolset | Tools | Examples |
+|---------|-------|----------|
+| `jobs` | 12 | `add_job`, `add_jobs_bulk`, `get_job`, `get_job_result`, `wait_for_job`, `get_job_logs` |
+| `job-control` | 7 | `cancel_job`, `promote_job`, `change_job_priority`, `move_to_delayed`, `discard_job` |
+| `processing` | 8 | `pull_job`, `ack_job`, `fail_job`, `job_heartbeat`, `extend_lock` |
+| `queues` | 11 | `list_queues`, `get_job_counts`, `pause_queue`, `drain_queue`, `clean_queue` |
+| `dlq` | 5 | `get_dlq`, `get_dlq_stats`, `retry_dlq`, `purge_dlq`, `retry_completed` |
+| `cron` | 4 | `add_cron`, `list_crons`, `get_cron`, `delete_cron` |
+| `limits` | 5 | `set_rate_limit`, `set_concurrency`, `get_queue_limits`, `clear_rate_limit` |
+| `flows` | 5 | `add_flow`, `add_flow_chain`, `add_flow_bulk_then`, `get_flow`, `get_children_values` |
+| `workers` | 7 | `register_worker`, `list_workers`, `register_handler`, `list_handlers` |
+| `webhooks` | 4 | `add_webhook`, `list_webhooks`, `set_webhook_enabled`, `remove_webhook` |
+| `monitoring` | 7 | `get_stats`, `get_queue_stats`, `get_memory_stats`, `get_prometheus_metrics` |
+| `workflows` (opt-in) | 3 | `list_workflow_executions`, `get_workflow_execution`, `signal_workflow` |
 
-Every tool name is prefixed `bunqueue_`. All tools return structured errors (`isError: true` with a plain message, never a stack trace).
+Every tool name is prefixed `bunqueue_`. All tools return structured errors (`isError: true` with a plain message, never a stack trace). Inputs are checked before anything reaches the queue, with the same bounds the server applies: queue and job names cannot be empty, priorities are integers within ±1,000,000, attempts are 1 to 1000, limits are positive integers. A rejected call changes nothing.
+
+### Parameters worth knowing
+
+- **Job options.** `add_job` and every item of `add_jobs_bulk` accept `priority`, `delay`, `attempts`, `backoff` (a number is an exponential base; or `{ type: 'fixed' | 'exponential', delay, maxDelay }`), `timeout`, `jobId`, `deduplication` (`{ id, ttl, extend, replace }`, scoped to the queue), `removeOnComplete`, `removeOnFail`, `durable`, `lifo`, `tags` and `stallTimeout`. A `jobId` is idempotent: adding it again while that job is unfinished returns the existing job. The flow tools take the same `opts` except `deduplication`, `tags` and `durable`, which are rejected. `get_job` and job listings show the options a job carries.
+- **Lock tokens.** Pass `owner` (and optionally `lockTtl`, 1 second to 24 hours, default 30 seconds) to `pull_job` or `pull_job_batch` and each job comes back locked, with a `token`. `ack_job`, `fail_job` and `job_heartbeat` then take `token`, and the batch tools take `tokens`, one per job id (`""` for a job pulled without an owner). A missing or wrong token on ack or fail is an error and the job stays active. A heartbeat with the token renews the lock; a lock that is not renewed expires, and the job uses up an attempt and is retried (or moves to the dead letter queue when none remain). `fail_job` also takes `unrecoverable: true` to skip the remaining attempts.
+- **Failure reasons.** `get_dlq` returns entries, oldest first, each with the job and why it failed: `reason` (`explicit_fail`, `max_attempts_exceeded`, `timeout`, `stalled`, `ttl_expired`, `worker_lost` or `unknown`), the last `error`, the last 10 attempts (`attemptCount` is the total) and its retry and expiry times. Filter with `reason`, page with `limit` (1 to 100, default 20) and `offset` while `hasMore` is true. `get_dlq_stats` gives the total, the count per reason, entries due for automatic retry, expired entries and the oldest and newest entry.
+- **Limits.** `set_rate_limit` takes `duration`, the window in milliseconds (default 1000), so "100 per minute" is `limit: 100, duration: 60000`. `get_queue_limits` reads back the rate limit, the concurrency limit, the active jobs, whether either limit is holding jobs back, and whether the queue is paused.
+- **Cron.** `add_cron` takes `timezone` (an IANA name such as `Europe/Rome`, only with `schedule`), `jobName`, `priority`, `maxLimit` (remove the schedule after that many runs), `immediately`, `skipIfNoWorker`, `preventOverlap` (on by default: at most one pending job per schedule), `skipMissedOnRestart`, `deduplication`, and options for the jobs it adds: `attempts`, `backoff`, `timeout`, `delay`, `stallTimeout`, `removeOnComplete` and `removeOnFail`. `list_crons` and `get_cron` show the time zone, job name, priority and run limit; the policy flags, deduplication and job options are applied but not shown, because the server does not return them.
 
 ### Prompts and resources
 
-The server also ships 3 pre-built diagnostic prompts, `bunqueue_health_report` (full health check with OK/WARNING/CRITICAL levels), `bunqueue_debug_queue` (deep dive on one queue) and `bunqueue_incident_response` (a triage playbook for "jobs not processing"), plus 5 read-only resources the agent can read at any time: `bunqueue://stats`, `bunqueue://queues`, `bunqueue://crons`, `bunqueue://workers`, `bunqueue://webhooks`.
+The server also ships 3 pre-built diagnostic prompts, `bunqueue_health_report` (full health check with OK/WARNING/CRITICAL levels), `bunqueue_debug_queue` (deep dive on one queue, including dead letter entries with their failure reasons) and `bunqueue_incident_response` (a triage playbook for "jobs not processing"), plus 5 read-only resources the agent can read at any time: `bunqueue://stats`, `bunqueue://queues`, `bunqueue://crons`, `bunqueue://workers`, `bunqueue://webhooks`.
+
+## Load only the tools the agent needs
+
+Every tool description costs context. With all 75 tools listed, a client that loads every tool sends about 16,000 tokens of tool schemas on each request, before the agent reads a word of your question. Set `BUNQUEUE_MCP_TOOLSETS` to expose less. It is off by default: without it, the tool list is exactly the 75 tools above (up to 78 with the workflow tools).
+
+| Value | What the agent sees |
+|-------|---------------------|
+| unset or `all` | All 75 tools (default) |
+| `queues,dlq` | Only those toolsets. Works with every MCP client |
+| `dynamic` | A catalog of 11 toolsets (12 with the workflow tools); the agent loads the groups it needs |
+| `dynamic,monitoring` | The catalog, with `monitoring` already loaded |
+
+The 11 toolsets are `jobs`, `job-control`, `processing`, `queues`, `dlq`, `cron`, `limits`, `flows`, `workers`, `webhooks` and `monitoring`, plus `workflows` when [workflow tools](#workflow-approvals) are enabled. In `dynamic` mode the agent starts with two tools: `bunqueue_enable_toolsets`, whose description is the catalog, and `bunqueue_call_tool`. The catalog alone is about 850 tokens. With one toolset loaded the agent sees between 1,300 and 4,600 tokens (about 1,800 for a typical toolset; `jobs` and `flows` are the largest), close to 90% less than the full list. Loading a toolset refreshes the client's tool list; clients that do not refresh it can call the loaded tools through `bunqueue_call_tool`, which validates the arguments against the tool's own schema.
+
+```bash
+claude mcp add bunqueue -e BUNQUEUE_MCP_TOOLSETS=dynamic -- bunx --package=bunqueue bunqueue-mcp
+```
+
+<Aside type="tip" title="Measured, not guessed">
+We tested the catalog before shipping it, on the 11 toolsets, with 72 requests that include paraphrases such as "let billing jobs run again" and requests in Italian. Given only the descriptions, TypeSafe Jev picked the toolset containing the right tool for 71 of 72 on the first run; after we reworded the one description involved in the miss, it picked all 72 (so that last score is not a blind result). Keyword search over the individual 75 tools found the right tool in its top 5 for only 53% of the held-out requests, so the selection is left to the model. The requests, the script and the full results are in [`scripts/mcp-eval/`](https://github.com/egeominotti/bunqueue/tree/main/scripts/mcp-eval).
+</Aside>
+
+## Confirm destructive operations
+
+Set `BUNQUEUE_MCP_CONFIRM=destructive` and two things change. Every tool is annotated as read-only, destructive, idempotent or open-world, so clients can treat `get_stats` and `obliterate_queue` differently. And nine tools no longer act on the first call, because they delete data for good or re-run already completed work in bulk (retrying failed jobs from the DLQ is not guarded: it is the normal remedy for a failure):
+
+`obliterate_queue`, `drain_queue`, `clean_queue`, `purge_dlq`, `cancel_job`, `clear_job_logs`, `delete_cron`, `remove_webhook`, and `retry_completed` without a `jobId`. With the [workflow tools](#workflow-approvals) enabled, `signal_workflow` is the tenth: a signal can never be withdrawn. (`discard_job` is not on the list: it moves the job to the dead letter queue, where it can be retried.)
+
+Before running one of them, the server works out the impact, for example "Permanently delete queue "billing" and every job in it (1204 waiting, 0 prioritized, 0 delayed, 3 active, ...)". Previews count paused jobs too, and `purge_dlq` states the exact number of entries it deletes. Then:
+
+1. **If your client can ask you** (MCP elicitation), you see the impact and confirm or decline. Your answer is final: a decline stops the call even if the agent tried to confirm it.
+2. **If it cannot**, the call returns `executed: false` with the error "Confirmation required for a destructive operation." (or "Confirmation required for this operation." for the bulk `retry_completed` and `signal_workflow`, which delete nothing), the impact and how to confirm. The agent has to show the impact to you and call again with `confirm` set to the exact target: the queue name, job id, cron name, webhook id or execution id.
+
+The confirmation names the target only. The rest of the call (for example the `state` and `graceMs` of `clean_queue`) is whatever the confirmed call carries, and the impact you approve describes exactly those arguments, so read it before saying yes.
+
+Every other tool behaves as before.
+
+```bash
+claude mcp add bunqueue -e BUNQUEUE_MCP_CONFIRM=destructive -- bunx --package=bunqueue bunqueue-mcp
+```
+
+## Decision models: Jev, Clef, Clef-flash, Kev 9B, Laya
+
+Decision models answer typed questions (pick one option, or say how likely a statement is) instead of writing text, in a few milliseconds. bunqueue can use one, optionally, for two jobs:
+
+- **`bunqueue_find_tools`** (with `BUNQUEUE_MCP_TOOLSETS=dynamic`): the agent describes what it needs in plain words and the model picks and loads the toolset. Useful with smaller agent models that struggle to choose among many tools.
+- **A second check on destructive calls** (with `BUNQUEUE_MCP_CONFIRM=destructive`), when your client cannot ask you. The agent must also pass your request in your own words (`userRequest`), and the model must judge that it explicitly asks for that exact operation. The model can only block a call, never approve one on your behalf: it is not consulted when you confirmed through the client, and if it is unreachable or unsure the call is refused.
+
+All supported models share one request format (SystemOne: `model`, `state`, `questions`), so you pick a provider and a model:
+
+| Provider | Models | Configuration |
+|----------|--------|---------------|
+| `typesafe` | Jev (`jev-latest`, `jev-1.13.0`) | `BUNQUEUE_MCP_DECISION_API_KEY` |
+| `cloudflare` | Clef, Clef-flash (Workers AI) | `BUNQUEUE_MCP_DECISION_API_KEY`, `BUNQUEUE_MCP_DECISION_ACCOUNT_ID` |
+| `systemone` | Any self-hosted or third-party endpoint that accepts the same request: Clef and Clef-flash (open weights), Kev 9B, Laya, DiffusionGemma Jev | `BUNQUEUE_MCP_DECISION_URL`, `BUNQUEUE_MCP_DECISION_MODEL`, optional key |
+
+```json
+{
+  "mcpServers": {
+    "bunqueue": {
+      "command": "bunx",
+      "args": ["--package=bunqueue", "bunqueue-mcp"],
+      "env": {
+        "BUNQUEUE_MCP_TOOLSETS": "dynamic",
+        "BUNQUEUE_MCP_CONFIRM": "destructive",
+        "BUNQUEUE_MCP_DECISION_PROVIDER": "cloudflare",
+        "BUNQUEUE_MCP_DECISION_MODEL": "clef-flash",
+        "BUNQUEUE_MCP_DECISION_ACCOUNT_ID": "your-account-id",
+        "BUNQUEUE_MCP_DECISION_API_KEY": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+For a self-hosted model, point `BUNQUEUE_MCP_DECISION_URL` at your endpoint, for example `http://127.0.0.1:8000/v1/systemone` with `BUNQUEUE_MCP_DECISION_MODEL=kev-9b`. Clef's model card ships a `systemone()` helper that takes and returns exactly this request and response, which is the simplest way to serve the open weights.
+
+Which model to choose depends on the job. On the public decision-model benchmarks, Jev leads When2Call (knowing when not to call a tool, 80.97), the skill behind the destructive-call check, while Clef leads tool retrieval (ToolRet 69.19), the skill behind `bunqueue_find_tools`, and Clef-flash answers in about 39 ms at the median, roughly 13 times faster than Jev. Because the model can only block, a weaker model makes the check stricter (more refusals), never less safe.
+
+<Aside type="caution">
+Requests to a hosted provider send the user's request text, the operation description (queue names, job names, counts) and the toolset catalog to that provider. Job payloads are never sent; the one exception is `signal_workflow`, whose description includes a preview of the signal payload (at most 500 characters). If that is not acceptable, use a self-hosted model or leave the decision model off.
+</Aside>
+
+## Workflow approvals
+
+If your application runs the [workflow engine](/guide/workflow/), an agent can list its runs, inspect one, and deliver the [human-in-the-loop signal](/guide/workflow/approval/) a run is waiting for, so "approve expense run 4f1c..." works from the chat. Set `BUNQUEUE_MCP_WORKFLOW_DB` to the Engine's `dataPath` file and three tools appear, in the `workflows` toolset:
+
+| Tool | What it does |
+|------|--------------|
+| `bunqueue_list_workflow_executions` | Runs, newest first, filtered by `workflowName` and `state` (`running`, `waiting`, `completed`, `failed`, `compensating`, `compensation-stuck`), paged with `limit` and `offset`. A waiting run shows the event it waits for when its `waitFor` has a timeout |
+| `bunqueue_get_workflow_execution` | One run: input, every step record (status, attempts, error, result, compensation), the signals received with their payloads, failure reason and rollback status |
+| `bunqueue_signal_workflow` | What `engine.signal(executionId, event, payload)` does in your app: the first signal for an event wins and cannot be changed or withdrawn. A run parked at the gate resumes; a run that has not reached it yet keeps the signal for later |
+
+The MCP server never runs workflow steps: the step code lives in your application. To resume a run, it records the signal in the workflow database through the same transaction `engine.signal()` uses, then adds the run's next step job to the Engine's queue, where your Engine picks it up. That works in one topology:
+
+- Your app's Engine connects to a bunqueue server over TCP and keeps its own `dataPath` file: `new Engine({ embedded: false, connection: { host, port }, dataPath: '/srv/app/data/workflows.db' })`.
+- The MCP server runs in TCP mode against the same server.
+- The MCP server runs on the same host and can open that file, its `-wal` and `-shm` files and its directory for writing. SQLite over a network filesystem is not safe.
+- If you changed the Engine's `queueName`, `BUNQUEUE_MCP_WORKFLOW_QUEUE` has the same value (default `__wf:steps`).
+
+```json
+{
+  "mcpServers": {
+    "bunqueue": {
+      "command": "bunx",
+      "args": ["--package=bunqueue", "bunqueue-mcp"],
+      "env": {
+        "BUNQUEUE_MODE": "tcp",
+        "BUNQUEUE_HOST": "your-server.com",
+        "BUNQUEUE_PORT": "6789",
+        "BUNQUEUE_TOKEN": "your-auth-token",
+        "BUNQUEUE_MCP_WORKFLOW_DB": "/srv/app/data/workflows.db"
+      }
+    }
+  }
+}
+```
+
+Use an absolute path: a relative one is resolved against the MCP process's working directory, which your client chooses. The server never creates the file; it must exist already.
+
+**Embedded apps call `engine.signal()` themselves.** An embedded Engine (`new Engine({ embedded: true, dataPath })`) keeps its step queue inside your application process, where no other process can add a job, so a resume job from the MCP server would never run. The MCP server recognizes this (the file also holds bunqueue's `jobs` table), and the same applies when the MCP server itself runs embedded. In both cases it still lists and inspects runs, but does not register `bunqueue_signal_workflow` and prints the reason on stderr at startup.
+
+A few limits to know:
+
+- A signal for a different event than the one a timed gate waits for is refused, so a typo cannot pre-open a later gate. For gates without a timeout the awaited event is not recorded, so the run shows `waitingFor: null`.
+- The MCP server cannot check that it talks to the same bunqueue server and queue as your Engine. If it does not, the run shows `running` and waits until your app calls `engine.recover()`.
+- Your app's `signal:received` listeners do not fire for signals sent through MCP; the step and workflow events that follow do.
+- With `BUNQUEUE_MCP_CONFIRM=destructive`, every signal needs confirmation; the impact names the workflow, the gate and a preview of the payload.
 
 ## Environment variables
 
@@ -183,6 +370,28 @@ The server also ships 3 pre-built diagnostic prompts, `bunqueue_health_report` (
 | `BUNQUEUE_PORT` | `6789` | TCP server port |
 | `BUNQUEUE_TOKEN` | (none) | Auth token for TCP |
 | `DATA_PATH` | (none, in-memory) | SQLite path for embedded mode (`BUNQUEUE_DATA_PATH` and `BQ_DATA_PATH` take priority). Unset means jobs are not persisted |
+| `BUNQUEUE_MCP_TRANSPORT` | `stdio` | `stdio` or `http` (Streamable HTTP) |
+| `BUNQUEUE_MCP_HTTP_HOST` | `127.0.0.1` | Interface to bind in http mode; a non-loopback address requires a token |
+| `BUNQUEUE_MCP_HTTP_PORT` | `6791` | Port in http mode; `0` picks a free port |
+| `BUNQUEUE_MCP_HTTP_PATH` | `/mcp` | Endpoint path (exact match) |
+| `BUNQUEUE_MCP_HTTP_TOKEN` | (none) | Comma-separated bearer tokens; required on a non-loopback host |
+| `BUNQUEUE_MCP_HTTP_MAX_SESSIONS` | `100` | Concurrent sessions; beyond it new clients get 503 |
+| `BUNQUEUE_MCP_HTTP_SESSION_TTL_MS` | `1800000` | Idle time before a session is closed |
+| `BUNQUEUE_MCP_HTTP_ALLOWED_HOSTS` | (none) | Extra accepted `Host` values: `name` (any port) or `name:port` |
+| `BUNQUEUE_MCP_HTTP_ALLOWED_ORIGINS` | (none) | Extra accepted `Origin` values, such as `https://app.example.com` |
+| `BUNQUEUE_MCP_TOOLSETS` | (all tools) | `all`, a comma list of toolsets, or `dynamic` optionally followed by toolsets to preload |
+| `BUNQUEUE_MCP_CONFIRM` | (off) | `destructive`: annotate every tool and require confirmation for the nine guarded tools (ten with workflow tools) |
+| `BUNQUEUE_MCP_DECISION_PROVIDER` | (none) | `typesafe`, `cloudflare` or `systemone` |
+| `BUNQUEUE_MCP_DECISION_MODEL` | `jev-latest` / `clef-flash` | Model id; required for `systemone` |
+| `BUNQUEUE_MCP_DECISION_API_KEY` | (none) | Bearer token; required for `typesafe` and `cloudflare` |
+| `BUNQUEUE_MCP_DECISION_ACCOUNT_ID` | (none) | Cloudflare account id for `cloudflare` |
+| `BUNQUEUE_MCP_DECISION_URL` | provider default | Endpoint; required for `systemone` |
+| `BUNQUEUE_MCP_DECISION_TIMEOUT_MS` | `10000` | Request timeout (one retry on network errors, 429 and overload) |
+| `BUNQUEUE_MCP_DECISION_THRESHOLD` | `0.8` | Minimum probability that your request asks for the destructive operation |
+| `BUNQUEUE_MCP_WORKFLOW_DB` | (none) | The workflow Engine's existing `dataPath` file; enables the workflow tools |
+| `BUNQUEUE_MCP_WORKFLOW_QUEUE` | `__wf:steps` | The Engine's `queueName`, where resumed runs get their next step job |
+
+An invalid value in any `BUNQUEUE_MCP_*` variable stops the server at startup with a message saying what is accepted.
 
 ## Troubleshooting
 
@@ -193,3 +402,19 @@ The server also ships 3 pre-built diagnostic prompts, `bunqueue_health_report` (
 **The agent does not see the tools.** Restart your MCP client, check the config JSON is valid, then run `bunx --package=bunqueue bunqueue-mcp` manually to see the actual error.
 
 **Jobs sit in `waiting` forever.** Nothing is processing the queue. Ask the agent to register an HTTP handler, or run a [Worker](/guide/worker/).
+
+**`Refusing to serve MCP over HTTP on non-loopback host ... without authentication`.** `BUNQUEUE_MCP_HTTP_HOST` is not a loopback address and `BUNQUEUE_MCP_HTTP_TOKEN` is not set. Set a token, or bind `127.0.0.1` behind a [reverse proxy](#serve-over-http).
+
+**HTTP requests get 403 `Forbidden: invalid Host header` (or `Origin`).** The request reached the server under a name it does not know, usually through a reverse proxy, a LAN address or a `0.0.0.0` bind. Add that name to `BUNQUEUE_MCP_HTTP_ALLOWED_HOSTS`, and browser origins to `BUNQUEUE_MCP_HTTP_ALLOWED_ORIGINS`.
+
+**HTTP requests get 401, or 404 `Session not found`.** 401: the client sends no `Authorization: Bearer <token>` header, or a token not in `BUNQUEUE_MCP_HTTP_TOKEN`. 404 after a restart or a long pause: sessions live in memory and expire when idle, so reconnect the client.
+
+**`Lock token required for job <id>`.** The job was pulled with an `owner`, so it is locked. Pass the `token` from the pull to `ack_job`, `fail_job` or `job_heartbeat`. `move_to_delayed`, `change_delay` and `discard_job` take no token and reject a locked job: finish it with `fail_job` (with its token, and `unrecoverable: true` to send it to the dead letter queue) or let the lock expire.
+
+**`add_cron` fails with `Unknown time zone`.** Use an IANA name such as `Europe/Rome` or `America/New_York`; offsets such as `+02:00` are not accepted. A `timezone` also needs a `schedule`: it has no effect with `repeatEvery`.
+
+**`wait_for_job` returns `Job not found`.** No job has that id; the tool now says so at once instead of waiting out the timeout.
+
+**`BUNQUEUE_MCP_WORKFLOW_DB ... does not exist or is not a file`** (or `is not a bunqueue workflow database`). The MCP server never creates a workflow database. Point it, as an absolute path, at the `dataPath` file of an Engine that has already started once. `BUNQUEUE_MCP_TOOLSETS selects toolsets with no tool in this configuration: workflows` means the same variable is missing.
+
+**`bunqueue_signal_workflow` is missing.** The server printed the reason on stderr at startup: it runs embedded, or the workflow database belongs to an embedded Engine. See [Workflow approvals](#workflow-approvals).

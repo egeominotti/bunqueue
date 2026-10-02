@@ -88,7 +88,7 @@ export const covers: readonly Cover[] = [
     l2pre: 'your ',
     l2: 'stack.',
     sub: 'Hono, Elysia, MCP for AI agents, Prometheus, webhooks, S3.',
-    stats: ['73 MCP tools', 'SSE + WebSocket', 'Prometheus'],
+    stats: ['75 MCP tools', 'SSE + WebSocket', 'Prometheus'],
   },
   {
     file: 'og/advanced',
@@ -106,7 +106,7 @@ export const covers: readonly Cover[] = [
     l2pre: 'run ',
     l2: 'on it.',
     sub: 'Email, webhooks, payments, images, AI agents, cron.',
-    stats: ['12+ patterns', 'saga rollback', '73 MCP tools'],
+    stats: ['12+ patterns', 'saga rollback', '75 MCP tools'],
   },
   {
     file: 'og/workflow',

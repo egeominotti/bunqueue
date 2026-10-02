@@ -178,7 +178,7 @@ That is a complete, working queue. The [Quick Start](/guide/quickstart/) walks t
 - **Native Bun.** Local persistence uses `bun:sqlite`; PostgreSQL uses Bun's built-in `SQL` client directly, with no ORM or third-party database driver.
 - **Familiar API.** If you know BullMQ, you already know most of bunqueue.
 - **Production features.** Retries with backoff (automatic waiting between retry attempts), a dead letter queue (a holding area for jobs that keep failing), cron scheduling, rate limiting, stall detection, and S3 backups.
-- **AI-agent ready.** A built-in MCP server with 73 tools lets agents like Claude add jobs, manage crons, and monitor queues via natural language.
+- **AI-agent ready.** A built-in MCP server with 75 tools lets agents like Claude add jobs, manage crons, and monitor queues via natural language.
 
 ## Two ways to run it
 
@@ -326,7 +326,7 @@ Server mode also unlocks clients in other runtimes: Node.js, Deno, Python, PHP, 
 | Pro telemetry / NestJS integration     | No             | Pro package  |
 | Advanced DLQ (auto-retry, filters)    | Yes            | Basic        |
 | S3 backups                            | SQLite mode    | No           |
-| MCP server for AI agents              | Yes (73 tools) | No           |
+| MCP server for AI agents              | Yes (75 tools) | No           |
 | Built-in workflow engine              | Yes            | No           |
 
 Migrating? The API is intentionally close to BullMQ, see the [migration guide](/guide/migration/).

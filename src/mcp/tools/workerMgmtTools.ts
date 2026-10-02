@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpBackend } from '../adapter';
+import { queueField } from './schemas';
 import { withErrorHandler } from './withErrorHandler';
 
 export function registerWorkerMgmtTools(server: McpServer, backend: McpBackend) {
@@ -15,7 +16,7 @@ export function registerWorkerMgmtTools(server: McpServer, backend: McpBackend) 
     'Register a new worker to process jobs from specified queues.',
     {
       name: z.string().describe('Worker name/identifier'),
-      queues: z.array(z.string()).min(1).describe('Queues this worker will process'),
+      queues: z.array(queueField()).min(1).describe('Queues this worker will process'),
     },
     withErrorHandler('bunqueue_register_worker', async ({ name, queues }) => {
       const worker = await backend.registerWorker(name, queues);

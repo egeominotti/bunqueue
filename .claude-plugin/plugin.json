@@ -1,6 +1,6 @@
 {
   "name": "bunqueue",
-  "description": "AI-native job queue for Bun — skills, MCP server (73 tools), custom agent, SQLite persistence, cron, priorities, retries, DLQ, webhooks",
+  "description": "AI-native job queue for Bun — skills, MCP server (75 tools), custom agent, SQLite persistence, cron, priorities, retries, DLQ, webhooks",
   "version": "1.1.0",
   "author": {
     "name": "egeominotti"

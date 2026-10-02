@@ -5,6 +5,7 @@
 import { Database } from 'bun:sqlite';
 import { pack } from './storeCodec';
 import { SignalCoordinator } from './storeSignals';
+import { WaitExpiry, type WaitExpiryOutcome } from './storeWaitExpiry';
 import type {
   Execution,
   ExecutionListOptions,
@@ -69,6 +70,7 @@ export class WorkflowStore {
   };
   /** Sole owner of the `signals` column — see storeSignals.ts */
   private readonly signals: SignalCoordinator;
+  private readonly waitExpiry: WaitExpiry;
   private readonly listing: ExecutionListing;
 
   constructor(dbPath?: string) {
@@ -127,6 +129,7 @@ export class WorkflowStore {
     };
 
     this.signals = new SignalCoordinator(this.db);
+    this.waitExpiry = new WaitExpiry(this.db);
     this.listing = new ExecutionListing(this.db);
   }
 
@@ -222,6 +225,14 @@ export class WorkflowStore {
    */
   parkForSignal(id: string, event: string): ParkOutcome {
     return this.signals.park(id, event);
+  }
+
+  /**
+   * Fail a timed-out `waitFor` only while its signal is still absent, in one claim
+   * that record() cannot interleave with — see storeWaitExpiry.ts.
+   */
+  expireWait(failed: Execution, event: string, nodeIndex: number): WaitExpiryOutcome {
+    return this.waitExpiry.claim(failed, event, nodeIndex);
   }
 
   list(workflowName?: string, state?: ExecutionState, options?: ExecutionListOptions): Execution[] {
