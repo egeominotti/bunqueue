@@ -18,6 +18,27 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## Unreleased
+
+### Documentation
+
+- **Generated API reference pages are `noindex, follow` and out of the
+  sitemap.** 262 of the 383 sitemap URLs were near-identical TypeDoc pages,
+  and Search Console reported most of the sitemap as not indexed, including
+  hand-written guides such as the quickstart and installation pages. The
+  generated pages stay browsable and linked from `/reference/`, and keep their
+  specific titles, descriptions and self canonicals. Any
+  existing `robots`, `googlebot` or `bingbot` directive on them is replaced by
+  exactly one `robots` tag, and `docs:validate-discovery` now fails if a
+  current reference page is indexable. The sitemap goes from 383 to 121 URLs.
+- **The home page quickstart runs as written in every language.** Deno now
+  gets `--allow-read` and unscoped `--allow-sys`, so the worker no longer stops
+  at a permission prompt in a terminal. PHP and Go list their minimum toolchain
+  versions. Elixir clones with `--depth 1`, says which `deps/0` to replace, and
+  installs Hex before `mix deps.get` so a fresh machine does not prompt. Both
+  "See it work" steps say that the worker keeps waiting and that
+  <kbd>Ctrl</kbd>+<kbd>C</kbd> stops it.
+
 ## [2.9.7] - 2026-10-02
 
 ### SDK releases

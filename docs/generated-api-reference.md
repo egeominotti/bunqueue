@@ -105,7 +105,7 @@ unaffected. Unit coverage for the scanners lives in `test/check-docs-data.test.t
 
 The version banner is the one piece of markup injected by the script, because TypeDoc has no slot for site chrome. It answers the two questions its own header cannot: which version am I reading, and how do I get back. Injection is idempotent, guarded by a check for `bq-ref-banner`, so re-running the build does not stack banners.
 
-`injectHead()` adds a second, separately-guarded injection: `<meta name="robots" content="noindex, follow">`, but **only on trees that are not the current version** (`shouldNoindex(version, current)`). The current tree stays indexable on purpose: a search for a type name should be able to reach its reference page. Older trees and `--dev` previews never index, so near-identical pages do not compete across every released version.
+`injectHead()` adds a second, separately-guarded injection: `<meta name="robots" content="noindex, follow">`, but **only on trees that are not the current version** (`shouldNoindex(version, current)`). Older trees and `--dev` previews never index, so near-identical pages do not compete across every released version. The tracked current tree keeps an indexable head, but the published site does not index it either: `docs/src/lib/reference-seo.ts` adds `noindex, follow` to the current pages at build time (see below).
 
 Demotion happens on the release that supersedes a tree, not when the tree is written: `main()` injects into the tree TypeDoc just produced, then walks every sibling version directory and re-runs the same injection with `noindex` on each one that is no longer current. Without that second pass the policy could never fire for a released version — a tree is only ever generated while it _is_ current, so it would keep the indexable head it was born with and each release would add another near-identical competitor. Both passes are idempotent, so re-running costs nothing.
 
@@ -120,28 +120,34 @@ HTML in Astro's `astro:build:done` hook. Titles and descriptions identify the
 symbol kind, module, and version; the index and hierarchy have separate metadata.
 Open Graph and Twitter metadata use the same per-page values. Injection escapes
 HTML attributes and replaces owned tags idempotently, preserving scripts, page
-content, and unrelated head elements. A missing head or a current page carrying
-`noindex` fails the build rather than publishing an indexing conflict.
+content, and unrelated head elements. A missing head fails the build.
+
+The current pages are also kept out of search results: the integration replaces
+any `robots`, `googlebot` or `bingbot` meta with a single
+`<meta name="robots" content="noindex, follow">`, and none of them join the
+sitemap. In 2026-10 they were 262 of the 383 sitemap URLs, and Google Search
+Console reported most of the sitemap as not indexed, including hand-written
+guides such as the quickstart, installation and queue pages. The self canonical
+and specific metadata still serve readers and link previews, and the
+`/reference/` landing page stays indexable. Expect Search Console to list these
+pages under "Excluded by 'noindex' tag": that is the intended state.
 
 The integration reads `apiVersions.json` through the Astro configuration and
-enumerates only the current tree. It supplies those URLs through
-[`@astrojs/sitemap`'s `customPages` option](https://docs.astro.build/en/guides/integrations-guide/sitemap/#custompages),
-because copied public HTML is not an Astro route. Directory indexes canonicalize
-to `/reference/v2.9/`; other TypeDoc pages retain their actual `.html` paths.
-The sitemap contains one URL per current page and excludes historical and
-development versions. The 262 current v2.9 pages join the 119 authored pages,
-for 381 canonical URLs. `docs/src/lib/sitemap.ts` preserves the authored-route
-priorities and git-derived modification dates; unknown dates remain absent.
+enumerates only the current tree. Directory indexes canonicalize to
+`/reference/v2.9/`; other TypeDoc pages retain their actual `.html` paths. The
+sitemap contains only authored pages (121 URLs at 2.9.7).
+`docs/src/lib/sitemap.ts` preserves the authored-route priorities and
+git-derived modification dates; unknown dates remain absent.
 
 `docs/vercel.json` applies a hosting-level `noindex` header only to raw Markdown.
-A blanket `/reference/v:version/(.*)` header would also block the current tree,
-overriding this policy, so it is explicitly prohibited by regression coverage.
-Historical version exclusions come from their HTML robots metadata.
+Reference pages get their robots policy from HTML metadata, which the discovery
+validator checks page by page; a `/reference/v:version/(.*)` header would bypass
+that check, so regression coverage prohibits it.
 
 The post-build discovery validator checks exact sitemap membership, matching
 canonical tags, titles and descriptions, unique current-reference metadata,
 historical/development `noindex`, and the hosting policy. It also retains the
-independent 104-page `llms-full.txt` coverage check; generated TypeDoc pages are
+independent 106-page `llms-full.txt` coverage check; generated TypeDoc pages are
 not added to that hand-authored document stream. Focused fixtures in
 `test/docs-seo.test.ts` exercise URL selection, encoding, metadata escaping,
 idempotence, build failures, and preservation of source and historical trees.

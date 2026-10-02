@@ -1,12 +1,8 @@
 import sitemap, { ChangeFreqEnum } from '@astrojs/sitemap';
 
-/** Keep existing route priorities and real git dates when adding public reference pages. */
-export function documentationSitemap(
-  lastmodForUrl: (url: string) => string | undefined,
-  customPages: string[]
-) {
+/** Route priorities and real git dates; generated API reference pages stay out (noindex). */
+export function documentationSitemap(lastmodForUrl: (url: string) => string | undefined) {
   return sitemap({
-    customPages,
     serialize(item) {
       const lastmod = lastmodForUrl(item.url);
       if (lastmod) item.lastmod = lastmod;
@@ -32,7 +28,7 @@ export function documentationSitemap(
         item.priority = 0.9;
         item.changefreq = ChangeFreqEnum.WEEKLY;
       }
-      // Core SDK docs and API reference - high priority
+      // Core SDK docs and the hand-written API pages - high priority
       else if (url.match(/^\/(guide\/(queue|worker|flow|server|cron|dlq)|api)\//)) {
         item.priority = 0.8;
         item.changefreq = ChangeFreqEnum.WEEKLY;
@@ -52,7 +48,7 @@ export function documentationSitemap(
         item.priority = 0.7;
         item.changefreq = ChangeFreqEnum.WEEKLY;
       }
-      // Changelog, security, contributing, and versioned references - lower priority
+      // Changelog, security, contributing - lower priority
       else {
         item.priority = 0.5;
         item.changefreq = ChangeFreqEnum.MONTHLY;

@@ -59,7 +59,6 @@ const currentReference = referencePages(
   apiVersions.current,
   SITE
 );
-indexableUrls.push(...currentReference.map(({ url }) => url));
 const llmsUrlsExpected = pages
   .filter(({ id }) => id !== '404' && id !== 'blog' && !id.startsWith('blog/'))
   .map(({ id }) => canonicalUrl(id));
@@ -119,8 +118,6 @@ if (!curated.includes(`[PostgreSQL Multi-Broker Example](${multiBrokerUrls[0]})`
   failures.push('llms.txt does not link the PostgreSQL multi-broker example hub');
 }
 
-const referenceTitles = new Set<string>();
-const referenceDescriptions = new Set<string>();
 for (const url of indexableUrls) {
   const route = new URL(url).pathname.slice(1);
   const file = join(DIST_ROOT, route.endsWith('/') || route === '' ? `${route}index.html` : route);
@@ -135,16 +132,34 @@ for (const url of indexableUrls) {
   if (head.descriptions.length !== 1 || !head.descriptions[0].trim()) {
     failures.push(`${url} does not have exactly one nonempty description`);
   }
-  if (route.startsWith(`reference/${apiVersions.current}/`)) {
-    const [title] = head.titles;
-    const [description] = head.descriptions;
-    if (referenceTitles.has(title)) failures.push(`Current reference repeats title ${title}`);
-    if (referenceDescriptions.has(description) || description === 'Documentation for bunqueue') {
-      failures.push(`Current reference has a generic or repeated description at ${url}`);
-    }
-    referenceTitles.add(title);
-    referenceDescriptions.add(description);
+}
+
+// The current API reference stays out of search results and the sitemap, but keeps
+// specific metadata and a self canonical for readers and link previews.
+const referenceTitles = new Set<string>();
+const referenceDescriptions = new Set<string>();
+for (const { url } of currentReference) {
+  const route = new URL(url).pathname.slice(1);
+  const file = join(DIST_ROOT, route.endsWith('/') ? `${route}index.html` : route);
+  const head = readSeoHead(await readFile(file, 'utf8'));
+  if (head.canonicals.length !== 1 || head.canonicals[0] !== url) {
+    failures.push(`${url} does not have exactly one matching canonical`);
   }
+  if (!head.noindex) failures.push(`Current reference page ${url} is indexable`);
+  if (head.titles.length !== 1 || !head.titles[0].trim()) {
+    failures.push(`${url} does not have exactly one nonempty title`);
+  }
+  if (head.descriptions.length !== 1 || !head.descriptions[0].trim()) {
+    failures.push(`${url} does not have exactly one nonempty description`);
+  }
+  const [title] = head.titles;
+  const [description] = head.descriptions;
+  if (referenceTitles.has(title)) failures.push(`Current reference repeats title ${title}`);
+  if (referenceDescriptions.has(description) || description === 'Documentation for bunqueue') {
+    failures.push(`Current reference has a generic or repeated description at ${url}`);
+  }
+  referenceTitles.add(title);
+  referenceDescriptions.add(description);
 }
 for (const entry of await readdir(join(DIST_ROOT, 'reference'), { withFileTypes: true })) {
   if (!entry.isDirectory() || entry.name === apiVersions.current) continue;

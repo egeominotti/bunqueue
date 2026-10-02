@@ -188,7 +188,7 @@ await queue.add('welcome', { to: 'hello@example.com' });
 ```
 
 ```bash
-deno run --allow-net --allow-env --allow-sys=hostname jobs.ts
+deno run --allow-net --allow-env --allow-read --allow-sys jobs.ts
 ```
 
                 </TabItem>
@@ -221,7 +221,7 @@ python jobs.py
                 <TabItem label="PHP">
 
 ```bash
-composer require bunqueue/client
+composer require bunqueue/client   # PHP 8.1+ and Composer
 ```
 
 ```php title="jobs.php"
@@ -253,7 +253,7 @@ php jobs.php
                 <TabItem label="Go">
 
 ```bash
-go mod init jobs && go get github.com/egeominotti/bunqueue/sdk/go
+go mod init jobs && go get github.com/egeominotti/bunqueue/sdk/go   # Go 1.26.5+
 ```
 
 ```go title="main.go"
@@ -326,11 +326,12 @@ cargo run
                 <TabItem label="Elixir">
 
 ```bash
-git clone https://github.com/egeominotti/bunqueue && mix new jobs && cd jobs
+git clone --depth 1 https://github.com/egeominotti/bunqueue && mix new jobs && cd jobs
 ```
 
 ```elixir title="mix.exs"
-# Hex release upcoming; use the bunqueue checkout next to this project
+# Replace the generated deps/0. Hex release upcoming: until then, use the
+# bunqueue checkout next to this project as a path dependency.
 defp deps do
   [{:bunqueue_client, path: "../bunqueue/sdk/elixir"}]
 end
@@ -356,7 +357,7 @@ Bunqueue.Worker.run(worker)
 ```
 
 ```bash
-mix deps.get && mix run jobs.exs
+mix local.hex --force && mix deps.get && mix run jobs.exs
 ```
 
                 </TabItem>
@@ -368,7 +369,7 @@ mix deps.get && mix run jobs.exs
             <div class="home-step-head">
               <span class="home-step-number" aria-hidden="true">3</span>
               <h3>See it work</h3>
-              <p>The worker picks up the job your app just added. Both use the same queue name and TCP address.</p>
+              <p>The worker picks up the job your app just added. Both use the same queue name and TCP address. The worker keeps waiting for jobs: press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it.</p>
             </div>
             <div class="home-step-body">
               <div class="home-output">
@@ -444,7 +445,7 @@ bun jobs.ts
             <div class="home-step-head">
               <span class="home-step-number" aria-hidden="true">3</span>
               <h3>See it work</h3>
-              <p>The example keeps jobs in memory. Configure <a href="/guide/databases/">SQLite persistence</a> to recover work after a restart.</p>
+              <p>The worker keeps waiting for jobs: press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it. The example keeps jobs in memory; configure <a href="/guide/databases/">SQLite persistence</a> to recover work after a restart.</p>
             </div>
             <div class="home-step-body">
               <div class="home-output">

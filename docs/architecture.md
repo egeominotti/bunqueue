@@ -1028,9 +1028,10 @@ real dynamic-port TCP broker backed by SQLite. Transport-only
 manually maintained class or method allowlist can hide a new uncovered API.
 
 The Astro documentation site is deployed from the `docs/` Vercel project root.
-Its current TypeDoc tree is indexable: `reference-seo.ts` adds canonical URLs
-and per-page metadata to the built files, and `sitemap.ts` includes those URLs.
-Historical reference trees retain their generated `noindex, follow` metadata.
+No generated TypeDoc page is indexable: `reference-seo.ts` adds canonical URLs,
+per-page metadata and `noindex, follow` to the current tree's built files, and
+`sitemap.ts` lists only authored pages. Historical reference trees retain their
+generated `noindex, follow` metadata; the `/reference/` landing page stays indexed.
 Per-page Markdown twins receive `X-Robots-Tag: noindex` from `vercel.json` to avoid
 competing with their canonical HTML pages. Configuration
 rationale belongs in this reference rather than in synthetic JSON properties:

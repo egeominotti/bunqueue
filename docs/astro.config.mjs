@@ -657,6 +657,6 @@ export default defineConfig({
       tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
     }),
     apiReference.integration,
-    documentationSitemap(lastmodForUrl, apiReference.customPages),
+    documentationSitemap(lastmodForUrl),
   ],
 });

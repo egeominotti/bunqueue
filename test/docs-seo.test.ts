@@ -10,7 +10,7 @@ import {
   referenceSeo,
 } from '../docs/src/lib/reference-seo';
 
-test('hosting noindex headers apply only to raw Markdown, never current HTML references', () => {
+test('hosting noindex headers apply only to raw Markdown, never reference HTML', () => {
   const config = JSON.parse(
     readFileSync(new URL('../docs/vercel.json', import.meta.url), 'utf8')
   ) as { headers: { source: string; headers: { key: string; value: string }[] }[] };
@@ -64,7 +64,7 @@ function fixture() {
   };
 }
 
-test('sitemap reference URLs are deterministic, current-only, and canonicalize directory indexes', () => {
+test('current reference URLs are deterministic, current-only, and canonicalize directory indexes', () => {
   const files = fixture();
   try {
     const pages = referencePages(files.publicRoot, current, SITE);
@@ -95,7 +95,7 @@ test('sitemap reference URLs are deterministic, current-only, and canonicalize d
   }
 });
 
-test('current reference metadata is specific, indexable, and distinguishes equal type names', () => {
+test('current reference metadata is specific, noindex-follow, and distinguishes equal type names', () => {
   const result = applyReferenceSeo(html, page, current);
   const head = readSeoHead(result);
   expect(head).toEqual({
@@ -104,8 +104,9 @@ test('current reference metadata is specific, indexable, and distinguishes equal
       'TypeScript API for the Worker class in bunqueue v2.9 (client). Explore its members, signatures, and related types.',
     ],
     canonicals: [page.url],
-    noindex: false,
+    noindex: true,
   });
+  expect(result).toContain('<meta name="robots" content="noindex, follow"/>');
   const alternative = applyReferenceSeo(
     html,
     {
@@ -144,19 +145,22 @@ test('metadata replacement is idempotent, escapes attributes, and replaces stale
   expect(result).not.toContain('Old title');
 });
 
-test('missing heads and current noindex directives fail the build instead of publishing conflicts', () => {
+test('missing heads fail the build and existing robots directives become one noindex, follow', () => {
   expect(() => applyReferenceSeo('<header>Not a head</header>', page, current)).toThrow(
     'no complete head'
   );
   for (const name of ['robots', 'googlebot', 'bingbot']) {
-    const blocked = html.replace(
-      '</head>',
-      `<meta content='NOINDEX, follow' name='${name}'></head>`
-    );
-    expect(() => applyReferenceSeo(blocked, page, current)).toThrow('Current API page is noindex');
-    expect(() =>
-      applyReferenceSeo(blocked.replace('NOINDEX, follow', 'none'), page, current)
-    ).toThrow('Current API page is noindex');
+    for (const directive of ['NOINDEX, nofollow', 'none', 'index, follow']) {
+      const existing = html.replace(
+        '</head>',
+        `<meta content='${directive}' name='${name}'></head>`
+      );
+      const result = applyReferenceSeo(existing, page, current);
+      expect(result).not.toContain(`content='${directive}' name='${name}'`);
+      expect(result.match(/<meta name="robots"/g)).toHaveLength(1);
+      expect(result).toContain('<meta name="robots" content="noindex, follow"/>');
+      expect(applyReferenceSeo(result, page, current)).toBe(result);
+    }
   }
 });
 
@@ -166,17 +170,13 @@ test('reference build integration updates only built current pages and preserves
     const source = readFileSync(join(files.publicRoot, current, page.file), 'utf8');
     const historical = readFileSync(join(files.distRoot, 'reference/v2.8/index.html'), 'utf8');
     const dev = readFileSync(join(files.distRoot, 'reference/dev/index.html'), 'utf8');
-    const { integration, customPages } = referenceSeo(files.publicRoot, current, SITE);
-    expect(customPages).toEqual([
-      page.url,
-      `${SITE}/reference/v2.9/`,
-      `${SITE}/reference/v2.9/interfaces/client.Job.html`,
-    ]);
+    const { integration } = referenceSeo(files.publicRoot, current, SITE);
     const hook = integration.hooks['astro:build:done']!;
     const context = { dir: pathToFileURL(`${files.distRoot}/`), logger: { info: () => {} } };
     await hook(context as Parameters<typeof hook>[0]);
     const result = readFileSync(join(files.distRoot, 'reference', current, page.file), 'utf8');
     expect(readSeoHead(result).canonicals).toEqual([page.url]);
+    expect(readSeoHead(result).noindex).toBe(true);
     await hook(context as Parameters<typeof hook>[0]);
     expect(readFileSync(join(files.distRoot, 'reference', current, page.file), 'utf8')).toBe(
       result

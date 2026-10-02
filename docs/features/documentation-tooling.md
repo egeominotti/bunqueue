@@ -111,8 +111,9 @@ published surface.
 Generation treats warnings as errors. A type reachable from a public signature
 must either be documented through a real entry point or listed as a deliberate
 internal structural helper in `typedoc.json`; an unmatched entry-point pattern or
-unresolved type link blocks the release. The generated current tree is indexable,
-while older minor trees receive `noindex, follow`. The complete contract and
+unresolved type link blocks the release. Older minor trees receive
+`noindex, follow` at generation time; the current tree receives it when the site
+is built, and no generated page joins the sitemap. The complete contract and
 versioning rationale live in [Generated API Reference](../generated-api-reference.md).
 
 ## LLM discovery outputs
@@ -316,10 +317,12 @@ themes. No queue lifecycle or SDK implementation changes are involved.
 
 ## Search indexing and canonical URLs
 
-`docs/src/lib/reference-seo.ts` collects the current version's TypeDoc HTML,
-adds canonical URLs and page-specific titles/descriptions to the build output,
-and supplies those URLs to the sitemap integration. It leaves the tracked
-generated sources untouched and rejects current pages containing `noindex`.
+`docs/src/lib/reference-seo.ts` collects the current version's TypeDoc HTML and
+adds canonical URLs, page-specific titles/descriptions and a single
+`noindex, follow` robots meta to the build output; none of those pages join the
+sitemap, so crawling goes to the hand-written pages (see
+[Generated API Reference](../generated-api-reference.md) for the Search Console
+evidence). It leaves the tracked generated sources untouched.
 It also gives every current reference page `og:image` and `twitter:image`
 (the site-wide `/og-image.png`), because TypeDoc emits no social image.
 Historical reference trees retain their generated `noindex, follow` metadata;
@@ -339,8 +342,9 @@ setting rather than repository configuration and should be permanent (308).
 
 `test/docs-seo.test.ts` covers the hosting policy, deterministic current-only
 page discovery, escaped/idempotent metadata, and actual temporary build output.
-The discovery validator checks authored pages and current reference URLs against
-the sitemap and verifies historical exclusion. See
+The discovery validator checks authored pages against the sitemap, requires every
+current reference page to carry `noindex`, a self canonical and unique metadata,
+and verifies historical exclusion. See
 [Generated API Reference](../generated-api-reference.md) for the version policy.
 
 ## Shared documentation interface

@@ -146,11 +146,17 @@ function metadata(file: string, version: string): { title: string; description: 
   };
 }
 
-/** Replace only metadata owned by this integration; repeated builds are byte-stable. */
+/**
+ * Replace only metadata owned by this integration; repeated builds are byte-stable.
+ * Generated reference pages are kept out of search results (`noindex, follow`) and out of
+ * the sitemap: hundreds of near-identical TypeDoc pages outnumbered the hand-written guides,
+ * and Search Console left most of the sitemap unindexed, guides included. They keep a
+ * specific title, description and self canonical for readers and link previews.
+ */
 export function applyReferenceSeo(html: string, page: ReferencePage, version: string): string {
-  if (readSeoHead(html).noindex) throw new Error(`Current API page is noindex: ${page.url}`);
   const { title, description } = metadata(page.file, version);
   const values: Record<string, string> = {
+    robots: 'noindex, follow',
     description,
     'og:title': title,
     'og:description': description,
@@ -170,7 +176,8 @@ export function applyReferenceSeo(html: string, page: ReferencePage, version: st
       const key = (attrs.name ?? attrs.property ?? '').toLowerCase();
       const canonical =
         /^<link\b/i.test(tag) && attrs.rel?.toLowerCase().split(/\s+/).includes('canonical');
-      return canonical || (/^<meta\b/i.test(tag) && Object.hasOwn(values, key)) ? '' : tag;
+      const owned = Object.hasOwn(values, key) || key === 'googlebot' || key === 'bingbot';
+      return canonical || (/^<meta\b/i.test(tag) && owned) ? '' : tag;
     });
   const injected =
     `<title>${escape(title)}</title><link rel="canonical" href="${escape(page.url)}"/>` +
@@ -186,7 +193,7 @@ export function applyReferenceSeo(html: string, page: ReferencePage, version: st
   );
 }
 
-/** Public files bypass Astro routes, so expose their URLs and post-process only dist. */
+/** Public files bypass Astro routes, so post-process only dist; nothing joins the sitemap. */
 export function referenceSeo(root: string, current: string, site: string) {
   const pages = referencePages(root, current, site);
   const integration: AstroIntegration = {
@@ -199,9 +206,11 @@ export function referenceSeo(root: string, current: string, site: string) {
           const updated = applyReferenceSeo(html, page, current);
           if (updated !== html) await writeFile(target, updated);
         }
-        logger.info(`Added canonical metadata to ${pages.length} current API reference pages`);
+        logger.info(
+          `Added canonical and noindex, follow metadata to ${pages.length} current API reference pages`
+        );
       },
     },
   };
-  return { integration, customPages: pages.map((page) => page.url) };
+  return { integration };
 }

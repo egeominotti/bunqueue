@@ -67,15 +67,15 @@ export function banner(version: string, depth: number): string {
 export const REFERENCE_ROBOTS = '<meta name="robots" content="noindex, follow"/>';
 
 /**
- * Only the current version tree belongs in the index. TypeDoc writes real per-page
- * titles (`Worker | bunqueue`), so an indexed current tree is a feature: a search for
- * a type name lands on that type. What must not accumulate is one near-identical tree
- * per released version, all sharing the same `Documentation for bunqueue` description
- * and no canonical, competing with each other and with the guide. `--dev` previews are
- * unreleased by definition and never index.
+ * Superseded version trees must never accumulate in the index: each is a near-identical
+ * copy sharing the same `Documentation for bunqueue` description and no canonical,
+ * competing with every other tree and with the guide. `--dev` previews are unreleased
+ * by definition and never index. The tracked current tree keeps an indexable head, but
+ * the published site does not index it either: `docs/src/lib/reference-seo.ts` adds
+ * `noindex, follow` to its built pages, because hundreds of generated pages outweighed
+ * the hand-written guides in search.
  *
- * `follow` keeps the tree's links counted either way. The `/reference/` listing is a
- * normal Starlight page and always stays indexed.
+ * The `/reference/` listing is a normal Starlight page and always stays indexed.
  */
 export function shouldNoindex(version: string, current: string): boolean {
   return version !== current;
@@ -205,7 +205,7 @@ async function main() {
     demoted.push(version);
   }
   console.log(
-    `robots:   ${current} indexable${demoted.length ? `, noindex on ${demoted.join(', ')}` : ''}`
+    `robots:   ${current} head indexable (the site build adds noindex)${demoted.length ? `, noindex on ${demoted.join(', ')}` : ''}`
   );
 
   // The page cannot read this directory itself: Vite bundles page modules, and
