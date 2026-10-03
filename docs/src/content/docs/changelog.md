@@ -18,7 +18,7 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## Unreleased
+## [2.9.8] - 2026-10-03
 
 ### MCP server
 
