@@ -1,5 +1,6 @@
 import { jobId, type Job as InternalJob } from '../../../domain/types/job';
 import { removeJobDeduplicationKey } from '../../jobDeduplication';
+import { waitJobUntilFinished } from '../../jobWait';
 import { getSharedManager } from '../../manager';
 import type { JobDependencies, JobDependenciesCount } from '../../types';
 import type { PendingTransitionSettlement, TcpConnection } from '../types';
@@ -7,24 +8,8 @@ import type { PendingTransitionSettlement, TcpConnection } from '../types';
 export function createWaitUntilFinishedHandler(
   embedded: boolean,
   tcp: TcpConnection | null
-): (id: string, _queueEvents: unknown, ttl?: number) => Promise<unknown> {
-  return async (id: string, _queueEvents: unknown, ttl?: number) => {
-    const timeout = ttl ?? 30000;
-    if (embedded) {
-      const manager = getSharedManager();
-      const job = await manager.getJob(jobId(id));
-      if (!job) throw new Error(`Job ${id} not found`);
-      if (job.completedAt) return manager.getResult(jobId(id));
-      const completed = await manager.waitForJobCompletion(jobId(id), timeout);
-      if (!completed) throw new Error(`waitUntilFinished timed out after ${timeout}ms`);
-      return manager.getResult(jobId(id));
-    }
-    if (!tcp) throw new Error('waitUntilFinished: no connection');
-    const response = await tcp.send({ cmd: 'WaitJob', id, timeout });
-    const result = response as { completed?: boolean; result?: unknown };
-    if (!result.completed) throw new Error(`waitUntilFinished timed out after ${timeout}ms`);
-    return result.result;
-  };
+): (id: string, queueEvents: unknown, ttl?: number) => Promise<unknown> {
+  return (id, queueEvents, ttl) => waitJobUntilFinished({ embedded, tcp }, id, queueEvents, ttl);
 }
 
 export function createDiscardHandler(

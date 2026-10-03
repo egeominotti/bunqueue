@@ -157,6 +157,34 @@ use the same connection and `prefixKey` as the Queue. External SDKs expose
 `waitForJob` for the common wait-for-result case and can use SSE/WebSocket for
 live queue events.*
 
+A wait settles on the job's final outcome, as in BullMQ: it resolves with the
+result once the job completes, even on a later attempt, and rejects with the
+last attempt's error once no retry is left, including a job the stall detector
+moved to the dead-letter queue. A failed attempt that will be retried does not
+end the wait; on `QueueEvents` its `failed` event carries `terminal: false`.
+`job.waitUntilFinished(queueEvents, ttl)` behaves the same, and also accepts
+`null` instead of `QueueEvents`, waiting up to `ttl` (30 seconds by default).
+A `ttl` of `0` means no timeout, with or without `QueueEvents`.
+
+A job that no longer exists (removed, drained, or removed on completion before
+the wait saw it) rejects the wait with `Job <id> not found`: its outcome is
+unknown. A wait survives a `QueueEvents` that closes or reconnects and a broker
+outage (rate-limit refusals, timeouts and lost connections are retried, not
+reported); only its `ttl` or a final error such as a refused token ends it early.
+After an outage it settles once the client has reconnected, which can lag by the
+reconnect backoff (up to 30 seconds) plus the next state read.
+
+Over TCP without `QueueEvents`, each connection of the pool holds the broker's
+`WaitJob` for at most 40 waits at a time (160 on the default pool of 4), so the
+broker keeps slots for other commands. A wait with a slot sees its job complete
+at once; waits beyond that queue for a slot and can see a completion seconds
+late (about 2 seconds at p90 with 1,000 concurrent waits on 1-second jobs). A
+failure is reported by the next state read: about a second after the wait
+starts and at most about 37 seconds late after that, while no more than about
+600 waits share the pool (later beyond that). For high-concurrency
+request/response, pass a `QueueEvents`: it reports every completion and failure
+as it happens.
+
 Manual state transitions are BullMQ-compatible. Whenever the active job has a
 lock, `token` is mandatory and must be that job's current worker token in both
 embedded and TCP mode. Jobs processed without locks remain administratively

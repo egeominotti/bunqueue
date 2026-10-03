@@ -4,6 +4,9 @@
  */
 
 import { TcpClient, type ConnectionOptions, type ConnectionHealth } from './tcpClient';
+import { LongPollRouter, type LongPollLease } from './tcp/longPollRouter';
+import { getPoolKey } from './tcp/poolKey';
+import type { SendOptions } from './tcp/types';
 
 export interface PoolOptions extends Partial<ConnectionOptions> {
   /** Number of connections in pool (default: 4) */
@@ -24,6 +27,7 @@ export class TcpConnectionPool {
   private closed = false;
   private refCount = 0; // Reference counting for shared pools
   private poolKey: string | null = null; // Track key for cleanup from sharedPools
+  private readonly longPolls = new LongPollRouter();
 
   constructor(options: PoolOptions = {}) {
     const poolSize = Math.max(1, options.poolSize ?? 4); // Validate: at least 1
@@ -99,12 +103,30 @@ export class TcpConnectionPool {
     return client;
   }
 
-  /** Send command using next available connection */
-  async send(command: Record<string, unknown>): Promise<Record<string, unknown>> {
+  /** Send command using next available connection; `options.timeout` overrides `commandTimeout`. */
+  async send(
+    command: Record<string, unknown>,
+    options?: SendOptions
+  ): Promise<Record<string, unknown>> {
     if (this.closed) {
       throw new Error('Connection pool is closed');
     }
-    return this.getNextClient().send(command);
+    return this.getNextClient().send(command, options);
+  }
+
+  /**
+   * Reserve a long-poll slot (for commands the broker holds, as WaitJob) on the
+   * connection with the fewest, at most `perConnection` and half of `maxInFlight` per
+   * connection; null when every connection is full. See `tcp/longPollRouter.ts`.
+   */
+  reserveLongPoll(perConnection: number): LongPollLease | null {
+    if (this.closed) return null;
+    const limit = Math.min(perConnection, Math.floor(this.options.maxInFlight / 2));
+    return this.longPolls.reserve(this.clients, limit, (index, command, options) =>
+      this.closed
+        ? Promise.reject(new Error('Connection pool is closed'))
+        : this.clients[index].send(command, options)
+    );
   }
 
   /** Send multiple commands in parallel across pool */
@@ -225,25 +247,6 @@ export class TcpConnectionPool {
 
 /** Shared pools by host:port key */
 const sharedPools = new Map<string, TcpConnectionPool>();
-
-/** Get pool key from options (includes all pool-differentiating params) */
-function getPoolKey(options?: PoolOptions): string {
-  const host = options?.host ?? 'localhost';
-  const port = options?.port ?? 6789;
-  const poolSize = options?.poolSize ?? 4;
-  const token = options?.token ?? '';
-  // Include poolSize and token hash to prevent sharing pools with different configs
-  const tokenHash = token ? String(Number(Bun.hash(token)) & 0xffff) : '0';
-  // TLS config must differentiate pools too: a TLS pool and a plaintext pool
-  // to the same host:port are NOT interchangeable.
-  const tlsKey = options?.tls ? JSON.stringify(options.tls) : '0';
-  // pipelining/maxInFlight shape per-connection behavior: without them in the
-  // key, two Queues with different windows would silently share whichever
-  // pool was created first.
-  const pipelining = (options?.pipelining ?? true) ? '1' : '0';
-  const maxInFlight = options?.maxInFlight ?? 100;
-  return `${host}:${port}:${poolSize}:${tokenHash}:${tlsKey}:${pipelining}:${maxInFlight}`;
-}
 
 /** Get or create shared connection pool */
 export function getSharedPool(options?: PoolOptions): TcpConnectionPool {

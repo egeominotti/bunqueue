@@ -50,6 +50,13 @@ export function peekSharedManager(): ReturnType<EmbeddedBackend['peekSharedManag
   return backend?.peekSharedManager() ?? null;
 }
 
+// Only a loaded engine owns a manager that shutdownManager() could stop.
+export function onSharedManagerShutdown(
+  listener: Parameters<EmbeddedBackend['onSharedManagerShutdown']>[0]
+): () => void {
+  return backend?.onSharedManagerShutdown(listener) ?? (() => undefined);
+}
+
 export function embeddedDlq(): EmbeddedBackend['dlq'] {
   return loadBackend().dlq;
 }

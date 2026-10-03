@@ -8,5 +8,8 @@ export interface PendingAck {
 }
 
 export interface TcpConnection {
-  send: (command: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  send: (
+    command: Record<string, unknown>,
+    options?: { timeout?: number }
+  ) => Promise<Record<string, unknown>>;
 }

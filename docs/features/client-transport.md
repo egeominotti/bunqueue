@@ -14,7 +14,7 @@ Owns:
 - Per-physical-socket outbound ordering: partial `Bun.Socket.write()` results are
   retained, later frames queue behind the missing tail, and `drain` resumes the
   write without replaying bytes across reconnects.
-- Request/response correlation via per-command `reqId`, pipelining up to `maxInFlight` commands, and per-command timeouts.
+- Request/response correlation via per-command `reqId`, pipelining up to `maxInFlight` commands, and per-command timeouts (the connection's `commandTimeout`, or a command's own `send(command, { timeout })`).
 - Dispatch of unsolicited `{ type: 'event', event: JobEvent }` frames before
   request correlation, so a subscription event cannot satisfy or reorder an
   in-flight command.
@@ -53,7 +53,8 @@ External / runtime:
 ```typescript
 constructor(options: PoolOptions = {})           // PoolOptions extends Partial<ConnectionOptions> + { poolSize?: number }
 async connect(): Promise<void>                    // connect all clients in parallel
-async send(command: Record<string, unknown>): Promise<Record<string, unknown>>
+async send(command: Record<string, unknown>, options?: SendOptions): Promise<Record<string, unknown>>
+reserveLongPoll(perConnection: number): LongPollLease | null  // { send(command, options?), release() } on one connection
 async sendParallel(commands: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>>
 onReconnect(cb: () => void): void                 // fires on every (re)connect of any pooled client
 isConnected(): boolean
@@ -74,7 +75,7 @@ Module functions (`tcpPool.ts`):
 ```typescript
 constructor(options: Partial<ConnectionOptions> = {})
 async connect(): Promise<void>
-async send(command: Record<string, unknown>): Promise<Record<string, unknown>>
+async send(command: Record<string, unknown>, options?: SendOptions): Promise<Record<string, unknown>>
 async hello(): Promise<HelloResponse>
 async ping(): Promise<boolean>
 close(): void
@@ -131,7 +132,9 @@ Key shapes defined by this layer:
 
 `PoolOptions` (`tcpPool.ts:8`) = `Partial<ConnectionOptions>` + `poolSize?` (default 4, floored to `>= 1`).
 
-`PendingCommand` (`tcp/types/command.ts:1-9`): `{ id, reqId, command, resolve, reject, timeout, promise? }`.
+`PendingCommand` (`tcp/types/command.ts`): `{ id, reqId, command, resolve, reject, timeout, timeoutMs?, promise? }`; `timeoutMs` is the command's own timeout.
+
+`SendOptions` (`tcp/types/command.ts`): `{ timeout?: number }`. A positive finite `timeout` replaces `commandTimeout` for that command only; anything else keeps the connection default. Long-poll commands use it: the job wait sends `WaitJob` with its hold plus 5 s (`client/job-wait/brokerWait.ts`), so a deliberate hold the broker answers within that margin is never reported as `Command timeout` (see [Client SDK: Queue](./client-queue-sdk.md)).
 
 `ConnectionHealth` (`tcp/types/connection.ts:21-32`): `{ healthy, state, lastSuccessAt, lastErrorAt, avgLatencyMs, consecutivePingFailures, consecutiveCommandTimeouts, totalCommands, totalErrors, uptimeMs }`.
 
@@ -141,9 +144,10 @@ Key shapes defined by this layer:
 
 ### Send path (pipelined)
 1. `TcpConnectionPool.send` rejects if closed, else picks a client via `getNextClient` (`tcpPool.ts:82-107`): scans from `currentIndex` for the first `isConnected()` client (advancing `currentIndex`); if all are down it falls back to plain round-robin so the chosen client triggers its own reconnect.
-2. `TcpClient.send` (`tcp/runtime/commands.ts:86-137`) assigns a monotonic `id` and a wrapped `reqId` (`generateReqId` masks to 31 bits, `tcp/runtime/health.ts:134-137`), enqueues the `PendingCommand`, then: if disconnected and not connecting it kicks off `connect().catch(()=>{})`; if connected it calls `processQueue`.
+2. `TcpClient.send` (`tcp/runtime/commands.ts`) assigns a monotonic `id` and a wrapped `reqId` (`generateReqId` masks to 31 bits, `tcp/runtime/health.ts`), enqueues the `PendingCommand` with its own timeout when `options.timeout` is set, then: if disconnected and not connecting it kicks off `connect().catch(()=>{})`; if connected it calls `processQueue`.
 3. `processQueue` drains the command queue while `hasPending()` and
-   `canSendMore(maxInFlight)`, (re)arms the timeout, moves the command to
+   `canSendMore(maxInFlight)`, (re)arms the timeout (the command's own
+   `timeoutMs`, else `commandTimeout`), moves the command to
    in-flight, and frames it. `createConnection` sends the bytes through one
    `SocketWriteQueue` owned by that physical socket. A short write retains the
    exact tail; later frames wait behind it until Bun invokes `drain`.
@@ -160,8 +164,12 @@ same token and connection defaults as the queue/worker transport, connects and
 authenticates first, sends `SubscribeEvents`, and reports ready only after the
 acknowledgement. A disconnect invalidates the current generation; the client's
 normal reconnect emits `connected`, which starts exactly one fresh subscription
-attempt. `close()` invalidates pending work and closes the socket, so no event
-can be delivered after teardown.
+attempt. Every successful subscription after the first calls the optional
+`onResubscribed` callback: events the broker sent while the connection was down
+are lost, so `QueueEvents` turns it into an internal `resubscribed` signal
+(`queue-events/streamSignals.ts`) on which job waits re-read their job.
+`close()` invalidates pending work and closes the socket, so no event can be
+delivered after teardown.
 
 ### Connect path
 `doConnect` (`tcp/runtime/connectivity.ts:52-90`) calls `createConnection` (msgpack over `Bun.connect`, TLS via `buildClientTls`), enables TCP keepalive (`setKeepAlive(true, 15000)`, best-effort, `tcp/transport.ts:97-118`), authenticates via `sendDirect({cmd:'Auth'})` when a token is set, then marks connected and `recordConnected()`. `connect` (`tcp/runtime/connectivity.ts:11-33`) resets the reconnect counter, emits `connected`, starts the ping timer, and flushes the queue. Concurrent `connect()` calls dedupe through `waitForConnection` (`tcp/runtime/connectivity.ts:37-50`).
@@ -202,7 +210,7 @@ No mutexes — single-threaded JS event loop. Concurrency is managed by:
   treated as a malformed stream and reconnects; it never falls through to the
   legacy current-command response slot.
 - **Frame too large**: `FrameSizeError` from `addData` surfaces as an `error` event (`tcp/transport.ts:80-95`) and the read returns without dispatching.
-- **Command timeout taxonomy** (`tcp/runtime/commands.ts:93-107`): a still-queued command (never written) is rejected but does NOT count toward dead-link detection; an in-flight command that got no response rejects AND calls `handleCommandTimeout`.
+- **Command timeout taxonomy** (`tcp/runtime/commands.ts`): a still-queued command (never written) is rejected but does NOT count toward dead-link detection; an in-flight command that got no response rejects AND calls `handleCommandTimeout`. A command with its own timeout is measured against that timeout in both phases, so a long-poll command the broker answers in time never counts toward dead-link detection (`test/tcp-client-command-timeout.test.ts`). The broker still runs at most 50 commands per connection at once (`MAX_CONCURRENT_PER_CONNECTION`): long-poll commands occupy those slots for their whole hold, and commands queued behind them on the broker can overrun their own timeout. The job wait therefore leases its `WaitJob` holds per connection through `TcpConnectionPool.reserveLongPoll(perConnection)` (`tcp/longPollRouter.ts`): a lease goes to the connection with the fewest (a connected one on a tie; an idle connection connects for it), and only while that connection has fewer than `perConnection` (the wait asks for 40) and fewer than half of its `maxInFlight` window, so every connection keeps room for ordinary commands on both the broker and the client (`client/job-wait/holdLimiter.ts`). A pool splits ordinary commands round-robin over its connected clients; other long-poll commands (`PULL`/`PULLB` with a `timeout`, the MCP backend's `wait_for_job`) are not covered by that cap.
 - **Connection lost / close**: `handleClose` (`tcp/runtime/health.ts:57-70`) rejects all in-flight with `Connection lost` and reconnects only if it was previously connected and `canReconnect()`.
 - **Outbound short write**: Bun TCP writes are unbuffered and may accept fewer
   bytes than supplied. The accepted prefix is not resent; the remaining tail
@@ -235,7 +243,7 @@ All knobs come through `ConnectionOptions` / `PoolOptions` (programmatic; no env
 | `maxReconnectAttempts` | `Infinity` | cap before `maxReconnectAttemptsReached` |
 | `reconnectDelay` / `maxReconnectDelay` | 100 / 30000 ms | backoff base / ceiling |
 | `connectTimeout` | 5000 ms | per-connect deadline |
-| `commandTimeout` | 30000 ms | per-command deadline |
+| `commandTimeout` | 30000 ms | per-command deadline, unless `send(command, { timeout })` gives the command its own |
 | `autoReconnect` | `true` | enable reconnection |
 | `pingInterval` | 30000 ms (0 = off) | health ping cadence |
 | `maxPingFailures` | 3 | consecutive ping fails → reconnect |

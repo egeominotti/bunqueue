@@ -7,6 +7,7 @@ import { rejectLegacyConnectionOptions } from './legacyConnectionOptions';
 import { getSharedManager } from './manager';
 import { EventType, type JobEvent } from '../domain/types/queue';
 import { TcpEventSubscription } from './queue-events/tcpSubscription';
+import { signalEventStream } from './queue-events/streamSignals';
 import type {
   ActiveEvent,
   CompletedEvent,
@@ -47,7 +48,7 @@ export type {
  * - waiting: job added to queue
  * - active: job started processing
  * - completed: job completed successfully
- * - failed: job failed
+ * - failed: job attempt failed (`terminal` is false while a retry is pending)
  * - progress: job progress updated
  * - stalled: job stalled (no heartbeat)
  * - removed: job removed from queue
@@ -137,6 +138,8 @@ export class QueueEvents<R = unknown, P = unknown> extends EventEmitter {
           jobId: event.jobId,
           failedReason: event.error ?? 'Job failed',
           data: event.data,
+          // Brokers before 2.8.56 send no flag; their failed events count as terminal.
+          terminal: event.terminal !== false,
         });
         if (event.error && this.listenerCount('error') > 0) {
           this.emit('error', new Error(event.error), event);
@@ -200,6 +203,7 @@ export class QueueEvents<R = unknown, P = unknown> extends EventEmitter {
       queue: this.queueKey,
       onEvent: handler,
       onError: (error) => this.emitTransportError(error),
+      onResubscribed: () => signalEventStream(this, 'resubscribed'),
     });
   }
 
@@ -246,5 +250,7 @@ export class QueueEvents<R = unknown, P = unknown> extends EventEmitter {
     this.subscription?.close();
     this.subscription = null;
     this.removeAllListeners();
+    // Job waits listening to this stream continue without it.
+    signalEventStream(this, 'closed');
   }
 }

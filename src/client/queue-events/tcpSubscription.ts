@@ -7,6 +7,8 @@ interface TcpEventSubscriptionOptions {
   connection?: ConnectionOptions;
   onError: (error: Error) => void;
   onEvent: (event: JobEvent) => void;
+  /** Called each time the stream subscribes again after a lost connection. */
+  onResubscribed?: () => void;
   queue: string;
 }
 
@@ -15,14 +17,18 @@ export class TcpEventSubscription {
   private readonly client: TcpClient;
   private readonly queue: string;
   private readonly onError: (error: Error) => void;
+  private readonly onResubscribed: (() => void) | undefined;
   private closed = false;
   private ready = false;
+  /** Whether any subscription succeeded, so a later one is a re-subscription. */
+  private subscribedBefore = false;
   private generation = 0;
   private subscriptionPromise: Promise<void> | null = null;
 
   constructor(options: TcpEventSubscriptionOptions) {
     this.queue = options.queue;
     this.onError = options.onError;
+    this.onResubscribed = options.onResubscribed;
     const connection = options.connection ?? {};
     this.client = new TcpClient({
       host: connection.host ?? 'localhost',
@@ -92,6 +98,9 @@ export class TcpEventSubscription {
           throw new Error('Event subscription changed while connecting');
         }
         this.ready = true;
+        // Events sent while the connection was down are lost; listeners re-read.
+        if (this.subscribedBefore) this.onResubscribed?.();
+        this.subscribedBefore = true;
       });
     this.subscriptionPromise = operation;
     void operation.then(

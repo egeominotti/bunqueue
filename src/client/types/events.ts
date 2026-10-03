@@ -28,6 +28,8 @@ export interface FailedEvent {
   jobId: string;
   failedReason: string;
   data?: unknown;
+  /** False for a failed attempt that will be retried; true once the job failed for good. */
+  terminal?: boolean;
 }
 
 export interface ProgressEvent<P = unknown> {

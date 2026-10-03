@@ -2,8 +2,16 @@ import { FrameParser } from '../../../infrastructure/server/protocol';
 import { PROTOCOL_CAPABILITIES, PROTOCOL_VERSION } from '../../../domain/types/protocol';
 import type { HelloResponse } from '../../../domain/types/response';
 import { encodeMessagePack } from '../../../shared/msgpack';
-import type { PendingCommand } from '../types';
+import type { PendingCommand, SendOptions } from '../types';
 import { TcpClientHealth } from './health';
+
+/** A positive finite per-command timeout, or undefined for the connection default. */
+function commandTimeoutOverride(options: SendOptions | undefined): number | undefined {
+  const timeout = options?.timeout;
+  return typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0
+    ? timeout
+    : undefined;
+}
 
 /** Command framing, queueing, pipelining, and timeout handling. */
 export abstract class TcpClientCommands extends TcpClientHealth {
@@ -75,7 +83,7 @@ export abstract class TcpClientCommands extends TcpClientHealth {
           next.reject(new Error('Command timeout'));
           this.handleCommandTimeout();
         }
-      }, this.options.commandTimeout);
+      }, next.timeoutMs ?? this.options.commandTimeout);
 
       next.timeout = newTimeout;
       this.commands.addInFlight(next);
@@ -83,12 +91,17 @@ export abstract class TcpClientCommands extends TcpClientHealth {
     }
   }
 
-  send(command: Record<string, unknown>): Promise<Record<string, unknown>> {
+  /**
+   * Send a command. `options.timeout` replaces the connection's `commandTimeout`
+   * for this command only, both while it is queued and once it is in flight.
+   */
+  send(command: Record<string, unknown>, options?: SendOptions): Promise<Record<string, unknown>> {
     const startTime = Date.now();
     this.health.recordCommandSent();
     const reqId = this.generateReqId();
     const commandWithReqId = { ...command, reqId };
     const id = this.commands.nextId();
+    const timeoutMs = commandTimeoutOverride(options);
 
     let pendingRef!: PendingCommand;
     const promise = new Promise<Record<string, unknown>>((resolve, reject) => {
@@ -104,12 +117,13 @@ export abstract class TcpClientCommands extends TcpClientHealth {
           reject(new Error('Command timeout'));
           this.handleCommandTimeout();
         }
-      }, this.options.commandTimeout);
+      }, timeoutMs ?? this.options.commandTimeout);
 
       pendingRef = {
         id,
         reqId,
         command: commandWithReqId,
+        timeoutMs,
         resolve: (result: Record<string, unknown>) => {
           this.health.recordSuccess(Date.now() - startTime);
           resolve(result);

@@ -2,6 +2,7 @@ import type { GetDependenciesOpts, JobDependencies, JobDependenciesCount } from 
 import * as bullmqCompatOps from '../bullmqCompat';
 import * as deduplicationOps from '../deduplication';
 import * as jobMoveOps from '../jobMove';
+import * as jobWaitOps from '../../jobWait';
 import * as schedulerOps from '../scheduler';
 import type { JobTemplate, RepeatOpts, SchedulerInfo } from '../scheduler';
 import { QueueConfiguration } from './configuration';
@@ -70,7 +71,7 @@ export class QueueScheduling<T> extends QueueConfiguration<T> {
   }
 
   waitJobUntilFinished(id: string, queueEvents: unknown, ttl?: number) {
-    return jobMoveOps.waitJobUntilFinished(this.moveCtx, id, queueEvents, ttl);
+    return jobWaitOps.waitJobUntilFinished(this.moveCtx, id, queueEvents, ttl);
   }
 
   getJobDependencies(id: string, opts?: GetDependenciesOpts): Promise<JobDependencies> {

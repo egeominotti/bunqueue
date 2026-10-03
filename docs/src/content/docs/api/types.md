@@ -330,11 +330,17 @@ interface Job<T = unknown> {
   ): Promise<boolean>;
 
   /**
-   * Wait until the job has finished (completed or failed).
-   * @param queueEvents - QueueEvents instance to listen on
-   * @param ttl - Maximum time to wait in ms (optional)
+   * Wait until the job has finished: completed, or failed with no retry left.
+   * A failed attempt that will be retried does not end the wait.
+   * @param queueEvents - QueueEvents instance to listen on, or null to wait without one
+   * @param ttl - Maximum time to wait in ms. A positive number bounds the wait; 0
+   *   (or any other non-positive or non-finite value) means no timeout. Omitted: no
+   *   timeout with QueueEvents, 30000 without.
    * @returns The job's return value
-   * @throws Error if job fails or times out
+   * @throws Error with the last attempt's failure reason; `Job <id> not found` when
+   *   the job no longer exists (removed, or removed on completion before the wait saw
+   *   it), so its outcome is unknown; the timeout error when the TTL elapses first;
+   *   `waitUntilFinished: the embedded engine was shut down` after shutdownManager()
    */
   waitUntilFinished(queueEvents: unknown, ttl?: number): Promise<unknown>;
 
@@ -1088,6 +1094,7 @@ interface FailedEvent {
   jobId: string;
   failedReason: string;
   data?: unknown;
+  terminal?: boolean; // false while a retry is pending; true once the job failed for good
 }
 
 /** Emitted when job progress is updated */

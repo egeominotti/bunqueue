@@ -1,5 +1,6 @@
 import { decodeMessagePack } from '../../../shared/msgpack';
 import type { JobEvent } from '../../../domain/types/queue';
+import type { SendOptions } from '../types';
 import { TcpClientConnectivity } from './connectivity';
 
 function isJobEvent(value: unknown): value is JobEvent {
@@ -91,7 +92,10 @@ export abstract class TcpClientHealth extends TcpClientConnectivity {
     }
   }
 
-  protected abstract send(command: Record<string, unknown>): Promise<Record<string, unknown>>;
+  protected abstract send(
+    command: Record<string, unknown>,
+    options?: SendOptions
+  ): Promise<Record<string, unknown>>;
 
   private handlePingFailure(): void {
     if (this.health.recordPingFailure()) {

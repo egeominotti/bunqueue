@@ -3,6 +3,7 @@ import { getFlowDependencies } from '../flowJobDependencies';
 import type { PublicJobMethodContext } from '../jobConversionTypes';
 import { getSharedManager } from '../manager';
 import { removeJobDeduplicationKey } from '../jobDeduplication';
+import { waitJobUntilFinished } from '../jobWait';
 import type { TcpConnectionPool } from '../tcpPool';
 import { buildFailCommand, failEmbeddedArgs } from './failWire';
 import type { SimpleJobContext } from './jobProxy';
@@ -127,21 +128,7 @@ export function createDlqJobMethods(ctx: DlqJobContext): PublicJobMethodContext 
       );
       return true;
     },
-    waitUntilFinished: async (id, _events, ttl) => {
-      const timeout = ttl ?? 30_000;
-      if (ctx.embedded) {
-        const current = await manager().getJob(jobId(id));
-        if (!current) throw new Error(`Job ${id} not found`);
-        if (current.completedAt) return manager().getResult(jobId(id));
-        if (!(await manager().waitForJobCompletion(jobId(id), timeout))) {
-          throw new Error(`Job ${id} timed out after ${timeout}ms`);
-        }
-        return manager().getResult(jobId(id));
-      }
-      const response = await send({ cmd: 'WaitJob', id, timeout }, 'WaitJob');
-      if (!response.completed) throw new Error(`Job ${id} timed out after ${timeout}ms`);
-      return response.result;
-    },
+    waitUntilFinished: (id, queueEvents, ttl) => waitJobUntilFinished(ctx, id, queueEvents, ttl),
     discard: (id) => {
       if (ctx.embedded) void manager().discard(jobId(id));
       else if (ctx.tcp) void ctx.tcp.send({ cmd: 'Discard', id });

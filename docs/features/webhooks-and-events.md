@@ -175,6 +175,7 @@ interface JobEvent {
   progress?: number;
   prev?: string;
   delay?: number;
+  terminal?: boolean; // failed only: false when the attempt will be retried
 }
 
 interface JobLogEntry {
@@ -211,6 +212,15 @@ subscription exists. It filters by the socket's selected queue, frames the
 event once for all matching sockets, and writes through each socket's bounded
 `SocketWriteQueue`. `QueueEvents` maps that internal shape to its typed public
 payloads; TCP Workers reuse the same dedicated subscription for `stalled`.
+`failed` is broadcast for every failed attempt with `terminal: !wasRetried`
+(`operations/ack/failure.ts`); the lock-expiry and flow-parent DLQ paths send
+no flag. The stall detector's DLQ move broadcasts only `stalled`
+(`stallDetection.ts`); removing a waiting job broadcasts `removed`, while
+drain, obliterate and clean broadcast no per-job event. `QueueEvents` reports
+`terminal: event.terminal !== false`, so an event without the flag counts as
+terminal; the client job waits skip `failed` events whose `terminal` is
+`false`, re-read the job on `stalled` and `removed`, and re-read periodically
+for the moves without a job event (see [Client SDK: Queue](./client-queue-sdk.md)).
 
 `job.progress` is broadcast to internal subscribers, including the telemetry journal and live queue-event transports, by `updateJobProgress`. Because `mapEventToWebhook` intentionally has no progress mapping, the same operation separately calls `webhookManager.trigger('job.progress', ...)` (`src/application/operations/jobManagement.ts:170-188`).
 

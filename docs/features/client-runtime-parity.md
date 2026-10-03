@@ -33,8 +33,10 @@ The portable build substitutes only the following boundaries:
   embedded use through Bun's `require()` (via `createRequire(import.meta.url)`),
   so the published output has no top-level `await` and CommonJS re-bundles
   succeed. Node, Deno, and Workers never evaluate it and keep `bun:sqlite` out
-  of startup. `shutdownManager()` and `peekSharedManager()` never load the
-  engine: no shared manager can exist before `getSharedManager()` loaded it.
+  of startup. `shutdownManager()`, `peekSharedManager()` and
+  `onSharedManagerShutdown()` never load the engine: no shared manager can
+  exist before `getSharedManager()` loaded it, so the shim registers a shutdown
+  listener only with an engine that is already loaded.
   A CommonJS re-bundle without the engine file reports a clear error. Embedded
   mode retains its Bun requirement; the network client does not pretend to
   emulate SQLite.
@@ -96,7 +98,11 @@ worktree before any parity tests run.
 - `scripts/client-parity/preload.ts`: runs unchanged native documentation
   contracts against the compiled package. It substitutes module entrypoints,
   not methods or broker outcomes; both SQLite engines and TCP brokers remain
-  real. The preload asserts that the redirection actually took effect.
+  real. The preload asserts that the redirection actually took effect. Its
+  `src/client/manager.ts` substitute is built from the module's own runtime
+  exports (`export function`, `export async function`, `export const`, ...),
+  each taken from `dist/embedded.js`; a name the built engine lacks fails the
+  run with an error naming it, instead of every suite failing to import.
 - `sdk/typescript/tests/canonical-{queue,worker}.mjs`: identical public
   scenarios run in Bun, Node, and Deno with disposable brokers and databases.
 - Protocol conformance uses the default package entry. Workers exercises

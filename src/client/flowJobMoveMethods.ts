@@ -3,6 +3,7 @@ import { getSharedManager } from './manager';
 import { buildFailCommand, failEmbeddedArgs } from './queue/failWire';
 import { assertFlowTcpOk, type FlowJobRuntime } from './flowJobTypes';
 import { removeJobDeduplicationKey } from './jobDeduplication';
+import { waitJobUntilFinished } from './jobWait';
 
 /** Lifecycle and failure-inspection methods exposed by a FlowProducer Job. */
 export function buildFlowJobMoveMethods(runtime: FlowJobRuntime) {
@@ -67,25 +68,8 @@ export function buildFlowJobMoveMethods(runtime: FlowJobRuntime) {
       assertFlowTcpOk(response, 'MoveToWaitingChildren');
       return true;
     },
-    waitUntilFinished: async (_queueEvents: unknown, ttl?: number) => {
-      const timeout = ttl ?? 30_000;
-      if (embedded) {
-        const manager = getSharedManager();
-        const job = await manager.getJob(jobId(id));
-        if (!job) throw new Error(`Job ${id} not found`);
-        if (job.completedAt) return manager.getResult(jobId(id));
-        if (!(await manager.waitForJobCompletion(jobId(id), timeout))) {
-          throw new Error(`waitUntilFinished timed out after ${timeout}ms`);
-        }
-        return manager.getResult(jobId(id));
-      }
-      if (!tcp) throw new Error('waitUntilFinished: no connection');
-      const response = await tcp.send({ cmd: 'WaitJob', id, timeout });
-      assertFlowTcpOk(response, 'WaitJob');
-      const typed = response as { completed?: boolean; result?: unknown };
-      if (!typed.completed) throw new Error(`waitUntilFinished timed out after ${timeout}ms`);
-      return typed.result;
-    },
+    waitUntilFinished: (queueEvents: unknown, ttl?: number) =>
+      waitJobUntilFinished(runtime, id, queueEvents, ttl),
     discard: () => {
       if (embedded) void getSharedManager().discard(jobId(id));
       else if (tcp) void tcp.send({ cmd: 'Discard', id });

@@ -1,5 +1,6 @@
 import type { ChangePriorityOpts, Job } from '../../types';
 import { removeJobDeduplicationKey } from '../../jobDeduplication';
+import { waitJobUntilFinished } from '../../jobWait';
 import { getSharedManager } from '../../manager';
 import { jobId } from '../../../domain/types/job';
 import { buildFailCommand, failEmbeddedArgs } from '../failWire';
@@ -246,23 +247,7 @@ export function createSimpleJob<T>(
       }
       return response.ok === true;
     },
-    waitUntilFinished: async (_queueEvents, ttl) => {
-      const timeout = ttl ?? 30000;
-      if (embedded) {
-        const manager = getSharedManager();
-        const job = await manager.getJob(jobId(id));
-        if (!job) throw new Error(`Job ${id} not found`);
-        if (job.completedAt) return manager.getResult(jobId(id));
-        const ok = await manager.waitForJobCompletion(jobId(id), timeout);
-        if (!ok) throw new Error(`waitUntilFinished timed out after ${timeout}ms`);
-        return manager.getResult(jobId(id));
-      }
-      if (!tcp) throw new Error('waitUntilFinished: no connection');
-      const response = await tcp.send({ cmd: 'WaitJob', id, timeout });
-      const typed = response as { completed?: boolean; result?: unknown };
-      if (!typed.completed) throw new Error(`waitUntilFinished timed out after ${timeout}ms`);
-      return typed.result;
-    },
+    waitUntilFinished: (queueEvents, ttl) => waitJobUntilFinished(ctx, id, queueEvents, ttl),
     discard: () => {
       if (embedded) {
         void getSharedManager().discard(jobId(id));

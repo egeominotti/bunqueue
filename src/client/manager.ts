@@ -68,14 +68,38 @@ export function getSharedManager(dataPath?: string): QueueManager {
   return instance;
 }
 
-/** Shutdown shared manager */
 /** Inspect an existing manager without initializing an embedded runtime. */
 export function peekSharedManager(): SharedManager | null {
   return shared?.instance ?? null;
 }
 
+const shutdownListeners = new Set<(manager: SharedManager) => void>();
+
+/**
+ * Call `listener` with the manager that shutdownManager() just stopped; returns the
+ * unsubscribe function. Job waits use it to settle instead of outliving the engine.
+ */
+export function onSharedManagerShutdown(listener: (manager: SharedManager) => void): () => void {
+  shutdownListeners.add(listener);
+  return () => {
+    shutdownListeners.delete(listener);
+  };
+}
+
+/** Shutdown shared manager */
 export function shutdownManager(): void {
   const current = shared;
   shared = null;
-  current?.instance.shutdown();
+  if (!current) return;
+  try {
+    current.instance.shutdown();
+  } finally {
+    for (const listener of [...shutdownListeners]) {
+      try {
+        listener(current.instance);
+      } catch {
+        // A listener must not keep the others from learning about the shutdown.
+      }
+    }
+  }
 }

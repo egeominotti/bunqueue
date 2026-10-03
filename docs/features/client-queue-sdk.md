@@ -1,6 +1,6 @@
 # Client SDK: Queue
 
-> **Category:** Client SDK · **Source:** `src/client/queue/queue.ts`, `src/client/queue/runtime/`, `src/client/queue/types/`, `src/client/queue/operations/`, `src/client/queue/job-proxy/`, `src/client/queue/dlq.ts`, `src/client/queue/addBatcher.ts`, `src/client/events.ts`, `src/client/queue-events/`, `src/client/types/events.ts`, `src/client/jobConversion.ts`, `src/client/manager.ts`, `src/client/queueGroup.ts`
+> **Category:** Client SDK · **Source:** `src/client/queue/queue.ts`, `src/client/queue/runtime/`, `src/client/queue/types/`, `src/client/queue/operations/`, `src/client/queue/job-proxy/`, `src/client/queue/dlq.ts`, `src/client/queue/addBatcher.ts`, `src/client/events.ts`, `src/client/queue-events/`, `src/client/types/events.ts`, `src/client/jobConversion.ts`, `src/client/jobWait.ts`, `src/client/job-wait/`, `src/client/manager.ts`, `src/client/queueGroup.ts`
 
 ## Purpose
 
@@ -44,6 +44,11 @@ Owns:
   `runtime/queries.ts`).
 - `QueueEvents`, the read-only embedded/TCP lifecycle-event listener
   (`events.ts`, `queue-events/tcpSubscription.ts`).
+- The one job wait behind `Queue.waitJobUntilFinished` and every
+  `Job.waitUntilFinished` — jobs from `add`/`addBulk`, queries, FlowProducer,
+  DLQ entries, and Worker/SandboxedWorker events (`client/jobWait.ts`, with
+  `client/job-wait/`: `session.ts`, `readers.ts`, `managerDispatch.ts`,
+  `emitterDispatch.ts`, `brokerWait.ts`, `types.ts`).
 - BullMQ-compatible error classes `UnrecoverableError` / `DelayedError` (`errors.ts`).
 
 Does NOT own:
@@ -62,7 +67,7 @@ Internal:
 - `getSharedManager(dataPath?)` — process-wide `QueueManager` singleton; lazily created, env-var data path resolution `BUNQUEUE_DATA_PATH > BQ_DATA_PATH > DATA_PATH > SQLITE_PATH`, with a programmatic `dataPath` override. The first effective path is canonicalized and retained; a later explicit path must identify the same database or construction throws synchronously. See [Core Queue Engine](./core-queue-engine.md), [Configuration & Entrypoint](./configuration.md).
 - `TcpConnectionPool`, `getSharedPool`, `releaseSharedPool` — TCP transport. See [Client Transport](./client-transport.md).
 - `AddBatcher` — concurrent `add()` batching into `PUSHB` (`addBatcher.ts`).
-- `resolveToken`, `Forwarder`, operation modules (`operations/*`, `stall`, `dlq`, `rateLimit`, `scheduler`, `deduplication`, `jobMove`, `workers`, `bullmqCompat`).
+- `resolveToken`, `Forwarder`, operation modules (`operations/*`, `stall`, `dlq`, `rateLimit`, `scheduler`, `deduplication`, `jobMove`, `jobWait`, `workers`, `bullmqCompat`).
 - `jobId()` from `src/domain/types/job` (string → internal job id), `pausedView` from `src/shared/pausedView`, `shardIndex` from `src/shared/hash`.
 
 External / runtime: Bun only (`import '../require-bun'` guard in `index.ts:23`), `Bun.env`, Node `events.EventEmitter` (for `QueueEvents`). No third-party runtime deps.
@@ -153,7 +158,8 @@ broker projection.
 
 Move / BullMQ-v5 (`queue/runtime/scheduling.ts`, `queue/jobMove.ts`):
 `moveJobToCompleted`, `moveJobToFailed`, `moveJobToWait`,
-`moveJobToDelayed`, `moveJobToWaitingChildren`, `waitJobUntilFinished`.
+`moveJobToDelayed`, `moveJobToWaitingChildren`, and `waitJobUntilFinished`,
+which delegates to the shared `client/jobWait.ts` (see Edge Cases).
 `moveJobToFailed(id, error)` forwards the error's stacktrace (#74) and honours
 `UnrecoverableError` (skip retry) via the shared `failWire` helper, matching the
 worker failure path. `moveJobToDelayed(id, timestamp)` takes an **absolute**
@@ -198,7 +204,7 @@ only after the broker acknowledges `SubscribeEvents`.
 
 TCP commands emitted by this module (exact names): `PUSH`, `PUSHB`, `GetJob`, `GetState`, `GetChildrenValues`, `GetJobs`, `GetJobCounts`, `GetCountsPerPriority`, `Count`, `Pause`, `Resume`, `Drain`, `Obliterate`, `IsPaused`, `Ping`, `Cancel`, `MoveToWait`, `MoveToWaitingChildren`, `RetryDlq`, `RetryCompleted`, `GetDlqStats`, `Clean`, `Promote`, `PromoteJobs`, `Progress`, `GetLogs`, `AddLog`, `ClearLogs`, `Update`, `ChangeDelay`, `ChangePriority`, `ExtendLock`, `ACK`, `FAIL`, `MoveToDelayed`, `WaitJob`, `SetStallConfig`, `GetStallConfig`, `GetQueueLimits`, `GetGroupJobsCount`, `GetGroupsJobsCount`, `GetGroupActiveCount`, `SetGroupRateLimit`, `GetGroupRateLimit`, `RemoveGroupRateLimit`, `GetGroupRateLimitTtl`, `SetGroupConcurrency`, `GetGroupConcurrency`, `RemoveGroupConcurrency`, `PauseGroup`, `ResumeGroup`, `IsGroupPaused`, `GetDeduplicationJobId`, `RemoveDeduplicationKey`, `RemoveJobDeduplicationKey`, `ListWorkers`, `Metrics`, `TrimEvents`, `GetResult`, `GetFailedChildrenValues`, `GetIgnoredChildrenFailures`, `RemoveChildDependency`, `RemoveUnprocessedChildren`, `Discard`, `SubscribeEvents`, `UnsubscribeEvents`.
 
-`QueueEvents` events emitted: `waiting`, `active`, `completed`, `failed`, `progress`, `stalled`, `removed`, `delayed`, `duplicated`, `retried`, `waiting-children`, `drained`, `paused`, `resumed`, `error` (`events.ts:150`).
+`QueueEvents` events emitted: `waiting`, `active`, `completed`, `failed`, `progress`, `stalled`, `removed`, `delayed`, `duplicated`, `retried`, `waiting-children`, `drained`, `paused`, `resumed`, `error` (`events.ts:150`). `failed` fires for every failed attempt; its payload's `terminal` flag is `false` while a retry is pending and `true` once the job failed for good.
 
 ## Data Models
 
@@ -266,7 +272,10 @@ under that parent's shard lock, so concurrent adds cannot overwrite an edge.
 `queue/job-proxy/reflection.ts` derives reflected option fields. Public
 conversion lives in `client/jobConversion.ts`. Full DLQ entries use
 `queue/dlqJobMethods.ts` so broker-returned jobs keep live methods rather than
-detached placeholders.
+detached placeholders. Each of these builders, the FlowProducer job
+(`client/flowJobMoveMethods.ts`), and Worker/SandboxedWorker event jobs
+(`worker/handlers/dependencies.ts`) delegate `waitUntilFinished` to
+`client/jobWait.ts`, so every Job waits with the same semantics.
 
 **getJob()** (`query.ts`): embedded uses full `toPublicJob` wiring when
 `ctx.updateJobData` is present (all callbacks route to the shared manager); TCP
@@ -317,11 +326,185 @@ zero.
   `trimEvents(maxLength)` returns the exact number removed from that queue's
   separate persistent event journal; repeated trims are idempotent.
 - **`retryJob` state machine** (embedded, `management.ts:40`): `failed` → `retryDlq` (throws if not in DLQ), `active` → `moveActiveToWait`, `waiting`/`prioritized`/`delayed` → no-op, anything else throws. TCP path issues `MoveToWait` and throws on `ok !== true`.
-- **`waitUntilFinished` TTL**: defaults to `30000ms`; rejects on timeout. The
-  method subscribes before checking state so it cannot miss a completion race.
-  An already-completed TCP job is followed by an authoritative `GetResult`, and
-  a live completion resolves with the event's exact return value. Both paths
-  settle and remove listeners exactly once.
+- **Waiting for a job** (`client/jobWait.ts`, `client/job-wait/`):
+  `Queue.waitJobUntilFinished(id, queueEvents, ttl?)` and every
+  `Job.waitUntilFinished(queueEvents, ttl?)` share BullMQ v5 semantics in both
+  runtimes. The wait resolves with the result once the job completes, including
+  on a later attempt; rejects with the final attempt's failure reason
+  (`job.failedReason`, falling back to `Job already failed`) once the job failed
+  for good (no retry left, moved to the DLQ by a failure, a stall or a lock
+  expiry); ignores `failed` events with `terminal: false`; and rejects with a
+  timeout only when the TTL elapses first. A `failed` payload without `terminal`
+  (a mock emitter, or a broker older than 2.8.56) still settles it.
+  - **TTL**: a positive finite TTL bounds the wait. Any other value (`0`, a
+    negative number, `NaN`, `Infinity`) means no timeout, with or without
+    QueueEvents. An omitted (or `null`) TTL means no timeout with QueueEvents,
+    as in BullMQ, and `30000ms` without. The deadline is a timer of its own, so a
+    wait is never held past it by a command that cannot complete (an unreachable
+    broker). When it fires, the wait reads the job once more if the read budget
+    (below) has a token, for at most 1 s, and settles on the outcome if the job
+    finished unseen; otherwise it rejects with `Job <id> timed out after <ttl>ms`
+    (with QueueEvents) or `waitUntilFinished timed out after <ttl>ms` (without).
+  - **Embedded**: every wait registers with one subscription per manager
+    (`job-wait/managerDispatch.ts`, a `Map<jobId, Set<watcher>>` created by the
+    first wait, released by the last, dropped with its manager), so N waits cost
+    O(1) per event. The job's `completed` and terminal `failed` events settle it;
+    `stalled` and `removed` make it re-read the state. It reads the job once right
+    after subscribing (the subscription is synchronous, so no transition is
+    missed). Reads use `peekSharedManager()` and never create a manager: a wait
+    started after `shutdownManager()` rejects at once, and `shutdownManager()`
+    rejects every pending wait on the stopped manager (`onSharedManagerShutdown`),
+    both with `waitUntilFinished: the embedded engine was shut down`. A
+    QueueEvents passed in embedded mode is listened to as well, but adds nothing
+    the manager does not already report.
+  - **TCP with QueueEvents** (or any object with `on`/`off` and the same
+    payloads): waits on one emitter share its listeners and one readiness round
+    trip (`job-wait/emitterDispatch.ts`; a TCP QueueEvents answers
+    `waitUntilReady()` with a Ping that counts toward its connection's rate
+    limit). The wait reads the state (`GetState`, plus `GetResult` or `GetJob`
+    for the reason) once the QueueEvents is ready, which closes the window in
+    which a job finishing while it subscribes would be missed. `stalled` and
+    `removed` events for the job trigger an immediate re-read; the internal
+    `resubscribed` signal after the QueueEvents reconnected
+    (`queue-events/streamSignals.ts`; events sent while it was down are lost)
+    queues one re-read per wait within the read budget. When the QueueEvents
+    closes (`close()`/`disconnect()`, a `closed` signal) or cannot become ready,
+    the wait continues without it as below, keeping its deadline and timeout
+    message.
+  - **TCP without QueueEvents** (`job-wait/brokerWait.ts`, `holdLimiter.ts`):
+    after the first state read, the wait reads the job on the `BROKER_READS`
+    schedule (1 s, then 2 s, 4 s ... and every 30 s), which reports failures,
+    since `WaitJob` settles only on completion. Meanwhile, with a hold slot, it
+    holds `WaitJob` for 1 s, then 2 s, 4 s ... up to 30 s per hold (never past
+    the TTL, so always inside the broker's `[0, 600000]` bound) and settles at
+    once on a completion. The broker runs at most 50 commands per connection at
+    once and a hold keeps one of them: uncapped, more than about 50 waits per
+    connection took every slot, other commands queued behind the holds (a
+    `getJobCounts` probe took 5 s and more), and queued holds overran their
+    timeout and forced reconnects. Hold slots are therefore leased per
+    connection (`TcpConnectionPool.reserveLongPoll`, `tcp/longPollRouter.ts`):
+    at most `HOLDS_PER_CONNECTION` (40) on each connection of the pool, never
+    more than half of its `maxInFlight` window, on the connection with the
+    fewest (a pool of 4 connections splits commands evenly, so a default pool
+    holds up to 160). A wait keeps its slot across holds until it settles, and
+    slots pass on in FIFO order, as the broker's own queue did when every wait
+    held `WaitJob`: since jobs mostly finish in the order they were added, a
+    queued wait usually holds by the time its job completes. A wait that held
+    for 30 s (`HOLD_TURN_MS`) while others queue yields its slot. Until it gets
+    a slot, a wait learns of a completion from its scheduled reads; with more
+    concurrent waits than slots and jobs that do not finish in order, that can
+    take seconds (see Limitations), so use `QueueEvents` for high-concurrency
+    request/response. Each hold runs under its own command timeout (hold + 5 s,
+    `SendOptions.timeout`), so the connection's `commandTimeout` does not cut it
+    short and a hold that the broker answers in time never counts toward the
+    consecutive-timeout reconnect (see [Client Transport](./client-transport.md)).
+    A reply before the hold ended is followed by an unref'd pause until its end,
+    so a broker answering early cannot turn the loop into a busy one. TTLs above
+    600000 ms are honoured by further holds.
+  - **Read budget and safety net** (`job-wait/readScheduler.ts`): every
+    background read (the safety net, the `BROKER_READS` schedule, the re-reads
+    after a re-subscription, the read at the deadline) goes through a token
+    bucket shared by all waits on one transport (`TCP_READS_PER_SECOND` = 20,
+    about 12 % of one connection's default broker budget of 10,000 requests per
+    60 s) or one embedded manager (1,000 per second). An event-driven wait
+    (embedded, or TCP with QueueEvents) re-reads the job about 5 s after it
+    starts, then after 10 s, 20 s and every 30 s; every delay is jittered by
+    ±25 %, so waits started together do not read in the same tick. This covers
+    outcomes with no job event (drain, obliterate, clean, DLQ purge, an event
+    lost without a re-subscription). A wait that settles first reads nothing
+    extra; with more waits than the budget covers (more than about 600 long
+    waits per transport) each is read less often instead of the connection being
+    flooded: 10,000 long waits are each re-read about every 8 minutes. The
+    scheduler's timer is unref'd and never keeps the process alive; a TTL timer
+    does, as before. Initial reads are not budgeted: N waits started at once
+    still send N `GetState` commands, as before.
+  - **A job that no longer exists** settles the wait with `Job <id> not found`
+    in every path: removed, drained, obliterated, cleaned, purged from the DLQ,
+    or removed on completion or failure (`removeOnComplete`/`removeOnFail`)
+    before the wait saw that event, including a job missing when the wait starts
+    (BullMQ rejects with "Missing key" there). The outcome of such a job is
+    unknown, so the wait reports neither a result nor a failure reason. Over TCP
+    with QueueEvents a `Job not found` read is confirmed through a fresh
+    `waitUntilReady()` round trip on the event connection first, so a
+    `completed` event already sent for a job removed on completion still wins.
+  - **Errors**: a read that fails for a transient reason (the broker's
+    `Rate limit exceeded`, `Command timeout`, `Connection lost`, `Not
+    connected`; `isTransientError` in `job-wait/types.ts`) says nothing about
+    the job and is retried by the next scheduled read, the first read included
+    (HEAD's state read swallowed such a refusal; with 14,000 waits started on
+    one connection, rejecting would have turned 4,000 of them into errors). Any
+    other failure is final and rejects the wait: an `ok: false` reply to
+    `GetState`, `GetResult` or `WaitJob` (for example `Not authenticated`), a
+    closed pool after `queue.close()`. `GetJob` only supplies the failure
+    reason, falling back to `Job already failed`. A broker outage longer than
+    `commandTimeout` therefore no longer rejects a wait: it settles once the
+    client has reconnected and sees the outcome (which can lag by the reconnect
+    backoff, up to 30 s, plus the next scheduled read), or at its TTL.
+  - **Limitations**: over TCP without QueueEvents a failure is reported by the
+    next scheduled read: about 1 s after the start and at most about 37 s late
+    after that while at most about 600 waits share the pool's read budget (20
+    reads per second); beyond that, reads come less often (measured with 1,500
+    failing jobs on one pool: median 36.7 s, max 74.3 s). A completion is seen at
+    once by a wait holding a slot; with more concurrent waits than slots (40 per
+    connection, 160 on a default pool of 4) and jobs that do not finish in the
+    order their waits started, a queued wait can learn of it seconds later
+    (measured on a default pool, 1 s jobs: 1,000 waits p90 2.0 s and max 5.1 s,
+    1,200 waits p90 2.1 s and max 5.1 s; HEAD about 0 ms, since every wait held
+    `WaitJob` on the broker) — use `QueueEvents` for high-concurrency
+    request/response. Outcomes without a job event (drain, obliterate, clean,
+    DLQ purge) surface at the next safety-net read. After a broker outage a wait
+    settles once the client has reconnected, which can lag by the reconnect
+    backoff (up to 30 s) plus the next scheduled read; in a 40 s outage the job
+    acked 3 s after the broker returned resolved its waits 19 s later. A job
+    removed on completion whose `completed` event the wait missed (it completed
+    before the wait started, or while a TCP QueueEvents was disconnected)
+    reports `Job <id> not found`, because its result is not retained. A
+    `QueueManager` shut down directly (`manager.shutdown()` instead of
+    `shutdownManager()`) sends no shutdown signal, so its waits settle from their
+    next read. An emitter whose `on()` throws for an event name loses only that
+    hint. A wait without a TTL does not keep the process alive by itself (its
+    timers are unref'd); with a TTL, the deadline timer and the bounded read at
+    the deadline do, until the wait has settled. A `WaitJob` hold already sent
+    when its wait settles cannot be withdrawn: the broker keeps that slot until
+    the hold ends (at most 35 s), and the wait keeps its hold slot until then,
+    but no further hold or read is issued. On the broker side, a `QueueManager`
+    shut down while its TCP server still serves connections answers pending
+    `WaitJob` holds with `completed: true` and no result
+    (`EventsManager.clear()` resolves its completion waiters,
+    `eventsManager.ts:61`, `handlers/advanced/jobs.ts:127-135`), and the wait
+    trusts that reply, so it can resolve `undefined` for a job that did not
+    complete; this server-side limitation is tracked separately.
+  - A job without a runtime (`toPublicJob`/`createPublicJob` without a wait
+    callback, or no embedded manager and no TCP connection) rejects with
+    `waitUntilFinished: no connection`. Every path settles exactly once and
+    removes its listeners, manager registration, scheduled reads, hold request
+    and timers, including when an emitter reports the outcome synchronously
+    while the wait is still subscribing (the wait then arms no timer and reads no
+    state; `test/job-wait-sync-source.test.ts`).
+
+  | Path | Mode | Outcome source | Already finished | Finishes during the wait | Job gone |
+  | --- | --- | --- | --- | --- | --- |
+  | QueueEvents | embedded | manager events (+ emitter) | first read, at once | event, at once | `removed`: at once; else next safety-net read |
+  | none | embedded | manager events | first read, at once | event, at once | `removed`: at once; else next safety-net read |
+  | QueueEvents | TCP | QueueEvents events | read after ready, one round trip | event, at once | `removed`: at once; else next safety-net read |
+  | none | TCP | holds (40 per connection, FIFO) + scheduled reads | first read, one round trip | completion: at once with a hold slot, else next read or slot; failure: next read | next read |
+  | QueueEvents closed | embedded | manager events (unchanged) | first read, at once | event, at once | as above |
+  | QueueEvents closed | TCP | as "none" over TCP | next read | as "none" over TCP | next read |
+
+  - Behavior changes from the per-path waiters this replaced: a retried attempt
+    no longer settles the wait; a Job object over TCP listens to the QueueEvents
+    it is given instead of ignoring it; an embedded `queue.add()` job accepts
+    `null`; a TTL of `0` without QueueEvents no longer times out at once; a
+    missing job rejects with `Job <id> not found` instead of a timeout (TCP) or
+    a wait to the TTL (QueueEvents); a DLQ or other already-failed job rejects at
+    once with its failure reason; an embedded wait at `shutdownManager()`
+    rejects with the shutdown error instead of resolving `undefined`; a TCP wait
+    is no longer cut short by `commandTimeout`, accepts TTLs above 600000 ms, and
+    with more than 40 waits per connection no longer takes every broker slot of
+    the connection, but a wait beyond the slots can see its job's completion
+    seconds late (see Limitations; use `QueueEvents` for high-concurrency
+    request/response); a refused state read rejects instead of being ignored; a
+    detached job rejects instead of resolving `undefined`.
 - **`QueueEvents` transport**: embedded mode subscribes to the shared manager;
   TCP mode uses a dedicated socket so unsolicited event frames cannot consume a
   pooled command response. The subscription authenticates before subscribing,
@@ -329,6 +512,12 @@ zero.
   transport or handler error is emitted only when an `error` listener exists,
   avoiding Node's unhandled `error` behavior. Progress payloads expose the
   public progress value rather than the manager's internal event envelope.
+  `failed` payloads carry `terminal: event.terminal !== false`, so failures
+  from brokers that predate the flag count as terminal. Besides its public
+  events, a QueueEvents raises two internal signals for job waits
+  (`queue-events/streamSignals.ts`, a `WeakMap` keyed by the instance, so
+  `removeAllListeners()` cannot drop them and no public listener sees them):
+  `resubscribed` after a TCP re-subscription and `closed` from `close()`.
 - **`prefixKey` isolation invariant**: every context created by
   `queue/runtime/state.ts` forwards `queueKey = prefixKey + name`, so two queues
   with the same logical name but different prefixes never collide; a consuming

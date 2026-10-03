@@ -1,4 +1,4 @@
-export type { PendingCommand } from './command';
+export type { PendingCommand, SendOptions } from './command';
 export { DEFAULT_CONNECTION } from './connection';
 export type { ConnectionHealth, ConnectionOptions } from './connection';
 export type { FrameParser, SocketWrapper } from './socket';

@@ -20,6 +20,52 @@ head:
 
 ## Unreleased
 
+### Fixed
+
+- **Waiting for a job settles on its final outcome, for every Job and in both
+  modes.** `Queue.waitJobUntilFinished()` and `job.waitUntilFinished()`
+  rejected with the first attempt's error as soon as a job with retries left
+  failed once, even when a later attempt completed. A wait now resolves with
+  the result once the job completes and rejects with the last attempt's error
+  once no retry is left, including a job the stall detector moves to the DLQ,
+  and rejects with `Job <id> not found` once the job no longer exists
+  (removed, drained, obliterated, or removed on completion before the wait saw
+  it). `QueueEvents` still fires `failed` for every attempt and now marks it
+  `terminal` (`false` while a retry is pending).
+- **TCP waits without `QueueEvents` report failures and survive long TTLs.** A
+  job that already failed settles at once; one that fails later is reported
+  by the next state read (about 1 s after the start, then every 2 to 30 s,
+  ±25%, while at most about 600 waits share a connection pool; less often
+  beyond that) instead of at the TTL. `WaitJob` holds run under their own
+  command timeout, so `commandTimeout` no longer cuts a wait short, and TTLs
+  above 600000 ms are honoured. Holds are capped at 40 per connection (160 on a
+  default pool of 4), so other commands keep broker slots: with a TTL at or
+  above `commandTimeout` and jobs still pending, 120 waits on one connection
+  used to fail with `Connection lost` after about 30 s. Beyond those slots a
+  wait queues for one and can see a completion seconds late (1,000 concurrent
+  waits on 1 s jobs: p90 2 s, where every wait used to see it at once), so use
+  `QueueEvents` for high-concurrency request/response. `TcpConnectionPool`
+  gains per-command timeouts (`send(command, { timeout })`) and per-connection
+  long-poll leases (`reserveLongPoll(perConnection)`).
+- **Waits no longer hang, and they no longer starve other traffic.** A wait
+  with `QueueEvents` re-reads the job on `stalled`, `removed` and after a
+  reconnect, carries on when the `QueueEvents` closes, and re-reads as a
+  jittered safety net. Background reads share a budget of 20 per second per
+  connection pool, and rate-limit refusals, command timeouts and lost
+  connections are retried instead of rejecting the wait. After a broker outage
+  a wait settles once the client has reconnected, which can lag by the
+  reconnect backoff (up to 30 s) plus the next state read. The TTL is a timer
+  of its own. Embedded waits share one manager subscription, never start a new
+  engine after `shutdownManager()`, and reject with `waitUntilFinished: the
+  embedded engine was shut down` when it stops. A TTL of `0` means no timeout
+  with or without `QueueEvents`; an embedded `queue.add()` job accepts `null`
+  instead of `QueueEvents`; a refused state read rejects with the broker's
+  error; a job without a connection rejects instead of resolving `undefined`;
+  and TCP `Job` objects now listen to the `QueueEvents` they are given. One
+  implementation (`src/client/jobWait.ts`, `src/client/job-wait/`) replaces six
+  copies that had drifted apart. The fix reaches `bunqueue-client` with its
+  next release.
+
 ### Documentation
 
 - **New diagrams in the MCP guide.** "Where the queue lives" now reads left to

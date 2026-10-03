@@ -203,7 +203,18 @@ be claimed.
   directory.
   QueueEvents and Worker stall notifications share a focused dedicated TCP
   subscription adapter under `client/queue-events/`; public event payloads live
-  separately under `client/types/events.ts`.
+  separately under `client/types/events.ts`. Every job wait
+  (`Queue.waitJobUntilFinished`, `Job.waitUntilFinished` on any Job source) runs
+  through `client/jobWait.ts` and `client/job-wait/`: embedded waits share one
+  manager subscription per manager that dispatches by job id and never create a
+  manager; TCP waits settle from QueueEvents (shared listeners and one readiness
+  round trip per instance, re-reading the job on `stalled`, `removed` and a
+  re-subscription) or, without it or once it closes, from scheduled state reads
+  and `WaitJob` holds under their own command timeout, leased per connection
+  (at most 40 each, FIFO, `tcp/longPollRouter.ts`). All skip `failed` events
+  marked `terminal: false`, re-read on a jittered safety-net schedule within a
+  per-transport read budget (`job-wait/readScheduler.ts`), retry transient read
+  failures, and settle a vanished job with `Job <id> not found`.
   Workflow shutdown ownership is centralized in `workflow/executionFence.ts`;
   node publication lives in `workflow/executorQueue.ts`, and the extracted
   `workflow/forEachRunner.ts` keeps each orchestration module below 300 lines.

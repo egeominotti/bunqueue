@@ -1,5 +1,6 @@
 import type { Job } from '../../types';
 import { removeJobDeduplicationKey } from '../../jobDeduplication';
+import { waitJobUntilFinished } from '../../jobWait';
 import { buildFailCommand } from '../failWire';
 import type { JobProxyContext, JobReflectionMeta } from '../types/job';
 import { computeDependencies } from './dependencies';
@@ -176,13 +177,7 @@ export function createJobProxy<T>(
       }
       return response.ok === true;
     },
-    waitUntilFinished: async (_queueEvents, ttl) => {
-      const timeout = ttl ?? 30000;
-      const response = await tcp.send({ cmd: 'WaitJob', id, timeout });
-      const typed = response as { completed?: boolean; result?: unknown };
-      if (!typed.completed) throw new Error(`waitUntilFinished timed out after ${timeout}ms`);
-      return typed.result;
-    },
+    waitUntilFinished: (queueEvents, ttl) => waitJobUntilFinished({ tcp }, id, queueEvents, ttl),
     discard: () => {
       void tcp.send({ cmd: 'Discard', id });
     },

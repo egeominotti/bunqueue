@@ -129,7 +129,9 @@ export function createPublicJob<T>(opts: CreatePublicJobOptions): Job<T> {
         ? moveToWaitingChildren(id, lockToken, moveOpts)
         : Promise.resolve(false),
     waitUntilFinished: (queueEvents: unknown, ttl?: number) =>
-      waitUntilFinished ? waitUntilFinished(id, queueEvents, ttl) : Promise.resolve(undefined),
+      waitUntilFinished
+        ? waitUntilFinished(id, queueEvents, ttl)
+        : Promise.reject(new Error('waitUntilFinished: no connection')),
 
     // BullMQ v5 additional methods
     discard: () => {
@@ -259,7 +261,9 @@ export function toPublicJob<T>(opts: ToPublicJobOptions): Job<T> {
         ? moveToWaitingChildren(id, lockToken, moveOpts)
         : Promise.resolve(false),
     waitUntilFinished: (queueEvents: unknown, ttl?: number) =>
-      waitUntilFinished ? waitUntilFinished(id, queueEvents, ttl) : Promise.resolve(undefined),
+      waitUntilFinished
+        ? waitUntilFinished(id, queueEvents, ttl)
+        : Promise.reject(new Error('waitUntilFinished: no connection')),
 
     // BullMQ v5 additional methods
     discard: () => {

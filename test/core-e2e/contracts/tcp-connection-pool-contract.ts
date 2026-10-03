@@ -44,6 +44,20 @@ export async function runTcpConnectionPoolContract(
       'parallel pooled commands failed'
     );
 
+    // One long-poll slot per connection: two leases fit the 2-connection pool, a third
+    // does not, and a released slot can be leased again.
+    const leases = tracker.call('TcpConnectionPool', 'reserveLongPoll', () => [
+      pool.reserveLongPoll(1),
+      pool.reserveLongPoll(1),
+      pool.reserveLongPoll(1),
+    ]);
+    ensure(leases[0] !== null && leases[1] !== null, 'pool did not lease a slot per connection');
+    ensure(leases[2] === null, 'pool leased beyond its per-connection limit');
+    const leased = await leases[0].send({ cmd: 'Ping' });
+    ensure(leased.ok === true, 'leased long-poll slot could not send');
+    leases[0].release();
+    ensure(pool.reserveLongPoll(1) !== null, 'released long-poll slot was not reusable');
+
     const health = tracker.call('TcpConnectionPool', 'getHealth', () => pool.getHealth());
     ensure(health.connectedCount === 2 && health.totalCommands >= 3, 'pool health is incoherent');
     tracker.call('TcpConnectionPool', 'setPoolKey', () =>

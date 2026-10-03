@@ -7,6 +7,7 @@ export type {
   ConnectionOptions,
   ConnectionHealth,
   PendingCommand,
+  SendOptions,
   SocketWrapper,
   ClientTlsOptions,
 } from './types';

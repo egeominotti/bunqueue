@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `Queue.waitJobUntilFinished()` and `job.waitUntilFinished()` settle on the
+  job's final outcome. A failed attempt that will be retried no longer rejects
+  the wait; a job that runs out of retries, or that the stall detector moves to
+  the DLQ, rejects with the last attempt's error; a job that no longer exists
+  rejects with `Job <id> not found`. Over TCP without `QueueEvents`, a failed
+  job is reported by the next state read (1 s after the start, then every 2 to
+  30 s ±25%, while at most about 600 waits share a pool) instead of at the TTL,
+  and waits are no longer cut short by `commandTimeout`. At most 40 waits per
+  connection hold `WaitJob`, so other commands keep broker slots; further waits
+  queue and can see a completion seconds late, so use `QueueEvents` for
+  high-concurrency request/response. Waits survive a `QueueEvents` `close()`,
+  reconnects and broker outages: rate-limit refusals, timeouts and lost
+  connections are retried within a per-pool read budget, and the wait settles
+  once the client has reconnected (which can lag by the reconnect backoff, up
+  to 30 s, plus the next state read) or at its TTL. Embedded waits reject when
+  `shutdownManager()` stops the engine and never restart it. A TTL of `0` means
+  no timeout. `QueueEvents` `failed` payloads carry `terminal`.
+
 ### Documentation
 
 - README rewritten: standard SDK header, the same tested quick start as the
