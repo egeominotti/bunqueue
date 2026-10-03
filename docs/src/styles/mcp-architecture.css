@@ -59,7 +59,8 @@
   line-height: 1.4;
 }
 
-.mcpd.not-content :not(pre) > code {
+:root .mcpd.not-content :not(pre) > code {
+  border: 0;
   padding: 0.05em 0.35em;
   border-radius: 4px;
   background: color-mix(in srgb, var(--sl-color-text) 8%, transparent);

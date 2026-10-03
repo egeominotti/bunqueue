@@ -1,0 +1,160 @@
+/* Queue simulator: the shard map and the throughput sparkline. */
+
+/* ── Shards ─────────────────────────────────────────────────────────── */
+
+.shard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shard-cell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.2rem 0.4rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.45rem 0.55rem 0.5rem;
+  border: 1px solid var(--docs-line);
+  border-radius: 6px;
+  background: var(--sl-color-bg);
+  transition:
+    border-color 300ms ease,
+    box-shadow 300ms ease;
+}
+
+/* A push just landed here: the new job is waiting, so the cell lights up in the
+   waiting color. */
+.shard-cell.is-flash {
+  border-color: var(--docs-state-waiting);
+  box-shadow: 0 0 0 1px var(--docs-state-waiting);
+}
+
+.shard-name,
+.shard-load {
+  color: var(--docs-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.shard-load {
+  text-align: right;
+}
+
+.shard-cell.has-load :is(.shard-name, .shard-load) {
+  color: var(--sl-color-text);
+}
+
+.shard-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--docs-line);
+}
+
+.shard-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--docs-state-waiting);
+  transition: width 200ms ease;
+}
+
+.shard-queues {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--docs-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Throughput ─────────────────────────────────────────────────────── */
+
+.spark-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.spark-value {
+  font-family: var(--sl-font-mono);
+  font-size: 1.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.spark-unit {
+  color: var(--docs-muted);
+  font-size: 0.8rem;
+}
+
+.spark-chart {
+  position: relative;
+}
+
+.spark-chart svg {
+  display: block;
+  width: 100%;
+  height: 72px;
+  overflow: visible;
+}
+
+.spark-base {
+  stroke: var(--docs-line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-line {
+  fill: none;
+  stroke: var(--docs-state-completed);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-area {
+  fill: color-mix(in srgb, var(--docs-state-completed) 14%, transparent);
+  stroke: none;
+}
+
+.spark-cursor line {
+  stroke: var(--docs-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-cursor circle {
+  fill: var(--docs-state-completed);
+}
+
+.spark-tip {
+  position: absolute;
+  top: -0.5rem;
+  padding: 0.1rem 0.45rem;
+  transform: translateX(-50%);
+  border: 1px solid var(--docs-line);
+  border-radius: 6px;
+  background: var(--sl-color-bg);
+  font-family: var(--sl-font-mono);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shard-cell.is-flash {
+    box-shadow: none;
+  }
+}

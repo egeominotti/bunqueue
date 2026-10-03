@@ -1,211 +1,73 @@
 ---
 /**
- * Static topology of the web dashboard (guide/dashboard): browser, the
- * all-in-one dashboard process (UI server + control agent) and the bunqueue
- * server. The figcaption carries the full description, so the boxes are
- * decorative for assistive technology.
+ * How the web dashboard connects, for /guide/dashboard/: the browser talks only to
+ * the dashboard process (bunx bunqueue-dashboard), whose UI server proxies /api/* to
+ * the bunqueue HTTP API and whose control agent reaches the server's TCP port through
+ * the SDKs. The optional Copilot is the one call that leaves the browser directly.
+ * Plain HTML, so the text stays readable, selectable and in reading order for screen
+ * readers; only the wires are hidden from them.
  */
+import '../styles/dashboard-architecture.css';
 ---
 
-<figure class="dash-arch not-content">
-  <div class="da-row" aria-hidden="true">
-    <div class="da-node">
-      <span class="da-kicker">Browser</span>
-      <span class="da-title">Dashboard UI</span>
-      <span class="da-sub">React SPA · polling + SSE</span>
-      <span class="da-sub">Tokens held for the session only</span>
+<figure class="dashd not-content" aria-label="How the browser, the dashboard process and the bunqueue server connect">
+  <div class="dashd-grid">
+    <div class="dashd-node dashd-browser">
+      <span class="dashd-kicker">Your browser</span>
+      <strong class="dashd-title">Dashboard UI</strong>
+      <span class="dashd-note">React app that polls the HTTP API and follows its SSE stream</span>
+      <p class="dashd-aside"><strong>Optional Copilot</strong> calls your AI provider directly</p>
     </div>
 
-    <div class="da-link">
-      <span class="da-link-label">HTTP<br /><span>same origin</span></span>
+    <div class="dashd-link dashd-link-browser">
+      <span class="dashd-link-label">HTTP :8080</span>
+      <span class="dashd-wire" aria-hidden="true"></span>
+      <span class="dashd-link-sub">same origin</span>
     </div>
 
-    <div class="da-node da-node-accent">
-      <span class="da-kicker"><code>bunx bunqueue-dashboard</code></span>
-      <div class="da-part">
-        <span class="da-title">UI server <code>:8080</code></span>
-        <span class="da-sub">Serves assets · proxies <code>/api/*</code></span>
+    <div class="dashd-node dashd-split dashd-process">
+      <div class="dashd-head">
+        <span class="dashd-kicker">bunqueue-dashboard</span>
+        <strong class="dashd-title">Dashboard process</strong>
+        <span class="dashd-note">npm package or standalone binary</span>
       </div>
-      <div class="da-part">
-        <span class="da-title">Control agent <code>127.0.0.1:6800</code></span>
-        <span class="da-sub">Process lifecycle · SDK bridges · SQLite reads · S3 backups</span>
+      <div class="dashd-part">
+        <strong class="dashd-title">UI server <code>:8080</code></strong>
+        <span class="dashd-note">Serves the UI, proxies <code>/api/*</code> and bridges <code>/agent/*</code> to the agent</span>
+      </div>
+      <div class="dashd-part">
+        <strong class="dashd-title">Control agent <code>127.0.0.1:6800</code></strong>
+        <span class="dashd-note">Server process, SDK bridges, SQLite inspector, S3 backups</span>
       </div>
     </div>
 
-    <div class="da-link">
-      <span class="da-link-label">HTTP 6790<br /><span>TCP 6789</span></span>
-    </div>
+    <ul class="dashd-links" role="list" aria-label="Connections to the bunqueue server">
+      <li class="dashd-link">
+        <span class="dashd-link-label">HTTP :6790</span>
+        <span class="dashd-wire" aria-hidden="true"></span>
+        <span class="dashd-link-sub">/api/* proxy</span>
+      </li>
+      <li class="dashd-link">
+        <span class="dashd-link-label">TCP :6789</span>
+        <span class="dashd-wire" aria-hidden="true"></span>
+        <span class="dashd-link-sub">SDK bridges</span>
+      </li>
+    </ul>
 
-    <div class="da-node">
-      <span class="da-kicker">Self-hosted</span>
-      <span class="da-title">bunqueue server</span>
-      <span class="da-sub">HTTP API + SSE on <code>:6790</code></span>
-      <span class="da-sub">TCP clients on <code>:6789</code></span>
-      <span class="da-sub">SQLite or PostgreSQL</span>
+    <div class="dashd-node dashd-split dashd-server">
+      <div class="dashd-head">
+        <span class="dashd-kicker">Self-hosted</span>
+        <strong class="dashd-title">bunqueue server</strong>
+        <span class="dashd-note">SQLite or PostgreSQL</span>
+      </div>
+      <div class="dashd-part">
+        <strong class="dashd-title">HTTP API <code>:6790</code></strong>
+        <span class="dashd-note">Reads, writes and the SSE stream</span>
+      </div>
+      <div class="dashd-part">
+        <strong class="dashd-title">TCP <code>:6789</code></strong>
+        <span class="dashd-note">Client SDKs and workers</span>
+      </div>
     </div>
   </div>
-  <figcaption>
-    Apart from optional Copilot calls to your AI provider, the browser talks only to the dashboard
-    process. Its UI server proxies <code>/api/*</code> to the
-    bunqueue HTTP API on port 6790. The control agent stays on loopback and handles process control,
-    Queue, Flow and Workflow SDK bridges over TCP, SQLite inspection and backups.
-  </figcaption>
 </figure>
-
-<style>
-  /* The layout follows the figure's own width, which already excludes the sidebar and the
-     table of contents, so it stacks whenever the content column is narrow. */
-  .dash-arch {
-    margin: 2rem 0;
-    container-type: inline-size;
-  }
-
-  .da-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 5.5rem minmax(0, 1.25fr) 5.5rem minmax(0, 1fr);
-    align-items: stretch;
-  }
-
-  .da-node {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    padding: 1rem 1.1rem;
-    border: 1px solid var(--sl-color-hairline);
-    border-radius: 10px;
-    background: var(--sl-color-bg-nav);
-    overflow-wrap: anywhere;
-  }
-
-  .da-node-accent {
-    border-color: var(--sl-color-accent);
-    gap: 0.75rem;
-  }
-
-  .da-part {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    padding-top: 0.7rem;
-    border-top: 1px solid var(--sl-color-hairline);
-  }
-
-  .da-kicker {
-    color: var(--sl-color-gray-3);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .da-kicker code {
-    text-transform: none;
-    letter-spacing: 0;
-  }
-
-  .da-title {
-    color: var(--sl-color-white);
-    font-size: 0.95rem;
-    font-weight: 650;
-  }
-
-  .da-sub {
-    color: var(--sl-color-gray-2);
-    font-size: 0.82rem;
-    line-height: 1.45;
-  }
-
-  .dash-arch code {
-    padding: 0 0.25em;
-    font-size: 0.85em;
-  }
-
-  .da-title code {
-    white-space: nowrap;
-  }
-
-  /* A connector is a centered rule with an arrowhead and a label above it. */
-  .da-link {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .da-link::before {
-    content: '';
-    position: absolute;
-    left: 6px;
-    right: 6px;
-    top: 50%;
-    border-top: 1px dashed var(--sl-color-gray-4);
-  }
-
-  .da-link::after {
-    content: '';
-    position: absolute;
-    right: 4px;
-    top: calc(50% - 4px);
-    border: 4px solid transparent;
-    border-left: 6px solid var(--sl-color-gray-3);
-  }
-
-  .da-link-label {
-    position: relative;
-    top: -1.3rem;
-    color: var(--sl-color-gray-3);
-    font-size: 0.68rem;
-    line-height: 1.2;
-    text-align: center;
-  }
-
-  .dash-arch figcaption {
-    margin-top: 1rem;
-    color: var(--sl-color-gray-2);
-    font-size: 0.88rem;
-    line-height: 1.6;
-  }
-
-  @container (max-width: 760px) {
-    .da-row {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .da-link {
-      min-height: 3rem;
-    }
-
-    .da-link::before {
-      left: 50%;
-      right: auto;
-      top: 6px;
-      bottom: 6px;
-      border-top: 0;
-      border-left: 1px dashed var(--sl-color-gray-4);
-    }
-
-    .da-link::after {
-      right: auto;
-      left: calc(50% - 4px);
-      top: auto;
-      bottom: 2px;
-      border: 4px solid transparent;
-      border-top: 6px solid var(--sl-color-gray-3);
-    }
-
-    .da-link-label {
-      top: 0;
-      left: 0.9rem;
-      padding-left: 50%;
-      text-align: left;
-    }
-
-    .da-link-label br {
-      display: none;
-    }
-
-    .da-link-label span::before {
-      content: ' · ';
-    }
-  }
-</style>

@@ -11,7 +11,8 @@ import { join } from 'node:path';
 
 const STYLES = join(import.meta.dir, '..', 'docs', 'src', 'styles');
 const FILES = ['docs-theme.css', 'docs-reading.css'];
-const CONTENT_TARGET = /(^|[\s>+~(,])(h[1-6]|p|li|a|code|table|th|td|thead|ul|ol)\b|:is\((p|li|h[1-6])/;
+const CONTENT_TARGET =
+  /(^|[\s>+~(,])(h[1-6]|p|li|a|code|table|th|td|thead|ul|ol)\b|:is\((p|li|h[1-6])/;
 
 /** Split a selector list on top-level commas (commas inside :is()/:not() stay). */
 function splitSelectors(list: string): string[] {

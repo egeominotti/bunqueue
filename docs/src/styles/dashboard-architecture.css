@@ -1,0 +1,290 @@
+/* DashboardArchitecture.astro on /guide/dashboard/. Global, so every class starts with
+   dashd; the figure is .not-content, so the theme's Markdown rules skip it. The layout
+   follows the figure's own width (a container query), because the content column is
+   only about 500px wide at some desktop widths where the sidebar and the table of
+   contents are both open. */
+
+.dashd {
+  container: dashd / inline-size;
+  margin: 2rem 0;
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--sl-color-text) 9%, transparent) 1px, transparent 0)
+      0 0 / 18px 18px,
+    var(--sl-color-bg);
+}
+
+.dashd-grid {
+  --dashd-spine: 1.25rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 1rem;
+}
+
+.dashd-grid,
+.dashd-grid * {
+  margin: 0;
+}
+
+.dashd-node {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  background: var(--docs-panel);
+}
+
+.dashd-kicker {
+  color: var(--docs-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.dashd-title {
+  color: var(--sl-color-text);
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.dashd-note {
+  color: var(--docs-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* Wins over the site-wide pink inline-code chip in custom.css. */
+.dashd.not-content .dashd-grid :not(pre) > code {
+  padding: 0.05em 0.35em;
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sl-color-text) 8%, transparent);
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-size: 0.85em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Boxes made of a heading and parts: the dashboard process and the server. */
+.dashd-split {
+  gap: 0;
+  padding-block: 0;
+}
+
+.dashd-head,
+.dashd-part {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.dashd-head {
+  padding: 0.85rem 0 0.75rem;
+}
+
+.dashd-part {
+  justify-content: center;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--docs-line);
+}
+
+/* A name and its port: when they wrap, the port starts flush left on its own line. */
+.dashd-part .dashd-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem 0.4rem;
+}
+
+/* The page's subject: the only box in the brand color. */
+.dashd-process {
+  border-color: color-mix(in srgb, var(--docs-accent) 55%, var(--docs-line));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--docs-accent) 9%, transparent);
+}
+
+.dashd-process .dashd-kicker {
+  color: var(--docs-accent);
+  font-family: var(--sl-font-mono);
+}
+
+.dashd-grid .dashd-aside {
+  margin-top: 0.45rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--docs-line);
+  color: var(--docs-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.dashd-aside strong {
+  color: var(--sl-color-text);
+  font-weight: 600;
+}
+
+/* Wires. Narrow: a vertical spine on the left with the labels beside it. */
+.dashd-links {
+  padding: 0;
+  list-style: none;
+}
+
+.dashd-link {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.6rem;
+  min-width: 0;
+  padding: 0.75rem 0 0.75rem calc(var(--dashd-spine) + 1rem);
+}
+
+.dashd-links > li:first-child {
+  padding-bottom: 0.2rem;
+}
+
+.dashd-links > li:last-child {
+  padding-top: 0.2rem;
+}
+
+.dashd-link-label {
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.dashd-link-sub {
+  color: var(--docs-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.dashd-wire {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--dashd-spine);
+  width: 1px;
+  background: var(--docs-muted);
+}
+
+/* A chevron whose tip lands on the end of the wire: an 8px square turned 45 degrees
+   reaches 4 * sqrt(2) = 5.66px from its center, so the box sits 1.66px inside. */
+.dashd-wire::after {
+  content: '';
+  position: absolute;
+  bottom: 1.66px;
+  left: -3.5px;
+  width: 8px;
+  height: 8px;
+  border-top: 1px solid var(--docs-muted);
+  border-right: 1px solid var(--docs-muted);
+  transform: rotate(135deg);
+}
+
+/* The two server links share one spine when stacked; only the last one has a head. */
+.dashd-links > li:first-child .dashd-wire::after {
+  display: none;
+}
+
+/* Wide: left to right. Every column shares three rows (heading, UI server, control
+   agent) through subgrid, so each wire runs level with the part it leaves and the
+   server port it reaches. */
+@container dashd (min-width: 48rem) {
+  .dashd-grid {
+    grid-template-columns: minmax(0, 0.95fr) 5.75rem minmax(0, 1.3fr) 5.75rem minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    padding: 1.5rem;
+  }
+
+  /* Centered on its three rows, so its wire, level with the UI server, meets it near
+     its middle. */
+  .dashd-browser {
+    grid-area: 1 / 1 / 4 / 2;
+    align-self: center;
+  }
+
+  .dashd-link-browser {
+    grid-area: 2 / 2;
+  }
+
+  .dashd-process {
+    grid-area: 1 / 3 / 4 / 4;
+  }
+
+  .dashd-links {
+    grid-area: 1 / 4 / 4 / 5;
+    /* Matches the boxes' 1px border, which subgrid adds to the first and last rows. */
+    border-block: 1px solid transparent;
+  }
+
+  .dashd-server {
+    grid-area: 1 / 5 / 4 / 6;
+  }
+
+  .dashd-split,
+  .dashd-links {
+    display: grid;
+    grid-template-rows: subgrid;
+  }
+
+  .dashd-links > li:first-child {
+    grid-row: 2;
+  }
+
+  .dashd-links > li:last-child {
+    grid-row: 3;
+  }
+
+  /* A horizontal wire through the middle of its row, label above and protocol below. */
+  .dashd-link,
+  .dashd-links > li:first-child,
+  .dashd-links > li:last-child {
+    display: flex;
+    align-items: center;
+    padding: 0;
+  }
+
+  .dashd-link-label,
+  .dashd-link-sub {
+    position: absolute;
+    right: 0;
+    left: 0;
+    text-align: center;
+  }
+
+  .dashd-link-label {
+    bottom: calc(50% + 0.45rem);
+  }
+
+  .dashd-link-sub {
+    top: calc(50% + 0.45rem);
+  }
+
+  .dashd-wire {
+    top: calc(50% - 0.5px);
+    bottom: auto;
+    left: 0;
+    width: 100%;
+    height: 1px;
+  }
+
+  .dashd-wire::after,
+  .dashd-links > li:first-child .dashd-wire::after {
+    display: block;
+    top: -3.5px;
+    right: 1.66px;
+    bottom: auto;
+    left: auto;
+    transform: rotate(45deg);
+  }
+}

@@ -294,6 +294,21 @@ which methods send a body, `timeoutMs`) come from `guide/mcp.mdx` and
 figures is styled with `.<root>.not-content :not(pre) > code`, because
 `custom.css`'s global inline-code chip also reaches `.not-content` blocks.
 
+The queue simulator on `/simulator/` is a React island
+(`components/simulator/`, engine in `lib/simulator/`) styled with the same
+tokens and job-state palette: waiting gray, delayed indigo, retry amber, active
+pink, completed teal and the dead-letter lane rose, applied to lanes, chips,
+counters, the event log and the shard map. Labels are sentence case; monospace
+is kept for ids, queue and job names, numbers, timers and code. Its styles are
+split across `simulator.css`, `transport.css`, `controls.css`, `pipeline.css`,
+`panels.css` and `activity.css` in that directory, and the layout follows the
+simulator's own width (the `sim` container): the side panel sits beside the
+board only when all five lanes still fit, and lanes scroll inside the board on
+phones. Speed and queue selections use `aria-pressed`, the last scenario run is
+`aria-current` (scenarios are one-shot actions), the event log is
+`role="log"` without live announcements (it updates several times a second), and
+reduced motion turns off the chip entry and shard flash animations.
+
 `HomeDashboard.astro`, below the agents section, introduces the separately
 released [bunqueue dashboard](https://github.com/egeominotti/bunqueue-dashboard):
 the 7:46 full-tour video in the click-to-load player (thumbnail
@@ -304,11 +319,16 @@ the live demo and the repository. Its styles live in
 breakpoints.
 
 The guide page `guide/dashboard.mdx` opens with the same full-tour video (anchor
-`#tour`), then uses `components/DashboardArchitecture.astro`,
-a static diagram of browser, dashboard process and server whose figcaption
-carries the full description and which stacks through a container query when
-its own width falls below 760px (the table of contents narrows the column),
-and the `.bq-shot` figure style from `docs-reading.css` for captioned
+`#tour`), then uses `components/DashboardArchitecture.astro`, a diagram of
+the browser, the dashboard process (the only node in the brand color) and the
+server in the same style as the MCP diagrams: a `.not-content` figure with its
+own stylesheet `styles/dashboard-architecture.css` (every class name starts with
+`dashd`), two separate wires to the server (`HTTP :6790` from the UI server's
+`/api/*` proxy, `TCP :6789` from the control agent's SDK bridges, aligned with a
+CSS subgrid), the UI server bridging `/agent/*` to the agent, and the optional
+Copilot calling the AI provider from the browser. It is left to right once its
+own width reaches 48rem (a container query) and stacked below, and the
+`.bq-shot` figure style from `docs-reading.css` for captioned
 screenshots; the Overview screenshot is the static WebP
 `public/dashboard/overview.webp`, converted from the dashboard repository's own
 screenshots. Facts on that page come from the

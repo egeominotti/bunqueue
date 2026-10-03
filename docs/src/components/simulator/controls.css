@@ -1,0 +1,205 @@
+/* Queue simulator: the control panel (push, workers, queue controls, chaos). */
+
+/* ── Control panel ──────────────────────────────────────────────────── */
+
+.simulator .controls {
+  padding: 0;
+}
+
+.ctl-section {
+  padding: 0.9rem 1rem 1rem;
+}
+
+.ctl-section + .ctl-section {
+  border-top: 1px solid var(--docs-line);
+}
+
+.ctl-section > :last-child {
+  margin-bottom: 0;
+}
+
+/* Below the board (one-column layout) with room to spare: the four sections as a
+   2 × 2 grid, split by hairlines. Beside the board they stack again. */
+@container sim (min-width: 40rem) {
+  .simulator .controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    background: var(--docs-line);
+  }
+  .ctl-section {
+    background: var(--docs-panel);
+  }
+  .ctl-section + .ctl-section {
+    border-top: 0;
+  }
+}
+
+@container sim (min-width: 65.75rem) {
+  .simulator .controls {
+    display: block;
+    background: var(--docs-panel);
+  }
+  .ctl-section + .ctl-section {
+    border-top: 1px solid var(--docs-line);
+  }
+}
+
+.ctl-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.ctl-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
+}
+
+/* Sliders in neutral ink: the fill follows the value through --fill. */
+.simulator .ctl-range {
+  --fill: 0%;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 1.25rem;
+  margin: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ctl-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--docs-muted) var(--fill), var(--docs-line) var(--fill));
+}
+
+.ctl-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid var(--sl-color-text);
+  border-radius: 50%;
+  background: var(--sl-color-bg);
+}
+
+.ctl-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--docs-line);
+}
+
+.ctl-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--docs-muted);
+}
+
+.ctl-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--sl-color-text);
+  border-radius: 50%;
+  background: var(--sl-color-bg);
+}
+
+/* Queue list: one row per queue, counts spelled out under the name. */
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-list > li {
+  margin: 0;
+}
+
+.queue-row {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.45rem 0.6rem 0.5rem;
+  border: 1px solid var(--docs-line);
+  border-radius: 6px;
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.queue-row:hover {
+  border-color: var(--docs-muted);
+}
+
+.queue-row[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--sl-color-text) 70%, var(--docs-line));
+}
+
+.queue-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.queue-row-name {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--sl-font-mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-row-shard {
+  color: var(--docs-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.72rem;
+}
+
+.queue-row-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.15rem 0.7rem;
+  color: var(--docs-muted);
+  font-size: 0.72rem;
+}
+
+.qc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.qc::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--qc);
+}
+
+.qc b {
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-waiting { --qc: var(--docs-state-waiting); }
+.qc-delayed { --qc: var(--docs-state-delayed); }
+.qc-active { --qc: var(--docs-state-active); }
+.qc-dlq { --qc: var(--docs-state-failed); }

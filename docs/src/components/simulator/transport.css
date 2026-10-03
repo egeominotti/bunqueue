@@ -1,0 +1,209 @@
+/* Queue simulator: the transport bar (clock, speed, live counters) and the scenario bar. */
+
+/* ── Transport bar ──────────────────────────────────────────────────── */
+
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  background: var(--docs-panel);
+}
+
+.transport-clock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+}
+
+.simulator .btn-icon {
+  width: 2rem;
+  padding: 0;
+}
+
+.btn-icon svg {
+  fill: currentColor;
+}
+
+.clock-time {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 3.4rem;
+  font-family: var(--sl-font-mono);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-time.is-paused {
+  color: var(--docs-muted);
+}
+
+.clock-state {
+  font-family: var(--sl-font);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Segmented control: the pressed speed reads as a raised segment, not in brand pink. */
+.speed-group {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--docs-line);
+  border-radius: 7px;
+  background: var(--sl-color-bg);
+}
+
+.speed-btn {
+  appearance: none;
+  min-width: 2.2rem;
+  min-height: 1.6rem;
+  padding: 0 0.45rem;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--docs-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.speed-btn:hover {
+  color: var(--sl-color-text);
+}
+
+.speed-btn[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--sl-color-text) 11%, transparent);
+  color: var(--sl-color-text);
+}
+
+.transport-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0 0 0 auto;
+  padding: 0;
+}
+
+.t-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.t-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  color: var(--docs-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* State counters carry the dot of the lane they count. */
+.t-stat[class*='tone-'] .t-stat-label::before {
+  content: '';
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.t-stat-value {
+  margin: 0;
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.tone-active { --tone: var(--docs-state-active); }
+.tone-completed { --tone: var(--docs-state-completed); }
+.tone-retry { --tone: var(--docs-state-retry); }
+.tone-failed { --tone: var(--docs-state-failed); }
+
+/* When the simulator column is too narrow for one row (a phone, or a laptop where the
+   sidebar takes its share): clock and reset on top, the counters as a grid below. */
+@container sim (max-width: 54rem) {
+  .transport {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .transport-reset {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .transport-stats {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+    gap: 0.6rem 1rem;
+    margin: 0;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--docs-line);
+  }
+}
+
+/* ── Scenario bar ───────────────────────────────────────────────────── */
+
+.scenarios {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.scenario-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.scenario-label {
+  margin-right: 0.3rem;
+  color: var(--docs-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.scenario-chip {
+  appearance: none;
+  min-height: 1.9rem;
+  padding: 0.2rem 0.8rem;
+  border: 1px solid var(--docs-line);
+  border-radius: 999px;
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  font: 500 0.8rem/1.2 var(--sl-font);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.scenario-chip:hover {
+  border-color: var(--docs-muted);
+  background: var(--docs-hover);
+}
+
+.scenario-chip[aria-current='true'] {
+  border-color: color-mix(in srgb, var(--sl-color-text) 70%, var(--docs-line));
+  background: color-mix(in srgb, var(--sl-color-text) 8%, transparent);
+}
+
+.simulator .scenario-hint {
+  margin: 0;
+  color: var(--docs-muted);
+  font-size: 0.82rem;
+}

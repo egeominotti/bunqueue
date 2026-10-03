@@ -1,0 +1,156 @@
+/* Queue simulator: worker cards and the event log. */
+
+/* ── Workers ────────────────────────────────────────────────────────── */
+
+.worker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 15rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.worker-card {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--docs-line);
+  border-radius: 6px;
+  background: var(--sl-color-bg);
+}
+
+.worker-card.is-stopped {
+  opacity: 0.6;
+}
+
+.worker-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.worker-id {
+  font-family: var(--sl-font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.worker-queue {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--docs-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Concurrency slots: a busy slot holds an active job, so it is filled in the
+   active color; the count is in the accessible name and the stats line. */
+.worker-slots {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.worker-slots i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+}
+
+.slot-idle {
+  border: 1px solid var(--docs-muted);
+}
+
+.slot-busy {
+  background: var(--docs-state-active);
+}
+
+.worker-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--docs-muted);
+  font-size: 0.75rem;
+}
+
+.worker-stats b {
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.worker-failed b {
+  color: var(--docs-state-failed);
+}
+
+.worker-stats .btn {
+  margin-left: auto;
+}
+
+/* ── Events ─────────────────────────────────────────────────────────── */
+
+.event-scroll {
+  max-height: 15rem;
+  overflow-y: auto;
+  border-radius: 6px;
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  font-family: var(--sl-font-mono);
+  font-size: 0.72rem;
+  list-style: none;
+}
+
+.event {
+  --ev: var(--docs-line);
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.16rem 0.5rem;
+  overflow: hidden;
+  border-left: 2px solid var(--ev);
+  white-space: nowrap;
+}
+
+.event-t {
+  flex-shrink: 0;
+  color: var(--docs-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.event-msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ev-state-waiting { --ev: var(--docs-state-waiting); }
+.ev-state-completed { --ev: var(--docs-state-completed); }
+.ev-state-retry { --ev: var(--docs-state-retry); }
+.ev-state-failed { --ev: var(--docs-state-failed); }
+
+.ev-control .event-msg {
+  color: var(--docs-muted);
+}
+
+.ev-scenario .event-msg {
+  color: var(--sl-color-text);
+  font-weight: 600;
+}

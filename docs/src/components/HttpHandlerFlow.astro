@@ -136,7 +136,8 @@
   }
 
   /* Outranks custom.css's global inline-code chip, which also reaches .not-content. */
-  .hfd.not-content :not(pre) > code {
+  :global(:root) .hfd.not-content :not(pre) > code {
+    border: 0;
     padding: 0.02em 0.3em;
     border-radius: 4px;
     background: color-mix(in srgb, var(--sl-color-text) 8%, transparent);

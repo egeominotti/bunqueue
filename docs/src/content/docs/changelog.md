@@ -31,10 +31,30 @@ head:
   light mode and stack vertically on phones. The guide now says that GET and
   DELETE handlers send no body.
 - **The queue simulator looks like itself again.** The refreshed heading,
-  link and inline-code styles had reached inside the simulator, turning its
-  lane and panel titles into large page headings. The docs styles now skip
-  widgets and diagrams, as Starlight's own styles do, and a test keeps it
-  that way.
+  link, inline-code and table styles had reached inside the simulator,
+  turning its lane and panel titles into large page headings. Those theme
+  rules now skip widgets and diagrams marked `.not-content`, as Starlight's
+  own styles do, and a test keeps it that way.
+- **The simulator and the dashboard diagram in one visual language.** The
+  queue simulator and the Web Dashboard architecture diagram now share the MCP
+  diagrams' style: hairline panels on the docs color
+  tokens, sentence-case labels instead of uppercase tags, monospace only for
+  ids, ports and code, brand pink only for the subject or the active choice,
+  and one job-state palette everywhere (waiting gray, delayed indigo, retry
+  amber, active pink, completed teal, failed rose). Each one follows its own
+  width, so it no longer cramps next to the sidebar and stacks cleanly on
+  phones without scrolling the page sideways.
+- **Simulator.** Lanes, chips, counters, the event log and the shard map use
+  that palette; chips show the id, job name and queue on separate lines;
+  sliders announce their units; speed and queue choices expose their pressed
+  state and the last scenario run is marked current; counts are spelled out next to every color; and reduced
+  motion turns off its animations. Its behavior is unchanged.
+- **Web Dashboard diagram.** It now draws two separate links to the server,
+  `HTTP :6790` from the UI server's `/api/*` proxy and `TCP :6789` from the
+  control agent's SDK bridges, shows the UI server bridging `/agent/*` to the
+  agent and the optional Copilot calling the AI provider directly. The guide
+  also corrects how long tokens last: they are kept in memory only, so
+  reloading the page clears them.
 - **AI agents on the homepage.** A new section below the Academy presents the
   MCP server's opt-in features (toolsets, confirmation of destructive calls,
   decision models) with the setup command, an example confirmation and the

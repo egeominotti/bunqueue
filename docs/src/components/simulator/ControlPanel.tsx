@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { SimulatorEngine, Snapshot } from '../../lib/simulator';
+import type { QueueView, SimulatorEngine, Snapshot } from '../../lib/simulator';
+import RangeField from './RangeField';
 
 // Manual controls: push jobs, start workers, pause/drain queues, and
 // dial in chaos (failure rate, per-queue rate limit).
@@ -21,6 +22,7 @@ export default function ControlPanel({
   const queue = snap.queues.find((q) => q.name === target);
   const failurePct = Math.round(snap.failureRate * 100);
   const rateLimit = queue?.rateLimit ?? 0;
+  const targetCode = <code>{target || '…'}</code>;
 
   const pushOne = () => {
     if (!target) return;
@@ -38,17 +40,19 @@ export default function ControlPanel({
   };
 
   return (
-    <aside className="panel controls">
+    <aside className="panel controls" aria-label="Simulator controls">
       <section className="ctl-section">
-        <h2 className="ctl-title">Push jobs</h2>
+        <h2 className="panel-title">Push jobs</h2>
         <label className="ctl-field">
-          <span>Queue</span>
+          <span className="ctl-label">Queue</span>
           <input
             type="text"
             value={queueName}
             onChange={(e) => setQueueName(e.target.value)}
             list="sim-queues"
             placeholder="emails"
+            spellCheck={false}
+            autoComplete="off"
           />
           <datalist id="sim-queues">
             {snap.queues.map((q) => (
@@ -57,27 +61,20 @@ export default function ControlPanel({
           </datalist>
         </label>
         <label className="ctl-field">
-          <span>Job name</span>
+          <span className="ctl-label">Job name</span>
           <input
             type="text"
             value={jobName}
             onChange={(e) => setJobName(e.target.value)}
             placeholder="send-welcome"
+            spellCheck={false}
+            autoComplete="off"
           />
         </label>
         <div className="ctl-pair">
+          <RangeField label="Priority" value={priority} min={0} max={9} onChange={setPriority} />
           <label className="ctl-field">
-            <span>Priority {priority}</span>
-            <input
-              type="range"
-              min={0}
-              max={9}
-              value={priority}
-              onChange={(e) => setPriority(Number(e.target.value))}
-            />
-          </label>
-          <label className="ctl-field">
-            <span>Delay</span>
+            <span className="ctl-label">Delay</span>
             <select value={delay} onChange={(e) => setDelay(Number(e.target.value))}>
               <option value={0}>none</option>
               <option value={2000}>2s</option>
@@ -86,52 +83,48 @@ export default function ControlPanel({
             </select>
           </label>
         </div>
+        <RangeField
+          label="Bulk size"
+          value={bulkCount}
+          min={5}
+          max={100}
+          step={5}
+          valueText={`${bulkCount} jobs`}
+          onChange={setBulkCount}
+        />
         <div className="ctl-buttons">
           <button type="button" className="btn btn-primary" onClick={pushOne}>
             Push job
           </button>
           <button type="button" className="btn" onClick={pushMany}>
-            Push ×{bulkCount}
+            Push {bulkCount}
           </button>
         </div>
-        <label className="ctl-field">
-          <span>Bulk size {bulkCount}</span>
-          <input
-            type="range"
-            min={5}
-            max={100}
-            step={5}
-            value={bulkCount}
-            onChange={(e) => setBulkCount(Number(e.target.value))}
-          />
-        </label>
       </section>
 
       <section className="ctl-section">
-        <h2 className="ctl-title">Workers</h2>
-        <label className="ctl-field">
-          <span>Concurrency {concurrency}</span>
-          <input
-            type="range"
-            min={1}
-            max={8}
-            value={concurrency}
-            onChange={(e) => setConcurrency(Number(e.target.value))}
-          />
-        </label>
+        <h2 className="panel-title">Workers</h2>
+        <RangeField
+          label="Concurrency"
+          value={concurrency}
+          min={1}
+          max={8}
+          valueText={`${concurrency} slots`}
+          onChange={setConcurrency}
+        />
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-block"
           onClick={() => target && engine.createWorker(target, concurrency)}
         >
-          Start worker on “{target || '…'}”
+          Start worker on {targetCode}
         </button>
       </section>
 
       <section className="ctl-section">
-        <h2 className="ctl-title">
+        <h2 className="panel-title">
           Queue controls
-          {queue?.paused && <span className="badge badge-paused">paused</span>}
+          {queue?.paused && <span className="badge badge-paused">Paused</span>}
         </h2>
         <div className="ctl-buttons">
           {queue?.paused ? (
@@ -151,27 +144,14 @@ export default function ControlPanel({
           </button>
         </div>
         {snap.queues.length > 0 && (
-          <ul className="queue-list">
+          <ul className="queue-list" aria-label="Queues">
             {snap.queues.map((q) => (
               <li key={q.name}>
-                <button
-                  type="button"
-                  className={`queue-row ${q.name === queueName ? 'is-selected' : ''}`}
-                  onClick={() => setQueueName(q.name)}
-                >
-                  <span className="queue-row-name">
-                    {q.name}
-                    <span className="queue-row-shard">S{q.shardIndex}</span>
-                    {q.paused && <span className="badge badge-paused">paused</span>}
-                    {q.rateLimit > 0 && <span className="badge badge-rate">≤{q.rateLimit}/s</span>}
-                  </span>
-                  <span className="queue-row-counts">
-                    <b className="c-waiting">{q.waiting}</b>
-                    <b className="c-delayed">{q.delayed}</b>
-                    <b className="c-active">{q.active}</b>
-                    <b className="c-dlq">{q.dlq}</b>
-                  </span>
-                </button>
+                <QueueRow
+                  queue={q}
+                  selected={q.name === queueName}
+                  onSelect={() => setQueueName(q.name)}
+                />
               </li>
             ))}
           </ul>
@@ -179,33 +159,63 @@ export default function ControlPanel({
       </section>
 
       <section className="ctl-section">
-        <h2 className="ctl-title">Chaos</h2>
-        <label className="ctl-field">
-          <span>Failure rate {failurePct}%</span>
-          <input
-            type="range"
-            min={0}
-            max={80}
-            step={5}
-            value={failurePct}
-            onChange={(e) => engine.setFailureRate(Number(e.target.value) / 100)}
-          />
-        </label>
-        <label className="ctl-field">
-          <span>
-            Rate limit {rateLimit === 0 ? 'off' : `${rateLimit}/s`} — {target || '…'}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={20}
-            value={rateLimit}
-            onChange={(e) => {
-              if (target) engine.setRateLimit(target, Number(e.target.value));
-            }}
-          />
-        </label>
+        <h2 className="panel-title">Chaos</h2>
+        <RangeField
+          label="Failure rate"
+          value={failurePct}
+          min={0}
+          max={80}
+          step={5}
+          display={`${failurePct}%`}
+          valueText={`${failurePct}%`}
+          onChange={(v) => engine.setFailureRate(v / 100)}
+        />
+        <RangeField
+          label={<>Rate limit on {targetCode}</>}
+          value={rateLimit}
+          min={0}
+          max={20}
+          display={rateLimit === 0 ? 'off' : `${rateLimit}/s`}
+          valueText={rateLimit === 0 ? 'off' : `${rateLimit} jobs per second`}
+          onChange={(v) => {
+            if (target) engine.setRateLimit(target, v);
+          }}
+        />
       </section>
     </aside>
+  );
+}
+
+// One queue: name and shard, then its counts in words, so the state colors are a
+// second signal rather than the only one. Selecting it targets the controls above.
+function QueueRow({
+  queue: q,
+  selected,
+  onSelect,
+}: {
+  queue: QueueView;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="queue-row"
+      aria-pressed={selected}
+      onClick={onSelect}
+    >
+      <span className="queue-row-head">
+        <span className="queue-row-name">{q.name}</span>
+        <span className="queue-row-shard">S{q.shardIndex}</span>
+        {q.paused && <span className="badge badge-paused">Paused</span>}
+        {q.rateLimit > 0 && <span className="badge badge-rate">≤{q.rateLimit}/s</span>}
+      </span>
+      <span className="queue-row-counts">
+        <span className="qc qc-waiting"><b>{q.waiting}</b> waiting</span>
+        <span className="qc qc-delayed"><b>{q.delayed}</b> delayed</span>
+        <span className="qc qc-active"><b>{q.active}</b> active</span>
+        <span className="qc qc-dlq"><b>{q.dlq}</b> dead</span>
+      </span>
+    </button>
   );
 }

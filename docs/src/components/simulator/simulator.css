@@ -1,6 +1,10 @@
-/* bunqueue simulator — operations-console look.
-   Quiet instrument panel: hairline borders, mono data, uppercase eyebrows.
-   State colors validated for contrast on both surfaces (see PipelineBoard). */
+/* Queue simulator: the base layer (layout, panels, buttons, form controls, badges).
+   Same visual language as the rest of the docs: 1px hairline panels on the docs
+   tokens, sentence-case labels, monospace only for ids, queue names, numbers and
+   code, and the job-state palette (--docs-state-*) for every state. Brand pink is
+   kept for the primary action and the active state. All colors are docs tokens, so
+   dark and light switch with the site theme. Component styles live in transport.css,
+   controls.css, pipeline.css, panels.css and activity.css. */
 
 /* Let the simulator page use the full main column. */
 @media (min-width: 72rem) {
@@ -10,82 +14,95 @@
 }
 
 .simulator {
-  /* dark-mode defaults (site :root is dark) */
-  --sim-panel: #0e0e12;
-  --sim-inset: #131318;
-  --sim-border: var(--sl-color-hairline);
-  --sim-ink: var(--sl-color-white);
-  --sim-ink-2: var(--sl-color-gray-3);
-  --sim-accent: var(--sl-color-accent);
-  --sim-mono: var(--sl-font-mono);
-  --st-waiting: #3b82f6;
-  --st-delayed: #f59e0b;
-  --st-active: #22c55e;
-  --st-completed: #71717a;
-  --st-failed: #ef4444;
-  --st-dlq: #dc2626;
-
+  container: sim / inline-size;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   margin-top: 1.25rem;
+  color: var(--sl-color-text);
   font-family: var(--sl-font);
-  font-size: 0.85rem;
-  color: var(--sim-ink);
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
-:root[data-theme='light'] .simulator {
-  --sim-panel: #ffffff;
-  --sim-inset: #fafafa;
-  --st-waiting: #2563eb;
-  --st-delayed: #d97706;
-  --st-active: #16a34a;
-  --st-failed: #dc2626;
-  --st-dlq: #991b1b;
-}
-
-.simulator * {
+.simulator *,
+.simulator *::before,
+.simulator *::after {
   box-sizing: border-box;
+}
+
+/* The docs give every heading a tight display tracking; widget headings are labels. */
+.simulator :is(h2, h3) {
+  letter-spacing: normal;
+}
+
+/* Inline code. A global rule paints any inline <code> as a pink chip, and it reaches
+   into .not-content blocks with specificity (0,2,2), so this selector out-ranks it. */
+:root .simulator.not-content :not(pre) > code {
+  padding: 0.05em 0.35em;
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sl-color-text) 8%, transparent);
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-size: 0.85em;
+  font-weight: 400;
+}
+
+.simulator .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ── Panels ─────────────────────────────────────────────────────────── */
 
 .simulator .panel {
-  background: var(--sim-panel);
-  border: 1px solid var(--sim-border);
-  border-radius: 10px;
-  padding: 0.9rem;
+  min-width: 0;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  background: var(--docs-panel);
 }
 
 .simulator .panel-title {
-  margin: 0 0 0.7rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--sim-ink-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin: 0 0 0.75rem;
+  color: var(--sl-color-text);
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.3;
 }
 
 .simulator .panel-hint {
-  font-family: var(--sim-mono);
+  color: var(--docs-muted);
+  font-size: 0.8rem;
   font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  opacity: 0.75;
-  margin-left: 0.35rem;
 }
 
 .simulator .panel-empty {
   margin: 0;
-  color: var(--sim-ink-2);
-  font-size: 0.8rem;
+  color: var(--docs-muted);
+  font-size: 0.82rem;
 }
 
 /* ── Layout ─────────────────────────────────────────────────────────── */
 
+/* The layout follows the simulator's own width (the `sim` container), not the
+   viewport, because the docs sidebar takes a different share at each breakpoint.
+   Narrow: one column, the board first and the controls after it. */
 .sim-grid {
   display: grid;
-  grid-template-columns: 290px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   align-items: start;
 }
@@ -94,631 +111,179 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  order: 1;
   min-width: 0;
+}
+
+.simulator .controls {
+  order: 2;
 }
 
 .sim-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   min-width: 0;
 }
 
-/* Collapse to one column below 72rem, the exact width where the rule at the
-   top of this file widens the content column to 88rem. Between 961px and
-   1151px the viewport looks roomy but the 18rem docs sidebar leaves the
-   content column at ~664px, so the 290px + 1fr grid (plus the nested
-   .sim-row 1fr 1fr) could not fit and pushed the whole PAGE into horizontal
-   scroll — up to 120px at 1000px, with the fixed sidebar then covering the
-   shifted text. */
-@media (max-width: 71.9375rem) {
-  .sim-grid {
-    grid-template-columns: 1fr;
-  }
-  .simulator .controls {
-    order: 2;
-  }
-  .sim-main {
-    order: 1;
-  }
+@container sim (min-width: 40rem) {
   .sim-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/* ── Buttons & badges ───────────────────────────────────────────────── */
+/* The side panel only when the board beside it still shows all five lanes: 17.5rem
+   of controls, the gap, and 47.4rem of board (five 8.75rem lanes, gaps, padding). */
+@container sim (min-width: 65.75rem) {
+  .sim-grid {
+    grid-template-columns: 17.5rem minmax(0, 1fr);
+  }
+  .sim-main,
+  .simulator .controls {
+    order: 0;
+  }
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
 
 .simulator .btn {
-  appearance: none;
-  border: 1px solid var(--sim-border);
-  background: var(--sim-inset);
-  color: var(--sim-ink);
-  border-radius: 7px;
-  padding: 0.42rem 0.75rem;
-  font-size: 0.78rem;
-  font-weight: 500;
-  font-family: var(--sl-font);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--docs-line);
+  border-radius: 6px;
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  font: 500 0.8rem/1.2 var(--sl-font);
   cursor: pointer;
-  transition: border-color 120ms, background 120ms;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .simulator .btn:hover {
-  border-color: var(--sim-ink-2);
+  border-color: var(--docs-muted);
+  background: var(--docs-hover);
 }
 
+/* The one brand-colored control per section: the action that moves the story on. */
 .simulator .btn-primary {
-  background: var(--sim-accent);
-  border-color: var(--sim-accent);
+  border-color: var(--docs-accent);
+  background: var(--docs-accent);
   color: var(--sl-color-text-invert);
 }
 
 .simulator .btn-primary:hover {
-  filter: brightness(1.08);
-  border-color: var(--sim-accent);
+  border-color: color-mix(in srgb, var(--docs-accent) 86%, var(--sl-color-text));
+  background: color-mix(in srgb, var(--docs-accent) 86%, var(--sl-color-text));
 }
 
 .simulator .btn-ghost {
   background: transparent;
 }
 
-.simulator .btn-xs {
-  padding: 0.15rem 0.5rem;
-  font-size: 0.7rem;
+.simulator .btn-block {
+  width: 100%;
 }
 
-.simulator .btn:focus-visible,
-.simulator input:focus-visible,
-.simulator select:focus-visible {
-  outline: 2px solid var(--sim-accent);
+.simulator .btn-xs {
+  min-height: 1.6rem;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.simulator :is(button, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--docs-accent);
   outline-offset: 2px;
 }
 
+/* ── Badges ─────────────────────────────────────────────────────────── */
+
 .simulator .badge {
+  --badge: var(--docs-muted);
   display: inline-block;
-  font-family: var(--sim-mono);
-  font-size: 0.62rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 99px;
-  border: 1px solid var(--sim-border);
-  color: var(--sim-ink-2);
-  vertical-align: middle;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--badge) 14%, transparent);
+  color: var(--badge);
+  font-family: var(--sl-font);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.55;
+  white-space: nowrap;
 }
 
+/* Callout colors, as the docs use them: caution is amber, a note is indigo. */
 .simulator .badge-paused {
-  color: var(--st-delayed);
-  border-color: color-mix(in srgb, var(--st-delayed) 45%, transparent);
+  --badge: var(--docs-state-retry);
 }
 
 .simulator .badge-rate {
-  color: var(--st-waiting);
-  border-color: color-mix(in srgb, var(--st-waiting) 45%, transparent);
+  --badge: var(--docs-state-delayed);
+  font-family: var(--sl-font-mono);
+  font-weight: 500;
 }
 
-/* ── Transport bar ──────────────────────────────────────────────────── */
-
-.transport {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  background: var(--sim-panel);
-  border: 1px solid var(--sim-border);
-  border-radius: 10px;
-  padding: 0.6rem 0.9rem;
-}
-
-.transport-clock {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.simulator .btn-icon {
-  appearance: none;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  border: 1px solid var(--sim-border);
-  background: var(--sim-inset);
-  color: var(--sim-ink);
-  font-size: 0.8rem;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-}
-
-.simulator .btn-icon:hover {
-  border-color: var(--sim-accent);
-}
-
-.clock-time {
-  font-family: var(--sim-mono);
-  font-size: 1.05rem;
-  font-variant-numeric: tabular-nums;
-  min-width: 3.4rem;
-}
-
-.clock-paused {
-  color: var(--sim-ink-2);
-}
-
-.speed-group {
-  display: flex;
-  border: 1px solid var(--sim-border);
-  border-radius: 7px;
-  overflow: hidden;
-}
-
-.speed-btn {
-  appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--sim-ink-2);
-  font-family: var(--sim-mono);
-  font-size: 0.7rem;
-  padding: 0.3rem 0.55rem;
-  cursor: pointer;
-}
-
-.speed-btn + .speed-btn {
-  border-left: 1px solid var(--sim-border);
-}
-
-.speed-btn.is-on {
-  background: var(--sim-inset);
-  color: var(--sim-accent);
-}
-
-.transport-stats {
-  display: flex;
-  gap: 1.1rem;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-
-.t-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.15;
-}
-
-.t-stat-value {
-  font-family: var(--sim-mono);
-  font-size: 1rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.t-stat-label {
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--sim-ink-2);
-}
-
-.t-stat.tone-active .t-stat-value { color: var(--st-active); }
-.t-stat.tone-delayed .t-stat-value { color: var(--st-delayed); }
-.t-stat.tone-dlq .t-stat-value { color: var(--st-dlq); }
-.t-stat.tone-accent .t-stat-value { color: var(--sim-accent); }
-
-/* ── Scenario bar ───────────────────────────────────────────────────── */
-
-.scenario-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.scenario-eyebrow {
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--sim-ink-2);
-}
-
-.scenario-chip {
-  appearance: none;
-  border: 1px dashed var(--sim-border);
-  background: transparent;
-  color: var(--sim-ink);
-  border-radius: 99px;
-  padding: 0.3rem 0.8rem;
-  font-size: 0.76rem;
-  cursor: pointer;
-  transition: border-color 120ms, color 120ms;
-}
-
-.scenario-chip:hover {
-  border-color: var(--sim-accent);
-  border-style: solid;
-  color: var(--sim-accent);
-}
-
-/* ── Controls ───────────────────────────────────────────────────────── */
-
-.simulator .controls {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0;
-}
-
-.ctl-section {
-  padding: 0.9rem;
-}
-
-.ctl-section + .ctl-section {
-  border-top: 1px solid var(--sim-border);
-}
-
-.ctl-title {
-  margin: 0 0 0.6rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--sim-ink-2);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+/* ── Form controls ──────────────────────────────────────────────────── */
 
 .ctl-field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 0.6rem;
-  font-size: 0.72rem;
-  color: var(--sim-ink-2);
-}
-
-.ctl-field input[type='text'],
-.ctl-field select {
-  border: 1px solid var(--sim-border);
-  background: var(--sim-inset);
-  color: var(--sim-ink);
-  border-radius: 7px;
-  padding: 0.4rem 0.55rem;
-  font-size: 0.8rem;
-  font-family: var(--sim-mono);
-}
-
-.ctl-field input[type='range'] {
-  accent-color: var(--sim-accent);
-}
-
-.ctl-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
-}
-
-.ctl-buttons {
-  display: flex;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.6rem;
-}
-
-/* queue list */
-
-.queue-list {
-  list-style: none;
-  margin: 0.6rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
   gap: 0.3rem;
+  margin: 0 0 0.75rem;
+  min-width: 0;
 }
 
-.queue-row {
-  appearance: none;
-  width: 100%;
+.ctl-label {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: baseline;
   gap: 0.5rem;
-  border: 1px solid var(--sim-border);
-  background: var(--sim-inset);
-  border-radius: 7px;
-  padding: 0.35rem 0.55rem;
-  cursor: pointer;
-  color: var(--sim-ink);
-  font-size: 0.75rem;
-  text-align: left;
+  min-width: 0;
+  color: var(--docs-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
-.queue-row.is-selected {
-  border-color: var(--sim-accent);
-}
-
-.queue-row-name {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: var(--sim-mono);
+.ctl-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.queue-row-shard {
-  font-size: 0.62rem;
-  color: var(--sim-ink-2);
-}
-
-.queue-row-counts {
-  display: flex;
+.ctl-value {
   flex-shrink: 0;
-  gap: 0.45rem;
-  font-family: var(--sim-mono);
-  font-size: 0.7rem;
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
 }
 
-.queue-row-counts b { font-weight: 500; }
-.c-waiting { color: var(--st-waiting); }
-.c-delayed { color: var(--st-delayed); }
-.c-active { color: var(--st-active); }
-.c-dlq { color: var(--st-dlq); }
-
-/* ── Shards ─────────────────────────────────────────────────────────── */
-
-.shard-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.45rem;
-}
-
-.shard-cell {
-  border: 1px solid var(--sim-border);
-  border-radius: 8px;
-  padding: 0.45rem 0.55rem;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.15rem 0.4rem;
-  background: var(--sim-inset);
-  transition: box-shadow 300ms;
-}
-
-.shard-cell.is-flash {
-  box-shadow: 0 0 0 1.5px var(--sim-accent);
-}
-
-.shard-name {
-  font-family: var(--sim-mono);
-  font-size: 0.72rem;
-  color: var(--sim-ink-2);
-}
-
-.shard-cell.has-load .shard-name {
-  color: var(--sim-ink);
-}
-
-.shard-load {
-  font-family: var(--sim-mono);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.shard-bar {
-  grid-column: 1 / -1;
-  height: 3px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--sim-border) 60%, transparent);
-  overflow: hidden;
-}
-
-.shard-bar i {
-  display: block;
-  height: 100%;
-  background: var(--sim-accent);
-  border-radius: 2px;
-  transition: width 200ms;
-}
-
-.shard-queues {
-  grid-column: 1 / -1;
-  font-family: var(--sim-mono);
-  font-size: 0.6rem;
-  color: var(--sim-ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ── Throughput ─────────────────────────────────────────────────────── */
-
-.spark-hero {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-}
-
-.spark-value {
-  font-family: var(--sim-mono);
-  font-size: 1.7rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.spark-unit {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--sim-ink-2);
-}
-
-.spark-chart {
-  position: relative;
-}
-
-.spark-chart svg {
-  display: block;
+.simulator .ctl-field :is(input[type='text'], select) {
   width: 100%;
-  height: 72px;
-}
-
-.spark-line {
-  fill: none;
-  stroke: var(--sim-accent);
-  stroke-width: 1.6;
-  vector-effect: non-scaling-stroke;
-}
-
-.spark-area {
-  fill: color-mix(in srgb, var(--sim-accent) 13%, transparent);
-  stroke: none;
-}
-
-.spark-cursor line {
-  stroke: var(--sim-ink-2);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-  vector-effect: non-scaling-stroke;
-}
-
-.spark-cursor circle {
-  fill: var(--sim-accent);
-}
-
-.spark-tip {
-  position: absolute;
-  top: -0.4rem;
-  transform: translateX(-50%);
-  background: var(--sim-inset);
-  border: 1px solid var(--sim-border);
+  min-height: 2.1rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--docs-line);
   border-radius: 6px;
-  padding: 0.1rem 0.45rem;
-  font-family: var(--sim-mono);
-  font-size: 0.65rem;
-  white-space: nowrap;
-  pointer-events: none;
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-size: 0.82rem;
 }
 
-/* ── Workers ────────────────────────────────────────────────────────── */
-
-.worker-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  max-height: 240px;
-  overflow-y: auto;
+.simulator .ctl-field :is(input[type='text'], select):hover {
+  border-color: var(--docs-muted);
 }
 
-.worker-card {
-  flex-shrink: 0;
-  border: 1px solid var(--sim-border);
-  border-radius: 8px;
-  background: var(--sim-inset);
-  padding: 0.5rem 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+@media (pointer: coarse) {
+  .simulator .btn {
+    min-height: 2.5rem;
+  }
 }
-
-.worker-card.is-stopped {
-  opacity: 0.55;
-}
-
-.worker-top {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: var(--sim-mono);
-  font-size: 0.75rem;
-}
-
-.worker-queue {
-  color: var(--sim-ink-2);
-}
-
-.worker-slots {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.worker-slots i {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-}
-
-.slot-idle {
-  border: 1px solid var(--sim-border);
-}
-
-.slot-busy {
-  background: var(--st-active);
-}
-
-.worker-stats {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  font-family: var(--sim-mono);
-  font-size: 0.68rem;
-  color: var(--sim-ink-2);
-}
-
-.worker-failed {
-  color: var(--st-failed);
-}
-
-.worker-stats .btn {
-  margin-left: auto;
-}
-
-/* ── Events ─────────────────────────────────────────────────────────── */
-
-.event-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 240px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-family: var(--sim-mono);
-  font-size: 0.68rem;
-}
-
-.event {
-  display: flex;
-  flex-shrink: 0;
-  gap: 0.6rem;
-  padding: 0.14rem 0.4rem;
-  border-left: 2px solid var(--sim-border);
-  border-radius: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.event-t {
-  color: var(--sim-ink-2);
-  flex-shrink: 0;
-}
-
-.event-msg {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ev-push { border-left-color: var(--st-waiting); }
-.ev-done { border-left-color: var(--st-active); }
-.ev-retry { border-left-color: var(--st-delayed); }
-.ev-dlq { border-left-color: var(--st-dlq); }
-.ev-worker, .ev-scenario { border-left-color: var(--sim-accent); }
-.ev-pause, .ev-resume, .ev-drain, .ev-retry-dlq, .ev-rate-limit { border-left-color: var(--st-completed); }
 
 @media (prefers-reduced-motion: reduce) {
   .simulator *,

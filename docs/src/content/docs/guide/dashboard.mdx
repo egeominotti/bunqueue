@@ -147,7 +147,7 @@ The npm package and the standalone binaries read these variables:
 | `AGENT_ALLOWED_ORIGINS` | development defaults | Extra browser origins allowed to call the agent. |
 | `TRUST_PROXY` | off | `1` trusts an `X-Forwarded-Host` that your proxy overwrites. |
 
-`VITE_*` variables are build-time values for the static build and seed the first profile in Settings. Vite compiles them into the public bundle as plain text, so never put a token in one. Enter tokens in **Settings** or at the sign-in prompt; they last for the browser session.
+`VITE_*` variables are build-time values for the static build and seed the first profile in Settings. Vite compiles them into the public bundle as plain text, so never put a token in one. Enter tokens in **Settings** or at the sign-in prompt; they are kept in memory only, so reloading the page clears them.
 
 ## Security model
 

@@ -6,7 +6,7 @@ const H = 72;
 const PAD_TOP = 6;
 
 // Completions per second over the last 60s of sim-time: a hero number
-// with its sparkline, crosshair on hover.
+// with its sparkline, crosshair on hover. Drawn in the completed-state color.
 export default function ThroughputPanel({ snap }: { snap: Snapshot }) {
   const [hover, setHover] = useState<number | null>(null);
   const { series } = snap;
@@ -24,13 +24,13 @@ export default function ThroughputPanel({ snap }: { snap: Snapshot }) {
   };
 
   return (
-    <div className="panel spark-panel">
-      <h2 className="panel-title">
+    <section className="panel spark-panel" aria-labelledby="sim-throughput-title">
+      <h2 className="panel-title" id="sim-throughput-title">
         Throughput <span className="panel-hint">last 60s</span>
       </h2>
       <div className="spark-hero">
         <span className="spark-value">{snap.totals.jobsPerSec.toFixed(1)}</span>
-        <span className="spark-unit">completed / sec</span>
+        <span className="spark-unit">completed per second</span>
       </div>
       <div className="spark-chart">
         <svg
@@ -41,6 +41,7 @@ export default function ThroughputPanel({ snap }: { snap: Snapshot }) {
           onMouseMove={onMove}
           onMouseLeave={() => setHover(null)}
         >
+          <line className="spark-base" x1={0} y1={H} x2={W} y2={H} />
           <path className="spark-area" d={areaPath} />
           <path className="spark-line" d={linePath} />
           {hover !== null && (
@@ -56,6 +57,6 @@ export default function ThroughputPanel({ snap }: { snap: Snapshot }) {
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
