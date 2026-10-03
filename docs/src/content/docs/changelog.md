@@ -38,7 +38,8 @@ head:
   ±25%, while at most about 600 waits share a connection pool; less often
   beyond that) instead of at the TTL. `WaitJob` holds run under their own
   command timeout, so `commandTimeout` no longer cuts a wait short, and TTLs
-  above 600000 ms are honoured. Holds are capped at 40 per connection (160 on a
+  above 600000 ms are honoured (up to about 24.8 days, the runtime's timer
+  limit). Holds are capped at 40 per connection (160 on a
   default pool of 4), so other commands keep broker slots: with a TTL at or
   above `commandTimeout` and jobs still pending, 120 waits on one connection
   used to fail with `Connection lost` after about 30 s. Beyond those slots a
@@ -63,8 +64,7 @@ head:
   error; a job without a connection rejects instead of resolving `undefined`;
   and TCP `Job` objects now listen to the `QueueEvents` they are given. One
   implementation (`src/client/jobWait.ts`, `src/client/job-wait/`) replaces six
-  copies that had drifted apart. The fix reaches `bunqueue-client` with its
-  next release.
+  copies that had drifted apart. The fix ships in `bunqueue-client` 0.2.2.
 
 ### Documentation
 
@@ -161,8 +161,7 @@ head:
   Bun 1.4+, Deno 2+, Cloudflare Workers), and notes on ESM-only loading,
   CommonJS bundling, embedded mode and Deno. The migration guide from 0.1.x
   keeps its anchor. `test/docs-homepage-snippets.test.ts` now also fails if this
-  quick start drifts from the docs. npm shows the new README with the next
-  `bunqueue-client` release.
+  quick start drifts from the docs. npm shows it with `bunqueue-client` 0.2.2.
 
 ## [2.9.8] - 2026-10-03
 

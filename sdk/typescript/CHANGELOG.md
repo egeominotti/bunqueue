@@ -5,27 +5,46 @@ All notable changes to `bunqueue-client` (TypeScript SDK) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.2] - 2026-10-03
+
+### Added
+
+- `TcpConnectionPool.send(command, { timeout })` accepts a per-command
+  timeout, and `TcpConnectionPool.reserveLongPoll(perConnection)` leases
+  long-poll slots per connection; both are optional and additive.
+- `QueueEvents` `failed` payloads carry `terminal`: `false` for an attempt
+  that will be retried, `true` once the job failed for good.
 
 ### Fixed
+
+These fixes apply to the default entry (`bunqueue-client`);
+`bunqueue-client/legacy` is unchanged.
 
 - `Queue.waitJobUntilFinished()` and `job.waitUntilFinished()` settle on the
   job's final outcome. A failed attempt that will be retried no longer rejects
   the wait; a job that runs out of retries, or that the stall detector moves to
   the DLQ, rejects with the last attempt's error; a job that no longer exists
-  rejects with `Job <id> not found`. Over TCP without `QueueEvents`, a failed
-  job is reported by the next state read (1 s after the start, then every 2 to
-  30 s ±25%, while at most about 600 waits share a pool) instead of at the TTL,
-  and waits are no longer cut short by `commandTimeout`. At most 40 waits per
-  connection hold `WaitJob`, so other commands keep broker slots; further waits
-  queue and can see a completion seconds late, so use `QueueEvents` for
-  high-concurrency request/response. Waits survive a `QueueEvents` `close()`,
-  reconnects and broker outages: rate-limit refusals, timeouts and lost
-  connections are retried within a per-pool read budget, and the wait settles
-  once the client has reconnected (which can lag by the reconnect backoff, up
-  to 30 s, plus the next state read) or at its TTL. Embedded waits reject when
-  `shutdownManager()` stops the engine and never restart it. A TTL of `0` means
-  no timeout. `QueueEvents` `failed` payloads carry `terminal`.
+  rejects with `Job <id> not found`.
+- Over TCP without `QueueEvents`, a failed job is reported by the next state
+  read (1 s after the start, then every 2 to 30 s ±25%, while at most about 600
+  waits share a pool) instead of at the TTL. Waits are no longer cut short by
+  `commandTimeout`, and TTLs above 600000 ms are honoured (up to about 24.8
+  days, the runtime's timer limit). At most 40 waits per connection hold
+  `WaitJob`, so other commands keep broker slots; further waits queue and can
+  see a completion seconds late, so use `QueueEvents` for high-concurrency
+  request/response.
+- Waits survive a `QueueEvents` `close()`, reconnects and broker outages:
+  rate-limit refusals, timeouts and lost connections are retried within a
+  per-pool read budget, and the wait settles once the client has reconnected
+  (which can lag by the reconnect backoff, up to 30 s, plus the next state
+  read) or at its TTL.
+- Behavior changes to check when upgrading: embedded waits reject when
+  `shutdownManager()` stops the engine (add a `.catch` to fire-and-forget
+  waits) and never restart it; a `Job` without a connection rejects with
+  `waitUntilFinished: no connection` instead of resolving `undefined`; TCP
+  `Job` objects now listen to the `QueueEvents` they are given; an embedded
+  `queue.add()` job accepts `null` instead of `QueueEvents`; a refused state
+  read rejects with the broker's error; and a TTL of `0` means no timeout.
 
 ### Documentation
 

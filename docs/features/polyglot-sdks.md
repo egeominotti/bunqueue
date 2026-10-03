@@ -31,7 +31,9 @@ for the portable transport, embedded loader, and declaration gates.
 Protocol v3 (`separate-job-name`) clients were released with server 2.9.7 on
 2026-10-02: TypeScript 0.2.1 (npm, `sdk-release.yml`), PHP 0.2.0 (Packagist reads
 the `egeominotti/bunqueue-php` mirror) and Go `sdk/go/v0.2.0` (a git tag; the Go
-proxy serves it). Python 0.2.0 and Rust 0.2.0 are versioned and built in the
+proxy serves it). TypeScript 0.2.2 followed on 2026-10-03 with the canonical
+client's job-wait fix (`src/client/jobWait.ts`) and the rewritten README.
+Python 0.2.0 and Rust 0.2.0 are versioned and built in the
 same release and are published by hand to PyPI and crates.io by the maintainer,
 who holds those credentials. The previous registry releases (Python 0.1.5, PHP
 0.1.1, Go v0.1.0, Rust 0.1.1, 2026-07-20) speak protocol v2 and lose the job
