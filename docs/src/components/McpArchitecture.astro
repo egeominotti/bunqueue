@@ -1,394 +1,54 @@
 ---
 /**
- * Animated MCP architecture diagram.
- * Shows: AI Agent ─(stdio or Streamable HTTP)─> MCP Server ─> Embedded memory/SQLite | TCP Client ─> Remote Server
+ * Where the queue lives, for /guide/mcp/: the AI client talks to bunqueue-mcp over
+ * stdio or Streamable HTTP, and the MCP server keeps the queue either inside its own
+ * process (embedded, the default) or on your bunqueue server (TCP). Plain HTML, so
+ * the text stays readable, selectable and in reading order for screen readers.
  */
+import '../styles/mcp-architecture.css';
 ---
 
-<div class="mcp-arch">
-  <!-- Row 1: AI Agent -->
-  <div class="ma-node ma-agent">
-    <div class="ma-icon">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/>
-        <path d="M12 2a4 4 0 0 0-4 4c0 1.95 1.4 3.58 3.25 3.93"/>
-        <circle cx="12" cy="14" r="4"/>
-        <path d="M19 22v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M5 22v-2a4 4 0 0 1 3-3.87"/>
-      </svg>
+<figure class="mcpd not-content" aria-label="How an AI client reaches the queue through the bunqueue MCP server">
+  <div class="mcpd-grid">
+    <div class="mcpd-node">
+      <span class="mcpd-kicker">Your AI client</span>
+      <strong class="mcpd-title">Claude Code, Claude Desktop, Cursor, Windsurf</strong>
+      <span class="mcpd-note">Any client that speaks MCP</span>
     </div>
-    <div class="ma-text">
-      <span class="ma-label">AI Agent</span>
-      <span class="ma-sub">Claude, Cursor, Windsurf</span>
+
+    <div class="mcpd-link">
+      <span class="mcpd-link-label">stdio or Streamable HTTP</span>
+      <span class="mcpd-wire" aria-hidden="true"></span>
+      <span class="mcpd-link-sub">JSON-RPC</span>
     </div>
-    <div class="ma-bubble">"Schedule a cleanup job every hour"</div>
+
+    <div class="mcpd-node mcpd-server">
+      <span class="mcpd-kicker">bunqueue-mcp</span>
+      <strong class="mcpd-title">75 tools, 3 prompts, 5 resources</strong>
+      <ul class="mcpd-chips" role="list" aria-label="Optional features">
+        <li class="mcpd-chips-label" aria-hidden="true">optional</li>
+        <li>toolsets</li>
+        <li>confirmations</li>
+        <li>decision models</li>
+      </ul>
+    </div>
+
+    <div class="mcpd-fork" aria-hidden="true">
+      <span class="mcpd-fork-stem"></span>
+      <span class="mcpd-fork-bar"></span>
+    </div>
+
+    <ul class="mcpd-modes" role="list" aria-label="Where the queue lives">
+      <li class="mcpd-node mcpd-mode">
+        <span class="mcpd-kicker">Embedded <em class="mcpd-default">default</em></span>
+        <strong class="mcpd-title">Inside the MCP server</strong>
+        <span class="mcpd-note">In memory, or a SQLite file with <code>DATA_PATH</code></span>
+      </li>
+      <li class="mcpd-node mcpd-mode">
+        <span class="mcpd-kicker">TCP <code>BUNQUEUE_MODE=tcp</code></span>
+        <strong class="mcpd-title">Your bunqueue server, port 6789</strong>
+        <span class="mcpd-note">SQLite or PostgreSQL, shared with your workers</span>
+      </li>
+    </ul>
   </div>
-
-  <!-- Connector: stdio -->
-  <div class="ma-vconn">
-    <div class="ma-vline"></div>
-    <div class="ma-vdot ma-vdot-down"></div>
-    <span class="ma-conn-label">stdio or HTTP (JSON-RPC)</span>
-  </div>
-
-  <!-- Row 2: MCP Server -->
-  <div class="ma-node ma-server">
-    <div class="ma-server-header">
-      <div class="ma-icon ma-icon-pink">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <line x1="8" y1="21" x2="16" y2="21"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-      </div>
-      <div class="ma-text">
-        <span class="ma-label">bunqueue MCP Server</span>
-        <span class="ma-sub">75 tools · 3 prompts · 5 resources</span>
-      </div>
-    </div>
-    <div class="ma-server-modes">
-      <div class="ma-mode ma-mode-embedded">
-        <div class="ma-mode-dot ma-mode-dot-active"></div>
-        <div class="ma-mode-info">
-          <span class="ma-mode-title">Embedded</span>
-          <span class="ma-mode-sub">Memory / SQLite</span>
-        </div>
-      </div>
-      <div class="ma-mode-divider"></div>
-      <div class="ma-mode ma-mode-tcp">
-        <div class="ma-mode-dot"></div>
-        <div class="ma-mode-info">
-          <span class="ma-mode-title">TCP Client</span>
-          <span class="ma-mode-sub">(remote)</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Connector: TCP (from TCP mode to remote server) -->
-  <div class="ma-vconn ma-vconn-tcp">
-    <div class="ma-vline ma-vline-dashed"></div>
-    <div class="ma-vdot ma-vdot-tcp"></div>
-    <span class="ma-conn-label">TCP :6789</span>
-  </div>
-
-  <!-- Row 3: Remote Server -->
-  <div class="ma-node ma-remote">
-    <div class="ma-icon ma-icon-dim">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-        <line x1="6" y1="6" x2="6.01" y2="6"/>
-        <line x1="6" y1="18" x2="6.01" y2="18"/>
-      </svg>
-    </div>
-    <div class="ma-text">
-      <span class="ma-label ma-label-dim">bunqueue Server</span>
-      <span class="ma-sub">Memory / SQLite / PostgreSQL</span>
-    </div>
-  </div>
-</div>
-
-<style>
-  .mcp-arch {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    padding: 2rem 1rem;
-    margin: 1.5rem 0;
-    border-radius: 16px;
-    border: 1px solid var(--sl-color-hairline);
-    background: var(--sl-color-bg-sidebar);
-  }
-
-  :root[data-theme='dark'] .mcp-arch {
-    background: rgba(12, 12, 15, 0.8);
-    border-color: rgba(255, 255, 255, 0.06);
-  }
-
-  /* Nodes */
-  .ma-node {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    border-radius: 12px;
-    border: 1.5px solid var(--sl-color-hairline);
-    background: var(--sl-color-bg);
-    min-width: 280px;
-    animation: maFadeIn 0.5s ease-out both;
-  }
-
-  :root[data-theme='dark'] .ma-node {
-    background: rgba(17, 17, 22, 0.9);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .ma-agent { animation-delay: 0s; }
-  .ma-server { animation-delay: 0.2s; flex-direction: column; align-items: stretch; gap: 1rem; padding: 1.25rem 1.5rem; }
-  .ma-remote { animation-delay: 0.4s; opacity: 0.6; border-style: dashed; }
-
-  @keyframes maFadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* Icons */
-  .ma-icon {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--sl-color-bg-sidebar);
-    color: var(--sl-color-gray-3);
-    border: 1px solid var(--sl-color-hairline);
-  }
-
-  :root[data-theme='dark'] .ma-icon {
-    background: rgba(24, 24, 27, 0.6);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .ma-icon-pink {
-    color: var(--sl-color-accent);
-    border-color: var(--sl-color-accent);
-    box-shadow: 0 0 12px rgba(219, 39, 119, 0.15);
-    animation: maPulse 3s ease-in-out infinite;
-  }
-
-  :root[data-theme='dark'] .ma-icon-pink {
-    color: #f9a8d4;
-    border-color: rgba(249, 168, 212, 0.4);
-    box-shadow: 0 0 16px rgba(249, 168, 212, 0.15);
-  }
-
-  @keyframes maPulse {
-    0%, 100% { box-shadow: 0 0 12px rgba(219, 39, 119, 0.15); }
-    50% { box-shadow: 0 0 24px rgba(219, 39, 119, 0.3); }
-  }
-
-  .ma-icon-dim { opacity: 0.5; }
-
-  /* Text */
-  .ma-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
-
-  .ma-label {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--sl-color-text);
-  }
-
-  .ma-label-dim { opacity: 0.6; }
-
-  .ma-sub {
-    font-size: 0.75rem;
-    color: var(--sl-color-gray-3);
-  }
-
-  /* Bubble */
-  .ma-bubble {
-    margin-left: auto;
-    padding: 0.35rem 0.75rem;
-    border-radius: 8px;
-    font-size: 0.72rem;
-    font-style: italic;
-    color: var(--sl-color-gray-3);
-    background: var(--sl-color-bg-sidebar);
-    border: 1px solid var(--sl-color-hairline);
-    white-space: nowrap;
-    animation: maBubblePulse 4s ease-in-out infinite;
-  }
-
-  :root[data-theme='dark'] .ma-bubble {
-    background: rgba(24, 24, 27, 0.5);
-    border-color: rgba(255, 255, 255, 0.06);
-  }
-
-  @keyframes maBubblePulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
-  }
-
-  /* Server internals */
-  .ma-server-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .ma-server-modes {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    background: var(--sl-color-bg-sidebar);
-    border: 1px solid var(--sl-color-hairline);
-  }
-
-  :root[data-theme='dark'] .ma-server-modes {
-    background: rgba(9, 9, 11, 0.6);
-    border-color: rgba(255, 255, 255, 0.05);
-  }
-
-  .ma-mode {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 1;
-  }
-
-  .ma-mode-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--sl-color-gray-3);
-    opacity: 0.3;
-    flex-shrink: 0;
-  }
-
-  .ma-mode-dot-active {
-    background: #22c55e;
-    opacity: 1;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
-    animation: maDotBlink 2s ease-in-out infinite;
-  }
-
-  @keyframes maDotBlink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-
-  .ma-mode-divider {
-    width: 1px;
-    height: 28px;
-    background: var(--sl-color-hairline);
-  }
-
-  :root[data-theme='dark'] .ma-mode-divider {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .ma-mode-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .ma-mode-title {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--sl-color-text);
-  }
-
-  .ma-mode-sub {
-    font-size: 0.68rem;
-    color: var(--sl-color-gray-3);
-  }
-
-  /* Vertical connectors */
-  .ma-vconn {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 48px;
-    width: 60px;
-  }
-
-  .ma-vline {
-    width: 2px;
-    height: 100%;
-    background: var(--sl-color-hairline);
-  }
-
-  :root[data-theme='dark'] .ma-vline {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .ma-vline-dashed {
-    background: repeating-linear-gradient(
-      to bottom,
-      var(--sl-color-hairline) 0px,
-      var(--sl-color-hairline) 4px,
-      transparent 4px,
-      transparent 8px
-    );
-  }
-
-  :root[data-theme='dark'] .ma-vline-dashed {
-    background: repeating-linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.1) 0px,
-      rgba(255, 255, 255, 0.1) 4px,
-      transparent 4px,
-      transparent 8px
-    );
-  }
-
-  .ma-vdot-down {
-    position: absolute;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--sl-color-accent);
-    left: 50%;
-    transform: translateX(-50%);
-    top: -3px;
-    box-shadow: 0 0 8px rgba(219, 39, 119, 0.4);
-    animation: maVdot 3s ease-in-out infinite;
-  }
-
-  :root[data-theme='dark'] .ma-vdot-down {
-    background: #f9a8d4;
-    box-shadow: 0 0 10px rgba(249, 168, 212, 0.5);
-  }
-
-  @keyframes maVdot {
-    0% { top: -3px; opacity: 0; }
-    10% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { top: calc(100% - 3px); opacity: 0; }
-  }
-
-  .ma-vdot-tcp {
-    position: absolute;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--sl-color-gray-3);
-    left: 50%;
-    transform: translateX(-50%);
-    top: -3px;
-    opacity: 0.4;
-    animation: maVdot 4s ease-in-out infinite 1s;
-  }
-
-  .ma-conn-label {
-    position: absolute;
-    left: calc(50% + 14px);
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.68rem;
-    color: var(--sl-color-gray-3);
-    white-space: nowrap;
-    font-family: var(--sl-font-mono);
-  }
-
-  /* Responsive */
-  @media (max-width: 640px) {
-    .mcp-arch { padding: 1.5rem 0.75rem; }
-    .ma-node { min-width: auto; padding: 0.75rem 1rem; }
-    .ma-bubble { display: none; }
-    .ma-server-modes { flex-direction: column; gap: 0.5rem; }
-    .ma-mode-divider { width: 100%; height: 1px; }
-  }
-</style>
+</figure>

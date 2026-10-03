@@ -40,6 +40,9 @@
 !docs/src/lib/
 !docs/src/lib/reference-seo.ts
 !docs/src/lib/rehypeTableLabels.ts
+!docs/src/styles/
+!docs/src/styles/docs-theme.css
+!docs/src/styles/docs-reading.css
 !docs/src/lib/llms-full.ts
 !docs/src/components/
 !docs/src/components/examples/

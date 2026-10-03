@@ -1,494 +1,254 @@
 ---
 /**
- * Animated HTTP Handler pipeline flow.
- * Shows: Cron/Add Job → Queue → Embedded Worker → HTTP API → Job Result
- * with animated dots, glowing worker, and success pulse.
+ * What happens to a job on a queue with an HTTP handler, for /guide/mcp/: it is
+ * added, a handler worker inside the MCP server takes it, calls your URL, and the
+ * response settles it. Job states use the docs' --docs-state-* tokens (waiting,
+ * active, completed, failed), the same palette as the homepage ledger. Plain HTML in reading order, so screen readers get the steps.
  */
 ---
 
-<div class="hf-wrap">
-  <div class="hf-flow">
-    <!-- Node 1: Trigger -->
-    <div class="hf-node hf-n1">
-      <div class="hf-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
-        </svg>
-      </div>
-      <span class="hf-label">Cron / Add Job</span>
-    </div>
-
-    <!-- Connector 1 -->
-    <div class="hf-conn">
-      <div class="hf-line"></div>
-      <div class="hf-arrow"></div>
-      <div class="hf-dot hf-d1"></div>
-    </div>
-
-    <!-- Node 2: Queue -->
-    <div class="hf-node hf-n2">
-      <div class="hf-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-        </svg>
-      </div>
-      <span class="hf-label">Queue</span>
-      <span class="hf-sublabel">waiting</span>
-    </div>
-
-    <!-- Connector 2 -->
-    <div class="hf-conn">
-      <div class="hf-line"></div>
-      <div class="hf-arrow"></div>
-      <div class="hf-dot hf-d2"></div>
-    </div>
-
-    <!-- Node 3: Worker (hero node) -->
-    <div class="hf-node hf-n3 hf-hero">
-      <div class="hf-glow"></div>
-      <div class="hf-icon hf-icon-active">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <line x1="8" y1="21" x2="16" y2="21"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-      </div>
-      <span class="hf-label">Embedded Worker</span>
-    </div>
-
-    <!-- Connector 3 -->
-    <div class="hf-conn">
-      <div class="hf-line"></div>
-      <div class="hf-arrow"></div>
-      <div class="hf-dot hf-d3"></div>
-    </div>
-
-    <!-- Node 4: HTTP API -->
-    <div class="hf-node hf-n4">
-      <div class="hf-icon hf-icon-blue">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-        </svg>
-      </div>
-      <span class="hf-label">HTTP API</span>
-      <span class="hf-sublabel">endpoint</span>
-    </div>
-
-    <!-- Connector 4 -->
-    <div class="hf-conn">
-      <div class="hf-line"></div>
-      <div class="hf-arrow"></div>
-      <div class="hf-dot hf-d4 hf-dot-green"></div>
-    </div>
-
-    <!-- Node 5: Result -->
-    <div class="hf-node hf-n5">
-      <div class="hf-icon hf-icon-green">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-      </div>
-      <span class="hf-label">Result</span>
-      <span class="hf-sublabel">saved</span>
-    </div>
-  </div>
-
-  <!-- Vertical layout for mobile -->
-  <div class="hf-vertical">
-    <div class="hf-vrow">
-      <div class="hf-vicon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-      </div>
-      <div><span class="hf-vlabel">Cron / Add Job</span><span class="hf-vsub">AI agent triggers</span></div>
-    </div>
-    <div class="hf-vconn"><div class="hf-vline"></div><div class="hf-vdot hf-vd1"></div></div>
-
-    <div class="hf-vrow">
-      <div class="hf-vicon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-        </svg>
-      </div>
-      <div><span class="hf-vlabel">Queue</span><span class="hf-vsub">Jobs waiting</span></div>
-    </div>
-    <div class="hf-vconn"><div class="hf-vline"></div><div class="hf-vdot hf-vd2"></div></div>
-
-    <div class="hf-vrow hf-vhero">
-      <div class="hf-vicon hf-vicon-pink">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-      </div>
-      <div><span class="hf-vlabel">Embedded Worker</span><span class="hf-vsub">Inside MCP server process</span></div>
-    </div>
-    <div class="hf-vconn"><div class="hf-vline"></div><div class="hf-vdot hf-vd3"></div></div>
-
-    <div class="hf-vrow">
-      <div class="hf-vicon hf-vicon-blue">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-        </svg>
-      </div>
-      <div><span class="hf-vlabel">HTTP API</span><span class="hf-vsub">Your endpoint</span></div>
-    </div>
-    <div class="hf-vconn"><div class="hf-vline"></div><div class="hf-vdot hf-vd4 hf-vdot-green"></div></div>
-
-    <div class="hf-vrow">
-      <div class="hf-vicon hf-vicon-green">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-      </div>
-      <div><span class="hf-vlabel">Job Result</span><span class="hf-vsub">Response saved</span></div>
-    </div>
-  </div>
-</div>
+<figure class="hfd not-content" aria-label="How an HTTP handler processes a job">
+  <ol class="hfd-steps" role="list">
+    <li class="hfd-step">
+      <span class="hfd-num" aria-hidden="true">1</span>
+      <span class="hfd-state hfd-waiting">waiting</span>
+      <strong class="hfd-title">A job is added</strong>
+      <span class="hfd-note">By the agent, by a cron or, in TCP mode, by any app on your server</span>
+    </li>
+    <li class="hfd-step">
+      <span class="hfd-num" aria-hidden="true">2</span>
+      <span class="hfd-state hfd-active">active</span>
+      <strong class="hfd-title">The handler takes it</strong>
+      <span class="hfd-note">A worker inside the MCP server; in TCP mode it pulls from your server</span>
+    </li>
+    <li class="hfd-step">
+      <span class="hfd-num" aria-hidden="true">3</span>
+      <span class="hfd-state hfd-active">active</span>
+      <strong class="hfd-title">It calls your URL</strong>
+      <span class="hfd-note"><code>GET</code> <code>POST</code> <code>PUT</code> <code>DELETE</code>; POST and PUT send the job's data, or your fixed body. It waits up to <code>timeoutMs</code></span>
+    </li>
+    <li class="hfd-step hfd-outcomes">
+      <span class="hfd-num" aria-hidden="true">4</span>
+      <ul class="hfd-split" role="list" aria-label="Outcome">
+        <li>
+          <span class="hfd-state hfd-completed">completed</span>
+          <strong class="hfd-title">2xx response</strong>
+          <span class="hfd-note">The response is saved as the job's result</span>
+        </li>
+        <li>
+          <span class="hfd-state hfd-failed">failed</span>
+          <strong class="hfd-title">Error status, network error or timeout</strong>
+          <span class="hfd-note">Retried with backoff while attempts remain, then moved to the dead letter queue</span>
+        </li>
+      </ul>
+    </li>
+  </ol>
+</figure>
 
 <style>
-  .hf-wrap {
-    margin: 1.5rem 0;
-    padding: 2rem 1rem;
-    border-radius: 16px;
-    border: 1px solid var(--sl-color-hairline);
-    background: var(--sl-color-bg-sidebar);
-    overflow-x: auto;
+  .hfd {
+    container: hfd / inline-size;
+    margin: 2rem 0;
+    padding: 1.5rem;
+    border: 1px solid var(--docs-line);
+    border-radius: var(--docs-radius);
+    background:
+      radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--sl-color-text) 9%, transparent) 1px, transparent 0)
+        0 0 / 18px 18px,
+      var(--sl-color-bg);
   }
 
-  :root[data-theme='dark'] .hf-wrap {
-    background: rgba(12, 12, 15, 0.8);
-    border-color: rgba(255, 255, 255, 0.06);
-  }
-
-  /* === Horizontal (desktop) === */
-  .hf-flow {
-    display: flex;
+  .hfd-steps {
+    --hfd-gap: 1.75rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.2fr);
     align-items: center;
-    justify-content: center;
-    gap: 0;
-    min-width: 600px;
+    gap: var(--hfd-gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: none;
   }
 
-  .hf-vertical { display: none; }
-
-  /* Nodes */
-  .hf-node {
+  .hfd-step {
+    position: relative;
     display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 0.35rem;
-    position: relative;
-    animation: hfAppear 0.5s ease-out both;
+    min-width: 0;
+    margin: 0;
+    padding: 0.85rem 0.9rem;
+    border: 1px solid var(--docs-line);
+    border-radius: var(--docs-radius);
+    background: var(--docs-panel);
   }
 
-  .hf-n1 { animation-delay: 0s; }
-  .hf-n2 { animation-delay: 0.12s; }
-  .hf-n3 { animation-delay: 0.24s; }
-  .hf-n4 { animation-delay: 0.36s; }
-  .hf-n5 { animation-delay: 0.48s; }
-
-  @keyframes hfAppear {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .hf-icon {
-    width: 46px;
-    height: 46px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1.5px solid var(--sl-color-hairline);
-    background: var(--sl-color-bg);
-    color: var(--sl-color-gray-3);
-    transition: all 0.3s ease;
-  }
-
-  :root[data-theme='dark'] .hf-icon {
-    background: rgba(17, 17, 22, 0.9);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .hf-icon-active {
-    border-color: var(--sl-color-accent);
-    color: var(--sl-color-accent);
-    animation: hfIconPulse 2.5s ease-in-out infinite;
-  }
-
-  :root[data-theme='dark'] .hf-icon-active {
-    border-color: #f9a8d4;
-    color: #f9a8d4;
-  }
-
-  @keyframes hfIconPulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(219, 39, 119, 0.15); }
-    50% { box-shadow: 0 0 20px rgba(219, 39, 119, 0.35); }
-  }
-
-  .hf-icon-blue {
-    color: #3b82f6;
-    border-color: rgba(59, 130, 246, 0.3);
-  }
-
-  :root[data-theme='dark'] .hf-icon-blue {
-    color: #93c5fd;
-    border-color: rgba(147, 197, 253, 0.3);
-  }
-
-  .hf-icon-green {
-    color: #22c55e;
-    border-color: rgba(34, 197, 94, 0.3);
-  }
-
-  :root[data-theme='dark'] .hf-icon-green {
-    color: #4ade80;
-    border-color: rgba(74, 222, 128, 0.3);
-  }
-
-  /* Hero glow */
-  .hf-hero { position: relative; }
-
-  .hf-glow {
+  /* The arrow to the next step sits in the gap. */
+  .hfd-step:not(:last-child)::after {
+    content: '';
     position: absolute;
-    top: -6px;
-    left: -6px;
-    right: -6px;
-    bottom: -6px;
-    border-radius: 18px;
-    background: radial-gradient(ellipse, rgba(219, 39, 119, 0.12) 0%, transparent 70%);
-    animation: hfGlow 3s ease-in-out infinite;
-    pointer-events: none;
-  }
-
-  :root[data-theme='dark'] .hf-glow {
-    background: radial-gradient(ellipse, rgba(249, 168, 212, 0.1) 0%, transparent 70%);
-  }
-
-  @keyframes hfGlow {
-    0%, 100% { opacity: 0.5; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.15); }
-  }
-
-  .hf-label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--sl-color-text);
-    text-align: center;
-    line-height: 1.2;
-    white-space: nowrap;
-  }
-
-  .hf-sublabel {
-    font-size: 0.65rem;
-    color: var(--sl-color-gray-3);
-    text-align: center;
-  }
-
-  /* Connectors */
-  .hf-conn {
-    position: relative;
-    width: 48px;
-    height: 46px;
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  .hf-line {
-    width: 100%;
-    height: 2px;
-    background: var(--sl-color-hairline);
-  }
-
-  :root[data-theme='dark'] .hf-line {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .hf-arrow {
-    position: absolute;
-    right: -1px;
     top: 50%;
-    transform: translateY(-50%);
-    width: 0;
-    height: 0;
-    border-top: 5px solid transparent;
-    border-bottom: 5px solid transparent;
-    border-left: 7px solid var(--sl-color-hairline);
+    right: calc(var(--hfd-gap) * -1 + 4px);
+    width: calc(var(--hfd-gap) - 8px);
+    height: 1px;
+    background: var(--docs-muted);
   }
 
-  :root[data-theme='dark'] .hf-arrow {
-    border-left-color: rgba(255, 255, 255, 0.1);
-  }
-
-  /* Animated dots */
-  .hf-dot {
+  .hfd-step:not(:last-child)::before {
+    content: '';
     position: absolute;
-    width: 7px;
-    height: 7px;
+    top: calc(50% - 3.5px);
+    right: calc(var(--hfd-gap) * -1 + 4px);
+    width: 8px;
+    height: 8px;
+    border-top: 1px solid var(--docs-muted);
+    border-right: 1px solid var(--docs-muted);
+    transform: rotate(45deg);
+  }
+
+  .hfd-num {
+    position: absolute;
+    top: -0.7rem;
+    left: 0.75rem;
+    display: grid;
+    place-items: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border: 1px solid var(--docs-line);
     border-radius: 50%;
-    background: var(--sl-color-accent);
-    top: 50%;
-    transform: translateY(-50%);
-    left: -3px;
-    box-shadow: 0 0 8px rgba(219, 39, 119, 0.5);
-    animation: hfDotTravel 3.5s ease-in-out infinite;
-  }
-
-  :root[data-theme='dark'] .hf-dot {
-    background: #f9a8d4;
-    box-shadow: 0 0 10px rgba(249, 168, 212, 0.6);
-  }
-
-  .hf-dot-green {
-    background: #22c55e;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
-  }
-
-  :root[data-theme='dark'] .hf-dot-green {
-    background: #4ade80;
-    box-shadow: 0 0 10px rgba(74, 222, 128, 0.6);
-  }
-
-  .hf-d1 { animation-delay: 0s; }
-  .hf-d2 { animation-delay: 0.7s; }
-  .hf-d3 { animation-delay: 1.4s; }
-  .hf-d4 { animation-delay: 2.1s; }
-
-  @keyframes hfDotTravel {
-    0% { left: -3px; opacity: 0; }
-    8% { opacity: 1; }
-    85% { opacity: 1; }
-    100% { left: calc(100% - 3px); opacity: 0; }
-  }
-
-  /* === Vertical (mobile) === */
-  .hf-vrow {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-  }
-
-  .hf-vhero {
-    padding: 0.6rem 0.75rem;
-    border-radius: 10px;
-    background: rgba(219, 39, 119, 0.04);
-    border: 1px solid rgba(219, 39, 119, 0.1);
-  }
-
-  :root[data-theme='dark'] .hf-vhero {
-    background: rgba(249, 168, 212, 0.04);
-    border-color: rgba(249, 168, 212, 0.1);
-  }
-
-  .hf-vicon {
-    width: 38px;
-    height: 38px;
-    min-width: 38px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1.5px solid var(--sl-color-hairline);
     background: var(--sl-color-bg);
-    color: var(--sl-color-gray-3);
-  }
-
-  :root[data-theme='dark'] .hf-vicon {
-    background: rgba(17, 17, 22, 0.9);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .hf-vicon-pink { color: var(--sl-color-accent); border-color: var(--sl-color-accent); }
-  :root[data-theme='dark'] .hf-vicon-pink { color: #f9a8d4; border-color: rgba(249, 168, 212, 0.4); }
-  .hf-vicon-blue { color: #3b82f6; border-color: rgba(59, 130, 246, 0.3); }
-  :root[data-theme='dark'] .hf-vicon-blue { color: #93c5fd; border-color: rgba(147, 197, 253, 0.3); }
-  .hf-vicon-green { color: #22c55e; border-color: rgba(34, 197, 94, 0.3); }
-  :root[data-theme='dark'] .hf-vicon-green { color: #4ade80; border-color: rgba(74, 222, 128, 0.3); }
-
-  .hf-vlabel {
-    font-size: 0.85rem;
-    font-weight: 600;
     color: var(--sl-color-text);
-    display: block;
-  }
-
-  .hf-vsub {
     font-size: 0.72rem;
-    color: var(--sl-color-gray-3);
-    display: block;
+    font-weight: 650;
   }
 
-  .hf-vconn {
-    position: relative;
-    height: 24px;
-    width: 38px;
-    display: flex;
-    justify-content: center;
+  .hfd-title {
+    color: var(--sl-color-text);
+    font-size: 0.92rem;
+    font-weight: 650;
+    line-height: 1.3;
   }
 
-  .hf-vline {
-    width: 2px;
+  .hfd-note {
+    color: var(--docs-muted);
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  /* Outranks custom.css's global inline-code chip, which also reaches .not-content. */
+  .hfd.not-content :not(pre) > code {
+    padding: 0.02em 0.3em;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--sl-color-text) 8%, transparent);
+    color: var(--sl-color-text);
+    font-size: 0.85em;
+  }
+
+  /* Job states, in the colors the docs use for them everywhere. */
+  .hfd-state {
+    --hfd-state: var(--docs-muted);
+    align-self: flex-start;
+    margin-top: 0.35rem;
+    padding: 0 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--hfd-state) 15%, transparent);
+    color: var(--hfd-state);
+    font-family: var(--sl-font-mono);
+    font-size: 0.68rem;
+    line-height: 1.6;
+  }
+
+  .hfd-waiting {
+    --hfd-state: var(--docs-state-waiting);
+  }
+
+  .hfd-active {
+    --hfd-state: var(--docs-state-active);
+  }
+
+  .hfd-completed {
+    --hfd-state: var(--docs-state-completed);
+  }
+
+  .hfd-failed {
+    --hfd-state: var(--docs-state-failed);
+  }
+
+  /* The last step splits into its two outcomes. */
+  .hfd-outcomes {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .hfd-split {
+    display: grid;
+    gap: 0.6rem;
     height: 100%;
-    background: var(--sl-color-hairline);
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  :root[data-theme='dark'] .hf-vline {
-    background: rgba(255, 255, 255, 0.1);
+  .hfd-split > li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--docs-line);
+    border-left: 2px solid var(--hfd-outcome);
+    border-radius: var(--docs-radius);
+    background: var(--docs-panel);
   }
 
-  .hf-vdot {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--sl-color-accent);
-    left: 50%;
-    transform: translateX(-50%);
-    top: -3px;
-    box-shadow: 0 0 6px rgba(219, 39, 119, 0.4);
-    animation: hfVdot 3.5s ease-in-out infinite;
+  .hfd-split > li:first-child {
+    --hfd-outcome: var(--docs-state-completed);
   }
 
-  :root[data-theme='dark'] .hf-vdot {
-    background: #f9a8d4;
-    box-shadow: 0 0 8px rgba(249, 168, 212, 0.5);
+  .hfd-split > li:last-child {
+    --hfd-outcome: var(--docs-state-failed);
   }
 
-  .hf-vdot-green {
-    background: #22c55e;
-    box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+  .hfd-split .hfd-state {
+    margin-top: 0;
   }
 
-  :root[data-theme='dark'] .hf-vdot-green {
-    background: #4ade80;
-    box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+  .hfd-outcomes > .hfd-num {
+    left: 0.75rem;
+    z-index: 1;
   }
 
-  .hf-vd1 { animation-delay: 0s; }
-  .hf-vd2 { animation-delay: 0.7s; }
-  .hf-vd3 { animation-delay: 1.4s; }
-  .hf-vd4 { animation-delay: 2.1s; }
-
-  @keyframes hfVdot {
-    0% { top: -3px; opacity: 0; }
-    8% { opacity: 1; }
-    85% { opacity: 1; }
-    100% { top: calc(100% - 3px); opacity: 0; }
+  @media (max-width: 30rem) {
+    .hfd {
+      padding: 1.25rem 1rem 1rem;
+    }
   }
 
-  /* Responsive */
-  @media (max-width: 700px) {
-    .hf-flow { display: none; }
-    .hf-vertical { display: flex; flex-direction: column; }
-    .hf-wrap { padding: 1.25rem 1rem; }
+  /* Narrow figures (the layout follows the figure's width, not the window's): steps
+     top to bottom, arrows pointing down. */
+  @container hfd (max-width: 45.99rem) {
+    .hfd-steps {
+      --hfd-gap: 1.6rem;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Centered, clear of the number badge at the next step's top-left corner. */
+    .hfd-step:not(:last-child)::after {
+      top: auto;
+      right: auto;
+      bottom: calc(var(--hfd-gap) * -1 + 4px);
+      left: 50%;
+      width: 1px;
+      height: calc(var(--hfd-gap) - 8px);
+    }
+
+    .hfd-step:not(:last-child)::before {
+      top: auto;
+      right: auto;
+      bottom: calc(var(--hfd-gap) * -1 + 4px);
+      left: calc(50% - 3.5px);
+      transform: rotate(135deg);
+    }
   }
 </style>

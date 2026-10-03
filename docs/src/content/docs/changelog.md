@@ -22,6 +22,19 @@ head:
 
 ### Documentation
 
+- **New diagrams in the MCP guide.** "Where the queue lives" now reads left to
+  right: your AI client, the stdio or Streamable HTTP link, `bunqueue-mcp`
+  with its optional features, and a fork to the embedded and TCP modes with
+  what each keeps. The HTTP handler diagram shows a job in four numbered
+  steps, from added to completed or failed, in the job-state colors the
+  homepage uses, and states which methods send a body. Both follow dark and
+  light mode and stack vertically on phones. The guide now says that GET and
+  DELETE handlers send no body.
+- **The queue simulator looks like itself again.** The refreshed heading,
+  link and inline-code styles had reached inside the simulator, turning its
+  lane and panel titles into large page headings. The docs styles now skip
+  widgets and diagrams, as Starlight's own styles do, and a test keeps it
+  that way.
 - **AI agents on the homepage.** A new section below the Academy presents the
   MCP server's opt-in features (toolsets, confirmation of destructive calls,
   decision models) with the setup command, an example confirmation and the

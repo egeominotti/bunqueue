@@ -13,15 +13,15 @@
    character of body text is about 7.5px, so 56ch holds about 75 characters per line,
    inside the 65-80 range that reads comfortably. Code, tables, asides and diagrams
    keep the full column. */
-:root[data-has-sidebar] .sl-markdown-content > :is(p, ul, ol, blockquote, dl) {
+:root[data-has-sidebar] .sl-markdown-content > :is(p, ul, ol, blockquote, dl):not(.not-content) {
   max-width: 56ch;
 }
 
-:root[data-has-sidebar] .sl-markdown-content :is(p, li) {
+:root[data-has-sidebar] .sl-markdown-content :is(p, li):not(:where(.not-content *)) {
   line-height: 1.75;
 }
 
-:root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1) {
+:root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1:not(:where(.not-content *))) {
   font-family: var(--docs-display);
   font-size: clamp(2rem, 3.1vw, 2.9rem);
   line-height: 1.15;
@@ -30,7 +30,7 @@
   text-wrap: balance;
 }
 
-:root[data-has-sidebar] .sl-markdown-content h2 {
+:root[data-has-sidebar] .sl-markdown-content h2:not(:where(.not-content *)) {
   font-family: var(--docs-display);
   font-size: 1.85rem;
   line-height: 1.25;
@@ -39,7 +39,7 @@
   text-wrap: balance;
 }
 
-:root[data-has-sidebar] .sl-markdown-content h3 {
+:root[data-has-sidebar] .sl-markdown-content h3:not(:where(.not-content *)) {
   font-family: var(--docs-display);
   font-size: 1.3rem;
   line-height: 1.4;
@@ -47,7 +47,7 @@
   font-weight: 600;
 }
 
-:root[data-has-sidebar] .sl-markdown-content :is(h2, h3, h4) {
+:root[data-has-sidebar] .sl-markdown-content :is(h2, h3, h4):not(:where(.not-content *)) {
   scroll-margin-top: 100px;
 }
 
@@ -78,7 +78,7 @@
   color: var(--docs-accent);
 }
 
-:root[data-has-sidebar] .sl-markdown-content a:not([class]) {
+:root[data-has-sidebar] .sl-markdown-content a:not([class]):not(:where(.not-content *)) {
   color: var(--docs-accent);
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
@@ -189,7 +189,7 @@
   :root[data-has-sidebar] .bq-hero .bq-hero-sub {
     font-size: 1rem;
   }
-  :root[data-has-sidebar] .sl-markdown-content h2 {
+  :root[data-has-sidebar] .sl-markdown-content h2:not(:where(.not-content *)) {
     font-size: 1.55rem;
   }
   :root[data-has-sidebar] starlight-tabs [role='tab'] {

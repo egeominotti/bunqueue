@@ -152,7 +152,7 @@ An agent can add jobs, but it cannot run a worker. An **HTTP handler** fills tha
 
 <HttpHandlerFlow />
 
-`bunqueue_register_handler` takes the `queue`, the `url`, the `method` (`GET`, `POST`, `PUT` or `DELETE`), and optionally `headers`, a fixed `body` (by default the job's data is sent) and `timeoutMs` (default 30000, from 1000 to 120000). In TCP mode the handler processes your server's queue.
+`bunqueue_register_handler` takes the `queue`, the `url`, the `method` (`GET`, `POST`, `PUT` or `DELETE`), and optionally `headers`, a fixed `body` (POST and PUT send it, or the job's data when it is not set; GET and DELETE send no body) and `timeoutMs` (default 30000, from 1000 to 120000). In TCP mode the handler processes your server's queue.
 
 Use handlers when the work is a single HTTP call: polling an API, forwarding a webhook, a health check. For anything else, run a normal [Worker](/guide/worker/): the agent still adds and schedules the jobs.
 

@@ -2,13 +2,18 @@
    contrast element. Titles share the homepage's condensed Bricolage Grotesque. Callouts
    take the job-state colors the homepage ledger uses (a note is "delayed", a tip is
    "completed", a caution is "retry", danger is "failed"), and the brand pink marks only
-   where you are and what you can click. Loaded after the other docs styles, so equal
+   where you are and what you can click. Diagrams use the same --docs-state-* tokens
+   (waiting, active, delayed, retry, completed, failed). Every content rule below skips
+   blocks marked .not-content, as Starlight's own Markdown styles do, so a diagram or
+   widget keeps its own typography. Loaded after the other docs styles, so equal
    selectors here win. */
 
 :root {
   --docs-code-bg: #111114;
   --docs-hover: #1b1b20;
   --docs-radius: 10px;
+  --docs-state-waiting: #a1a1aa;
+  --docs-state-active: #f472b6;
   --docs-state-delayed: #a5b4fc;
   --docs-state-completed: #5eead4;
   --docs-state-retry: #fbbf24;
@@ -18,6 +23,8 @@
 :root[data-theme='light'] {
   --docs-code-bg: #f7f7f9;
   --docs-hover: #f1f1f4;
+  --docs-state-waiting: #52525b;
+  --docs-state-active: #ba1c62;
   --docs-state-delayed: #4f46e5;
   --docs-state-completed: #0d6d65;
   --docs-state-retry: #b45309;
@@ -41,7 +48,7 @@ header.header {
   display: none;
 }
 
-:root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1) {
+:root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1:not(:where(.not-content *))) {
   font-family: var(--docs-display);
   font-stretch: 75%;
   font-weight: 760;
@@ -61,7 +68,7 @@ header.header {
   line-height: 1.6;
 }
 
-:root[data-has-sidebar] .sl-markdown-content h2 {
+:root[data-has-sidebar] .sl-markdown-content h2:not(:where(.not-content *)) {
   margin-top: 3rem;
   font-family: var(--docs-display);
   font-stretch: 75%;
@@ -71,7 +78,7 @@ header.header {
   letter-spacing: 0;
 }
 
-:root[data-has-sidebar] .sl-markdown-content h3 {
+:root[data-has-sidebar] .sl-markdown-content h3:not(:where(.not-content *)) {
   font-family: var(--sl-font-system);
   font-size: 1.15rem;
   font-weight: 650;
@@ -79,16 +86,16 @@ header.header {
 }
 
 /* Links: pink, with a quiet underline that fills on hover. */
-:root[data-has-sidebar] .sl-markdown-content a:not([class]) {
+:root[data-has-sidebar] .sl-markdown-content a:not([class]):not(:where(.not-content *)) {
   text-decoration-color: color-mix(in srgb, var(--docs-accent) 40%, transparent);
 }
 
-:root[data-has-sidebar] .sl-markdown-content a:not([class]):hover {
+:root[data-has-sidebar] .sl-markdown-content a:not([class]):not(:where(.not-content *)):hover {
   text-decoration-color: currentColor;
 }
 
 /* Inline code reads as text: neutral color on a soft chip, no border. */
-:root[data-has-sidebar] .sl-markdown-content :not(pre) > code {
+:root[data-has-sidebar] .sl-markdown-content :not(pre) > code:not(:where(.not-content *)) {
   padding: 0.12em 0.36em;
   border: 0;
   border-radius: 5px;
@@ -97,8 +104,8 @@ header.header {
   font-size: 0.87em;
 }
 
-:root[data-has-sidebar] .sl-markdown-content a :not(pre) > code,
-:root[data-has-sidebar] .sl-markdown-content a > code {
+:root[data-has-sidebar] .sl-markdown-content a :not(pre) > code:not(:where(.not-content *)),
+:root[data-has-sidebar] .sl-markdown-content a > code:not(:where(.not-content *)) {
   color: inherit;
 }
 
@@ -138,12 +145,12 @@ header.header {
   border-radius: var(--docs-radius);
 }
 
-:root[data-has-sidebar] .sl-markdown-content table th {
+:root[data-has-sidebar] .sl-markdown-content table th:not(:where(.not-content *)) {
   color: var(--docs-muted);
   font-size: 0.78rem;
 }
 
-:root[data-has-sidebar] .sl-markdown-content thead:not(:has(th:not(:empty))) {
+:root[data-has-sidebar] .sl-markdown-content thead:not(:has(th:not(:empty))):not(:where(.not-content *)) {
   display: none;
 }
 
@@ -231,10 +238,10 @@ nav.sidebar ul ul a:hover {
 }
 
 @media (max-width: 49.99rem) {
-  :root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1) {
+  :root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1:not(:where(.not-content *))) {
     font-size: 2.6rem;
   }
-  :root[data-has-sidebar] .sl-markdown-content h2 {
+  :root[data-has-sidebar] .sl-markdown-content h2:not(:where(.not-content *)) {
     font-size: 1.85rem;
   }
 }

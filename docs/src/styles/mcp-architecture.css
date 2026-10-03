@@ -1,0 +1,299 @@
+/* McpArchitecture.astro on /guide/mcp/. Global: every class starts with mcpd. The figure
+   is .not-content and its own query container: the layout follows the figure's width. */
+
+.mcpd {
+  container: mcpd / inline-size;
+  margin: 2rem 0;
+  padding: 1.5rem;
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--sl-color-text) 9%, transparent) 1px, transparent 0)
+      0 0 / 18px 18px,
+    var(--sl-color-bg);
+}
+
+.mcpd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5rem minmax(0, 1.05fr) 2.5rem minmax(0, 1.25fr);
+  align-items: center;
+}
+
+.mcpd-grid > *,
+.mcpd-modes > li,
+.mcpd-chips > li {
+  margin: 0;
+}
+
+.mcpd-node {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  background: var(--docs-panel);
+}
+
+.mcpd-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--docs-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.mcpd-title {
+  color: var(--sl-color-text);
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.mcpd-note {
+  color: var(--docs-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.mcpd.not-content :not(pre) > code {
+  padding: 0.05em 0.35em;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sl-color-text) 8%, transparent);
+  color: var(--sl-color-text);
+  font-size: 0.85em;
+}
+
+/* The page's subject: the only brand-colored node. */
+.mcpd-server {
+  border-color: color-mix(in srgb, var(--docs-accent) 55%, var(--docs-line));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--docs-accent) 9%, transparent);
+}
+
+.mcpd-server .mcpd-kicker {
+  color: var(--docs-accent);
+  font-family: var(--sl-font-mono);
+}
+
+.mcpd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mcpd-chips .mcpd-chips-label {
+  border: 0;
+  color: var(--docs-muted);
+  font-style: italic;
+}
+
+.mcpd-chips li {
+  padding: 0.1rem 0.45rem;
+  border: 1px dashed color-mix(in srgb, var(--docs-muted) 55%, transparent);
+  border-radius: 999px;
+  color: var(--docs-muted);
+  font-size: 0.72rem;
+}
+
+/* Client to server: a labelled wire, arrowheads at both ends. */
+.mcpd-link {
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 0 0.5rem;
+  text-align: center;
+}
+
+.mcpd-link-label {
+  align-self: end;
+  color: var(--sl-color-text);
+  font-family: var(--sl-font-mono);
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.mcpd-link-sub {
+  color: var(--docs-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.68rem;
+}
+
+.mcpd-wire {
+  position: relative;
+  width: 100%;
+  height: 1px;
+  background: var(--docs-muted);
+}
+
+.mcpd-wire::before,
+.mcpd-wire::after {
+  content: '';
+  position: absolute;
+  top: -3.5px;
+  width: 8px;
+  height: 8px;
+  border-top: 1px solid var(--docs-muted);
+  border-right: 1px solid var(--docs-muted);
+}
+
+.mcpd-wire::after {
+  right: 0;
+  transform: rotate(45deg);
+}
+
+.mcpd-wire::before {
+  left: 0;
+  transform: rotate(-135deg);
+}
+
+/* Server to modes: a stem, then a bar and branches drawn on the card list itself. */
+.mcpd-fork {
+  position: relative;
+  align-self: stretch;
+}
+
+.mcpd-fork > span {
+  position: absolute;
+  background: var(--docs-muted);
+}
+
+.mcpd-fork-stem {
+  top: 50%;
+  left: 0;
+  width: 50%;
+  height: 1px;
+}
+
+.mcpd-fork-bar { display: none; }
+
+.mcpd-modes {
+  --mcpd-gap: 0.75rem;
+  --mcpd-reach: 1.25rem;
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--mcpd-gap);
+  padding: 0;
+  list-style: none;
+}
+
+.mcpd-modes::before {
+  content: '';
+  position: absolute;
+  top: calc((100% - var(--mcpd-gap)) / 4);
+  bottom: calc((100% - var(--mcpd-gap)) / 4);
+  left: calc(var(--mcpd-reach) * -1);
+  width: 1px;
+  background: var(--docs-muted);
+}
+
+.mcpd-modes > li {
+  position: relative;
+  justify-content: center;
+}
+
+.mcpd-modes > li::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: calc(var(--mcpd-reach) * -1 - 1px);
+  width: var(--mcpd-reach);
+  height: 1px;
+  background: var(--docs-muted);
+}
+
+.mcpd-default {
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--docs-state-completed) 16%, transparent);
+  color: var(--docs-state-completed);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 650;
+}
+
+/* Narrow screens: top to bottom, one spine on the left, a branch into each mode. */
+@container mcpd (max-width: 43.99rem) {
+  .mcpd-grid {
+    --mcpd-spine: calc(0.75rem - 0.5px);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .mcpd-link {
+    grid-template-rows: auto auto;
+    grid-template-columns: auto 1fr;
+    justify-items: start;
+    column-gap: 0.75rem;
+    row-gap: 0.1rem;
+    padding: 0 0 0 var(--mcpd-spine);
+    text-align: left;
+  }
+
+  .mcpd-wire {
+    grid-row: 1 / span 2;
+    grid-column: 1;
+    width: 1px;
+    height: 2.6rem;
+  }
+
+  .mcpd-link-sub {
+    align-self: start;
+  }
+
+  .mcpd-wire::before,
+  .mcpd-wire::after {
+    left: -3.5px;
+    right: auto;
+    top: auto;
+  }
+
+  .mcpd-wire::after {
+    bottom: 0;
+    transform: rotate(135deg);
+  }
+
+  .mcpd-wire::before {
+    top: 0;
+    transform: rotate(-45deg);
+  }
+
+  .mcpd-fork {
+    height: 0.9rem;
+  }
+
+  .mcpd-fork-stem {
+    display: none;
+  }
+
+  .mcpd-fork-bar {
+    display: block;
+    top: 0;
+    bottom: 0;
+    left: var(--mcpd-spine);
+    width: 1px;
+  }
+
+  .mcpd-modes {
+    padding-left: 1.75rem;
+  }
+
+  .mcpd-modes::before {
+    top: 0;
+    left: var(--mcpd-spine);
+  }
+
+  .mcpd-modes > li::before {
+    left: calc(var(--mcpd-spine) - 1.75rem);
+    width: calc(1.75rem - var(--mcpd-spine));
+  }
+}
+
+@media (max-width: 30rem) { .mcpd { padding: 1rem; } }

@@ -34,6 +34,7 @@ COPY --chown=bun:bun docs/src/data/firstJob.ts ./docs/src/data/firstJob.ts
 COPY --chown=bun:bun README.md ./README.md
 COPY --chown=bun:bun docs/src/lib/reference-seo.ts ./docs/src/lib/reference-seo.ts
 COPY --chown=bun:bun docs/src/lib/rehypeTableLabels.ts ./docs/src/lib/rehypeTableLabels.ts
+COPY --chown=bun:bun docs/src/styles/docs-theme.css docs/src/styles/docs-reading.css ./docs/src/styles/
 COPY --chown=bun:bun docs/vercel.json ./docs/vercel.json
 COPY --chown=bun:bun .github/workflows/ci.yml ./.github/workflows/ci.yml
 COPY --chown=bun:bun .github/workflows/sdk.yml ./.github/workflows/sdk.yml

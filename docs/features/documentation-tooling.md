@@ -273,6 +273,27 @@ come from `guide/mcp.mdx`; update both together. Its styles live in
 transcript's inline code outranks the site-wide inline-code chip in
 `custom.css`.
 
+`/guide/mcp/` has two diagrams, both plain HTML in reading order (no canvas or
+SVG text) inside a `.not-content` figure, drawn with the theme tokens
+(`--docs-line`, `--docs-panel`, `--docs-muted`, `--docs-accent`, and the
+`--docs-state-*` job-state palette) so they follow dark and light mode. Each
+figure is its own query container, so the layout follows the figure's width,
+not the window's (the content column is only about 500 to 700px wide between
+800 and 1280px windows): left to right from 44rem (architecture) or 46rem (handler
+flow), stacked below. `McpArchitecture.astro` shows where the queue
+lives: the AI client, the stdio or Streamable HTTP link, `bunqueue-mcp` (the only
+node in the brand color) and a fork to the embedded and TCP modes. The fork's
+bar and branches are drawn on the mode list itself so they meet the card centers
+at every width (on phones one spine on the left ends in a branch into each mode
+card); its styles are in `styles/mcp-architecture.css` (global, every class name
+starts with `mcpd`). `HttpHandlerFlow.astro` shows a handled job as four numbered
+steps with chips in the job-state palette (waiting, active, completed, failed).
+Their figures (75 tools, 3 prompts, 5 resources, port 6789, the HTTP methods,
+which methods send a body, `timeoutMs`) come from `guide/mcp.mdx` and
+`src/mcp/httpHandler.ts`; update them together. Inline code inside these
+figures is styled with `.<root>.not-content :not(pre) > code`, because
+`custom.css`'s global inline-code chip also reaches `.not-content` blocks.
+
 `HomeDashboard.astro`, below the agents section, introduces the separately
 released [bunqueue dashboard](https://github.com/egeominotti/bunqueue-dashboard):
 the 7:46 full-tour video in the click-to-load player (thumbnail
@@ -392,9 +413,15 @@ header; page titles and H2s in the homepage's condensed Bricolage Grotesque
 (`font-stretch: 75%`), without the hero eyebrow and with the title in one color;
 inline code as a neutral chip; callouts with one thin border and a faint wash in
 the homepage's job-state colors (note = delayed, tip = completed, caution =
-retry, danger = failed); a header row with no labels hidden; tabs, steps,
-pagination, the sidebar and the table of contents marking the current item with
-a pink rail. Code blocks are configured in `docs/ec.config.mjs`, not in
+retry, danger = failed), plus `--docs-state-waiting` and `--docs-state-active`
+so diagrams can show every job state; a header row with no labels hidden; tabs,
+steps, pagination, the sidebar and the table of contents marking the current
+item with a pink rail. Every rule in `docs-theme.css` and `docs-reading.css` that
+styles headings, paragraphs, links, inline code or tables inside
+`.sl-markdown-content` skips `.not-content` blocks, as Starlight's own Markdown
+styles do, so widgets such as the queue simulator keep their own typography;
+`test/docs-theme-not-content.test.ts` fails on any such rule without the
+exclusion. Code blocks are configured in `docs/ec.config.mjs`, not in
 `astro.config.mjs`: GitHub dark/light themes on the docs surface, shell blocks
 without the terminal window frame, and file names on a tab underlined in pink.
 They live there because their theme-aware style functions are not
