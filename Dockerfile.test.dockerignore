@@ -1,5 +1,6 @@
 *
 !package.json
+!README.md
 !bun.lock
 !bunfig.toml
 !tsconfig.json
@@ -34,8 +35,11 @@
 !docs/src/content/
 !docs/src/content/docs/
 !docs/src/content/docs/**
+!docs/src/data/
+!docs/src/data/firstJob.ts
 !docs/src/lib/
 !docs/src/lib/reference-seo.ts
+!docs/src/lib/rehypeTableLabels.ts
 !docs/src/lib/llms-full.ts
 !docs/src/components/
 !docs/src/components/examples/
@@ -60,6 +64,7 @@
 !sdk/typescript/tests/workers/
 !sdk/typescript/tests/workers/run.mjs
 !sdk/typescript/package.json
+!sdk/typescript/README.md
 !sdk/typescript/tsconfig.json
 !sdk/typescript/bun.lock
 !sdk/typescript/src/

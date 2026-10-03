@@ -1,0 +1,19 @@
+---
+// One part of the "first job" example for a runtime (src/data/firstJob.ts): the install
+// command, the file(s) to save, or the run command. The homepage quickstart and
+// /guide/quickstart/ both render through here, so they can never drift apart.
+import { Code } from '@astrojs/starlight/components';
+import { firstJobRuntime } from '../data/firstJob';
+
+interface Props {
+  runtime: string;
+  part: 'install' | 'files' | 'run';
+}
+
+const { runtime, part } = Astro.props;
+const example = firstJobRuntime(runtime);
+---
+
+{part === 'install' && <Code code={example.install} lang="bash" />}
+{part === 'files' && example.files.map((file) => <Code code={file.code} lang={file.lang} title={file.name} />)}
+{part === 'run' && <Code code={example.run} lang="bash" />}

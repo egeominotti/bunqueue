@@ -127,6 +127,16 @@ variable with the actual source in a fenced block. It fails the build if the
 import has no code destination or cannot be read, preventing an apparently
 complete dump from silently omitting executable examples.
 
+Pages follow the `ORDER` list in `docs/src/pages/llms-full.txt.ts`; pages it
+does not name are appended alphabetically after it. A section split into
+several pages lists them right after its hub: the TCP protocol overview
+(`api/tcp`) is followed by its eight command pages (`api/tcp/jobs`, `queries`,
+`control`, `dlq`, `cron`, `flows`, `monitoring`, `workers`). The overview keeps
+the wire format, connection, negotiation, pipelining, authentication, response
+format, connection lifecycle and limits, plus a command summary whose rows link
+to each command's section, so a new TCP command needs a section on its family
+page and a linked summary row.
+
 `docs/public/robots.txt` advertises the curated and full-text endpoints and the
 sitemap index. Astro's sitemap integration emits only canonical indexable
 routes, derives per-page `lastmod` values from Git history when available, and
@@ -171,7 +181,14 @@ Elixir) that connects to `127.0.0.1:6789`, adds one job and prints it from the
 worker, and "See it work" with the expected worker output. The Bun embedded path
 sets `embedded: true` on both clients. The SQLite server example binds to
 loopback and explicitly enables persistence; the embedded example describes its
-ephemeral default. The SDK programs target the released SDK packages
+ephemeral default. Every command and program of both paths comes from one
+module, `src/data/firstJob.ts` (install command, files and run command per
+runtime, plus the Docker and Bun CLI server commands and the health check), and
+is rendered by `components/FirstJobCode.astro`; `HomeDockerQuickstart.astro`
+builds its Docker variants from the same module. `/guide/quickstart/` renders the
+same examples at its top, so the header's "Get started" and the homepage's "Run
+your first job" lead to identical, tested files, and the README's quickstart
+repeats them verbatim. The SDK programs target the released SDK packages
 (constructor options, job data access, blocking `run`), except Elixir, which
 uses a path dependency on a bunqueue checkout until its Hex release. Every Go
 example on the site that indexes job data does it through
@@ -179,13 +196,16 @@ example on the site that indexes job data does it through
 v0.1.0 (`Data() map[string]any`) and v0.2.0 (`Data() any`); examples that pass
 `job.Data()` along whole compile against both as is. Recheck the programs when
 an SDK release changes its public API. `test/docs-homepage-snippets.test.ts`
-compiles both TypeScript quickstarts, so the page must keep exactly two
-`typescript` fences.
+checks that every runtime has an install command, files and a run command,
+compiles the two TypeScript programs (Deno and embedded Bun), and fails if the
+README's Bun and Node.js examples, or the `bunqueue-client` README's quick start
+(Docker and Bun CLI server commands, health check, Node.js file), drift from the
+module.
 
 `components/home/HomeHero.astro` owns the headline ("Add a background job in
 one language. Process it in another.", which keeps the primary keyword in the
-H1), the MIT link, a "New" announcement that jumps to the `#academy` section,
-the two calls to action and the three included-with-bunqueue facts.
+H1), the MIT link, two "New" announcements that jump to the `#academy` and `#agents`
+sections, the two calls to action and the three included-with-bunqueue facts.
 `HomeLedger.astro` renders the hero's simulated `orders` queue: five jobs, each
 added from one client language and processed by a worker in another, move
 through `waiting`, `delayed`, `active`, `retry` and `completed`. The
@@ -222,8 +242,10 @@ the sidebar and as "Academy" in the header) renders the full list through
 `components/academy/AcademyCourse.astro`, which also emits `ItemList` +
 `VideoObject` structured data for the released episodes.
 `components/academy/GuideEpisode.astro` places an episode under the hero of the
-guide it follows (introduction, quickstart, queue, worker, cron, DLQ and flow
-overviews) and renders nothing until that episode has a `videoId`.
+guide it follows (introduction, queue, worker, cron, DLQ and flow overviews) and
+renders nothing until that episode has a `videoId`. On `/guide/quickstart/` the
+episode follows the first job instead, as "Prefer to watch?", so the first
+command is visible without scrolling.
 
 All videos use `components/VideoPlayer.astro`, a click-to-load player: the page
 ships only the local thumbnail and a button, and the privacy-enhanced
@@ -236,7 +258,22 @@ also styles the captioned `.bq-video-figure` used under guide heroes. The play
 button's focus ring is drawn inside the clipped frame, overriding the homepage's
 outward focus offset so keyboard focus stays visible.
 
-`HomeDashboard.astro`, below the Academy section, introduces the separately
+`HomeAgents.astro`, below the Academy section (anchor `#agents`), presents the
+MCP server's opt-in agent features: the copy with a `claude mcp add` command that
+enables toolsets and confirmation, an example confirmation exchange (the agent's
+`bunqueue_obliterate_queue` call, the server's impact text, the user's decline and
+the `executed: false` refusal, all worded as the server words them), three
+columns keyed by the variable that turns each feature on
+(`BUNQUEUE_MCP_TOOLSETS`, `BUNQUEUE_MCP_CONFIRM`, `BUNQUEUE_MCP_DECISION_*`) and
+the supported decision models (Jev, Clef, Clef-flash, Kev 9B, Laya,
+DiffusionGemma Jev, with where each one runs). Its figures (75 tools, 11
+toolsets, 1,300 to 4,600 tokens instead of about 16,000, nine guarded tools)
+come from `guide/mcp.mdx`; update both together. Its styles live in
+`styles/home-agents.css`, whose selectors include `.home-agents` so the
+transcript's inline code outranks the site-wide inline-code chip in
+`custom.css`.
+
+`HomeDashboard.astro`, below the agents section, introduces the separately
 released [bunqueue dashboard](https://github.com/egeominotti/bunqueue-dashboard):
 the 7:46 full-tour video in the click-to-load player (thumbnail
 `public/dashboard/tour-thumbnail.jpg`), the `bunx bunqueue-dashboard` command
@@ -304,12 +341,12 @@ Native Starlight tabs and HTML disclosures provide keyboard interactions;
 theme tokens, visible focus states and reduced-motion rules cover both themes.
 The two setup choices fit without horizontal scrolling on narrow screens.
 
-`test/docs-homepage-snippets.test.ts` extracts the homepage's TypeScript fences
-and compiles each as an independent virtual module against the real public
-engine and network-client exports. This catches missing job payload types and
+`test/docs-homepage-snippets.test.ts` reads the first-job examples from
+`src/data/firstJob.ts` and compiles each TypeScript program as an independent
+virtual module against the real public engine and network-client exports. This catches missing job payload types and
 API drift without duplicating the examples. The unit validation image includes
-the TypeScript SDK source subtree for that check; it does not copy SDK caches
-or install an additional SDK dependency tree.
+the TypeScript SDK source subtree and its README for that check; it does not copy
+SDK caches or install an additional SDK dependency tree.
 
 Validate changes with the snippet regression, docs build/discovery checks and browser inspection
 of server/client tabs, embedded mode, FAQs, desktop/mobile layouts, and both
@@ -349,9 +386,41 @@ and verifies historical exclusion. See
 
 ## Shared documentation interface
 
-`Header.astro` owns the header links (Dashboard, Blog, Simulator, vs BullMQ and
-llms.txt); `MobileMenuFooter.astro` repeats them, except llms.txt, in the mobile
-drawer, so a new header link belongs in both. `Header.astro` also loads the
+`styles/docs-theme.css`, imported last by `Header.astro` together with the
+width axis of Bricolage Grotesque, sets the documentation's look: a translucent
+header; page titles and H2s in the homepage's condensed Bricolage Grotesque
+(`font-stretch: 75%`), without the hero eyebrow and with the title in one color;
+inline code as a neutral chip; callouts with one thin border and a faint wash in
+the homepage's job-state colors (note = delayed, tip = completed, caution =
+retry, danger = failed); a header row with no labels hidden; tabs, steps,
+pagination, the sidebar and the table of contents marking the current item with
+a pink rail. Code blocks are configured in `docs/ec.config.mjs`, not in
+`astro.config.mjs`: GitHub dark/light themes on the docs surface, shell blocks
+without the terminal window frame, and file names on a tab underlined in pink.
+They live there because their theme-aware style functions are not
+JSON-serializable and the `<Code>` component (used by `FirstJobCode.astro`)
+loads its options from that file. `inlineFirstJobCode` in `src/lib/llms-full.ts`
+expands `<FirstJobCode>`, the shared server commands and string-literal inline
+code into Markdown for `/llms-full.txt` and every page's Markdown twin
+(`/<slug>.md`, the "View Markdown" link), so those carry the code itself
+(`test/docs-llms-full.test.ts`).
+
+`Header.astro` owns the header links (Academy, AI Agents, Dashboard and Blog);
+`MobileMenuFooter.astro` repeats them in the mobile drawer, so a new header link
+belongs in both. "vs BullMQ" lives in the sidebar's Start Here group and the
+footer, the simulator in Resources and the footer, and `llms.txt`, which is for
+AI tools, in the footer's Docs column next to the MCP server.
+
+The sidebar (`astro.config.mjs`) is organized for a first-time reader in 11
+groups: Start Here (Quick Start first, with a "1 min" badge, then Introduction,
+Installation, the video course, Simple Mode, use cases, BullMQ migration and
+comparison, FAQ), Queue, Worker, Cron, Retries & Flows (Cron & Schedulers, Dead
+Letter Queue and Flow Producer as subgroups), Workflow Engine, AI Agents (MCP
+server and the agent integrations), SDKs & Integrations, Run in Production,
+Examples (the PostgreSQL multi-broker pages as a subgroup), Reference (with
+TCP Protocol, Performance and Internals subgroups) and Resources. Blog posts are listed on
+`/blog/` only. Regrouping never changes a page's URL; every other new page needs
+a sidebar entry. `Header.astro` also loads the
 shared navigation, reading and table styles from
 `docs-navigation.css`, `docs-reading.css` and `docs-tables.css`. They retain
 Starlight's search, sidebar persistence, tab synchronization, mobile drawer,
@@ -361,11 +430,32 @@ Language strips retain native scrolling without a permanent fade that masks
 the final selected tab; overflowing strips show a thin scrollbar.
 
 `DocsContext.astro` derives breadcrumbs from the current Starlight sidebar
-tree and links to the existing Markdown/MDX source route. `PageTitle.astro`
+tree and links to the existing Markdown/MDX source route. Blog posts are not in
+the sidebar (the sidebar links only the `/blog/` index), so for them it adds a
+"Blog" crumb that leads back to the post list. Below 50rem the source link and
+the hero eyebrow (which repeats the breadcrumb) are hidden, so the title starts
+higher on phones. `PageTitle.astro`
 renders the context above standard headings; `MarkdownContent.astro` renders
 it before pages with a custom hero. The homepage owns its single visible H1.
 Custom hero pages receive a visible `#_top` focus target so the skip link and
 overview anchor do not lead into Starlight's hidden title panel.
+
+`src/lib/rehypeTableLabels.ts`, registered as a rehype plugin on the Markdown
+processor (MDX inherits it), copies each column header's text onto the cells
+below it as `data-label` and gives the table explicit ARIA roles. Below 600px
+`docs-tables.css` turns every such table into one card per row: the first cell
+and the last one span the card, the cells in between sit two by two, each
+printing its column name above its value, and long identifiers wrap, so no
+reference table scrolls sideways on a phone; the visually hidden header row and
+the roles keep the table announced as a table. Tables with more than 40 rows
+(index tables such as the TCP command summary) get roles but no labels, so they
+stay tables that scroll sideways rather than a hundred cards.
+
+Paragraphs, lists, block quotes and definition lists in guides are capped at
+`56ch`. With Inter at 16px a `ch` (the width of "0") is about 10.1px while an
+average character of body text is about 7.5px, so the cap holds about 75
+characters per line; code blocks, tables, asides and diagrams keep the full
+column.
 
 `DocsTables.astro` wraps authored tables in scroll regions without changing
 their table semantics. Only overflowing regions become focusable landmarks,
@@ -377,6 +467,24 @@ Introduction and installation copy explicitly separate the Bun engine from
 client runtimes and link new readers to the server/embedded setup choices.
 Verify shared changes on guide, SDK, API and blog pages in both themes, with
 keyboard navigation, wide tables, search, and a narrow mobile viewport.
+
+`src/styles/custom.css` is the site-wide stylesheet registered as Starlight
+`customCss`. Besides the theme tokens and Starlight overrides it holds the
+`bq-*` primitives that authored pages and scripts use directly: the page hero
+and wrapper, the `bq-diag-*` diagrams, cards and bar charts, blog cards, the
+`bq-cl-*` changelog feed built by `public/bq-changelog.js`, the tooltip layer of
+`public/bq-inter.js`, the `bq-sim-*` workflow simulations and the
+`hp-code-window` terminal frame of the workflow guides. The rules of earlier
+homepage designs (the bento, stats, mode, feature and call-to-action sections
+of the `hp-*` landing page with its `sc-*` syntax colors, the hero grid and
+benchmark card, the first queue simulator's lanes, the step list, and the
+terminal, language, trust and vs-BullMQ cards) were removed once no page,
+component or script referenced their classes. Before deleting a rule as unused,
+search for its class in `docs/src`, `docs/public`, `docs/scripts` and
+`astro.config.mjs`, in class names built at runtime (template literals in
+components, `classList` calls in `public/*.js`) and in the markup that Starlight,
+Expressive Code and Pagefind generate (`sl-*`, `ec-*`, `pagefind-ui__*`, `hero`,
+`card`); a class inside `:not()` does not make a selector dead.
 
 ## Release checks
 

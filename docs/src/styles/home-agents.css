@@ -1,0 +1,266 @@
+/* AI agents: copy and setup command beside an example confirmation, then the three opt-in
+   features and the supported decision models. */
+.bq-home .home-agents {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 48px 64px;
+}
+
+.bq-home .home-agents-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  color: var(--home-accent);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.home-agents-badge span {
+  padding-left: 12px;
+  border-left: 1px solid var(--home-line);
+  color: var(--home-muted);
+  font-weight: 400;
+}
+
+.bq-home .home-agents-copy h2 + p {
+  max-width: 48ch;
+  margin-top: 20px;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.bq-home .home-agents-command {
+  margin: 28px 0 0;
+  padding: 14px 18px;
+  overflow-x: auto;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  background: var(--home-surface);
+  color: var(--sl-color-text);
+  font: 0.9rem/1.6 var(--bq-mono);
+}
+
+.home-agents-command span {
+  color: var(--home-muted);
+  user-select: none;
+}
+
+.bq-home .home-agents-command code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  white-space: pre;
+}
+
+.bq-home .home-agents-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-top: 28px;
+}
+
+.bq-home .home-agents-actions .home-text-link {
+  margin-top: 0;
+}
+
+/* Example exchange: who speaks on the left rail, what they say on the right. */
+.bq-home .home-agents-example {
+  margin: 0;
+}
+
+.home-agents-transcript {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  background: var(--home-surface);
+}
+
+.bq-home .home-agents-transcript li {
+  --who: var(--state-delayed);
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0;
+  padding: 16px 20px;
+}
+
+.bq-home .home-agents-transcript li + li {
+  border-top: 1px solid var(--home-line);
+}
+
+.home-agents-transcript li[data-role='server'] { --who: var(--home-accent); }
+.home-agents-transcript li[data-role='you'] { --who: var(--state-completed); }
+
+.home-agents-who {
+  grid-row: span 2;
+  color: var(--who);
+  font: 600 0.8rem var(--bq-mono);
+  line-height: 1.7;
+}
+
+.bq-home .home-agents-transcript :is(p, code) {
+  grid-column: 2;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* .home-agents in the selector outranks the site-wide inline-code chip (custom.css). */
+.bq-home .home-agents .home-agents-transcript code {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sl-color-text);
+  font-family: var(--bq-mono);
+  overflow-wrap: anywhere;
+}
+
+.bq-home .home-agents .home-agents-transcript p code {
+  margin-right: 6px;
+  color: var(--home-accent);
+}
+
+.bq-home .home-agents-transcript .home-agents-ask {
+  color: var(--sl-color-text);
+  font-weight: 600;
+}
+
+.home-agents-choice {
+  display: inline-block;
+  padding: 2px 12px;
+  border: 1px solid var(--who);
+  border-radius: 999px;
+  color: var(--sl-color-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.bq-home .home-agents-example figcaption {
+  margin-top: 12px;
+  color: var(--home-muted);
+  font-size: 0.84rem;
+}
+
+.bq-home .home-agents-example figcaption code {
+  overflow-wrap: anywhere;
+}
+
+/* Three opt-in features, each labelled by the variable that turns it on. */
+.home-agents-features {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--home-line);
+}
+
+.bq-home .home-agents-features li {
+  margin: 0;
+  padding: 26px 28px 0 0;
+}
+
+.bq-home .home-agents-features li + li {
+  padding-left: 28px;
+  border-left: 1px solid var(--home-line);
+}
+
+.bq-home .home-agents .home-agents-variable {
+  display: inline-block;
+  margin-bottom: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--home-accent);
+  font: 600 0.8rem var(--bq-mono);
+  overflow-wrap: anywhere;
+}
+
+.bq-home .home-agents-features p {
+  margin-top: 10px;
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+
+/* Supported models: names first, where each one runs underneath. */
+.home-agents-models {
+  grid-column: 1 / -1;
+}
+
+.bq-home .home-agents-models-label {
+  margin-bottom: 14px;
+  color: var(--sl-color-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.home-agents-models ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bq-home .home-agents-models li {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  background: var(--home-surface);
+}
+
+.home-agents-models strong {
+  color: var(--sl-color-text);
+  font-family: var(--home-display);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.home-agents-models li span {
+  color: var(--home-muted);
+  font-size: 0.8rem;
+}
+
+.bq-home .home-agents-models .home-note {
+  margin-top: 16px;
+}
+
+@media (max-width: 1024px) {
+  .bq-home .home-agents {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .bq-home .home-agents {
+    gap: 32px;
+  }
+  .home-agents-features {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bq-home .home-agents-features li,
+  .bq-home .home-agents-features li + li {
+    padding: 20px 0 0;
+    border-left: 0;
+  }
+  .bq-home .home-agents-transcript li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-agents-who {
+    grid-row: auto;
+  }
+  .bq-home .home-agents-transcript :is(p, code) {
+    grid-column: 1;
+  }
+}

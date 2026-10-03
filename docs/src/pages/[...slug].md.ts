@@ -1,11 +1,15 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
 import { getCollection } from 'astro:content';
+import { inlineFirstJobCode } from '../lib/llms-full';
 
 /**
  * Raw markdown-source twin of every doc page, served at `/<slug>.md`, for AI
  * crawlers and agents that prefer the source over rendered HTML+nav (GEO). The
  * body is the page's authored markdown/MDX verbatim (imports and JSX included
- * on .mdx pages). Companion to /llms.txt (curated index) and /llms-full.txt.
+ * on .mdx pages), except that the shared first-job examples (FirstJobCode and the
+ * server commands from src/data/firstJob.ts) are expanded into code fences, since a
+ * reader copying the page needs the code itself. Companion to /llms.txt (curated
+ * index) and /llms-full.txt.
  */
 const SITE = 'https://bunqueue.dev';
 
@@ -23,7 +27,7 @@ export const GET: APIRoute = async ({ props }) => {
     `# ${e.data.title}\n\n` +
     (e.data.description ? `${e.data.description}\n\n` : '') +
     `Canonical: ${url}\n\n---\n\n`;
-  return new Response(front + (e.body ?? ''), {
+  return new Response(front + inlineFirstJobCode(e.body ?? ''), {
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
   });
 };

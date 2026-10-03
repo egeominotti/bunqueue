@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { inlineRawCodeImports } from '../lib/llms-full';
+import { inlineFirstJobCode, inlineRawCodeImports } from '../lib/llms-full';
 
 /**
  * Full-text dump of the docs for LLM grounding (https://llmstxt.org/).
@@ -38,6 +38,14 @@ const ORDER = [
   'guide/env-vars',
   'api/http',
   'api/tcp',
+  'api/tcp/jobs',
+  'api/tcp/queries',
+  'api/tcp/control',
+  'api/tcp/dlq',
+  'api/tcp/cron',
+  'api/tcp/flows',
+  'api/tcp/monitoring',
+  'api/tcp/workers',
   'api/types',
   'guide/cron',
   'guide/backup',
@@ -120,8 +128,10 @@ export const GET: APIRoute = async () => {
   const sections = await Promise.all(
     pages.map(async (e) => {
       const desc = e.data.description ? `${e.data.description}\n` : '';
-      const raw = await inlineRawCodeImports(e.body ?? '', (specifier) =>
-        loadRawSource(e.filePath, specifier)
+      const raw = inlineFirstJobCode(
+        await inlineRawCodeImports(e.body ?? '', (specifier) =>
+          loadRawSource(e.filePath, specifier)
+        )
       );
       return `\n\n---\n\n# ${e.data.title}\n${desc}URL: ${urlFor(e.id)}\n\n${raw}`;
     })

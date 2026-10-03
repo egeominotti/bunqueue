@@ -1,5 +1,6 @@
 ---
 import { Code, Tabs, TabItem } from '@astrojs/starlight/components';
+import { SERVER_HEALTH_CHECK, dockerRunCommand } from '../../data/firstJob';
 
 const variants = [
   { label: 'Alpine', tag: 'alpine', description: 'The default: a compact musl base with a shell and apk.' },
@@ -7,12 +8,6 @@ const variants = [
   { label: 'Slim', tag: 'slim', description: 'Debian with glibc, a shell and apt, with fewer bundled utilities.' },
   { label: 'Distroless', tag: 'distroless', description: 'Required runtime libraries only. No shell or package manager.' },
 ];
-const command = (tag: string) => `docker run -d --name bunqueue \\
-  --restart unless-stopped \\
-  -p 127.0.0.1:6789:6789 \\
-  -p 127.0.0.1:6790:6790 \\
-  -v bunqueue-data:/app/data \\
-  egeominotti/bunqueue:${tag}`;
 ---
 
 <div class="home-docker-quickstart">
@@ -22,13 +17,13 @@ const command = (tag: string) => `docker run -d --name bunqueue \\
       {variants.map(({ label, tag, description }) => (
         <TabItem label={label}>
           <p class="home-note">{description} Same bunqueue features on AMD64 and ARM64.</p>
-          <Code code={command(tag)} lang="bash" />
+          <Code code={dockerRunCommand(tag)} lang="bash" />
         </TabItem>
       ))}
     </Tabs>
   </div>
   <p class="home-step-lead">Check that the server is ready:</p>
-  <Code code="curl --fail http://127.0.0.1:6790/health" lang="bash" />
+  <Code code={SERVER_HEALTH_CHECK} lang="bash" />
   <p class="home-note">Ports stay local to your machine. SQLite data persists in the <code>bunqueue-data</code> volume when you replace the container. Run one variant at a time. These tags follow new releases; pin a version or digest for deployment.</p>
 </div>
 

@@ -1,0 +1,240 @@
+/* Documentation theme. A quiet frame around the content, with code as the highest-
+   contrast element. Titles share the homepage's condensed Bricolage Grotesque. Callouts
+   take the job-state colors the homepage ledger uses (a note is "delayed", a tip is
+   "completed", a caution is "retry", danger is "failed"), and the brand pink marks only
+   where you are and what you can click. Loaded after the other docs styles, so equal
+   selectors here win. */
+
+:root {
+  --docs-code-bg: #111114;
+  --docs-hover: #1b1b20;
+  --docs-radius: 10px;
+  --docs-state-delayed: #a5b4fc;
+  --docs-state-completed: #5eead4;
+  --docs-state-retry: #fbbf24;
+  --docs-state-failed: #fb7185;
+}
+
+:root[data-theme='light'] {
+  --docs-code-bg: #f7f7f9;
+  --docs-hover: #f1f1f4;
+  --docs-state-delayed: #4f46e5;
+  --docs-state-completed: #0d6d65;
+  --docs-state-retry: #b45309;
+  --docs-state-failed: #be123c;
+}
+
+/* Header: translucent, so the page reads through it while scrolling. */
+header.header {
+  background-color: color-mix(in srgb, var(--sl-color-bg) 84%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+}
+
+/* Page title: the breadcrumb already says where you are, so no eyebrow above it, and
+   the title is one color. */
+:root[data-has-sidebar] .bq-hero {
+  padding: 4px 0 24px;
+}
+
+:root[data-has-sidebar] .bq-hero .bq-eyebrow {
+  display: none;
+}
+
+:root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1) {
+  font-family: var(--docs-display);
+  font-stretch: 75%;
+  font-weight: 760;
+  font-size: clamp(2.6rem, 4.2vw, 3.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.005em;
+}
+
+:root[data-has-sidebar] .bq-hero-h1 em {
+  color: inherit;
+  font-style: normal;
+}
+
+:root[data-has-sidebar] .bq-hero .bq-hero-sub {
+  margin-top: 16px;
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+:root[data-has-sidebar] .sl-markdown-content h2 {
+  margin-top: 3rem;
+  font-family: var(--docs-display);
+  font-stretch: 75%;
+  font-weight: 740;
+  font-size: 2.1rem;
+  line-height: 1.04;
+  letter-spacing: 0;
+}
+
+:root[data-has-sidebar] .sl-markdown-content h3 {
+  font-family: var(--sl-font-system);
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+/* Links: pink, with a quiet underline that fills on hover. */
+:root[data-has-sidebar] .sl-markdown-content a:not([class]) {
+  text-decoration-color: color-mix(in srgb, var(--docs-accent) 40%, transparent);
+}
+
+:root[data-has-sidebar] .sl-markdown-content a:not([class]):hover {
+  text-decoration-color: currentColor;
+}
+
+/* Inline code reads as text: neutral color on a soft chip, no border. */
+:root[data-has-sidebar] .sl-markdown-content :not(pre) > code {
+  padding: 0.12em 0.36em;
+  border: 0;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--sl-color-text) 8%, transparent);
+  color: var(--sl-color-text);
+  font-size: 0.87em;
+}
+
+:root[data-has-sidebar] .sl-markdown-content a :not(pre) > code,
+:root[data-has-sidebar] .sl-markdown-content a > code {
+  color: inherit;
+}
+
+/* Callouts: one thin border and a faint wash in the job-state color, title in that color. */
+:root[data-has-sidebar] .starlight-aside {
+  --docs-aside: var(--docs-state-delayed);
+  padding: 0.95rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--docs-aside) 34%, var(--docs-line));
+  border-radius: var(--docs-radius);
+  background: color-mix(in srgb, var(--docs-aside) 7%, var(--sl-color-bg));
+}
+
+:root[data-has-sidebar] .starlight-aside--tip {
+  --docs-aside: var(--docs-state-completed);
+}
+
+:root[data-has-sidebar] .starlight-aside--caution {
+  --docs-aside: var(--docs-state-retry);
+}
+
+:root[data-has-sidebar] .starlight-aside--danger {
+  --docs-aside: var(--docs-state-failed);
+}
+
+:root[data-has-sidebar] .starlight-aside__title {
+  color: var(--docs-aside);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+:root[data-has-sidebar] .starlight-aside__icon {
+  color: var(--docs-aside);
+}
+
+/* Tables: rounded frame, small muted headers; a header row with no labels is hidden. */
+:root[data-has-sidebar] .sl-markdown-content .docs-table-scroll {
+  border-radius: var(--docs-radius);
+}
+
+:root[data-has-sidebar] .sl-markdown-content table th {
+  color: var(--docs-muted);
+  font-size: 0.78rem;
+}
+
+:root[data-has-sidebar] .sl-markdown-content thead:not(:has(th:not(:empty))) {
+  display: none;
+}
+
+/* Steps: quiet numbered dots on a hairline. */
+:root[data-has-sidebar] .sl-steps > li::before {
+  border: 1px solid var(--docs-line);
+  background-color: var(--docs-panel);
+  color: var(--sl-color-text);
+  font-weight: 600;
+}
+
+:root[data-has-sidebar] .sl-steps > li::after {
+  background-color: var(--docs-line);
+}
+
+/* Tabs: the selected tab is the readable one, underlined in pink. */
+:root[data-has-sidebar] starlight-tabs [role='tab'] {
+  color: var(--docs-muted);
+}
+
+:root[data-has-sidebar] starlight-tabs [role='tab'][aria-selected='true'] {
+  color: var(--sl-color-text);
+  border-color: var(--docs-accent);
+}
+
+/* Sidebar: readable groups, muted pages, the current page marked by a pink rail. */
+nav.sidebar .top-level > li {
+  margin-bottom: 2px;
+}
+
+nav.sidebar .top-level > li > details > summary,
+nav.sidebar .top-level > li > a {
+  padding: 7px 10px;
+  border-radius: 8px;
+}
+
+nav.sidebar .group-label .large {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+nav.sidebar ul ul a {
+  padding: 6px 12px;
+  font-size: 0.86rem;
+}
+
+nav.sidebar a[aria-current='page'] {
+  color: var(--sl-color-text);
+  background: var(--docs-hover);
+  border-left: 0;
+  box-shadow: inset 2px 0 0 var(--docs-accent);
+  padding-left: 12px;
+  font-weight: 600;
+}
+
+nav.sidebar summary:hover,
+nav.sidebar ul ul a:hover {
+  color: var(--sl-color-text);
+  background: var(--docs-hover);
+}
+
+/* On this page: a hairline guide with the current section marked in pink. */
+.right-sidebar starlight-toc a {
+  padding: 5px 12px;
+  border-left: 1px solid var(--docs-line);
+}
+
+.right-sidebar starlight-toc a[aria-current='true'] {
+  color: var(--sl-color-text);
+  background: none;
+  border-left: 2px solid var(--docs-accent);
+  padding-left: 11px;
+}
+
+/* Previous/next links at the end of a page. */
+:root[data-has-sidebar] .pagination-links a {
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  box-shadow: none;
+}
+
+:root[data-has-sidebar] .pagination-links a:hover {
+  border-color: color-mix(in srgb, var(--docs-accent) 50%, var(--docs-line));
+  background: var(--docs-hover);
+}
+
+@media (max-width: 49.99rem) {
+  :root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1) {
+    font-size: 2.6rem;
+  }
+  :root[data-has-sidebar] .sl-markdown-content h2 {
+    font-size: 1.85rem;
+  }
+}

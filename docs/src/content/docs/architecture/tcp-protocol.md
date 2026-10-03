@@ -214,7 +214,7 @@ Token comparison uses constant-time algorithm to prevent timing attacks.
 `GetGroupJobsCount`, `GetGroupsJobsCount`, and `GetGroupActiveCount` expose
 server-authoritative depth. `Set/Get/RemoveGroupRateLimit`,
 `GetGroupRateLimitTtl`, and `Set/Get/RemoveGroupConcurrency` manage local group
-overrides. Results are wrapped in `data`; see the [wire reference](/api/tcp/)
+overrides. Results are wrapped in `data`; see the [wire reference](/api/tcp/control/#job-group-controls-and-getters)
 for exact shapes.
 
 ### Control Commands

@@ -19,9 +19,11 @@ The TypeScript SDK (`bunqueue-client` 0.2.0) ships the canonical
 `bunqueue/client` API as its default entry, a breaking change from 0.1.x; the
 0.1.x API stays unchanged at `bunqueue-client/legacy`, and
 `sdk/typescript/README.md#migrating-from-01x` is the migration guide. The
-package has one runtime dependency (`msgpackr`), no top-level `await` (CommonJS
-bundlers accept it), and self-contained declarations that need only the
-consumer's `@types/node`. See [Canonical client parity](client-runtime-parity.md)
+package is ESM-only (`require()` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`), has
+one runtime dependency (`msgpackr`), no top-level `await` (CommonJS bundlers such
+as `esbuild --format=cjs` accept it), and self-contained declarations that need
+only the consumer's `@types/node`. Its README opens with the same tested quick
+start as the docs (`test/docs-homepage-snippets.test.ts`). See [Canonical client parity](client-runtime-parity.md)
 for the portable transport, embedded loader, and declaration gates.
 
 ### Release state

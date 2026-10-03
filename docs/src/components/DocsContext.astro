@@ -16,12 +16,16 @@ function currentPath(entries: SidebarEntry[]): SidebarEntry[] {
 const trail = currentPath(sidebar);
 const currentLabel = trail.at(-1)?.label ?? entry.data.title;
 const groups = trail.filter((item) => item.type === 'group');
+// Blog posts are reached from /blog/ and the header, not from the sidebar, so their
+// trail is empty: lead back to the post list instead of jumping from Docs to the title.
+const blogPost = trail.length === 0 && id.startsWith('blog/');
 ---
 
 <div class="docs-context">
   <nav aria-label="Breadcrumb">
     <ol>
       <li><a href="/guide/introduction/">Docs</a></li>
+      {blogPost && <li><a href="/blog/">Blog</a></li>}
       {groups.map((group) => <li><span>{group.label}</span></li>)}
       <li><span aria-current="page" title={currentLabel}>{currentLabel}</span></li>
     </ol>

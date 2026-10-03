@@ -87,3 +87,87 @@
     font-size: 0.83rem;
   }
 }
+
+/* Phones: a reference table becomes one card per row. Every cell prints its column
+   name (data-label, added at build time by src/lib/rehypeTableLabels.ts) above its
+   value, so nothing scrolls sideways. The header row stays in the accessibility tree,
+   visually hidden, and the plugin's explicit ARIA roles keep the table semantics that
+   `display: block` would otherwise drop. The `/ ''` alternative text keeps screen
+   readers from announcing the printed label on top of the column header. */
+@media (max-width: 37.49rem) {
+  .sl-markdown-content .docs-table-scroll:has(td[data-label]) {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  .sl-markdown-content table:has(td[data-label]),
+  .sl-markdown-content .docs-table-scroll > table:has(td[data-label]),
+  .sl-markdown-content table:has(td[data-label]) tbody {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* A row is a two-column grid: the first cell (the name) and the last one (usually the
+     description) span the card, short values in between sit side by side. */
+  .sl-markdown-content table:has(td[data-label]) tbody tr {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 12px;
+  }
+
+  .sl-markdown-content table:has(td[data-label]) td {
+    display: block !important;
+    min-width: 0 !important;
+  }
+
+  .sl-markdown-content table:has(td[data-label]) td:is(:first-child, :last-child) {
+    grid-column: 1 / -1;
+  }
+
+  .sl-markdown-content table:has(td[data-label]) thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sl-markdown-content table:has(td[data-label]) tbody tr {
+    margin-bottom: 10px;
+    padding: 6px 0;
+    border: 1px solid var(--docs-line);
+    border-radius: 8px;
+    background: none !important;
+  }
+
+  .sl-markdown-content table:has(td[data-label]) td {
+    padding: 4px 14px !important;
+    border: 0 !important;
+    background: none !important;
+    line-height: 1.5;
+  }
+
+  .sl-markdown-content table:has(td[data-label]) td:first-child {
+    font-weight: 600;
+  }
+
+  /* A card has no horizontal scroll to fall back on, so long identifiers wrap. */
+  .sl-markdown-content .docs-table-scroll table:has(td[data-label]) td code,
+  .sl-markdown-content table:has(td[data-label]) td code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .sl-markdown-content table:has(td[data-label]) td[data-label]:not([data-label=''])::before {
+    content: attr(data-label);
+    content: attr(data-label) / '';
+    display: block;
+    color: var(--docs-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+}

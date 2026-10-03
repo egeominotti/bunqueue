@@ -3,6 +3,8 @@ import config from 'virtual:starlight/user-config';
 import '../styles/docs-navigation.css';
 import '../styles/docs-reading.css';
 import '../styles/docs-tables.css';
+import '../styles/docs-theme.css';
+import '@fontsource-variable/bricolage-grotesque/wdth.css';
 
 import LanguageSelect from 'virtual:starlight/components/LanguageSelect';
 import Search from 'virtual:starlight/components/Search';
@@ -16,13 +18,13 @@ import ThemeSelect from 'virtual:starlight/components/ThemeSelect';
 const shouldRenderSearch =
 	config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
 
+// Four destinations people come for. vs BullMQ and the simulator live in the sidebar
+// and the footer; llms.txt, which is for AI tools, lives in the footer.
 const navLinks = [
 	{ label: 'Academy', href: '/academy/' },
+	{ label: 'AI Agents', href: '/guide/mcp/' },
 	{ label: 'Dashboard', href: '/guide/dashboard/' },
 	{ label: 'Blog', href: '/blog/' },
-	{ label: 'Simulator', href: '/simulator/' },
-	{ label: 'vs BullMQ', href: '/guide/comparison/' },
-	{ label: 'llms.txt', href: '/llms.txt' },
 ];
 
 const { pathname } = Astro.url;

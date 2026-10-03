@@ -36,11 +36,17 @@ import HomeDockerQuickstart from '@components/home/HomeDockerQuickstart.astro';
 import HomeUsedBy from '@components/home/HomeUsedBy.astro';
 import HomeDashboard from '@components/home/HomeDashboard.astro';
 import HomeAcademy from '@components/home/HomeAcademy.astro';
+import FirstJobCode from '@components/FirstJobCode.astro';
+import { Code } from '@astrojs/starlight/components';
+import { BUN_CLI_SERVER } from '../../data/firstJob';
+import HomeAgents from '@components/home/HomeAgents.astro';
 
 <div class="bq-home not-content">
   <HomeHero />
 
   <HomeAcademy />
+
+  <HomeAgents />
 
   <HomeDashboard />
 
@@ -74,9 +80,7 @@ import HomeAcademy from '@components/home/HomeAcademy.astro';
                 <TabItem label="Bun CLI">
               <p class="home-step-lead">In a terminal with <a href="/guide/installation/">Bun installed</a>, start the included server.</p>
 
-```bash
-bunx bunqueue start --host 127.0.0.1 --data-path ./bunqueue.db
-```
+<Code code={BUN_CLI_SERVER} lang="bash" />
 
               <p class="home-note">Jobs persist in <code>./bunqueue.db</code>, a local SQLite file. The server is included in the MIT-licensed package.</p>
                 </TabItem>
@@ -95,270 +99,74 @@ bunx bunqueue start --host 127.0.0.1 --data-path ./bunqueue.db
               <Tabs>
                 <TabItem label="Node.js">
 
-```bash
-npm install bunqueue-client
-```
+<FirstJobCode runtime="node" part="install" />
 
-```javascript title="jobs.mjs"
-import { Queue, Worker } from 'bunqueue-client';
+<FirstJobCode runtime="node" part="files" />
 
-const options = {
-  embedded: false,
-  connection: { host: '127.0.0.1', port: 6789 },
-};
-const queue = new Queue('emails', options);
-
-const worker = new Worker(
-  'emails',
-  async (job) => {
-    console.log('Processing:', job.data.to);
-    return { sent: true };
-  },
-  options
-);
-
-worker.on('error', (error) => console.error(error));
-await queue.add('welcome', { to: 'hello@example.com' });
-```
-
-```bash
-node jobs.mjs
-```
+<FirstJobCode runtime="node" part="run" />
 
                 </TabItem>
                 <TabItem label="Bun">
 
-```bash
-bun add bunqueue-client
-```
+<FirstJobCode runtime="bun" part="install" />
 
-```javascript title="jobs.mjs"
-import { Queue, Worker } from 'bunqueue-client';
+<FirstJobCode runtime="bun" part="files" />
 
-const options = {
-  embedded: false,
-  connection: { host: '127.0.0.1', port: 6789 },
-};
-const queue = new Queue('emails', options);
-
-const worker = new Worker(
-  'emails',
-  async (job) => {
-    console.log('Processing:', job.data.to);
-    return { sent: true };
-  },
-  options
-);
-
-worker.on('error', (error) => console.error(error));
-await queue.add('welcome', { to: 'hello@example.com' });
-```
-
-```bash
-bun jobs.mjs
-```
+<FirstJobCode runtime="bun" part="run" />
 
                 </TabItem>
                 <TabItem label="Deno">
 
-```bash
-deno add npm:bunqueue-client
-```
+<FirstJobCode runtime="deno" part="install" />
 
-```typescript title="jobs.ts"
-import { Queue, Worker } from 'bunqueue-client';
+<FirstJobCode runtime="deno" part="files" />
 
-const options = {
-  embedded: false,
-  connection: { host: '127.0.0.1', port: 6789 },
-};
-const queue = new Queue<{ to: string }>('emails', options);
-
-const worker = new Worker<{ to: string }>(
-  'emails',
-  async (job) => {
-    console.log('Processing:', job.data.to);
-    return { sent: true };
-  },
-  options
-);
-
-worker.on('error', (error) => console.error(error));
-await queue.add('welcome', { to: 'hello@example.com' });
-```
-
-```bash
-deno run --allow-net --allow-env --allow-read --allow-sys jobs.ts
-```
+<FirstJobCode runtime="deno" part="run" />
 
                 </TabItem>
                 <TabItem label="Python">
 
-```bash
-pip install bunqueue-client
-```
+<FirstJobCode runtime="python" part="install" />
 
-```python title="jobs.py"
-from bunqueue import Queue, Worker
+<FirstJobCode runtime="python" part="files" />
 
-connection = {"host": "127.0.0.1", "port": 6789}
-queue = Queue("emails", **connection)
-queue.add("welcome", {"to": "hello@example.com"})
-queue.close()
-
-def process(job):
-    print("Processing:", job.data["to"])
-    return {"sent": True}
-
-Worker("emails", process, **connection).run()
-```
-
-```bash
-python jobs.py
-```
+<FirstJobCode runtime="python" part="run" />
 
                 </TabItem>
                 <TabItem label="PHP">
 
-```bash
-composer require bunqueue/client   # PHP 8.1+ and Composer
-```
+<FirstJobCode runtime="php" part="install" />
 
-```php title="jobs.php"
-<?php
-require __DIR__ . '/vendor/autoload.php';
+<FirstJobCode runtime="php" part="files" />
 
-use Bunqueue\Job;
-use Bunqueue\Queue;
-use Bunqueue\Worker;
-
-$connection = ['host' => '127.0.0.1', 'port' => 6789];
-
-$queue = new Queue('emails', $connection);
-$queue->add('welcome', ['to' => 'hello@example.com']);
-$queue->close();
-
-$worker = new Worker('emails', function (Job $job) {
-    echo 'Processing: ', $job->data()['to'], PHP_EOL;
-    return ['sent' => true];
-}, $connection);
-$worker->run();
-```
-
-```bash
-php jobs.php
-```
+<FirstJobCode runtime="php" part="run" />
 
                 </TabItem>
                 <TabItem label="Go">
 
-```bash
-go mod init jobs && go get github.com/egeominotti/bunqueue/sdk/go   # Go 1.26.5+
-```
+<FirstJobCode runtime="go" part="install" />
 
-```go title="main.go"
-package main
+<FirstJobCode runtime="go" part="files" />
 
-import (
-	"fmt"
-
-	bunqueue "github.com/egeominotti/bunqueue/sdk/go"
-)
-
-func main() {
-	queue := bunqueue.NewQueue("emails", bunqueue.Options{Host: "127.0.0.1", Port: 6789})
-	defer queue.Close()
-	if _, err := queue.Add("welcome", map[string]any{"to": "hello@example.com"}, nil); err != nil {
-		panic(err)
-	}
-
-	worker := bunqueue.NewWorker("emails", func(job *bunqueue.Job) (any, error) {
-		fmt.Println("Processing:", any(job.Data()).(map[string]any)["to"])
-		return map[string]any{"sent": true}, nil
-	}, bunqueue.WorkerOptions{Host: "127.0.0.1", Port: 6789})
-	worker.Run()
-}
-```
-
-```bash
-go run .
-```
+<FirstJobCode runtime="go" part="run" />
 
                 </TabItem>
                 <TabItem label="Rust">
 
-```bash
-cargo new jobs && cd jobs && cargo add bunqueue-client
-```
+<FirstJobCode runtime="rust" part="install" />
 
-```rust title="src/main.rs"
-use bunqueue_client::{ConnectionOptions, JobOptions, Queue, Value, Worker, WorkerOptions};
+<FirstJobCode runtime="rust" part="files" />
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let connection = ConnectionOptions {
-        host: "127.0.0.1".into(),
-        port: 6789,
-        ..Default::default()
-    };
-
-    let queue = Queue::new("emails", connection.clone());
-    let data = Value::Map(vec![(Value::from("to"), Value::from("hello@example.com"))]);
-    queue.add("welcome", data, JobOptions::default())?;
-
-    let worker = Worker::new(
-        "emails",
-        |job| {
-            println!("Processing: {}", job.data()["to"].as_str().unwrap_or_default());
-            Ok(Value::Map(vec![(Value::from("sent"), Value::from(true))]))
-        },
-        WorkerOptions { connection, ..Default::default() },
-    );
-    worker.run()?;
-    Ok(())
-}
-```
-
-```bash
-cargo run
-```
+<FirstJobCode runtime="rust" part="run" />
 
                 </TabItem>
                 <TabItem label="Elixir">
 
-```bash
-git clone --depth 1 https://github.com/egeominotti/bunqueue && mix new jobs && cd jobs
-```
+<FirstJobCode runtime="elixir" part="install" />
 
-```elixir title="mix.exs"
-# Replace the generated deps/0. Hex release upcoming: until then, use the
-# bunqueue checkout next to this project as a path dependency.
-defp deps do
-  [{:bunqueue_client, path: "../bunqueue/sdk/elixir"}]
-end
-```
+<FirstJobCode runtime="elixir" part="files" />
 
-```elixir title="jobs.exs"
-connection = [host: "127.0.0.1", port: 6789]
-
-queue = Bunqueue.queue("emails", connection)
-{:ok, _job} = Bunqueue.Queue.add(queue, "welcome", %{to: "hello@example.com"})
-
-worker =
-  Bunqueue.Worker.new(
-    "emails",
-    fn job ->
-      IO.puts("Processing: #{job.data["to"]}")
-      {:ok, %{sent: true}}
-    end,
-    connection: connection
-  )
-
-Bunqueue.Worker.run(worker)
-```
-
-```bash
-mix local.hex --force && mix deps.get && mix run jobs.exs
-```
+<FirstJobCode runtime="elixir" part="run" />
 
                 </TabItem>
               </Tabs>
@@ -400,9 +208,7 @@ mix local.hex --force && mix deps.get && mix run jobs.exs
             </div>
             <div class="home-step-body">
 
-```bash
-bun add bunqueue
-```
+<FirstJobCode runtime="embedded" part="install" />
 
             </div>
           </li>
@@ -416,27 +222,9 @@ bun add bunqueue
             </div>
             <div class="home-step-body">
 
-```typescript title="jobs.ts"
-import { Queue, Worker } from 'bunqueue/client';
+<FirstJobCode runtime="embedded" part="files" />
 
-const queue = new Queue<{ to: string }>('emails', { embedded: true });
-
-const worker = new Worker<{ to: string }>(
-  'emails',
-  async (job) => {
-    console.log('Processing:', job.data.to);
-    return { sent: true };
-  },
-  { embedded: true }
-);
-
-worker.on('error', (error) => console.error(error));
-await queue.add('welcome', { to: 'hello@example.com' });
-```
-
-```bash
-bun jobs.ts
-```
+<FirstJobCode runtime="embedded" part="run" />
 
             </div>
           </li>

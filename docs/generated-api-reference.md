@@ -6,7 +6,7 @@
 
 A per-version reference of everything the package exports, generated from the source rather than written by hand, published at `https://bunqueue.dev/reference/<version>/`.
 
-Hand-written API docs drift the moment a signature changes, and the repo already carries three hand-maintained reference pages (`/api/types/`, `/api/http/`, `/api/tcp/`) that must be kept honest by review. This one cannot drift: it is TypeDoc output over the real entry points.
+Hand-written API docs drift the moment a signature changes, and the repo already carries three hand-maintained references (`/api/types/`, `/api/http/`, and the `/api/tcp/` overview with its eight command pages) that must be kept honest by review. This one cannot drift: it is TypeDoc output over the real entry points.
 
 Versioning is the point. A reader on `bunqueue@2.6` needs the surface 2.6 shipped, not the surface on `main` today, so each generated tree is frozen where it is written and older versions stay served.
 
@@ -60,7 +60,7 @@ an entry-point glob that matched nothing.
 
 Both were hit while building this, and both fail silently rather than loudly.
 
-**1. `/api/` is taken.** Starlight already owns `/api/http/`, `/api/tcp/` and `/api/types/` as content routes. Output therefore goes to `/reference/`, not `/api/`.
+**1. `/api/` is taken.** Starlight already owns `/api/http/`, `/api/tcp/` (plus its command pages under `/api/tcp/`) and `/api/types/` as content routes. Output therefore goes to `/reference/`, not `/api/`.
 
 **2. `public/` overwrites built pages.** An earlier version of the script wrote `docs/public/reference/index.html` as the version listing. Astro copies `public/` over the built output _last_, so that file clobbered the Starlight page that owns `/reference/`, and the site served unstyled HTML there. The script no longer writes it; `/reference/` is `docs/src/content/docs/reference.mdx`.
 
@@ -135,7 +135,9 @@ pages under "Excluded by 'noindex' tag": that is the intended state.
 The integration reads `apiVersions.json` through the Astro configuration and
 enumerates only the current tree. Directory indexes canonicalize to
 `/reference/v2.9/`; other TypeDoc pages retain their actual `.html` paths. The
-sitemap contains only authored pages (121 URLs at 2.9.7).
+sitemap contains only authored pages (121 URLs at 2.9.7; 129 after the TCP
+protocol reference was split into the `/api/tcp/` overview and eight command
+pages under `/api/tcp/<family>/`).
 `docs/src/lib/sitemap.ts` preserves the authored-route priorities and
 git-derived modification dates; unknown dates remain absent.
 
@@ -147,8 +149,9 @@ that check, so regression coverage prohibits it.
 The post-build discovery validator checks exact sitemap membership, matching
 canonical tags, titles and descriptions, unique current-reference metadata,
 historical/development `noindex`, and the hosting policy. It also retains the
-independent 106-page `llms-full.txt` coverage check; generated TypeDoc pages are
-not added to that hand-authored document stream. Focused fixtures in
+independent `llms-full.txt` coverage check (106 pages at 2.9.7, 114 after the
+TCP reference split); generated TypeDoc pages are not added to that
+hand-authored document stream. Focused fixtures in
 `test/docs-seo.test.ts` exercise URL selection, encoding, metadata escaping,
 idempotence, build failures, and preservation of source and historical trees.
 

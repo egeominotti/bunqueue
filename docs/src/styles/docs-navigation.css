@@ -226,11 +226,20 @@ nav.sidebar ul ul a:hover {
   nav.sidebar summary {
     min-height: 44px;
   }
+  /* Phones: get to the title sooner. The breadcrumb already names the section, so the
+     hero eyebrow repeats it, and the Markdown source link (for copying a page into an
+     AI tool) is a desktop affordance. */
   .docs-source-link {
-    padding-block: 6px;
+    display: none;
   }
   .docs-context {
-    margin-bottom: 16px;
-    padding-bottom: 16px;
+    margin-bottom: 14px;
+    padding-block: 0 12px;
+  }
+  :root[data-has-sidebar] .bq-hero {
+    padding-top: 0;
+  }
+  :root[data-has-sidebar] .bq-hero .bq-eyebrow {
+    display: none;
   }
 }

@@ -1,0 +1,108 @@
+---
+// The MCP server's opt-in agent features: toolsets, destructive-call confirmation and
+// decision models. It sits below the Academy section, high on the page, and the hero's
+// second announcement jumps here (#agents). Every figure matches guide/mcp.mdx.
+import '../../styles/home-agents.css';
+
+const features = [
+  {
+    variable: 'BUNQUEUE_MCP_TOOLSETS',
+    title: 'Load only the tools you need.',
+    body: 'The 75 tools come in 11 toolsets. Expose a few, or start the agent from a catalog and load groups on demand: with one loaded, 1,300 to 4,600 tokens of context per request instead of about 16,000.',
+    href: '/guide/mcp/#load-only-the-tools-the-agent-needs',
+    link: 'Toolsets',
+  },
+  {
+    variable: 'BUNQUEUE_MCP_CONFIRM',
+    title: 'Destructive calls ask first.',
+    body: 'Obliterate, drain, purge and six more show their exact impact and run only after you confirm in your client. A decline always wins.',
+    href: '/guide/mcp/#confirm-destructive-operations',
+    link: 'Confirmation',
+  },
+  {
+    variable: 'BUNQUEUE_MCP_DECISION_*',
+    title: 'Decision models, built in.',
+    body: 'A decision model routes plain-language requests to the right toolset and double-checks destructive ones. It can block a call, never approve one.',
+    href: '/guide/mcp/#decision-models-jev-clef-clef-flash-kev-9b-laya',
+    link: 'Decision models',
+  },
+];
+
+const models = [
+  { name: 'Jev', via: 'TypeSafe' },
+  { name: 'Clef', via: 'Workers AI or self-hosted' },
+  { name: 'Clef-flash', via: 'Workers AI or self-hosted' },
+  { name: 'Kev 9B', via: 'Self-hosted' },
+  { name: 'Laya', via: 'Self-hosted' },
+  { name: 'DiffusionGemma Jev', via: 'Self-hosted' },
+];
+---
+
+<section class="home-section home-agents" id="agents" aria-labelledby="agents-title">
+  <div class="home-agents-copy">
+    <span class="home-agents-badge">AI agents <span>Native MCP server</span></span>
+    <h2 id="agents-title">Hand agents the queue. Keep the final say.</h2>
+    <p>
+      Claude, Cursor and any MCP client get 75 tools over stdio or Streamable HTTP. Three opt-in
+      features keep the context small and destructive calls in your hands.
+    </p>
+    <pre class="home-agents-command"><code><span aria-hidden="true">$ </span>claude mcp add bunqueue \
+  -e BUNQUEUE_MCP_TOOLSETS=dynamic \
+  -e BUNQUEUE_MCP_CONFIRM=destructive \
+  -- bunx --package=bunqueue bunqueue-mcp</code></pre>
+    <div class="home-agents-actions">
+      <a class="home-button" href="/guide/mcp/">MCP server guide</a>
+      <a class="home-text-link" href="/guide/mcp/#serve-over-http">Serve it over HTTP</a>
+    </div>
+  </div>
+
+  <figure class="home-agents-example">
+    <ol class="home-agents-transcript" role="list">
+      <li data-role="agent">
+        <span class="home-agents-who">Agent</span>
+        <code>bunqueue_obliterate_queue {'{'} queue: "billing" {'}'}</code>
+      </li>
+      <li data-role="server">
+        <span class="home-agents-who">bunqueue</span>
+        <p>
+          Permanently delete queue "billing" and every job in it (1204 waiting, 0 prioritized,
+          0 delayed, 3 active, 18330 completed, 2 failed), including results and logs.
+        </p>
+        <p class="home-agents-ask">Run it?</p>
+      </li>
+      <li data-role="you">
+        <span class="home-agents-who">You</span>
+        <p><span class="home-agents-choice">Decline</span></p>
+      </li>
+      <li data-role="server">
+        <span class="home-agents-who">bunqueue</span>
+        <p><code>executed: false</code> The user did not confirm this operation.</p>
+      </li>
+    </ol>
+    <figcaption>Example with <code>BUNQUEUE_MCP_CONFIRM=destructive</code> in a client that can ask you.</figcaption>
+  </figure>
+
+  <ul class="home-agents-features" role="list">
+    {features.map((item) => (
+      <li>
+        <code class="home-agents-variable">{item.variable}</code>
+        <h3>{item.title}</h3>
+        <p>{item.body}</p>
+        <a class="home-text-link" href={item.href}>{item.link}</a>
+      </li>
+    ))}
+  </ul>
+
+  <div class="home-agents-models">
+    <p class="home-agents-models-label">Supported decision models</p>
+    <ul role="list">
+      {models.map(({ name, via }) => (
+        <li><strong>{name}</strong> <span>{via}</span></li>
+      ))}
+    </ul>
+    <p class="home-note">
+      One client for the SystemOne request format: TypeSafe, Cloudflare Workers AI or any compatible
+      endpoint you host. Optional; every feature above works without a model.
+    </p>
+  </div>
+</section>

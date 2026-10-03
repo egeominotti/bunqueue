@@ -5,6 +5,15 @@ All notable changes to `bunqueue-client` (TypeScript SDK) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Documentation
+
+- README rewritten: standard SDK header, the same tested quick start as the
+  bunqueue docs, waiting for a result with `QueueEvents`, a runtime support
+  table, and notes on ESM-only loading, CommonJS bundling, embedded mode and
+  Deno. The migration guide from 0.1.x keeps its anchor.
+
 ## [0.2.1] - 2026-10-02
 
 ### Fixed

@@ -8,200 +8,141 @@ head:
       content: https://bunqueue.dev/og/guide/quickstart.png
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import { Code, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import GuideEpisode from '@components/academy/GuideEpisode.astro';
+import FirstJobCode from '@components/FirstJobCode.astro';
+import { BUN_CLI_SERVER, SERVER_HEALTH_CHECK, dockerRunCommand } from '../../../data/firstJob';
 
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · quickstart</span>
   <h1 class="bq-hero-h1 bq-bench-h1">Working queue in <em>a minute.</em></h1>
-  <p class="bq-hero-sub">Create a queue, add jobs, process them with a Worker, and turn on persistence. On Bun everything runs embedded in a single process with zero configuration; from any other language, start the server once and connect.</p>
+  <p class="bq-hero-sub">From nothing to a processed job in about a minute, in Node.js, Bun, Deno, Python, PHP, Go, Rust or Elixir. Copy, run, see it work, then add retries, persistence and the rest.</p>
 </div>
 
-<GuideEpisode number={1} />
+## Run your first job
 
-## The smallest working queue
+Pick how you run bunqueue. Both ways are free and have the same queue features.
 
-Install the client for your runtime (see the [SDK guide](/guide/sdks/)), save the snippet as a file, run it. On Bun the queue runs embedded in your process; in every other language, start the server once with `bunx bunqueue start` first.
+<Tabs syncKey="run-mode">
+<TabItem label="Any language, with the server">
 
-<Tabs syncKey="lang">
-<TabItem label="Bun">
+<Steps>
 
-```typescript
-import { Queue, Worker } from 'bunqueue/client';
+1. **Start the server.** With [Docker](https://docs.docker.com/get-docker/) running, no Bun needed:
 
-// The queue: where you put jobs
-const queue = new Queue('emails', { embedded: true });
+   <Code code={dockerRunCommand()} lang="bash" />
 
-// The worker: pulls jobs and runs your function on each one
-const worker = new Worker(
-  'emails',
-  async (job) => {
-    console.log(`Sending "${job.data.subject}" to ${job.data.to}`);
-    return { sent: true };
-  },
-  { embedded: true }
-);
+   Or, with [Bun installed](/guide/installation/), run it directly: <code>{BUN_CLI_SERVER}</code>. Check that it is ready:
 
-// Add a job
-await queue.add('welcome', { to: 'user@example.com', subject: 'Welcome!' });
-```
+   <Code code={SERVER_HEALTH_CHECK} lang="bash" />
 
-</TabItem>
-<TabItem label="Node.js / Deno">
+2. **Add a job and process it.** In another terminal, install the client for your language, save the file and run it.
 
-```typescript
-import { Queue, Worker } from 'bunqueue-client';
+   <Tabs syncKey="lang">
+   <TabItem label="Node.js">
 
-// The queue: where you put jobs
-const queue = new Queue('emails', { embedded: false });
+   <FirstJobCode runtime="node" part="install" />
 
-// The worker: pulls jobs and runs your function on each one
-const worker = new Worker(
-  'emails',
-  async (job) => {
-    console.log(`Sending "${job.data.subject}" to ${job.data.to}`);
-    return { sent: true };
-  },
-  { embedded: false }
-);
+   <FirstJobCode runtime="node" part="files" />
 
-// Add a job
-await queue.add('welcome', { to: 'user@example.com', subject: 'Welcome!' });
-```
+   <FirstJobCode runtime="node" part="run" />
 
-</TabItem>
-<TabItem label="Python">
+   </TabItem>
+   <TabItem label="Bun">
 
-```python
-from bunqueue import Queue, Worker
+   <FirstJobCode runtime="bun" part="install" />
 
-# The queue: where you put jobs (connects to localhost:6789 by default)
-queue = Queue("emails")
-queue.add("welcome", {"to": "user@example.com", "subject": "Welcome!"})
+   <FirstJobCode runtime="bun" part="files" />
 
-# The worker: pulls jobs and runs your function on each one
-def process(job):
-    print(f"Sending {job.data['subject']} to {job.data['to']}")
-    return {"sent": True}
+   <FirstJobCode runtime="bun" part="run" />
 
-worker = Worker("emails", process)
-worker.run()
-```
+   </TabItem>
+   <TabItem label="Deno">
 
-</TabItem>
-<TabItem label="PHP">
+   <FirstJobCode runtime="deno" part="install" />
 
-```php
-use Bunqueue\Queue;
-use Bunqueue\Worker;
+   <FirstJobCode runtime="deno" part="files" />
 
-// The queue: where you put jobs (connects to localhost:6789 by default)
-$queue = new Queue('emails');
-$queue->add('welcome', ['to' => 'user@example.com', 'subject' => 'Welcome!']);
+   <FirstJobCode runtime="deno" part="run" />
 
-// The worker: pulls jobs and runs your function on each one
-$worker = new Worker('emails', function (Bunqueue\Job $job) {
-    $data = $job->data();
-    echo "Sending {$data['subject']} to {$data['to']}\n";
-    return ['sent' => true];
-});
-$worker->run();
-```
+   </TabItem>
+   <TabItem label="Python">
 
-</TabItem>
-<TabItem label="Go">
+   <FirstJobCode runtime="python" part="install" />
 
-```go
-// The queue: where you put jobs (connects to localhost:6789 by default)
-queue := bunqueue.NewQueue("emails", bunqueue.Options{})
-defer queue.Close()
+   <FirstJobCode runtime="python" part="files" />
 
-queue.Add("welcome", map[string]any{
-    "to": "user@example.com", "subject": "Welcome!",
-}, nil)
+   <FirstJobCode runtime="python" part="run" />
 
-// The worker: pulls jobs and runs your function on each one
-worker := bunqueue.NewWorker("emails", func(job *bunqueue.Job) (any, error) {
-    data := any(job.Data()).(map[string]any)
-    fmt.Printf("Sending %v to %v\n", data["subject"], data["to"])
-    return map[string]any{"sent": true}, nil
-}, bunqueue.WorkerOptions{})
-worker.Run()
-```
+   </TabItem>
+   <TabItem label="PHP">
+
+   <FirstJobCode runtime="php" part="install" />
+
+   <FirstJobCode runtime="php" part="files" />
+
+   <FirstJobCode runtime="php" part="run" />
+
+   </TabItem>
+   <TabItem label="Go">
+
+   <FirstJobCode runtime="go" part="install" />
+
+   <FirstJobCode runtime="go" part="files" />
+
+   <FirstJobCode runtime="go" part="run" />
+
+   </TabItem>
+   <TabItem label="Rust">
+
+   <FirstJobCode runtime="rust" part="install" />
+
+   <FirstJobCode runtime="rust" part="files" />
+
+   <FirstJobCode runtime="rust" part="run" />
+
+   </TabItem>
+   <TabItem label="Elixir">
+
+   <FirstJobCode runtime="elixir" part="install" />
+
+   <FirstJobCode runtime="elixir" part="files" />
+
+   <FirstJobCode runtime="elixir" part="run" />
+
+   </TabItem>
+   </Tabs>
+
+3. **See it work.** The worker prints the job your app just added, then keeps waiting for more (press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it):
+
+   ```text
+   Processing: hello@example.com
+   ```
+
+</Steps>
 
 </TabItem>
-<TabItem label="Rust">
+<TabItem label="Bun, no server">
 
-```rust
-use bunqueue_client::{ConnectionOptions, JobOptions, Queue, Value, Worker, WorkerOptions};
+<Steps>
 
-// The queue: where you put jobs (connects to localhost:6789 by default)
-let queue = Queue::new("emails", ConnectionOptions::default());
-let data = Value::Map(vec![
-    (Value::from("to"), Value::from("user@example.com")),
-    (Value::from("subject"), Value::from("Welcome!")),
-]);
-queue.add("welcome", data, JobOptions::default())?;
+1. **Install bunqueue.** The queue runs inside your app, so there is no server to start.
 
-// The worker: pulls jobs and runs your function on each one
-let worker = Worker::new(
-    "emails",
-    |job| {
-        println!("Sending {:?}", job.data());
-        Ok(Value::from(true))
-    },
-    WorkerOptions::default(),
-);
-worker.run()?;
-```
+   <FirstJobCode runtime="embedded" part="install" />
 
-</TabItem>
-<TabItem label="Elixir">
+2. **Add a job and process it.** Save the file and run it.
 
-```elixir
-# The queue: where you put jobs (connects to localhost:6789 by default)
-queue = Bunqueue.queue("emails")
+   <FirstJobCode runtime="embedded" part="files" />
 
-{:ok, _job} =
-  Bunqueue.Queue.add(queue, "welcome", %{to: "user@example.com", subject: "Welcome!"})
+   <FirstJobCode runtime="embedded" part="run" />
 
-# The worker: pulls jobs and runs your function on each one
-worker =
-  Bunqueue.Worker.new("emails", fn job ->
-    IO.puts("Sending #{job.data["subject"]} to #{job.data["to"]}")
-    {:ok, %{sent: true}}
-  end)
+3. **See it work.** The worker prints the job, then keeps waiting for more (press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop it):
 
-Bunqueue.Worker.run(worker)
-```
+   ```text
+   Processing: hello@example.com
+   ```
 
-</TabItem>
-</Tabs>
-
-The snippets above are the body of a program, not a whole file: drop each one into
-your project's entry point, then run it. The worker keeps running until you stop it
-with `Ctrl-C`:
-
-```bash
-bun run app.ts       # Bun
-node app.js          # Node.js (needs "type": "module" in package.json)
-deno run -A app.ts   # Deno
-python app.py        # Python
-php app.php          # PHP
-go run .             # Go
-cargo run            # Rust
-mix run --no-halt    # Elixir
-```
-
-The worker prints one line per job:
-
-```text
-Sending "Welcome!" to user@example.com    # Bun, Node.js / Deno
-Sending Welcome! to user@example.com      # Python, PHP, Go, Elixir
-Sending Map([(String(Utf8String { s: Ok("to") }), ...)])    # Rust: `{:?}` on the decoded msgpack value
-```
-
-On Bun, `embedded: true` means the queue runs inside your process, no server needed. Every other client talks TCP to the server (`bunx bunqueue start`) and defaults to `localhost:6789`.
+</Steps>
 
 :::danger[The one mistake everyone makes]
 On Bun, `Queue` and `Worker` must use the **same mode**. If one has `embedded: true` and the other doesn't, the other tries to connect to a TCP server that isn't running and fails with a "Command timeout" error.
@@ -217,6 +158,26 @@ const worker = new Worker('tasks', handler); // Missing embedded: true!
 ```
 
 :::
+
+</TabItem>
+</Tabs>
+
+### It works. Now pick what you need
+
+| You want to | Read |
+|-------------|------|
+| Retry failed jobs and see why they failed | [Errors & retries](/guide/worker/errors/), [Dead letter queue](/guide/dlq/) |
+| Run something every hour or every day | [Cron](/guide/cron/) |
+| Keep jobs when the process restarts | [Turn on persistence](#turn-on-persistence) |
+| Watch queues and jobs in a browser | [Web dashboard](/guide/dashboard/) |
+| Let an AI agent manage the queue | [MCP server](/guide/mcp/) |
+| Run jobs in a chain or a tree | [Flows](/guide/flow/), [Workflow engine](/guide/workflow/) |
+
+Prefer to watch? The first [bunqueue Academy](/academy/) episode walks through the same steps.
+
+<GuideEpisode number={1} />
+
+The rest of this page builds on the same queue and worker: job options, the processor, events, persistence and a clean shutdown.
 
 ## Add jobs with options
 

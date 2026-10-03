@@ -8,6 +8,7 @@ import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { referenceSeo } from './src/lib/reference-seo';
 import { documentationSitemap } from './src/lib/sitemap';
+import { rehypeTableLabels } from './src/lib/rehypeTableLabels';
 import apiVersions from './src/data/apiVersions.json';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -75,8 +76,10 @@ export default defineConfig({
   // processor, so .mdx tables no longer need the deprecated top-level
   // `markdown.gfm` flag. Keep `gfm: true` here: without it every GFM table
   // in a .md or .mdx page is emitted as literal |---| text.
+  // rehypeTableLabels labels every Markdown table cell with its column name, which
+  // docs-tables.css uses to show tables as cards on phones (see the plugin).
   markdown: {
-    processor: unified({ gfm: true }),
+    processor: unified({ gfm: true, rehypePlugins: [rehypeTableLabels] }),
   },
 
   // Performance optimizations
@@ -147,22 +150,8 @@ export default defineConfig({
       editLink: {
         baseUrl: 'https://github.com/egeominotti/bunqueue/edit/main/docs/',
       },
-      expressiveCode: {
-        themes: ['catppuccin-latte', 'catppuccin-mocha'],
-        styleOverrides: {
-          borderRadius: '12px',
-          borderColor: 'var(--bq-line, #e4e4e7)',
-          codeFontFamily: "'IBM Plex Mono', ui-monospace, 'SF Mono', monospace",
-          codeFontSize: '0.95rem',
-          codeLineHeight: '1.8',
-          codePaddingInline: '1.3rem',
-          codePaddingBlock: '1rem',
-          uiFontFamily: "'IBM Plex Mono', ui-monospace, monospace",
-          frames: {
-            frameBoxShadowCssValue: '0 6px 24px rgba(0, 0, 0, 0.08)',
-          },
-        },
-      },
+      // Expressive Code options live in ec.config.mjs: they use theme-aware functions, which
+      // the <Code> component can only load from there.
       customCss: [
         '@fontsource-variable/bricolage-grotesque',
         '@fontsource/ibm-plex-mono/400.css',
@@ -182,13 +171,14 @@ export default defineConfig({
         {
           label: 'Start Here',
           items: [
+            { label: 'Quick Start', link: '/guide/quickstart/', badge: { text: '1 min', variant: 'success' } },
             { label: 'Introduction', link: '/guide/introduction/' },
             { label: 'Installation', link: '/guide/installation/' },
-            { label: 'Quick Start', link: '/guide/quickstart/' },
             { label: 'Video Course', link: '/academy/', badge: { text: 'New', variant: 'tip' } },
             { label: 'Simple Mode', link: '/guide/simple-mode/' },
             { label: 'Use Cases & Patterns', link: '/guide/use-cases/' },
             { label: 'Migrate from BullMQ', link: '/guide/migration/' },
+            { label: 'bunqueue vs BullMQ', link: '/guide/comparison/' },
             { label: 'FAQ', link: '/faq/' },
           ],
         },
@@ -198,6 +188,7 @@ export default defineConfig({
           items: [
             { label: 'Overview', link: '/guide/queue/' },
             { label: 'Adding Jobs', link: '/guide/queue/adding-jobs/' },
+            { label: 'Job Options Reference', link: '/guide/queue/options/' },
             { label: 'Deduplication', link: '/guide/queue/deduplication/' },
             { label: 'Querying Jobs', link: '/guide/queue/querying/' },
             { label: 'Control & Maintenance', link: '/guide/queue/control/' },
@@ -208,7 +199,6 @@ export default defineConfig({
             { label: 'Queue Groups', link: '/guide/queue-group/' },
             { label: 'Workers & Metrics', link: '/guide/queue/metrics/' },
             { label: 'Namespaces & Batching', link: '/guide/queue/advanced/' },
-            { label: 'Job Options Reference', link: '/guide/queue/options/' },
           ],
         },
         {
@@ -229,35 +219,41 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Cron & Schedulers',
+          label: 'Cron, Retries & Flows',
           collapsed: true,
           items: [
-            { label: 'Overview', link: '/guide/cron/' },
-            { label: 'Recipes', link: '/guide/cron/recipes/' },
-            { label: 'Job Schedulers (Queue API)', link: '/guide/queue/schedulers/' },
-            { label: 'Expressions & Options', link: '/guide/cron/reference/' },
-          ],
-        },
-        {
-          label: 'Dead Letter Queue',
-          collapsed: true,
-          items: [
-            { label: 'Overview', link: '/guide/dlq/' },
-            { label: 'Operations', link: '/guide/dlq/operations/' },
-            { label: 'From the Queue API', link: '/guide/queue/dlq/' },
-            { label: 'Automatic Retry', link: '/guide/dlq/auto-retry/' },
-            { label: 'Configuration', link: '/guide/dlq/configuration/' },
-            { label: 'Reference', link: '/guide/dlq/reference/' },
-          ],
-        },
-        {
-          label: 'Flow Producer',
-          collapsed: true,
-          items: [
-            { label: 'Overview', link: '/guide/flow/' },
-            { label: 'Patterns', link: '/guide/flow/patterns/' },
-            { label: 'Child Failures', link: '/guide/flow/failures/' },
-            { label: 'Reference', link: '/guide/flow/reference/' },
+            {
+              label: 'Cron & Schedulers',
+              collapsed: true,
+              items: [
+                { label: 'Overview', link: '/guide/cron/' },
+                { label: 'Recipes', link: '/guide/cron/recipes/' },
+                { label: 'Job Schedulers (Queue API)', link: '/guide/queue/schedulers/' },
+                { label: 'Expressions & Options', link: '/guide/cron/reference/' },
+              ],
+            },
+            {
+              label: 'Dead Letter Queue',
+              collapsed: true,
+              items: [
+                { label: 'Overview', link: '/guide/dlq/' },
+                { label: 'Operations', link: '/guide/dlq/operations/' },
+                { label: 'From the Queue API', link: '/guide/queue/dlq/' },
+                { label: 'Automatic Retry', link: '/guide/dlq/auto-retry/' },
+                { label: 'Configuration', link: '/guide/dlq/configuration/' },
+                { label: 'Reference', link: '/guide/dlq/reference/' },
+              ],
+            },
+            {
+              label: 'Flow Producer',
+              collapsed: true,
+              items: [
+                { label: 'Overview', link: '/guide/flow/' },
+                { label: 'Patterns', link: '/guide/flow/patterns/' },
+                { label: 'Child Failures', link: '/guide/flow/failures/' },
+                { label: 'Reference', link: '/guide/flow/reference/' },
+              ],
+            },
           ],
         },
         {
@@ -270,18 +266,27 @@ export default defineConfig({
             { label: 'Rollback (Saga)', link: '/guide/workflow/rollback/' },
             { label: 'Durability & Idempotency', link: '/guide/workflow/durability/' },
             { label: 'Human Approval', link: '/guide/workflow/approval/' },
-            { label: 'AI Agents (Vercel AI SDK)', link: '/guide/workflow/ai-agents/' },
-            { label: 'Agent SDK Integrations', link: '/guide/workflow/agent-sdks/' },
             { label: 'API Reference', link: '/guide/workflow/api/' },
           ],
         },
         {
-          label: 'SDKs, CLI & MCP',
+          label: 'AI Agents',
+          collapsed: true,
+          items: [
+            { label: 'MCP Server', link: '/guide/mcp/', badge: { text: 'New', variant: 'tip' } },
+            { label: 'Workflows with the Vercel AI SDK', link: '/guide/workflow/ai-agents/' },
+            { label: 'Agent SDK Integrations', link: '/guide/workflow/agent-sdks/' },
+          ],
+        },
+        {
+          label: 'SDKs & Integrations',
           collapsed: true,
           items: [
             { label: 'SDK Guide · Six Languages', link: '/guide/sdks/' },
             { label: 'CLI Commands', link: '/guide/cli/' },
-            { label: 'MCP Server for AI Agents', link: '/guide/mcp/' },
+            { label: 'Framework Integrations', link: '/guide/integrations/' },
+            { label: 'Hono', link: '/guide/hono/' },
+            { label: 'Elysia', link: '/guide/elysia/' },
           ],
         },
         {
@@ -290,36 +295,17 @@ export default defineConfig({
           items: [
             { label: 'Running the Server', link: '/guide/server/' },
             { label: 'Deployment Guide', link: '/guide/deployment/' },
+            { label: 'Production Readiness', link: '/guide/production/' },
             { label: 'Configuration File', link: '/guide/configuration/' },
             { label: 'Environment Variables', link: '/guide/env-vars/' },
+            { label: 'SQLite / PostgreSQL', link: '/guide/databases/' },
             { label: 'Native TLS', link: '/guide/tls/' },
             { label: 'Web Dashboard', link: '/guide/dashboard/' },
             { label: 'Monitoring', link: '/guide/monitoring/' },
             { label: 'Telemetry', link: '/guide/telemetry/' },
             { label: 'Webhooks', link: '/guide/webhooks/' },
             { label: 'S3 Backup', link: '/guide/backup/' },
-            { label: 'SQLite / PostgreSQL', link: '/guide/databases/' },
             { label: 'IoT & Edge (MQTT)', link: '/guide/iot-edge/' },
-            { label: 'Production Operations', link: '/guide/production/' },
-          ],
-        },
-        {
-          label: 'Framework Integrations',
-          collapsed: true,
-          items: [
-            { label: 'Overview', link: '/guide/integrations/' },
-            { label: 'Hono', link: '/guide/hono/' },
-            { label: 'Elysia', link: '/guide/elysia/' },
-          ],
-        },
-        {
-          label: 'Performance',
-          collapsed: true,
-          items: [
-            { label: 'Benchmarks', link: '/guide/benchmarks/' },
-            { label: 'v2.9.4 Performance', link: '/guide/version-performance-2-9-4/' },
-            { label: 'SDK Performance', link: '/guide/sdk-benchmarks/' },
-            { label: 'bunqueue vs BullMQ', link: '/guide/comparison/' },
           ],
         },
         {
@@ -327,16 +313,19 @@ export default defineConfig({
           collapsed: true,
           items: [
             { label: 'All Recipes', link: '/examples/' },
-            { label: 'PostgreSQL Multi-Broker', link: '/examples/postgres-multibroker/' },
-            { label: 'Docker Topology', link: '/examples/postgres-multibroker/docker/' },
             {
-              label: 'Queues & Workers',
-              link: '/examples/postgres-multibroker/queues-workers/',
+              label: 'PostgreSQL Multi-Broker',
+              collapsed: true,
+              items: [
+                { label: 'Overview', link: '/examples/postgres-multibroker/' },
+                { label: 'Docker Topology', link: '/examples/postgres-multibroker/docker/' },
+                { label: 'Queues & Workers', link: '/examples/postgres-multibroker/queues-workers/' },
+                { label: 'Reliability Controls', link: '/examples/postgres-multibroker/reliability/' },
+                { label: 'Durable Flows', link: '/examples/postgres-multibroker/flows/' },
+                { label: 'Operations', link: '/examples/postgres-multibroker/operations/' },
+                { label: 'Validation Report', link: '/examples/postgres-multibroker/validation/' },
+              ],
             },
-            { label: 'Reliability Controls', link: '/examples/postgres-multibroker/reliability/' },
-            { label: 'Durable Flows', link: '/examples/postgres-multibroker/flows/' },
-            { label: 'Production Operations', link: '/examples/postgres-multibroker/operations/' },
-            { label: 'Validation Report', link: '/examples/postgres-multibroker/validation/' },
           ],
         },
         {
@@ -345,47 +334,46 @@ export default defineConfig({
           items: [
             { label: 'API Reference (by version)', link: '/reference/' },
             { label: 'HTTP API', link: '/api/http/' },
-            { label: 'TCP Protocol', link: '/api/tcp/' },
+            {
+              label: 'TCP Protocol',
+              collapsed: true,
+              items: [
+                { label: 'Overview', link: '/api/tcp/' },
+                { label: 'Jobs', link: '/api/tcp/jobs/' },
+                { label: 'Queries', link: '/api/tcp/queries/' },
+                { label: 'Control & Limits', link: '/api/tcp/control/' },
+                { label: 'Dead Letter Queue', link: '/api/tcp/dlq/' },
+                { label: 'Cron', link: '/api/tcp/cron/' },
+                { label: 'Flows', link: '/api/tcp/flows/' },
+                { label: 'Monitoring', link: '/api/tcp/monitoring/' },
+                { label: 'Workers & Webhooks', link: '/api/tcp/workers/' },
+              ],
+            },
             { label: 'TypeScript Types', link: '/api/types/' },
             { label: 'Glossary', link: '/guide/glossary/' },
-          ],
-        },
-        {
-          label: 'Architecture',
-          collapsed: true,
-          items: [
-            { label: 'Overview', link: '/architecture/' },
-            { label: 'Client SDK', link: '/architecture/client-sdk/' },
-            { label: 'Domain Layer', link: '/architecture/domain-layer/' },
-            { label: 'Application Layer', link: '/architecture/application-layer/' },
-            { label: 'TCP Protocol', link: '/architecture/tcp-protocol/' },
-            { label: 'Persistence', link: '/architecture/persistence/' },
-            { label: 'Model-Based Testing', link: '/architecture/model-based-testing/' },
-            { label: 'Data Structures', link: '/architecture/data-structures/' },
-            { label: 'Cron Scheduler', link: '/architecture/cron-scheduler/' },
-          ],
-        },
-        {
-          label: 'Blog',
-          collapsed: true,
-          items: [
-            { label: 'All Posts', link: '/blog/' },
-            { label: 'Why bunqueue: SQLite Over Redis', link: '/blog/why-bunqueue/' },
-            { label: 'Getting Started in 5 Minutes', link: '/blog/getting-started-five-minutes/' },
-            { label: 'Sharding Architecture Deep Dive', link: '/blog/sharding-deep-dive/' },
-            { label: 'bunqueue vs BullMQ Benchmarks', link: '/blog/benchmarks-vs-bullmq/' },
-            { label: 'Reliable Workers & Stall Detection', link: '/blog/reliable-workers/' },
-            { label: 'Dead Letter Queues', link: '/blog/dead-letter-queues/' },
-            { label: 'Cron Jobs & Scheduling', link: '/blog/cron-scheduling/' },
-            { label: 'Auto-Batching: 3x Throughput', link: '/blog/auto-batching/' },
-            { label: 'Production Deployment', link: '/blog/production-deployment/' },
-            { label: 'Hono & Elysia Integrations', link: '/blog/framework-integrations/' },
-            { label: 'S3 Backup & Disaster Recovery', link: '/blog/s3-backup-recovery/' },
-            { label: 'Job Pipelines with FlowProducer', link: '/blog/job-pipelines-flows/' },
-            { label: 'Rate Limiting & Concurrency', link: '/blog/rate-limiting-concurrency/' },
             {
-              label: 'Workflow Engine: Orchestration Without Temporal',
-              link: '/blog/workflow-engine/',
+              label: 'Performance',
+              collapsed: true,
+              items: [
+                { label: 'Benchmarks', link: '/guide/benchmarks/' },
+                { label: 'SDK Performance', link: '/guide/sdk-benchmarks/' },
+                { label: 'v2.9.4 Performance', link: '/guide/version-performance-2-9-4/' },
+              ],
+            },
+            {
+              label: 'Internals',
+              collapsed: true,
+              items: [
+                { label: 'Overview', link: '/architecture/' },
+                { label: 'Client SDK', link: '/architecture/client-sdk/' },
+                { label: 'Domain Layer', link: '/architecture/domain-layer/' },
+                { label: 'Application Layer', link: '/architecture/application-layer/' },
+                { label: 'TCP Protocol', link: '/architecture/tcp-protocol/' },
+                { label: 'Persistence', link: '/architecture/persistence/' },
+                { label: 'Model-Based Testing', link: '/architecture/model-based-testing/' },
+                { label: 'Data Structures', link: '/architecture/data-structures/' },
+                { label: 'Cron Scheduler', link: '/architecture/cron-scheduler/' },
+              ],
             },
           ],
         },
@@ -395,6 +383,7 @@ export default defineConfig({
           items: [
             { label: 'Troubleshooting', link: '/troubleshooting/' },
             { label: 'Changelog', link: '/changelog/' },
+            { label: 'Blog', link: '/blog/' },
             { label: 'Queue Simulator', link: '/simulator/' },
             { label: 'Security', link: '/security/' },
             { label: 'Contributing', link: '/contributing/' },

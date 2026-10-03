@@ -9,8 +9,12 @@
   line-height: 1.75;
 }
 
-:root[data-has-sidebar] .sl-markdown-content > :is(p, ul, ol, blockquote) {
-  max-width: 76ch;
+/* Prose measure. `ch` is the width of "0" (10.1px in Inter at 16px) while an average
+   character of body text is about 7.5px, so 56ch holds about 75 characters per line,
+   inside the 65-80 range that reads comfortably. Code, tables, asides and diagrams
+   keep the full column. */
+:root[data-has-sidebar] .sl-markdown-content > :is(p, ul, ol, blockquote, dl) {
+  max-width: 56ch;
 }
 
 :root[data-has-sidebar] .sl-markdown-content :is(p, li) {
@@ -62,7 +66,7 @@
 }
 
 :root[data-has-sidebar] .bq-hero .bq-hero-sub {
-  max-width: 72ch;
+  max-width: 56ch;
   margin-top: 18px;
   font-size: 1.05rem;
   color: var(--docs-muted);

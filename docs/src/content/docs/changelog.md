@@ -18,6 +18,63 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## Unreleased
+
+### Documentation
+
+- **AI agents on the homepage.** A new section below the Academy presents the
+  MCP server's opt-in features (toolsets, confirmation of destructive calls,
+  decision models) with the setup command, an example confirmation and the
+  supported decision models (Jev, Clef, Clef-flash, Kev 9B, Laya,
+  DiffusionGemma Jev); a second "New" announcement in the hero links to it.
+- **MCP guide rewritten for first-time readers.** It now starts with a
+  three-step setup with tabs per client, then explains where the queue lives,
+  HTTP handlers and the optional features, with the HTTP server, workflow
+  approvals, the parameter details and the environment variables after them.
+  Every anchor that other pages link to is kept.
+- **A first job in about a minute, the same everywhere.** The Quick Start now
+  opens with three numbered steps for each path (start the server or install
+  bunqueue, save the file and run it, see the expected output) in Node.js, Bun,
+  Deno, Python, PHP, Go, Rust, Elixir and embedded Bun, followed by a table of
+  where to go next; the video follows the first job. The homepage quickstart,
+  the Quick Start and the README now show the same files from one source,
+  checked by `test/docs-homepage-snippets.test.ts`.
+- **Simpler navigation.** The sidebar goes from 17 groups to 11, starting with
+  the Quick Start: cron, the dead letter queue and flows share one group, a new
+  AI Agents group holds the MCP server and the agent integrations, and blog
+  posts are listed on the blog page. No URL changed. The header keeps Academy,
+  AI Agents, Dashboard and Blog; "vs BullMQ", the simulator and `llms.txt` moved
+  to the sidebar and the footer.
+- **A refreshed look.** Page titles use the homepage's condensed typeface,
+  code blocks use cleaner GitHub-style colors without the fake terminal
+  window, inline code is neutral instead of pink, and notes, tips and warnings
+  use one thin border in the colors of job states. The sidebar and the
+  table of contents mark the current page with a thin pink rail.
+- **Easier reading.** Guide paragraphs hold about 75 characters per line
+  instead of about 100. On phones, tables become one card per row instead of
+  scrolling sideways, and the page title starts higher.
+- **Leaner site stylesheet.** `custom.css` loses about 1,500 lines of rules for
+  components no page renders any more: earlier homepage designs with their
+  syntax colors, hero grid and benchmark card, the first queue simulator's
+  lanes, the step list, and the terminal, language, trust and vs-BullMQ cards.
+  The main site stylesheet shrinks from 154 KB to 130 KB (26.4 KB to 22.8 KB
+  gzipped) and no page looks any different.
+- **TCP protocol reference in nine pages.** `/api/tcp/` keeps the wire format,
+  connection, negotiation, pipelining, authentication, response format and
+  limits, plus a command summary that links every command to its section. The
+  command reference moved, unchanged, to eight pages under `/api/tcp/`: jobs,
+  queries, control and limits, DLQ, cron, flows, monitoring, and workers and
+  webhooks. Command and family anchors now live on those pages.
+- **A professional README for `bunqueue-client`.** The npm page of the
+  TypeScript client now opens with the standard SDK header, then the same
+  tested quick start as the docs (start the server, save `jobs.mjs`, run it),
+  waiting for a result with `QueueEvents`, a runtime support table (Node.js 20+,
+  Bun 1.4+, Deno 2+, Cloudflare Workers), and notes on ESM-only loading,
+  CommonJS bundling, embedded mode and Deno. The migration guide from 0.1.x
+  keeps its anchor. `test/docs-homepage-snippets.test.ts` now also fails if this
+  quick start drifts from the docs. npm shows the new README with the next
+  `bunqueue-client` release.
+
 ## [2.9.8] - 2026-10-03
 
 ### MCP server
