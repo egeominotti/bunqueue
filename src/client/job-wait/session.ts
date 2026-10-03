@@ -1,5 +1,6 @@
 /** The state of one job wait: settles once, owns its timers, coalesces state reads. */
 
+import { armDeadlineTimer, type DeadlineTimer } from './deadlineTimer';
 import type { ReadSchedule, ReadScheduler, ScheduledReads } from './readScheduler';
 import { isTransientError, type Outcome, type OutcomeReader, type WaitLimit } from './types';
 
@@ -24,7 +25,7 @@ export class JobWaitSession {
   private done = false;
   private readonly cleanups: Array<() => void> = [];
   private readonly sleeps = new Map<Timer, () => void>();
-  private deadlineTimer: Timer | undefined;
+  private deadlineTimer: DeadlineTimer | undefined;
   private reads: ScheduledReads | undefined;
   private firstRead: Promise<void> | undefined;
   private reading = false;
@@ -39,7 +40,7 @@ export class JobWaitSession {
   settle(outcome: Outcome): void {
     if (this.done) return;
     this.done = true;
-    clearTimeout(this.deadlineTimer);
+    this.deadlineTimer?.clear();
     this.reads?.stop();
     for (const [timer, wake] of this.sleeps) {
       clearTimeout(timer);
@@ -95,26 +96,27 @@ export class JobWaitSession {
   /**
    * Reject with the limit's message at its deadline, after one more read when the
    * budget allows (at most 1 s), so a job that finished unseen settles on its outcome.
+   * A deadline beyond the runtime's timer limit is armed in chunks (`deadlineTimer.ts`);
+   * its timers keep the process alive, so a script awaiting the wait does not exit.
    */
   armDeadline(limit: WaitLimit): void {
     if (this.done || !Number.isFinite(limit.deadline)) return;
     const timedOut = { error: new Error(limit.message) };
-    this.deadlineTimer = setTimeout(
-      () => {
-        if (!this.options.scheduler.tryTake()) {
-          this.settle(timedOut);
-          return;
-        }
-        // Kept alive like the TTL itself: a script waiting on this wait must not exit
-        // while the last read is pending.
-        this.deadlineTimer = setTimeout(() => this.settle(timedOut), FINAL_READ_MS);
-        void this.outcome().then(
-          (outcome) => this.settle(outcome ?? timedOut),
-          () => this.settle(timedOut)
-        );
-      },
-      Math.max(0, limit.deadline - Date.now())
-    );
+    this.deadlineTimer = armDeadlineTimer(limit.deadline, () => {
+      if (!this.options.scheduler.tryTake()) {
+        this.settle(timedOut);
+        return;
+      }
+      // Kept alive like the TTL itself: a script waiting on this wait must not exit
+      // while the last read is pending.
+      this.deadlineTimer = armDeadlineTimer(Date.now() + FINAL_READ_MS, () =>
+        this.settle(timedOut)
+      );
+      void this.outcome().then(
+        (outcome) => this.settle(outcome ?? timedOut),
+        () => this.settle(timedOut)
+      );
+    });
   }
 
   /** Resolve after `ms`, or at once when the wait settles; never keeps the process alive. */

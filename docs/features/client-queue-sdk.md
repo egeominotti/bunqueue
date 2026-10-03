@@ -47,8 +47,9 @@ Owns:
 - The one job wait behind `Queue.waitJobUntilFinished` and every
   `Job.waitUntilFinished` — jobs from `add`/`addBulk`, queries, FlowProducer,
   DLQ entries, and Worker/SandboxedWorker events (`client/jobWait.ts`, with
-  `client/job-wait/`: `session.ts`, `readers.ts`, `managerDispatch.ts`,
-  `emitterDispatch.ts`, `brokerWait.ts`, `types.ts`).
+  `client/job-wait/`: `session.ts`, `deadlineTimer.ts`, `readers.ts`,
+  `managerDispatch.ts`, `emitterDispatch.ts`, `brokerWait.ts`, `holdLimiter.ts`,
+  `readScheduler.ts`, `types.ts`).
 - BullMQ-compatible error classes `UnrecoverableError` / `DelayedError` (`errors.ts`).
 
 Does NOT own:
@@ -345,6 +346,15 @@ zero.
     (below) has a token, for at most 1 s, and settles on the outcome if the job
     finished unseen; otherwise it rejects with `Job <id> timed out after <ttl>ms`
     (with QueueEvents) or `waitUntilFinished timed out after <ttl>ms` (without).
+    A TTL of any length holds: Bun and Node.js accept a timer delay of at most
+    2^31 - 1 ms (about 24.8 days) and fire a longer one after 1 ms, so the
+    deadline (an absolute epoch-ms `WaitLimit.deadline`) is armed in chunks of at
+    most 24 days (`DEADLINE_CHUNK_MS`, `armDeadlineTimer` in
+    `job-wait/deadlineTimer.ts`). Each chunk measures what remains against
+    `Date.now()`, so clock drift does not accumulate across chunks and the
+    deadline never fires early; the session keeps the chunk armed now, and
+    settling clears it (`test/job-wait-long-deadline.test.ts`,
+    `test/repro-wait-long-ttl.test.ts`).
   - **Embedded**: every wait registers with one subscription per manager
     (`job-wait/managerDispatch.ts`, a `Map<jobId, Set<watcher>>` created by the
     first wait, released by the last, dropped with its manager), so N waits cost
