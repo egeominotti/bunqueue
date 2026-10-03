@@ -1,7 +1,19 @@
+/**
+ * Job states as getJobState() reports them (src/application/operations/query/state.ts):
+ * a job waiting out its retry backoff is `delayed`, and a job in the DLQ is `failed`.
+ */
+export type JourneyJobState = 'waiting' | 'active' | 'delayed' | 'completed' | 'failed';
+
 export interface JourneyStep {
+  /**
+   * The attempt in this step throws. The job is still `active` while it runs, so the
+   * state chip alone cannot show it; the rail and the card add a "fails" cue.
+   */
+  attemptFails?: true;
+  /** One sentence; text between backticks renders as inline code. */
   detail: string;
   label: string;
-  tone: 'default' | 'failure' | 'retry' | 'success';
+  state: JourneyJobState;
 }
 
 export interface JobJourney {
@@ -15,23 +27,23 @@ export const JOB_JOURNEYS = {
     steps: [
       {
         label: 'Producer',
-        detail: 'queue.add() persists the job and returns its ID.',
-        tone: 'default',
+        state: 'waiting',
+        detail: '`queue.add()` persists the job and returns its ID.',
       },
       {
         label: 'Ready queue',
+        state: 'waiting',
         detail: 'The job is eligible and waits in scheduling order.',
-        tone: 'default',
       },
       {
         label: 'Worker',
+        state: 'active',
         detail: 'One worker claims the job and owns its active attempt.',
-        tone: 'default',
       },
       {
         label: 'Completed',
+        state: 'completed',
         detail: 'The ACK saves the result and releases the concurrency slot.',
-        tone: 'success',
       },
     ],
   },
@@ -40,38 +52,39 @@ export const JOB_JOURNEYS = {
     steps: [
       {
         label: 'Producer',
-        detail: 'queue.add() persists the job with attempts and backoff.',
-        tone: 'default',
+        state: 'waiting',
+        detail: '`queue.add()` persists the job with attempts and backoff.',
       },
       {
         label: 'Ready queue',
+        state: 'waiting',
         detail: 'The first attempt becomes eligible for a worker.',
-        tone: 'default',
       },
       {
         label: 'Attempt 1',
+        state: 'active',
         detail: 'The worker throws, so bunqueue records a failed attempt.',
-        tone: 'failure',
+        attemptFails: true,
       },
       {
         label: 'Retry delay',
+        state: 'delayed',
         detail: 'Backoff keeps the job ineligible until its retry time.',
-        tone: 'retry',
       },
       {
         label: 'Ready again',
-        detail: 'The delayed job is promoted back into scheduling order.',
-        tone: 'default',
+        state: 'waiting',
+        detail: 'Once the backoff elapses, the job is eligible again in scheduling order.',
       },
       {
         label: 'Attempt 2',
+        state: 'active',
         detail: 'A worker claims the next legal attempt.',
-        tone: 'default',
       },
       {
         label: 'Completed',
+        state: 'completed',
         detail: 'The successful ACK stores the result exactly once.',
-        tone: 'success',
       },
     ],
   },
@@ -80,37 +93,52 @@ export const JOB_JOURNEYS = {
     steps: [
       {
         label: 'Producer',
-        detail: 'queue.add() persists the job with a finite attempt budget.',
-        tone: 'default',
+        state: 'waiting',
+        detail: '`queue.add()` persists the job with a finite attempt budget.',
       },
       {
         label: 'Ready queue',
+        state: 'waiting',
         detail: 'The job becomes eligible for its first attempt.',
-        tone: 'default',
       },
       {
         label: 'Attempt 1',
+        state: 'active',
         detail: 'Processing fails and consumes one attempt.',
-        tone: 'failure',
+        attemptFails: true,
       },
       {
         label: 'Retry delay',
+        state: 'delayed',
         detail: 'Backoff prevents an immediate hot retry.',
-        tone: 'retry',
       },
       {
         label: 'Final attempt',
+        state: 'active',
         detail: 'The worker fails after the remaining attempt is claimed.',
-        tone: 'failure',
+        attemptFails: true,
       },
       {
         label: 'Dead letter queue',
+        state: 'failed',
         detail: 'The terminal failure stays available for inspection or replay.',
-        tone: 'failure',
       },
     ],
   },
 } as const satisfies Record<string, JobJourney>;
+
+export interface DetailPart {
+  code: boolean;
+  text: string;
+}
+
+/** Splits a step detail on backticks: odd segments are inline code. */
+export function detailParts(detail: string): DetailPart[] {
+  return detail
+    .split('`')
+    .map((text, index) => ({ code: index % 2 === 1, text }))
+    .filter(({ text }) => text.length > 0);
+}
 
 export function clampJourneyStep(index: number, totalSteps: number): number {
   if (!Number.isFinite(index) || totalSteps <= 0) return 0;
@@ -169,6 +197,26 @@ export const TOPOLOGIES: Topology[] = [
     links: ['TCP through a load balancer', 'transactional coordination'],
   },
 ];
+
+function lowerFirstWord(label: string): string {
+  const [first = '', ...rest] = label.split(' ');
+  if (first.length < 2) return label;
+  return [first[0].toLowerCase() + first.slice(1), ...rest].join(' ');
+}
+
+/**
+ * The diagram as one sentence per layer, for its text alternative, e.g.
+ * "Client processes: Producer, Worker A, Worker B. Via TCP to queue service: bunqueue broker."
+ */
+export function describeTopology(topology: Topology): string {
+  return topology.layers
+    .map(({ label, nodes }, index) => {
+      const members = nodes.join(', ');
+      if (index === 0) return `${label}: ${members}.`;
+      return `Via ${topology.links[index - 1]} to ${lowerFirstWord(label)}: ${members}.`;
+    })
+    .join(' ');
+}
 
 export function resolveTopology(value: string | undefined): Topology {
   return TOPOLOGIES.find(({ id }) => id === value) ?? TOPOLOGIES[0];

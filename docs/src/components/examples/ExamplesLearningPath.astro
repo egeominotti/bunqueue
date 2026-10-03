@@ -1,47 +1,66 @@
 ---
+/**
+ * The five stages of /examples/, in reading order. Each stage is one row: a numbered
+ * node on a rail, the stage link, and one line on what it covers. The whole row is a
+ * click target for the stage link; stage 2 also links straight to its three recipes.
+ * Plain HTML in reading order, styled by examples-learning.css (not-content, so the
+ * theme's Markdown rules stay out).
+ */
 import './examples-learning.css';
 ---
 
-<nav class="ex-learning" aria-label="Examples learning path">
-  <ol>
-    <li>
-      <span class="ex-learning-index" aria-hidden="true">01</span>
-      <div>
-        <strong><a href="#minimal-queue-and-worker">Run one job</a></strong>
-        <p>Start with one queue and one worker in the same process.</p>
+<nav class="ex-learning not-content" aria-label="Examples learning path">
+  <ol class="ex-learning-steps" role="list">
+    <li class="ex-learning-step">
+      <span class="ex-learning-num" aria-hidden="true">1</span>
+      <div class="ex-learning-card">
+        <a class="ex-learning-title" href="#minimal-queue-and-worker">Run one job</a>
+        <div class="ex-learning-body">
+          <p class="ex-learning-note">Start with one queue and one worker in the same process.</p>
+        </div>
       </div>
     </li>
-    <li>
-      <span class="ex-learning-index" aria-hidden="true">02</span>
-      <div>
-        <strong><a href="#understand-the-job-lifecycle">Make failure predictable</a></strong>
-        <p>Follow the lifecycle, then add retries, schedules, and idempotency.</p>
-        <span class="ex-learning-links">
-          <a href="#retries-and-the-dead-letter-queue">Retries</a>
-          <a href="#scheduled-and-repeating-jobs">Schedules</a>
-          <a href="#deduplicate-jobs-with-jobid">Deduplication</a>
-        </span>
+    <li class="ex-learning-step">
+      <span class="ex-learning-num" aria-hidden="true">2</span>
+      <div class="ex-learning-card">
+        <a class="ex-learning-title" href="#understand-the-job-lifecycle">Make failure predictable</a>
+        <div class="ex-learning-body">
+          <p class="ex-learning-note">Follow the lifecycle, then add retries, schedules, and idempotency.</p>
+          <ul class="ex-learning-links" role="list" aria-label="Recipes in this stage">
+            <li><a href="#retries-and-the-dead-letter-queue">Retries</a></li>
+            <li><a href="#scheduled-and-repeating-jobs">Schedules</a></li>
+            <li><a href="#deduplicate-jobs-with-jobid">Deduplication</a></li>
+          </ul>
+        </div>
       </div>
     </li>
-    <li>
-      <span class="ex-learning-index" aria-hidden="true">03</span>
-      <div>
-        <strong><a href="#choose-a-deployment-topology">Split into processes</a></strong>
-        <p>Move to TCP, observe events, and shut workers down safely.</p>
+    <li class="ex-learning-step">
+      <span class="ex-learning-num" aria-hidden="true">3</span>
+      <div class="ex-learning-card">
+        <a class="ex-learning-title" href="#choose-a-deployment-topology">Split into processes</a>
+        <div class="ex-learning-body">
+          <p class="ex-learning-note">Move to TCP, observe events, and shut workers down safely.</p>
+        </div>
       </div>
     </li>
-    <li>
-      <span class="ex-learning-index" aria-hidden="true">04</span>
-      <div>
-        <strong><a href="#workflow-automatic-rollback-on-failure">Orchestrate workflows</a></strong>
-        <p>Coordinate compensation and human decisions after queue fundamentals are clear.</p>
+    <li class="ex-learning-step">
+      <span class="ex-learning-num" aria-hidden="true">4</span>
+      <div class="ex-learning-card">
+        <a class="ex-learning-title" href="#workflow-automatic-rollback-on-failure">Orchestrate workflows</a>
+        <div class="ex-learning-body">
+          <p class="ex-learning-note">
+            Coordinate compensation and human decisions after queue fundamentals are clear.
+          </p>
+        </div>
       </div>
     </li>
-    <li>
-      <span class="ex-learning-index" aria-hidden="true">05</span>
-      <div>
-        <strong><a href="#end-to-end-example-projects">Scale to multiple brokers</a></strong>
-        <p>Finish with the tested PostgreSQL topology and its engineering report.</p>
+    <li class="ex-learning-step">
+      <span class="ex-learning-num" aria-hidden="true">5</span>
+      <div class="ex-learning-card">
+        <a class="ex-learning-title" href="#end-to-end-example-projects">Scale to multiple brokers</a>
+        <div class="ex-learning-body">
+          <p class="ex-learning-note">Finish with the tested PostgreSQL topology and its engineering report.</p>
+        </div>
       </div>
     </li>
   </ol>

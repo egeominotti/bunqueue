@@ -35,26 +35,36 @@ head:
   turning its lane and panel titles into large page headings. Those theme
   rules now skip widgets and diagrams marked `.not-content`, as Starlight's
   own styles do, and a test keeps it that way.
-- **The simulator and the dashboard diagram in one visual language.** The
-  queue simulator and the Web Dashboard architecture diagram now share the MCP
-  diagrams' style: hairline panels on the docs color
-  tokens, sentence-case labels instead of uppercase tags, monospace only for
-  ids, ports and code, brand pink only for the subject or the active choice,
-  and one job-state palette everywhere (waiting gray, delayed indigo, retry
-  amber, active pink, completed teal, failed rose). Each one follows its own
-  width, so it no longer cramps next to the sidebar and stacks cleanly on
+- **Every docs graphic in one visual language.** The simulator, the Web
+  Dashboard architecture diagram and the three explainers on the Examples page
+  now share the MCP diagrams' style: hairline panels on the docs color tokens,
+  sentence-case labels instead of uppercase tags, monospace only for ids, ports
+  and code, brand pink only for the subject or the active choice, and one
+  job-state palette for every state they show (waiting gray, delayed indigo,
+  retry amber, active pink, completed teal, failed rose). Each one follows its
+  own width, so it no longer cramps next to the sidebar and stacks cleanly on
   phones without scrolling the page sideways.
 - **Simulator.** Lanes, chips, counters, the event log and the shard map use
   that palette; chips show the id, job name and queue on separate lines;
   sliders announce their units; speed and queue choices expose their pressed
-  state and the last scenario run is marked current; counts are spelled out next to every color; and reduced
-  motion turns off its animations. Its behavior is unchanged.
+  state and the last scenario run is marked current; counts are spelled out
+  next to every color; and reduced motion turns off its animations. Its
+  behavior is unchanged.
 - **Web Dashboard diagram.** It now draws two separate links to the server,
   `HTTP :6790` from the UI server's `/api/*` proxy and `TCP :6789` from the
   control agent's SDK bridges, shows the UI server bridging `/agent/*` to the
   agent and the optional Copilot calling the AI provider directly. The guide
   also corrects how long tokens last: they are kept in memory only, so
   reloading the page clears them.
+- **Examples page.** The learning path is a compact numbered rail of clickable
+  rows. The job lifecycle explorer shows every step with the state bunqueue
+  reports, marks the attempts that throw with "✕ fails", and explains the
+  current step in a card that screen readers announce. The topology explorer
+  draws each layer as a zone joined by labelled links, with a one-line summary
+  and the durability owner. All three lay themselves out by their own width,
+  so they stack before a label or node name would have to wrap mid-word, and
+  both explorers keep the same height whichever option is chosen and work
+  fully from the keyboard.
 - **AI agents on the homepage.** A new section below the Academy presents the
   MCP server's opt-in features (toolsets, confirmation of destructive calls,
   decision models) with the setup command, an example confirmation and the

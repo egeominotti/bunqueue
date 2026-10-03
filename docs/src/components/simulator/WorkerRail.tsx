@@ -17,7 +17,7 @@ export default function WorkerRail({
       {workers.length === 0 ? (
         <p className="panel-empty">No workers. Start one to process jobs.</p>
       ) : (
-        <ul className="worker-list">
+        <ul className="worker-list" role="list">
           {workers.map((w) => (
             <li key={w.id} className={`worker-card is-${w.status}`}>
               <div className="worker-top">

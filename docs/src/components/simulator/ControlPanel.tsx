@@ -144,7 +144,7 @@ export default function ControlPanel({
           </button>
         </div>
         {snap.queues.length > 0 && (
-          <ul className="queue-list" aria-label="Queues">
+          <ul className="queue-list" role="list" aria-label="Queues">
             {snap.queues.map((q) => (
               <li key={q.name}>
                 <QueueRow

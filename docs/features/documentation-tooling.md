@@ -153,17 +153,31 @@ reading order changes, so inbound links remain valid.
 The page's small visual system lives under `docs/src/components/examples/`.
 `ExamplesLearningPath.astro` provides direct anchor navigation, while
 `JobJourney.astro` and `TopologyExplorer.astro` use guarded custom elements for
-progressive enhancement. Their first server-rendered state is meaningful
-without JavaScript. Native buttons, `aria-pressed`, `aria-current`, live status
-text, visible keyboard focus, and reduced-motion styling are required parts of
-the component contract.
+progressive enhancement; their first server-rendered state is meaningful without
+JavaScript, and the load-time sync never writes to a live region. Each root is
+`.not-content` and uses only the docs tokens. Layout follows the widget's own
+width, not the viewport: `.ex-panel` and `.ex-learning` are named inline-size
+containers and every breakpoint is an `@container` query (journey and topology
+stack at 44rem, measured to need 41rem side by side; the learning path stacks at
+36rem), because the content column is 504 to 818px wide on desktop windows
+depending on the open sidebars. Styles live in `examples-learning.css`,
+`examples-explainers.css` (shared frame, choice buttons, state chips, the failure
+cue, option stacking), `examples-journey.css` and `examples-topology.css`. Each
+lifecycle step carries the state `getJobState()` reports, and attempts that
+throw (`attemptFails`) also show an icon-and-text "fails" cue. Options share one
+grid cell (`[hidden]` = `visibility: hidden`), so switching never changes height;
+the journey card's size-holding copies are `aria-hidden` and
+`data-pagefind-ignore`. Native buttons, `aria-pressed`, `aria-current`,
+`aria-disabled` previous/next that keep focus, live status text, visible focus,
+and reduced-motion styling are part of the contract.
 
-`explainerModels.ts` is the shared source for lifecycle routes and deployment
-topologies. `test/docs-examples-page.test.ts` verifies the page order, anchor
-targets, model boundaries, topology progression, accessibility hooks, and the
-300-line file limit. The unit validation image copies only this explicit
-component subtree in addition to the documentation content already required by
-the test suite.
+`explainerModels.ts` is the shared source for routes, topologies,
+`describeTopology()` (the diagram's text alternative) and `detailParts()`;
+`test/docs-examples-page.test.ts` covers page order, anchors, models, these
+helpers, accessibility hooks, the container-query layout, and the 300-line
+limit for every file in the directory. The unit validation image copies only
+this explicit component subtree in addition to the documentation content
+already required by the test suite.
 
 ## Homepage onboarding
 

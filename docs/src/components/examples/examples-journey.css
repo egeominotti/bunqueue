@@ -1,0 +1,281 @@
+/* JobJourney.astro: one job's states as numbered nodes on a rail, the current step
+   explained in the card below it, and previous/next controls. The current node and
+   the card edge take the current job state's color; nothing else is colored. */
+
+.ex-journey {
+  --exj-node: 1.5rem;
+  --exj-gap: 0.5rem;
+}
+
+.ex-journey .ex-route-stage {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  background: var(--docs-panel);
+}
+
+.ex-journey .ex-route {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--exj-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ex-journey .ex-route li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.ex-route-node {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--exj-node);
+  height: var(--exj-node);
+  margin-bottom: 0.2rem;
+  border: 1px solid var(--docs-line);
+  border-radius: 50%;
+  background: var(--sl-color-bg);
+  color: var(--docs-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+/* The rail to the next node: dashed ahead of the job, solid where it has been. */
+.ex-journey .ex-route li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--exj-node) / 2);
+  right: calc(-1 * var(--exj-gap) + 5px);
+  left: calc(var(--exj-node) + 5px);
+  border-top: 1px dashed color-mix(in srgb, var(--docs-muted) 50%, transparent);
+}
+
+.ex-journey .ex-route li[data-state='done']::before {
+  border-top-style: solid;
+  border-top-color: var(--docs-muted);
+}
+
+.ex-route-label {
+  color: var(--docs-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* The state chip, plus "fails" for an attempt that throws. Wraps under the chip in a
+   narrow rail column. */
+.ex-route-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.4rem;
+}
+
+.ex-route li[data-state='done'] .ex-route-node {
+  border-color: var(--docs-muted);
+  color: var(--sl-color-text);
+}
+
+.ex-route li[data-state='done'] .ex-route-label,
+.ex-route li[data-state='current'] .ex-route-label {
+  color: var(--sl-color-text);
+}
+
+.ex-route li[data-state='current'] .ex-route-label {
+  font-weight: 700;
+}
+
+.ex-route li[data-state='current'] .ex-route-node {
+  border-color: var(--ex-state);
+  background: var(--ex-state);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ex-state) 20%, transparent);
+  color: var(--sl-color-bg);
+}
+
+/* The current step, explained. Every detail is also laid out invisibly in the same
+   cell, so the card keeps the height of the longest one. */
+.ex-journey .ex-now {
+  margin: 0.75rem 0 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--docs-line);
+  border-left: 3px solid var(--ex-state);
+  border-radius: var(--docs-radius);
+  background: var(--docs-panel);
+  transition: border-color 160ms ease;
+}
+
+.ex-now-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.55rem;
+}
+
+.ex-now-head strong {
+  color: var(--sl-color-text);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.ex-journey .ex-now-text {
+  margin: 0;
+}
+
+.ex-now-detail {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--sl-color-text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.ex-now-ghost {
+  visibility: hidden;
+}
+
+.ex-step-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.ex-step-controls button {
+  min-height: 2.5rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--docs-line);
+  border-radius: var(--docs-radius);
+  background: var(--docs-panel);
+  color: var(--sl-color-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ex-step-controls button:first-child {
+  justify-self: start;
+}
+
+.ex-step-controls button:last-child {
+  justify-self: end;
+}
+
+.ex-step-controls button:hover:not([aria-disabled='true']) {
+  border-color: color-mix(in srgb, var(--docs-muted) 50%, var(--docs-line));
+  background: var(--docs-hover);
+}
+
+/* At either end: no fill, dashed edge, muted label. The button keeps focus. */
+.ex-step-controls button[aria-disabled='true'] {
+  border-style: dashed;
+  background: transparent;
+  color: var(--docs-muted);
+  cursor: not-allowed;
+}
+
+.ex-step-count {
+  color: var(--docs-muted);
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A narrow widget: the rail runs down the left, the chips at each row's end. The
+   seven-step rail needs 41rem (656px, measured) of widget width for every label and
+   chip to fit its column on whole words; switching at 44rem keeps a margin. */
+@container ex-panel (max-width: 44rem) {
+  .ex-journey .ex-route-stage {
+    padding: 0.85rem;
+  }
+
+  .ex-journey .ex-route {
+    grid-auto-columns: auto;
+    grid-auto-flow: row;
+    align-content: start;
+    gap: 0.7rem;
+  }
+
+  .ex-journey .ex-route li {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .ex-route-node {
+    margin-bottom: 0;
+  }
+
+  .ex-route-label {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ex-route-tags {
+    flex-wrap: nowrap;
+  }
+
+  .ex-journey .ex-route li:not(:last-child)::before {
+    top: calc(var(--exj-node) + 3px);
+    right: auto;
+    bottom: calc(-0.7rem + 3px);
+    left: calc(var(--exj-node) / 2 - 0.5px);
+    border-top: 0;
+    border-left: 1px dashed color-mix(in srgb, var(--docs-muted) 50%, transparent);
+  }
+
+  .ex-journey .ex-route li[data-state='done']::before {
+    border-left-style: solid;
+    border-left-color: var(--docs-muted);
+  }
+
+  .ex-step-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .ex-step-count {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    text-align: center;
+  }
+
+  .ex-step-controls button {
+    width: 100%;
+  }
+}
+
+/* The word "state" stays for screen readers but leaves the narrowest buttons. */
+@container ex-panel (max-width: 30rem) {
+  .ex-step-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ex-route-node,
+  .ex-journey .ex-now {
+    transition: none;
+  }
+}

@@ -33,7 +33,7 @@ export default function PipelineBoard({ snap }: { snap: Snapshot }) {
                   </h2>
                   <span className="lane-count">{lane.total}</span>
                 </header>
-                <ul className="lane-body">
+                <ul className="lane-body" role="list">
                   {lane.jobs.map((job) => (
                     <Chip
                       key={job.id}

@@ -1,8 +1,9 @@
 import type { SimulatorEngine } from '../../lib/simulator';
 import { SCENARIOS } from '../../lib/simulator';
 
-// One-click demos — the fastest way to see each mechanic move. The last one
-// run stays pressed and its hint is shown below, announced once per click.
+// One-click demos — the fastest way to see each mechanic move. They are one-shot
+// actions, so the last one run is marked current (not pressed) and its hint is
+// shown below, announced once per click.
 export default function ScenarioBar({
   engine,
   selected,

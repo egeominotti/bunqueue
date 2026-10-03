@@ -38,7 +38,7 @@ export default function EventLog({ events }: { events: SimEvent[] }) {
           aria-labelledby="sim-events-title"
           tabIndex={0}
         >
-          <ul className="event-list">
+          <ul className="event-list" role="list">
             {events.map((ev) => (
               <li
                 key={ev.id}

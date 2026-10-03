@@ -23,7 +23,7 @@ const POLL_MS = 120;
 export default function Simulator() {
   const [engine] = useState(() => new SimulatorEngine());
   const [snap, setSnap] = useState(() => engine.snapshot());
-  // The last demo run, for the scenario bar's pressed state. View state only.
+  // The last demo run, marked current in the scenario bar. View state only.
   const [scenario, setScenario] = useState<string | null>(null);
 
   useEffect(() => {
