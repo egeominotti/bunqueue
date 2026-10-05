@@ -31,7 +31,7 @@ Does NOT own:
 
 Internal:
 
-- `src/domain/types/job.ts` is the stable facade: model types live in `src/domain/types/jobs/model.ts`, while creation, ids, locks, payload normalization, state predicates/backoff, and constants are split under `src/domain/job/`.
+- `src/domain/types/job.ts` is the stable facade: model types live in `src/domain/types/jobs/model.ts`, while creation, ids, locks, payload normalization, state predicates/backoff, and constants are split under `src/domain/job/`. The processing-timeout rule (`src/domain/job/timeoutRule.ts`: `processingDeadline`, `processingTimeoutDelay`) is imported directly, not through the facade, by the broker's timeout scheduler and the Worker ([Background Tasks](./background-tasks.md)).
 - `src/domain/queue/shard.ts` — per-shard `getQueue`, `incrementQueued`/`decrementQueued`, `tryAcquireConcurrency`/`tryAcquireRateLimit`, `releaseJobResources`, `addToDlq`, `waitingDeps`/`waitingChildren`, `notify`/`notifyBatch`/`waitForJob` (delegated to `WaiterManager`). See [Core Queue Engine](./core-queue-engine.md).
 - `src/domain/queue/waiterManager.ts` — long-poll notification fan-out.
 - `src/shared/lock.ts` — `withWriteLock`, `RWLock`. See [Concurrency & Locking](./concurrency-and-locking.md).
@@ -114,6 +114,8 @@ plus the batch helpers `ExtractedJob`/`BatchContext`/`FinalizeContext` and
 `groupByProcShard`/`extractJobs`/`groupByQueueShard`/`releaseResources`/
 `finalizeBatchAck` in `ackHelpers.ts`.
 
+`isTimedOut(job, now)` follows `processingDeadline` (`src/domain/job/timeoutRule.ts`): an absent, `0` or NaN `timeout` never times out, a fractional deadline rounds up, and the deadline itself is due, exactly as the timeout scheduler fails jobs. `QueueManager.pull`/`pullWithLock`/`pullBatch`/`pullBatchWithLock` reject a `timeoutMs` outside 0..60,000 ms (NaN, Infinity, negative) with the TCP `PULL` message, before claiming anything.
+
 Job-type helpers re-exported from the `src/domain/types/job.ts` facade: `createJob`, `generateJobId`, `jobId`, `calculateBackoff`, `canRetry`, `isReady`, `isDelayed`, `isExpired`, `isTimedOut`, `normalizeStacktrace`, `createJobLock`, `renewLock`, `isLockExpired`, and the `JobState` const enum.
 
 TCP commands handled (routed in `src/infrastructure/server/handler-routes/jobs.ts:52-76`): **`PUSH`**, **`PUSHB`**, **`PULL`**, **`PULLB`**, **`ACK`**, **`ACKB`**, **`FAIL`**. The batch commands (`PUSHB`/`PULLB`/`ACKB`) map to `pushJobBatch`/`pullJobBatch`/`ackJobBatch`(`WithResults`).
@@ -125,14 +127,14 @@ Events broadcast (`EventType`): `pushed`, `pulled`, `completed`, `failed`, `Retr
 See [data-model](../data-model.md) for full definitions. The central shape is `Job` (`src/domain/types/jobs/model.ts:41-90`). Most relevant fields for the lifecycle:
 
 - Scheduling: `runAt` (createdAt + delay; also the next-retry timestamp), `startedAt`, `completedAt`.
-- Retry: `attempts`, `maxAttempts` (default `3`), `backoff` (default `1000` ms), `backoffConfig` (`{ type: 'fixed' | 'exponential'; delay; maxDelay? }`).
+- Retry: `attempts`, `maxAttempts` (default `3`), `backoff` (default `1000` ms), `backoffConfig` (`{ type; delay; maxDelay? }`: `'fixed'` is fixed, any other type, such as `'exponential'`, `'linear'` or BullMQ's `'custom'`, runs as exponential, as on 2.9.10).
 - Lifetime: `ttl`, `timeout`, `removeOnComplete`, `removeOnFail`.
 - Dedup / identity: `uniqueKey`, `customId`.
 - Dependencies / flow: `dependsOn`, `parentId`, `failParentOnFailure`, `removeDependencyOnFailure`, `ignoreDependencyOnFailure`, `continueParentOnFailure`.
 - Failure: `stacktrace` (capped at `stackTraceLimit`, default `10`).
 - `timeline: JobTimelineEntry[]` — capped at `MAX_TIMELINE_ENTRIES = 20` and persisted as a MessagePack BLOB on lifecycle transitions, so it survives SQLite recovery.
 
-`JobInput` (`src/domain/types/jobs/model.ts:92-137`) is the wire/SDK input; `createJob` (`src/domain/job/create.ts:93-134`) fills defaults from `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`). Note `removeOnComplete`/`removeOnFail` are coerced via `toBoolean` because the wire boundary is not runtime-type-safe (#90, `src/domain/job/create.ts:50-62`). `parseBackoff` (`src/domain/job/create.ts:5-31`) turns the object form of `backoff` into `backoffConfig` and keeps `maxDelay` only when it is a finite number in `0..MAX_BACKOFF_DELAY` (24 h); anything else is dropped so the default cap applies, because embedded `Queue.add`/`addBulk` and cron admission do not run the server validator (atomic flows do, through `validateAtomicFlowBatch`, in both modes). A `null` backoff is treated as absent.
+`JobInput` (`src/domain/types/jobs/model.ts:92-137`) is the wire/SDK input; `createJob` (`src/domain/job/create.ts:108-151`) fills defaults from `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`). Note `removeOnComplete`/`removeOnFail` are coerced via `toBoolean` because the wire boundary is not runtime-type-safe (#90, `src/domain/job/create.ts`). Every public admission path (TCP/HTTP, flows, embedded `Queue.add`/`addBulk`, cron templates) first runs the shared `validateJobOptions` ([Job Options Validation](./job-options-validation.md)), which refuses only what cannot run, so every option value 2.9.10 ran is admitted. `createJob` first applies `normalizeJobInput` (`src/domain/job/optionNormalize.ts`, also applied by `QueueManager.push/pushBatch` and the PostgreSQL engine): a numeric string is its number, `maxAttempts` 0 is stored as 1 (it runs once, as on 2.9.10) and a fraction rounds up (so the attempts made never exceed `maxAttempts`), `maxAttempts` above 2,147,483,647 or Infinity is that maximum, and `delay`/`timeout`/`ttl`/`dedup.ttl`/`debounceTtl`/`repeat.every` beyond `MAX_JOB_DURATION_MS` (4.32e15 ms) are clamped. `createJob` still defends internal callers and stored rows: `parseBackoff` turns the object form of `backoff` into `backoffConfig` and keeps `maxDelay` only when it is a finite number in `0..MAX_BACKOFF_DELAY` (24 h), and a NaN or non-number `timestamp`, `delay`, `backoff`/`backoff.delay`, `priority` or `maxAttempts` falls back to now, no delay or the default, so no NaN reaches a `NOT NULL` SQLite column (the write buffer would drop the row). A `null` backoff is treated as absent. A negative `delay` is accepted by the validator and kept as on 2.9.10: `runAt = createdAt + jobRunDelay(delay)` (`src/domain/job/options.ts`, bounded to ±`MAX_JOB_DURATION_MS`), a run time in the past, so the job is created `waiting` (never `delayed`), stays out of the delayed index and, since ready jobs are ordered by `runAt`, goes ahead of ready jobs with a later run time. `ChangeDelay`/`MoveToDelayed` keep a negative delay the same way (`runAt = now + delay`).
 
 `JobState` enum values: `waiting`, `prioritized`, `delayed`, `active`, `completed`, `failed` (`src/domain/types/jobs/model.ts:4-11`). The additional logical states `waiting-children` (dependency gate) and `paused` (queue-level) are represented via shard membership (`waitingDeps`/`waitingChildren`) and `QueueState.paused`, not the enum.
 
@@ -231,8 +233,14 @@ SQLite restart.
    `storage.markActive(...)` for a single handoff (non-fatal on error —
    in-memory is source of truth), bumps counters, and broadcasts `pulled`. It
    returns `false` when a management operation claimed the job before handoff.
-6. If no job and deadline not reached, `await shard.waitForJob(queue, remaining)`
-   and loop; otherwise return `null`.
+6. If no job and deadline not reached, `await shard.waitForJob(queue, wait)`
+   and loop; otherwise return `null`. `wait` is `remaining`, shortened to
+   `max(1, nextRunAt - now)` only when that run time matures before the deadline:
+   a NaN, infinite or far `nextRunAt` (a corrupt or legacy row) waits for a
+   notification or the deadline instead of re-polling every ~1 ms. Readiness is
+   `isReady(job) = !(runAt > now)`, the complement of `isDelayed`, so a NaN run
+   time is due rather than reported `waiting` and never pulled; in a
+   group-scheduled queue it used to loop forever inside one synchronous pull.
 
 `pullJobBatch` pulls up to `count` jobs in one shard lock, acquiring exactly one
 rate-limit and concurrency slot per selected job. A blocked or delayed entry
@@ -282,7 +290,7 @@ before a late SQLite insert. Selective permanent removal then transitions
 `failed` to absent without retrying and releases terminal indexes, custom-ID,
 dependency-result, result/log, and parent flow-failure ownership. 4. Broadcast `failed`; if retried, also broadcast `Retried` (prev `failed`). 5. Flow propagation when NOT retried: `failParentOnFailure` → `onChildTerminalFailure`; `removeDependencyOnFailure`/`ignoreDependencyOnFailure`/`continueParentOnFailure` → `onChildDependencyOption`.
 
-`calculateBackoff` (`src/domain/job/state.ts:37-54`): fixed = `delay * (0.8 + rand*0.4)` (±20% jitter); exponential / default = `base * 2^attempts * (0.5 + rand)` (±50% jitter), capped at `backoffConfig.maxDelay ?? DEFAULT_MAX_BACKOFF` (1 h). The same cap governs stall retries. The processor `DelayedError` re-delay (`calculateDelayedErrorDelay`, same file) uses the base delay without growth or jitter (a non-positive or `NaN` base falls back to `1000`), capped at a positive finite `maxDelay`, else `DEFAULT_MAX_BACKOFF`: a `maxDelay` of `0` does not apply there, so a job that keeps throwing `DelayedError` never re-runs without a wait. `maxDelay` is carried into repeat successors (`buildRepeatSuccessor` copies `backoffConfig`) and cron-spawned jobs (`CronJobOptions.backoff`).
+`calculateBackoff` (`src/domain/job/state.ts`): fixed = `delay * (0.8 + rand*0.4)` (±20% jitter); exponential / default = `base * 2^attempts * (0.5 + rand)` (±50% jitter), capped at `backoffConfig.maxDelay ?? DEFAULT_MAX_BACKOFF` (1 h). It always returns a finite delay >= 0: a zero base is `0` for any attempt count (no `0 * 2^1024 = NaN`), the exponent is capped at 1023, a NaN, negative or missing base uses the 1000 ms default, and an invalid stored `maxDelay` falls back to the 1-hour cap. The same cap governs stall retries. The processor `DelayedError` re-delay (`calculateDelayedErrorDelay`, same file) uses the base delay without growth or jitter (a non-positive or `NaN` base falls back to `1000`), capped at a positive finite `maxDelay`, else `DEFAULT_MAX_BACKOFF`: a `maxDelay` of `0` does not apply there, so a job that keeps throwing `DelayedError` never re-runs without a wait. `maxDelay` is carried into repeat successors (`buildRepeatSuccessor` copies `backoffConfig`) and cron-spawned jobs (`CronJobOptions.backoff`).
 
 ### Batch ack (`ackHelpers.ts`)
 
@@ -335,7 +343,10 @@ mode. Batch ownership is preflighted before the first extraction. An expired
 but still-current token is accepted (#101), while a token from an older
 processing generation is rejected. With no lease, an administrative active
 transition remains valid. `WaiterManager` partitions waiters by queue, tracks
-the active count in O(1), and consumes entries through a head cursor.
+the active count in O(1), and consumes entries through a head cursor. Each wait
+timer is a `safeTimeout` (a wait above 2^31 - 1 ms no longer fires after ~1 ms;
+Infinity waits for a notification), and a NaN timeout is rejected with a
+`TypeError` instead of becoming a ~1 ms re-poll.
 Notifications clear the waiter's timer immediately; surplus notifications
 coalesce into one edge-triggered `pending` bit instead of accumulating
 notification debt. The array is compacted only after the consumed prefix
@@ -416,7 +427,7 @@ These operations read no environment variables directly; behavior is driven by p
 | `JobInput.durable`                           | `false`              | SQLite: bypass the ~10 ms buffer; PostgreSQL is transactional.  |
 | `JobInput.stackTraceLimit`                   | `10`                 | Max stored stack lines.                                         |
 | `DEFAULT_MAX_BACKOFF`                        | `3_600_000` ms       | Backoff cap when `backoff.maxDelay` is absent.                  |
-| `MAX_BACKOFF_DELAY`                          | `86_400_000` ms      | Upper bound for `backoff`, `backoff.delay`, `backoff.maxDelay`. |
+| `MAX_BACKOFF_DELAY`                          | `86_400_000` ms      | Upper bound for `backoff.maxDelay` (the retry-delay cap); `backoff`/`backoff.delay` are unbounded since the cap applies. |
 | `MAX_TIMELINE_ENTRIES`                       | `20`                 | Timeline cap.                                                   |
 | `pullJob` `timeoutMs`                        | `0` (no wait)        | Long-poll deadline; Worker `pollTimeout` max 30 000 ms.         |
 | `DEFAULT_LOCK_TTL`                           | `30_000` ms          | Lock duration (used by `pullWithLock`, not the raw pull).       |

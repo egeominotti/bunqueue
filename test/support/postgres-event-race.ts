@@ -23,7 +23,7 @@ export interface Deferred<T> {
 export interface PausablePostgresEventStream {
   cursor: number;
   subscription: { unlisten(): Promise<void> } | null;
-  pollTimer: ReturnType<typeof setInterval> | null;
+  pollTimer: { clear(): void } | null;
   drain(): Promise<void>;
 }
 
@@ -151,7 +151,7 @@ export async function pausePostgresEventStream(
   manager: PostgresQueueManager
 ): Promise<PausablePostgresEventStream> {
   const stream = postgresEventStream(manager);
-  if (stream.pollTimer) clearInterval(stream.pollTimer);
+  stream.pollTimer?.clear();
   stream.pollTimer = null;
   await stream.subscription?.unlisten();
   stream.subscription = null;

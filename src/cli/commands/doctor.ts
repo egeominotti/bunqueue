@@ -1,6 +1,7 @@
+import { stdoutColorEnabled } from '../../shared/colorSupport';
 import { VERSION } from '../../shared/version';
 
-const style = {
+const ANSI = {
   green: '\x1b[32m',
   red: '\x1b[31m',
   yellow: '\x1b[33m',
@@ -8,6 +9,11 @@ const style = {
   bold: '\x1b[1m',
   reset: '\x1b[0m',
 } as const;
+
+/** Plain text unless color is enabled (FORCE_COLOR / NO_COLOR / TERM=dumb / TTY). */
+const style: Record<keyof typeof ANSI, string> = stdoutColorEnabled()
+  ? ANSI
+  : { green: '', red: '', yellow: '', dim: '', bold: '', reset: '' };
 
 export interface HealthData {
   version?: string;

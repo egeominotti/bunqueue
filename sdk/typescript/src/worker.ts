@@ -14,8 +14,11 @@ import { Job } from './job.js';
 import type { PulledJobsResponse } from './responses.js';
 import { terminalOutcomeWasApplied } from './terminal-outcome.js';
 import { WorkerBase } from './worker-base.js';
+import { safeInterval } from './timing.js';
 import { SlotSignal } from './worker-slot-signal.js';
 import {
+  EMPTY_PULL_DELAY_MS,
+  LONG_POLL_REPOLL_MS,
   MAX_STACK_LINES,
   type Processor,
   RECONNECT_BACKOFF_MS,
@@ -31,10 +34,8 @@ export class Worker<T = unknown, R = unknown> extends WorkerBase<T, R> {
   constructor(queue: string, processor: Processor<T, R>, opts: WorkerOptions = {}) {
     super(queue, opts);
     this.processor = processor;
-    const ab = opts.ackBatch;
-    this.ackBatcher = ab?.enabled
-      ? new AckBatcher(this.connection, ab.maxSize ?? 50, ab.maxDelayMs ?? 5)
-      : null;
+    const ab = this.ackBatchOptions;
+    this.ackBatcher = ab ? new AckBatcher(this.connection, ab.maxSize, ab.maxDelayMs) : null;
     if (opts.autorun !== false) this.run();
   }
 
@@ -68,8 +69,11 @@ export class Worker<T = unknown, R = unknown> extends WorkerBase<T, R> {
         continue;
       }
       try {
-        await this.pollOnce();
+        const idleMs = await this.pollOnce();
         backoffIdx = 0;
+        // Without this pause pollTimeoutMs 0 re-polled an empty queue at once
+        // (thousands of PULLB/s); mirrors src/client/worker/runtime/polling.ts.
+        if (idleMs > 0) await sleep(idleMs);
       } catch (err) {
         this.emit('error', err instanceof Error ? err : new Error(String(err)));
         if (err instanceof ConnectionClosedError || err instanceof CommandTimeoutError) {
@@ -83,11 +87,12 @@ export class Worker<T = unknown, R = unknown> extends WorkerBase<T, R> {
     }
   }
 
-  private async pollOnce(): Promise<void> {
+  /** One pull; resolves to the pause before the next one (0 after jobs or a slot wait). */
+  private async pollOnce(): Promise<number> {
     const free = this.concurrency - this.active.size;
     if (free <= 0) {
       await this.slotSignal.wait(20);
-      return;
+      return 0;
     }
 
     // The registration is per-connection server state: after a reconnect the
@@ -117,7 +122,7 @@ export class Worker<T = unknown, R = unknown> extends WorkerBase<T, R> {
         this.wasBusy = false;
         this.emit('drained');
       }
-      return;
+      return this.pollTimeoutMs > 0 ? LONG_POLL_REPOLL_MS : EMPTY_PULL_DELAY_MS;
     }
 
     this.wasBusy = true;
@@ -127,6 +132,7 @@ export class Worker<T = unknown, R = unknown> extends WorkerBase<T, R> {
       // fire-and-forget: bounded by the free-slot accounting above
       void this.runJob(jobs[i], tokens[i]);
     }
+    return 0;
   }
 
   private async runJob(raw: Record<string, unknown>, token: string): Promise<void> {
@@ -203,11 +209,11 @@ export class Worker<T = unknown, R = unknown> extends WorkerBase<T, R> {
   // --------------------------------------------------------------- heartbeat
 
   private startHeartbeat(): void {
-    // 0, negative or non-finite (NaN coerces to interval 0) disables
-    // heartbeats — setInterval(fn, 0) would fire every macrotask and flood
-    // the server with Heartbeat commands.
-    if (!(Number.isFinite(this.heartbeatIntervalS) && this.heartbeatIntervalS > 0)) return;
-    this.heartbeatTimer = setInterval(() => {
+    // heartbeatIntervalS is normalized (sdk-clamps.ts): 0 means disabled.
+    // safeInterval honours a period beyond 2^31 - 1 ms, which a native setInterval
+    // would turn into a ~1 ms Heartbeat flood.
+    if (this.heartbeatIntervalS === 0) return;
+    this.heartbeatTimer = safeInterval(() => {
       void (async () => {
         await this.safeCall({
           cmd: 'Heartbeat',
@@ -222,8 +228,7 @@ export class Worker<T = unknown, R = unknown> extends WorkerBase<T, R> {
           await this.safeCall({ cmd: 'JobHeartbeatB', ids, tokens });
         }
       })();
-    }, this.heartbeatIntervalS * 1000);
-    this.heartbeatTimer.unref?.(); // don't keep the process alive for heartbeats
+    }, this.heartbeatIntervalS * 1000).unref(); // don't keep the process alive for heartbeats
   }
 
   private async register(): Promise<void> {

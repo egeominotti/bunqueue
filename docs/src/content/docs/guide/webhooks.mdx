@@ -1,5 +1,5 @@
 ---
-title: "Webhooks: Get Notified When Jobs Complete or Fail"
+title: 'Webhooks: Get Notified When Jobs Complete or Fail'
 description: bunqueue sends HTTP callbacks on job events, signed with HMAC-SHA256 and retried automatically. No polling needed.
 head:
   - tag: meta
@@ -12,8 +12,14 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · webhooks</span>
-  <h1 class="bq-hero-h1 bq-bench-h1">Job events, delivered as <em>webhooks.</em></h1>
-  <p class="bq-hero-sub">A webhook is an HTTP POST that bunqueue sends to your URL when something happens to a job. Instead of polling for status, your service gets told, with a signed payload and automatic retries.</p>
+  <h1 class="bq-hero-h1 bq-bench-h1">
+    Job events, delivered as <em>webhooks.</em>
+  </h1>
+  <p class="bq-hero-sub">
+    A webhook is an HTTP POST that bunqueue sends to your URL when something happens to a job.
+    Instead of polling for status, your service gets told, with a signed payload and automatic
+    retries.
+  </p>
 </div>
 
 ## Quick Start
@@ -64,11 +70,11 @@ const queue = new Queue('emails');
 const { webhookId } = await queue.addWebhook({
   url: 'https://api.example.com/hooks/bunqueue',
   events: ['job.completed', 'job.failed'],
-  secret: 'my-webhook-secret',   // optional
+  secret: 'my-webhook-secret', // optional
 });
 
 const hooks = await queue.listWebhooks();
-await queue.setWebhookEnabled(webhookId, false);  // pause delivery
+await queue.setWebhookEnabled(webhookId, false); // pause delivery
 await queue.removeWebhook(webhookId);
 ```
 
@@ -141,7 +147,7 @@ the HTTP API, or the raw `AddWebhook` / `ListWebhooks` / `RemoveWebhook` TCP com
 </TabItem>
 </Tabs>
 
-*The PHP and Go helpers register global, unsigned webhooks (`url` + `events` only); use the CLI or HTTP API to set a `secret` or a queue scope from those languages.*
+_The PHP and Go helpers register global, unsigned webhooks (`url` + `events` only); use the CLI or HTTP API to set a `secret` or a queue scope from those languages._
 
 ### Scope a webhook to one queue
 
@@ -177,13 +183,13 @@ Disabling stops delivery but keeps the configuration, useful during maintenance.
 
 These five events are the only valid ones; anything else is rejected at registration time:
 
-| Event | When it fires |
-|-------|---------------|
-| `job.pushed` | Job added to a queue |
-| `job.started` | A worker picked the job up |
-| `job.completed` | The worker finished successfully |
-| `job.failed` | The worker threw an error |
-| `job.progress` | The processor called `job.updateProgress()` |
+| Event           | When it fires                               |
+| --------------- | ------------------------------------------- |
+| `job.pushed`    | Job added to a queue                        |
+| `job.started`   | A worker picked the job up                  |
+| `job.completed` | The worker finished successfully            |
+| `job.failed`    | The worker threw an error                   |
+| `job.progress`  | The processor called `job.updateProgress()` |
 
 ## Payload
 
@@ -352,13 +358,13 @@ Without `--secret`, payloads are sent unsigned and anyone can forge requests to 
 
 A delivery succeeds when your endpoint returns a 2xx status within 10 seconds. Failed deliveries are retried with linear backoff:
 
-| Attempt | Delay |
-|---------|-------|
-| 1 | Immediate |
-| 2 | 1 second |
-| 3 | 2 seconds |
+| Attempt | Delay     |
+| ------- | --------- |
+| 1       | Immediate |
+| 2       | 1 second  |
+| 3       | 2 seconds |
 
-The totals are configurable with `WEBHOOK_MAX_RETRIES` (default 3 attempts) and `WEBHOOK_RETRY_DELAY_MS` (default 1000). After all attempts, the delivery is abandoned and logged. Webhook failures never affect job processing.
+The totals are configurable with `WEBHOOK_MAX_RETRIES` (default 3 attempts, the first try included; at least 1) and `WEBHOOK_RETRY_DELAY_MS` (default 1000; attempt n + 1 waits n × this delay). The `webhooks.maxRetries` and `webhooks.retryDelay` keys in [`bunqueue.config.ts`](/guide/configuration/#webhooks) are ignored (the server logs a warning). An invalid value (for example `abc` or `0` retries, or a `1e3` delay) stops the server at startup with an error naming the setting, instead of never delivering. A delay without a number or below zero (`abc`, `-1`) retries at once, as earlier releases did, and the server logs a warning. After all attempts, the delivery is abandoned and logged. Webhook failures never affect job processing.
 
 Because of retries, the same event can arrive twice. Deduplicate on `jobId` + `event` if that matters to your handler. Also return 2xx quickly and do heavy work asynchronously, so slow processing does not get counted as a failed delivery.
 
@@ -370,7 +376,8 @@ Because of retries, the same event can arrive twice. Deduplicate on `jobId` + `e
 - **Invalid signature errors:** verify against the raw body, make sure no proxy rewrites the payload, and confirm both sides use the same secret.
 
 :::tip[Related Guides]
+
 - [Queue API](/guide/queue/) - In-process events without HTTP
 - [Environment Variables](/guide/env-vars/) - Webhook retry configuration
 - [Server Mode](/guide/server/) - Webhooks require server mode
-:::
+  :::

@@ -339,14 +339,14 @@ For the prebuilt server, use Docker Hub (available from 2.9.5):
 docker run -d --name bunqueue \
   -p 6789:6789 -p 6790:6790 \
   -v bunqueue-data:/app/data \
-  egeominotti/bunqueue:2.9.10
+  egeominotti/bunqueue:2.9.11
 ```
 
-The same release is available as `ghcr.io/egeominotti/bunqueue:2.9.10`.
+The same release is available as `ghcr.io/egeominotti/bunqueue:2.9.11`.
 Both registries provide Linux amd64 and arm64 images. The volume preserves SQLite
 data across container replacement. Pin a version or digest for deployments.
 
-Choose `2.9.10-alpine`, `2.9.10-debian`, `2.9.10-slim`, or `2.9.10-distroless`.
+Choose `2.9.11-alpine`, `2.9.11-debian`, `2.9.11-slim`, or `2.9.11-distroless`.
 The moving tags are `alpine`, `debian`, `slim`, and `distroless`. Unsuffixed version
 tags and `latest` continue to select Alpine. All variants support amd64 and arm64,
 run as UID/GID `1001:1001`, and share the same ports and persistent data path.
@@ -356,14 +356,16 @@ required system libraries, and CA certificates, without project dependencies or
 a separate Bun installation.
 
 The exec-form health check runs `/app/bunqueue healthcheck`. It requests
-`http://127.0.0.1:$HTTP_PORT/health` (default port `6790`), requires a healthy JSON
-response, and fails after five seconds. It works with server authentication enabled.
+`http://127.0.0.1:$HTTP_PORT/health` (default port `6790`; `HTTP_PORT` is read exactly
+as the server reads it, and an invalid value or `0` fails the check with a message naming
+it), requires a healthy JSON response, and fails after five seconds. It works with server
+authentication enabled.
 If you change the listener using a config file or CLI flags, use a custom hostname,
 or enable HTTPS, override the probe with the matching URL. For distroless, use a
 derived Dockerfile with JSON exec form:
 
 ```dockerfile
-FROM egeominotti/bunqueue:2.9.10-distroless
+FROM egeominotti/bunqueue:2.9.11-distroless
 HEALTHCHECK CMD ["/app/bunqueue", "healthcheck", "https://broker.example:8443/health"]
 ```
 

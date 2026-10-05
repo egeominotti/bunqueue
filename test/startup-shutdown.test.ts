@@ -11,6 +11,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { createHttpServer } from '../src/infrastructure/server/http';
 import { createTcpServer } from '../src/infrastructure/server/tcp';
+import { resolveServerConfig } from '../src/config';
 
 describe('Startup & Shutdown', () => {
   let qm: QueueManager;
@@ -104,62 +105,106 @@ describe('Startup & Shutdown', () => {
       httpServer.stop();
     });
 
-    test('auth tokens as comma-separated values are correctly split', () => {
-      // This mirrors loadConfig()'s AUTH_TOKENS parsing logic
-      const raw = 'token1,token2,token3';
-      const parsed = raw.split(',').filter(Boolean);
-      expect(parsed).toEqual(['token1', 'token2', 'token3']);
+    // The env parsing below goes through the real resolver (these used to compare string
+    // literals with themselves, so they could not catch a parsing bug: METRICS_AUTH=1 was
+    // silently read as false while the old test stayed green).
+    function resolveWithEnv(vars: Record<string, string | undefined>) {
+      const saved = new Map<string, string | undefined>();
+      for (const [key, value] of Object.entries(vars)) {
+        saved.set(key, Bun.env[key]);
+        if (value === undefined) delete Bun.env[key];
+        else Bun.env[key] = value;
+      }
+      try {
+        return resolveServerConfig(null);
+      } finally {
+        for (const [key, value] of saved) {
+          if (value === undefined) delete Bun.env[key];
+          else Bun.env[key] = value;
+        }
+      }
+    }
+
+    test('AUTH_TOKENS is split on commas, empty entries dropped', () => {
+      expect(resolveWithEnv({ AUTH_TOKENS: 'token1,token2,,token3' }).authTokens).toEqual([
+        'token1',
+        'token2',
+        'token3',
+      ]);
+      expect(resolveWithEnv({ AUTH_TOKENS: '' }).authTokens).toEqual([]);
+      expect(resolveWithEnv({ AUTH_TOKENS: undefined }).authTokens).toEqual([]);
     });
 
-    test('empty AUTH_TOKENS string results in empty array', () => {
-      const raw = '';
-      const parsed = raw.split(',').filter(Boolean);
-      expect(parsed).toEqual([]);
+    test('CORS_ALLOW_ORIGIN is split on commas; unset means no origins', () => {
+      expect(
+        resolveWithEnv({ CORS_ALLOW_ORIGIN: 'https://a.com,https://b.com' }).corsOrigins
+      ).toEqual(['https://a.com', 'https://b.com']);
+      expect(resolveWithEnv({ CORS_ALLOW_ORIGIN: undefined }).corsOrigins).toEqual([]);
     });
 
-    test('CORS_ALLOW_ORIGIN parsing with multiple origins', () => {
-      const raw = 'https://a.com,https://b.com';
-      const parsed = raw.split(',').filter(Boolean);
-      expect(parsed).toEqual(['https://a.com', 'https://b.com']);
+    test('boolean config: S3_BACKUP_ENABLED accepts every boolean word, any case', () => {
+      const credentials = { S3_BUCKET: 'b', S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: 's' };
+      for (const raw of ['1', 'true', 'TRUE', 'yes', 'on']) {
+        expect(resolveWithEnv({ ...credentials, S3_BACKUP_ENABLED: raw }).s3BackupEnabled).toBe(
+          true
+        );
+      }
+      for (const raw of ['0', 'false', 'no', 'Off', '', undefined]) {
+        expect(resolveWithEnv({ ...credentials, S3_BACKUP_ENABLED: raw }).s3BackupEnabled).toBe(
+          false
+        );
+      }
+      // Another word keeps the 2.9.10 value (off), with a warning naming the variable.
+      const unknown = resolveWithEnv({ S3_BACKUP_ENABLED: 'maybe' });
+      expect(unknown.s3BackupEnabled).toBe(false);
+      expect(unknown.configWarnings).toEqual([
+        expect.stringContaining('Invalid S3_BACKUP_ENABLED: "maybe"'),
+      ]);
     });
 
-    test('undefined CORS_ALLOW_ORIGIN results in empty array', () => {
-      const raw: string | undefined = undefined;
-      const parsed = raw?.split(',').filter(Boolean) ?? [];
-      expect(parsed).toEqual([]);
-    });
-
-    test('boolean config: S3_BACKUP_ENABLED parses correctly', () => {
-      expect('1' === '1' || '1' === 'true').toBe(true);
-      expect('true' === '1' || 'true' === 'true').toBe(true);
-      expect('0' === '1' || '0' === 'true').toBe(false);
-      expect('false' === '1' || 'false' === 'true').toBe(false);
-    });
-
-    test('boolean config: METRICS_AUTH parses correctly', () => {
-      expect('true' === 'true').toBe(true);
-      expect('false' === 'true').toBe(false);
-      expect('1' === 'true').toBe(false); // Only strict 'true' enables it
+    test('boolean config: METRICS_AUTH accepts every boolean word, any case', () => {
+      // Every "on" word requires auth on /prometheus. It used to be only the exact
+      // string 'true', so METRICS_AUTH=1 left the endpoint unauthenticated.
+      for (const raw of ['1', 'true', 'TRUE', 'yes', 'on']) {
+        expect(resolveWithEnv({ METRICS_AUTH: raw }).requireAuthForMetrics).toBe(true);
+      }
+      for (const raw of ['0', 'false', 'no', 'off', '', undefined]) {
+        expect(resolveWithEnv({ METRICS_AUTH: raw }).requireAuthForMetrics).toBe(false);
+      }
+      // Another word keeps the 2.9.10 value (off: it compared 'true'), with a warning.
+      const unknown = resolveWithEnv({ METRICS_AUTH: 'enabled' });
+      expect(unknown.requireAuthForMetrics).toBe(false);
+      expect(unknown.configWarnings).toEqual([
+        expect.stringContaining('Invalid METRICS_AUTH: "enabled"'),
+      ]);
     });
 
     test('port defaults: TCP=6789, HTTP=6790', () => {
-      const tcpDefault = parseInt(undefined ?? '6789', 10);
-      const httpDefault = parseInt(undefined ?? '6790', 10);
-      expect(tcpDefault).toBe(6789);
-      expect(httpDefault).toBe(6790);
+      const config = resolveWithEnv({ TCP_PORT: undefined, HTTP_PORT: undefined });
+      expect(config.tcpPort).toBe(6789);
+      expect(config.httpPort).toBe(6790);
     });
 
     test('hostname defaults to 0.0.0.0', () => {
-      const hostname = undefined ?? '0.0.0.0';
-      expect(hostname).toBe('0.0.0.0');
+      expect(resolveWithEnv({ HOST: undefined }).hostname).toBe('0.0.0.0');
     });
 
-    test('DATA_PATH falls back to SQLITE_PATH', () => {
-      // Mirrors: dataPath: Bun.env.DATA_PATH ?? Bun.env.SQLITE_PATH
-      const dataPath = undefined;
-      const sqlitePath = '/some/path.db';
-      const resolved = dataPath ?? sqlitePath;
-      expect(resolved).toBe('/some/path.db');
+    test('data path aliases: BUNQUEUE_DATA_PATH > BQ_DATA_PATH > DATA_PATH > SQLITE_PATH', () => {
+      const none = {
+        BUNQUEUE_DATA_PATH: undefined,
+        BQ_DATA_PATH: undefined,
+        DATA_PATH: undefined,
+        SQLITE_PATH: undefined,
+      };
+      expect(resolveWithEnv({ ...none, SQLITE_PATH: '/some/path.db' }).dataPath).toBe(
+        '/some/path.db'
+      );
+      expect(
+        resolveWithEnv({ ...none, DATA_PATH: '/data.db', SQLITE_PATH: '/sqlite.db' }).dataPath
+      ).toBe('/data.db');
+      expect(
+        resolveWithEnv({ ...none, BUNQUEUE_DATA_PATH: '/bq.db', DATA_PATH: '/data.db' }).dataPath
+      ).toBe('/bq.db');
     });
   });
 

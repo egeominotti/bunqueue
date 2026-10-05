@@ -1,8 +1,13 @@
 /**
  * Bunqueue — Batch Processing
  * Accumulates jobs and processes them in groups.
+ *
+ * The partial-batch timer is a `safeTimeout`: a timeout that fits the runtime's timer
+ * range is one native timer (the per-batch cost is unchanged), and a longer one is
+ * armed in chunks instead of firing after about 1 ms.
  */
 
+import { safeTimeout, type SafeTimer } from '../../shared/timers';
 import type { Job, FlowJobData, Processor } from '../types';
 import type { BatchConfig } from './types';
 
@@ -14,11 +19,16 @@ interface BufferEntry<T, R> {
 
 export class BatchAccumulator<T = unknown, R = unknown> {
   private readonly buffer: BufferEntry<T, R>[] = [];
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private timer: SafeTimer | null = null;
   private readonly config: BatchConfig<T, R>;
+  /** Validated by the Bunqueue constructor; read once so the hot path does no lookups. */
+  private readonly size: number;
+  private readonly timeoutMs: number;
 
   constructor(config: BatchConfig<T, R>) {
     this.config = config;
+    this.size = config.size;
+    this.timeoutMs = config.timeout ?? 5000;
   }
 
   /** Build a Processor that buffers jobs into batches */
@@ -27,21 +37,22 @@ export class BatchAccumulator<T = unknown, R = unknown> {
       return new Promise<R>((resolve, reject) => {
         this.buffer.push({ job, resolve, reject });
 
-        if (this.buffer.length >= this.config.size) {
+        if (this.buffer.length >= this.size) {
           this.flush();
         } else if (!this.timer) {
-          const timeout = this.config.timeout ?? 5000;
-          this.timer = setTimeout(() => {
-            this.flush();
-          }, timeout);
+          this.timer = safeTimeout(this.flushOnTimeout, this.timeoutMs);
         }
       });
     };
   }
 
+  private readonly flushOnTimeout = (): void => {
+    this.flush();
+  };
+
   flush(): void {
     if (this.timer) {
-      clearTimeout(this.timer);
+      this.timer.clear();
       this.timer = null;
     }
 
@@ -66,7 +77,7 @@ export class BatchAccumulator<T = unknown, R = unknown> {
 
   destroy(): void {
     if (this.timer) {
-      clearTimeout(this.timer);
+      this.timer.clear();
       this.timer = null;
     }
     // Flush remaining

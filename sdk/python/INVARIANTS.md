@@ -22,6 +22,20 @@ must preserve the wire contract and lifecycle semantics.
   telemetry. `Hello` negotiates `PROTOCOL_VERSION`.
 - TLS verifies peers by default. Custom CA and explicit verification opt-out
   preserve identical framing and response handling.
+- `connect_timeout` and `command_timeout` are validated at construction
+  (seconds > 0; a bool counts as 0 or 1 s, as in 0.2.0). `connect_timeout=None`
+  is the 0.2.0 blocking connect, and `command_timeout=None` or `math.inf`
+  means no command deadline. The reconnect backoff stays within 0.5–5 s for
+  any number of failures. A duration never reaches a timer, a sleep or a
+  socket as an infinity or a value above `threading.TIMEOUT_MAX`
+  (`bunqueue/durations.py`); a NaN or negative timer delay is passed on only
+  where 0.2.0 fired that timer at once.
+- Backward compatibility: an option value that 0.2.0 handled keeps its 0.2.0
+  result (`None`, bools, `float()`/`int()` coercion, Simple Mode `x or
+  default`). Only values that 0.2.0 could not handle are rejected, where
+  they enter: a crashed thread, a connect that never completed, every
+  command or job failing, or a hot loop. `tests/test_compat_options.py` and
+  `tests/test_compat_simple.py` pin each case.
 
 ## Serialization and option mapping
 
@@ -63,7 +77,49 @@ must preserve the wire contract and lifecycle semantics.
   Worker-owned discard use that token and cannot be applied to a different
   delivery.
 - Heartbeats remain active until processing and any ACK batch settle, then stop
-  on every terminal path.
+  on every terminal path. A zero, negative or non-finite `heartbeat_interval_s`
+  disables them (so does `False`; `True` beats every second, as in 0.2.0); a
+  positive one is capped at `threading.TIMEOUT_MAX`.
+- The four rule-4 options never raise for a number (`sdk_clamps.py`):
+  - `batch_size` is `max(1, min(value, 1000))`, the 0.2.0 clamp: NaN and
+    -inf give 1, +inf gives 1000, a bool gives 1;
+  - `poll_timeout_ms` is clamped to [0, 30000], and NaN means 5000;
+  - the `wait_for_job` ttl is `max(0, min(value, 600000))`, the 0.2.0 clamp:
+    NaN gives 0, and a bool counts as 0 or 1;
+  - a zero, negative or non-finite heartbeat interval disables heartbeats.
+
+  `None` means the default, and any other non-number raises `TypeError`
+  (`poll_timeout_ms` also rejects a bool, which the broker refused).
+  `lock_ttl_ms` is a finite number >= 1, checked by the constructor, or
+  `None`, sent as `lockTtl: null` for the broker's 30000 ms default. After an
+  empty pull the loop waits 10 ms, or 50 ms at poll timeout 0, as the main
+  client does; it never re-polls with zero delay.
+- The pull loop classifies each failure (`bunqueue/worker_errors.py`, mirror
+  of `isTransientPullError` and `handlePullError` in the main client):
+  - transient: `ConnectionClosedError`, `CommandTimeoutError`, and the
+    refusals `Rate limit exceeded`, `Internal server error`,
+    `Lock acquisition timed out`, `Read lock acquisition timed out` and
+    `Write lock acquisition timed out`. Always retried, emitted as `error`
+    and logged at debug level;
+  - permanent: every other `BunqueueError` (`AuthError`, a validation
+    refusal), and any other `Exception` (an SDK or protocol defect). With no
+    `error` listener (`on` or `once`) the loop ends through `_shutdown` and
+    `run()` re-raises it unchanged, as 0.2.0 did. With a listener it is
+    emitted and retried, logged as a warning (refusal) or as an error with
+    its traceback (unexpected), so a fixed token or broker setting recovers
+    the Worker without a restart.
+
+  Every retry waits 0.5, 1, 2, then 5 s (the 0.2.0 schedule, bounded for any
+  number of failures). A pull the broker answers, even an empty one, resets
+  it. A `BaseException` that is not an `Exception` (`KeyboardInterrupt`,
+  `SystemExit`) always ends the loop through `_shutdown`, so Ctrl-C still
+  stops a blocking `run()`.
+- `RegisterWorker`, heartbeats, `ACK` and `FAIL` turn every `Exception` into a
+  warning and an `error` event. A failure there never ends the loop or the
+  heartbeat thread, and never skips a slot release; a failed registration is
+  retried by the next poll, whose pull then follows the policy above. A
+  failed setup step in `run()` still goes through `_shutdown`, so
+  `is_running()` never reports a dead loop as running.
 - A worker concurrency slot is released exactly once after success, processor
   failure, transport failure, cancellation, or callback failure.
 - `completed` events and processed counters occur only after an ACK the broker
@@ -174,3 +230,18 @@ python tests/run_e2e.py
 The harness uses dynamic ports and a temporary SQLite directory. Flow E2E must
 cover trees, chains, fan-in, custom IDs, reciprocal snapshots, reads, and
 “invalid batch creates zero jobs”.
+
+The Worker error-path tests drive the real loop through a scripted connection
+double, and the compatibility tests pin every 0.2.0 option result. They need
+no broker, and `tests/run_e2e.py` also runs them:
+
+```bash
+python -m pytest tests/test_worker_pull_errors.py tests/test_worker_wire_errors.py \
+  tests/test_compat_options.py tests/test_compat_simple.py
+```
+
+`tests/e2e_worker_refusals.py` repeats the broker refusals on dedicated
+servers. A rate-limited Worker keeps retrying with or without a listener. A
+Worker refused for a wrong token raises `AuthError` from `run()` without a
+listener, and with one it recovers once the token is fixed.
+`tests/e2e_compat.py` runs the 0.2.0 option values against a real broker.

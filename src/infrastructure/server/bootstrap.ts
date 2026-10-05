@@ -8,18 +8,25 @@
 import { QueueManager } from '../../application/queueManager';
 import { createTcpServer } from './tcp';
 import { createHttpServer } from './http';
-import { Logger, serverLog, statsLog, type LogLevel } from '../../shared/logger';
+import { Logger, serverLog } from '../../shared/logger';
+import { stdoutColorEnabled } from '../../shared/colorSupport';
+import { configureLockTimeoutMs } from '../../shared/lockTimeout';
+import { configureWorkerTimeoutMs } from '../../shared/workerTimeouts';
 import { VERSION } from '../../shared/version';
 import { S3BackupManager } from '../backup';
+import type { S3BackupConfig } from '../backup';
 import { CloudAgent } from '../cloud';
+import type { CloudConfig } from '../cloud';
 import { SHARD_COUNT } from '../../shared/hash';
 import {
+  ConfigError,
   resolveCloudConfig,
   resolveBackupConfig,
   resolveTlsServerOptions,
   type BunqueueConfig,
   type ResolvedConfig,
 } from '../../config';
+import { startStatsLog } from './statsLog';
 import {
   backupStartupError,
   createServerQueueManager,
@@ -31,13 +38,14 @@ import { createServerShutdown } from './shutdownCoordinator';
 
 export { backupStartupError } from './storageManager';
 
-/** Print startup banner */
+/** Print startup banner (plain text on a pipe or log file, see colorSupport.ts). */
 function printBanner(config: ResolvedConfig, cloudUrl?: string): void {
-  const dim = '\x1b[2m';
-  const reset = '\x1b[0m';
-  const bold = '\x1b[1m';
-  const magenta = '\x1b[35m';
-  const green = '\x1b[32m';
+  const ansi = stdoutColorEnabled();
+  const dim = ansi ? '\x1b[2m' : '';
+  const reset = ansi ? '\x1b[0m' : '';
+  const bold = ansi ? '\x1b[1m' : '';
+  const magenta = ansi ? '\x1b[35m' : '';
+  const green = ansi ? '\x1b[32m' : '';
   const active = `${green}●${reset}`;
   const inactive = `${dim}○${reset}`;
   const info = `${dim}•${reset}`;
@@ -89,14 +97,12 @@ export async function bootServer(
   fileConfig: BunqueueConfig | null,
   config: ResolvedConfig
 ): Promise<void> {
-  // Apply logging config before anything else
-  const logFormat = fileConfig?.logging?.format ?? Bun.env.LOG_FORMAT;
-  const logLevel = fileConfig?.logging?.level ?? Bun.env.LOG_LEVEL?.toLowerCase();
-  if (logFormat === 'json') Logger.enableJsonMode();
-  if (logLevel) {
-    const validLevels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
-    if (validLevels.includes(logLevel as LogLevel)) Logger.setLevel(logLevel as LogLevel);
-  }
+  // Apply logging config before anything else (`logging.*` > LOG_* > defaults, resolved
+  // by resolveServerConfig). JSON is only ever turned on here: LOG_FORMAT=json applied
+  // by the bare entry point stays on, as in 2.9.10 (see src/config/logging.ts).
+  if (config.logFormat === 'json') Logger.enableJsonMode();
+  if (config.logLevel) Logger.setLevel(config.logLevel);
+  for (const warning of config.configWarnings ?? []) serverLog.warn(warning);
 
   const startupError = storageStartupError(config) ?? backupStartupError(config);
   if (startupError) {
@@ -105,8 +111,21 @@ export async function bootServer(
     return;
   }
 
-  // Resolve cloud config
-  const cloudConfig = resolveCloudConfig(fileConfig, config.dataPath);
+  // Resolve (and validate) the Cloud and S3 backup config before anything binds: an
+  // invalid value stops startup here, never after the listeners are up.
+  let cloudConfig: CloudConfig | null;
+  let backupConfig: S3BackupConfig | null;
+  try {
+    cloudConfig = resolveCloudConfig(fileConfig, config.dataPath);
+    backupConfig =
+      config.storageDriver === 'sqlite' && config.dataPath
+        ? resolveBackupConfig(fileConfig, config.dataPath)
+        : null;
+  } catch (err) {
+    serverLog.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
+  }
 
   // Resolve TLS config — fail fast on partial cert/key before binding anything
   let tlsConfig: ReturnType<typeof resolveTlsServerOptions>;
@@ -117,16 +136,28 @@ export async function bootServer(
     process.exit(1);
   }
 
+  // The runtime timeouts (`timeouts.*` > env > default) must be set before the
+  // QueueManager reads them at construction.
+  if (config.lockTimeoutMs !== undefined) configureLockTimeoutMs(config.lockTimeoutMs);
+  if (config.workerTimeoutMs !== undefined) configureWorkerTimeoutMs(config.workerTimeoutMs);
+
   let queueManager: QueueManager;
   try {
     queueManager = await createServerQueueManager(config);
   } catch (error) {
-    serverLog.error('Failed to initialize storage', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (error instanceof ConfigError) serverLog.error(error.message);
+    else {
+      serverLog.error('Failed to initialize storage', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     process.exitCode = 1;
     return;
   }
+  queueManager.webhookManager.setDeliveryPolicy({
+    maxRetries: config.webhookMaxRetries,
+    retryDelayMs: config.webhookRetryDelayMs,
+  });
   printBanner(config, cloudConfig?.url);
 
   // Start TCP + HTTP servers; a bind failure must not leave a half-started process
@@ -159,8 +190,7 @@ export async function bootServer(
 
   // Initialize S3 backup manager
   let backupManager: S3BackupManager | null = null;
-  if (config.storageDriver === 'sqlite' && config.dataPath) {
-    const backupConfig = resolveBackupConfig(fileConfig, config.dataPath);
+  if (backupConfig) {
     backupManager = new S3BackupManager({
       ...backupConfig,
       flushBeforeBackup: () => {
@@ -200,9 +230,20 @@ export async function bootServer(
     shards: SHARD_COUNT,
   });
 
+  // Print stats periodically
+  const statsTimer = startStatsLog(
+    queueManager,
+    {
+      tcp: () => tcpServer.getConnectionCount(),
+      ws: () => httpServer.getWsClientCount(),
+      sse: () => httpServer.getSseClientCount(),
+    },
+    config.statsIntervalMs
+  );
+
   const shutdown = createServerShutdown({
     shutdownTimeoutMs: config.shutdownTimeoutMs,
-    stopStats: () => clearInterval(statsInterval),
+    stopStats: () => statsTimer.clear(),
     stopTcp: () => tcpServer.stop(),
     stopHttp: () => httpServer.stop(),
     getActiveJobs: () => queueManager.getStats().active,
@@ -230,36 +271,4 @@ export async function bootServer(
     });
     void shutdown('unhandledRejection');
   });
-
-  // Print stats periodically
-  const statsInterval = setInterval(() => {
-    const stats = queueManager.getStats();
-    const memStats = queueManager.getMemoryStats();
-    const workerStats = queueManager.workerManager.getStats();
-    const mem = process.memoryUsage();
-    const now = new Date();
-    const timestamp = now.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    statsLog.info('Queue statistics', {
-      time: timestamp,
-      waiting: stats.waiting,
-      active: stats.active,
-      delayed: stats.delayed,
-      completed: stats.completed,
-      dlq: stats.dlq,
-      tcp: tcpServer.getConnectionCount(),
-      ws: httpServer.getWsClientCount(),
-      sse: httpServer.getSseClientCount(),
-      workers: `${workerStats.active}/${workerStats.total}`,
-      mem: `${Math.round(mem.heapUsed / 1024 / 1024)}MB/${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
-      rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
-      // Internal collection sizes (for memory debugging)
-      idx: memStats.jobIndex,
-      locks: memStats.jobLocks,
-      clients: memStats.clientJobsTotal,
-    });
-  }, config.statsIntervalMs);
 }

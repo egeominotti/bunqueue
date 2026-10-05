@@ -6,7 +6,7 @@ import type {
   PulledJob,
   PullLockOptions,
 } from '../../types/adapter';
-import { toBulkJobInput, toJobInput } from '../jobOptions';
+import { admittedBulkInputs, admittedJobInput } from '../jobOptions';
 import { serializeMcpJob } from '../serializers';
 import { EmbeddedBackendBase } from './base';
 
@@ -19,12 +19,12 @@ function pulled(job: Job, token: string | null | undefined): PulledJob {
 
 export class EmbeddedJobBackend extends EmbeddedBackendBase {
   async addJob(queue: string, name: string, data: unknown, opts?: McpJobOptions) {
-    const job = await this.manager.push(queue, toJobInput(name, data, opts));
+    const job = await this.manager.push(queue, admittedJobInput(name, data, opts));
     return { jobId: String(job.id) };
   }
 
   async addJobsBulk(queue: string, jobs: McpBulkJob[]) {
-    const ids = await this.manager.pushBatch(queue, jobs.map(toBulkJobInput));
+    const ids = await this.manager.pushBatch(queue, admittedBulkInputs(jobs));
     return { jobIds: ids.map(String) };
   }
 

@@ -5,7 +5,7 @@
  * realistic failures, delays, priorities, flows and crons.
  */
 
-import { Queue, Worker, FlowProducer } from '../src/client';
+import { Queue, Worker, FlowProducer, QueueEvents } from '../src/client';
 
 const PORT = parseInt(process.env.TCP_PORT ?? '6789');
 const conn = { connection: { port: PORT } };
@@ -180,8 +180,9 @@ for (const q of [
   'media-process',
   'audit-log',
 ]) {
-  new Worker(q, async () => {}, { concurrency: 0, ...conn }).on('failed', () => {
-    stats.failed++;
+  // Count final failures only: an attempt with a retry pending is not yet failed.
+  new QueueEvents(q, conn).on('failed', ({ terminal }) => {
+    if (terminal !== false) stats.failed++;
   });
 }
 

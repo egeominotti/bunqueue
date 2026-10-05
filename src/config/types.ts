@@ -3,7 +3,14 @@
  * Global configuration file interface and defineConfig helper
  */
 
-/** Global bunqueue configuration (all sections optional) */
+/**
+ * Global bunqueue configuration (all sections optional). The server validates the
+ * file at startup: a value it cannot use stops startup with the key name; a value
+ * earlier releases ran with (a numeric string port or timeout, a string read by its
+ * truthiness where a boolean is expected, `null` for "unset", a documented fallback)
+ * keeps working, with a warning where it is ignored or reinterpreted; an unknown key
+ * is logged as a warning. See docs/features/configuration.md.
+ */
 export interface BunqueueConfig {
   server?: {
     tcpPort?: number;
@@ -71,17 +78,28 @@ export interface BunqueueConfig {
     prefix?: string;
   };
   timeouts?: {
+    /** Graceful-shutdown wait for active jobs, ms (0 = do not wait). Env: SHUTDOWN_TIMEOUT_MS. */
     shutdown?: number;
+    /** Stats log interval, ms (>= 1). Env: STATS_INTERVAL_MS. */
     stats?: number;
+    /** Ignored (it never took effect; a warning is logged). Set WORKER_TIMEOUT_MS instead. */
     worker?: number;
+    /** Ignored (it never took effect; a warning is logged). Set LOCK_TIMEOUT_MS instead. */
     lock?: number;
   };
   webhooks?: {
+    /** Ignored (it never took effect; a warning is logged). Set WEBHOOK_MAX_RETRIES instead. */
     maxRetries?: number;
+    /** Ignored (it never took effect; a warning is logged). Set WEBHOOK_RETRY_DELAY_MS instead. */
     retryDelay?: number;
   };
   logging?: {
+    /**
+     * Log level (any case; `warning`, `trace`, `verbose`, `fatal` and `critical` are
+     * accepted aliases at runtime; another word is a warning). Env: LOG_LEVEL.
+     */
     level?: 'debug' | 'info' | 'warn' | 'error';
+    /** Log format (any case is accepted at runtime). Env: LOG_FORMAT. */
     format?: 'text' | 'json';
   };
 }

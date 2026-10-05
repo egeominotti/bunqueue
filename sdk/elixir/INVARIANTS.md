@@ -16,6 +16,11 @@ is shown in [`README.md`](README.md).
   error and the connection state drops the socket.
 - Timeout, decode, transport, and protocol failures disconnect the stream.
   Reconnect is lazy on the next call and increments the generation.
+- Command timeouts are whole milliseconds in `1..4_294_965_295`, so the
+  GenServer call deadline (timeout plus 2 s) stays within the BEAM timer limit.
+  A configured value below 1 ms falls back to 30 s. An explicit per-call value
+  of `nil`, `false`, or at least 0 but below 1 ms uses the connection's
+  timeout, and a negative or non-number one 30 s. Larger values are capped.
 - If a token is configured, `Auth` is the first exchange of every generation.
   Authentication errors remain distinct from command and connection errors.
 - TLS uses peer and hostname verification by default, with OTP system CAs or a
@@ -54,9 +59,10 @@ is shown in [`README.md`](README.md).
   lookup-before-write race.
 - Only a not-found `CommandError` becomes `{:ok, nil}` for job/custom-ID and
   scheduler lookup. All other typed errors propagate unchanged.
-- Negative query offsets and limits clamp to zero. Wait timeout clamps to
-  `0..600_000` ms and the connection call gets five seconds of transport
-  headroom.
+- Negative query offsets and limits clamp to zero. A `wait_for_job` timeout
+  clamps to `0..600_000` ms; `nil` or a non-number is a 0 ms hold, as in 0.1.1,
+  and an omitted one (`wait_for_job/2`) is 30_000. The connection call gets
+  five seconds of transport headroom.
 - Queue control and administration return only after the broker response; no
   local pause, count, DLQ, rate, concurrency, or cron state is authoritative.
 
@@ -66,15 +72,30 @@ is shown in [`README.md`](README.md).
   GenServers plus one `WorkerLifecycle` GenServer. These linked OTP processes
   belong to the caller's supervision tree; socket ownership must not leak into
   handler tasks.
-- `batch_size` is clamped to `1..1000`, poll timeout to `0..30_000`, and
-  `pull_count/1` is at most concurrency.
+- Worker option values keep their 0.1.1 meaning (`test/option_compat_test.exs`
+  replays them with `--only release_parity`). An integer `batch_size` is
+  clamped to `1..1000`, and `nil`, a float or a non-number is 1; an omitted one
+  follows concurrency, and `pull_count/1` is at most concurrency. A numeric poll
+  timeout is truncated and clamped to `0..30_000`, and `nil` or a non-number is
+  0. After an empty `run_once/1`, `run/1`
+  waits 50 ms when the poll timeout is 0 and 10 ms when it is above 0, mirroring
+  the main client's `polling.ts`, so no poll timeout makes the loop spin.
+- `lock_ttl` is a whole number of milliseconds in `1..9_007_199_254_740_991`:
+  `nil` means 30_000, a positive float is rounded up, and a larger value is
+  capped. Zero, negative and non-number values raise `ArgumentError` before the
+  worker starts a process, never a silent 1 ms lease.
 - PULLB jobs and tokens must have equal lengths. Each zipped pair is processed
   in `Task.async_stream` with bounded concurrency and infinite task timeout so
   the worker does not abandon a live lease handler.
-- A positive heartbeat interval starts one linked heartbeat process per active
-  job on the dedicated heartbeat connection. Its stop message includes the
-  owning handler PID, preventing one handler's mailbox traffic from stopping
-  another job's heartbeat.
+- A heartbeat interval of 0 or less, `nil`, `false` or another atom disables
+  heartbeats; `true` or a non-atom non-number raises `ArgumentError` before the
+  worker starts a process instead of silently dropping them. A positive interval
+  starts one linked heartbeat process per active job on the dedicated
+  heartbeat connection. The interval is a whole number of milliseconds in
+  `1..4_294_967_295`: never `after 0`, never a `:timeout_value` crash that
+  would kill the linked handler task. Its stop message includes the owning
+  handler PID, preventing one handler's mailbox traffic from stopping another
+  job's heartbeat.
 - ACK/FAIL uses the exact lease token. A handler is counted successful or
   failed only after the broker applies that transition; ACK/FAIL errors are
   surfaced. An acknowledged `already-finalized` response settles the
@@ -87,6 +108,13 @@ is shown in [`README.md`](README.md).
 - `WorkerLifecycle` is the stop barrier: once stopping begins no new run enters;
   the owner waits for every active run and ACK/FAIL, followers wait for the same
   completion, then unregister/close happens once.
+- Liveness, not a timer, bounds that wait. Every admitted process is
+  monitored, and its `:DOWN` releases it exactly like `leave`. A run killed by a
+  link exit therefore cannot hold `stop/1`. Its handler tasks, heartbeats and
+  ACK/FAIL die with it, and a live run is never abandoned. The stop owner is
+  monitored too: if it dies before finishing, the oldest waiting stopper, or
+  the next caller, takes over, and unregister/close tolerate an already-closed
+  connection.
 
 ## FlowProducer
 

@@ -31,7 +31,8 @@ supervised process pool for production workloads.
 `SandboxedWorker` runs a processor module in Bun Workers or portable worker threads on Node.js and Deno. The queue and
 heartbeat loop stay in the parent thread. A per-job timeout terminates a stuck
 thread, and a crashed thread is restarted only while `autoRestart` is enabled
-and its restart budget remains.
+and its restart budget remains; otherwise it is retired (see
+[Crashed threads](#crashed-threads)).
 
 This is execution separation, **not a security sandbox**. Threads share the same
 OS process and authority; do not use it to run untrusted code, and do not assume
@@ -155,7 +156,7 @@ export default async (job: {
   queue: string;
   attempts: number;
   parentId?: string;
-  progress: (value: number) => void;
+  progress: (value: number | object) => void;
   log: (message: string) => void;
   fail: (error: string | Error) => void;
 }) => {
@@ -165,6 +166,14 @@ export default async (job: {
   return result;
 };
 ```
+
+`job.progress()` is stored as `updateProgress` stores it on any job: a number as-is
+(`NaN` is 0), a BullMQ-style object as progress `0` with the object's JSON as the
+progress message, a numeric string, boolean or `null` as its number (`'50'` is 50), and
+other text as progress `0` with the text as the message, as in 2.9.10. The `progress`
+event carries the value as passed. A progress update that still fails (for example the
+connection drops) is reported as an `error` with `context: 'progress'` and `jobId`; the
+job keeps running.
 
 To connect to a remote server instead of running embedded, pass a `connection`
 option (`host`, `port`, `token`); otherwise the shared embedded manager is used.
@@ -180,25 +189,116 @@ await worker.stop(true);         // Force
 ```
 
 `getStats()` reports pool bookkeeping in the current process. It is not a broker
-metrics snapshot.
+metrics snapshot. `recycled` counts every slot without a running thread: threads
+recycled while idle and threads retired after a crash. A thread still loading its
+processor counts as `idle`.
+
+`stop()` is idempotent. A second call, or one made while a stop is in progress,
+releases nothing again and waits for the same shutdown; `stop(true)` cuts short a
+graceful stop that is still draining. `closed` fires once per run, whether the pool
+stopped through `stop()` or through `idleTimeout`. A `stop()` always wins: it cancels
+the `autoStart` watch, a queue check still in flight, and a restart that is still
+starting threads. `start()` after a stop (or while one finishes) starts a fresh pool
+and takes its TCP connection back. In TCP mode the worker holds one reference on
+the shared connection pool from construction until it stops (the `autoStart` watch
+keeps it to poll the queue), so stopping never closes connections other clients
+still use. The watch waits `autoStartPollMs` between queue checks and sends one
+queue-count request at a time.
+
+A failed `start()` rejects and leaves nothing running: the threads it started, its
+wrapper file and its TCP pool reference are released, and a later `start()` works.
+When the `autoStart` watch restarts the pool and that start fails, the worker emits
+`error` with `context: 'restart'` and `consecutiveErrors`, keeps watching, and retries
+after `autoStartPollMs × 2^failures`, at most `max(autoStartPollMs, 30 s)`.
+
+### Thread startup
+
+A thread receives jobs only once its processor module has loaded, whether it is
+started by `start()`, restarted after a crash, or respawned after idle recycling. A
+processor with slow top-level work (a top-level `await`, a large import) therefore
+never loses a job: the job waits in the queue until a loaded thread is free.
+`start()` waits up to 5 s for its threads to load; a thread that takes longer keeps
+loading and gets its first job once it is ready. A processor that fails to load
+fails `start()`; a restarted thread whose processor fails to load counts as a
+crash (see [Crashed threads](#crashed-threads)) and is given no job.
+
+### Pull errors
+
+A failed pull never stops the pool, as with `Worker`. A TCP error, a permanent broker
+refusal or a thread that fails to respawn is retried after 100 ms, doubling up to 30 s;
+the next answered pull, even an empty one, resets the backoff, and `stop()` ends the
+wait at once. A temporary refusal counts as an empty pull and is followed by the next
+pull after `pollInterval`. The failure is reported as `error` with `queue`, `consecutiveErrors` and
+`context: 'pull'` (or `'spawn'`). A refused PULL is a `PullRefusedError` (`reason`,
+`transient`), never an empty queue.
+
+- **Transient** refusals (`Rate limit exceeded`, a broker lock timeout such as
+  `Write lock acquisition timed out`, `Internal server error`) count as an empty pull
+  (they also count toward `idleTimeout`) and are not reported, even to an `error`
+  listener, as in earlier releases. Other transient
+  failures (a lock timeout thrown by an embedded pull, a timeout, a lost connection)
+  and respawn failures reach only an attached `error` listener.
+- **Permanent** pull failures, such as a refused queue name or a missing or wrong auth
+  token, reach an attached `error` listener. Without one they are written to the
+  console instead (one line naming the queue and the reason, at most once a minute), as
+  for `Worker`: a refusal never ends the process, and the pool resumes as soon as the
+  cause is fixed.
+
+A job pulled for a thread that then fails to respawn is failed with
+`Dispatch failed: <reason>` rather than left holding its lease.
+
+### Crashed threads
+
+A thread dies when its processor throws outside the job's promise (for example
+from a timer), leaves a promise rejection unhandled, or calls `process.exit()`. A
+per-job timeout also terminates its thread, and a restarted thread whose processor
+module fails to load counts as a crash too. In every case:
+
+- the job that was running fails at once with `Worker crashed: <reason>` (the job
+  is retried according to its `attempts`) and `failed` is emitted, so the job never
+  keeps its lease until a timeout;
+- an `error` with `context: 'crash'` and `workerIndex` is emitted (for a timeout,
+  only when the broker applied it);
+- with `autoRestart` and restart budget left, the slot gets a new thread, which
+  receives jobs only once its processor has loaded (see
+  [Thread startup](#thread-startup)). Otherwise the slot is **retired**: it is never
+  respawned and never receives a job.
+
+While some threads still work, the worker keeps running on them at reduced
+capacity. When every slot is retired, it pulls nothing more. It emits `error` with
+`context: 'exhausted'` (and logs it), then stops as `stop()` would, `autoStart`
+included, because an automatic restart would only crash again; `closed` follows. Call
+`start()` to run again with a fresh restart budget once the processor is fixed.
 
 ### SandboxedWorker options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `processor` | `string` | (required) | Path to processor file |
-| `concurrency` | `number` | `1` | Parallel worker threads |
+| `concurrency` | `number` | `1` | Parallel worker threads (one thread each); a fraction rounds up and a value below `1` starts one thread |
 | `maxMemory` | `number` | `256` | Compatibility hint: values `<= 64` enable Bun's `smol` Worker mode. This implementation does **not** enforce an MB memory limit |
-| `timeout` | `number` | `30000` | Per-job timeout in ms (0 = disabled) |
-| `autoRestart` | `boolean` | `true` | Auto-restart crashed threads |
-| `maxRestarts` | `number` | `10` | Restart budget per thread; the counter increments before the check, so `10` allows 9 actual restarts |
-| `pollInterval` | `number` | `10` | Sleep in ms when no idle thread is available; job pulls themselves use a fixed 1000 ms broker long-poll |
-| `heartbeatInterval` | `number` | `5000` (embedded) / `10000` (TCP) | Heartbeat for stall detection and lock renewal; non-positive disables it |
-| `idleTimeout` | `number` | `0` | Stop the pool after this many idle ms (0 = disabled) |
-| `idleRecycleMs` | `number` | `30000` | Recycle idle threads after this many ms (0 = disabled) |
+| `timeout` | `number` | `30000` | Per-job timeout in ms; `0`, a negative value or `Infinity` disables it |
+| `autoRestart` | `boolean` | `true` | Auto-restart crashed threads; when `false`, a crashed thread is retired at once |
+| `maxRestarts` | `number` | `10` | Restart budget per thread; the counter increments before the check, so `10` allows 9 actual restarts. A thread past it is retired; the worker stops when every thread is |
+| `pollInterval` | `number` | `10` | Sleep in ms when no idle thread is available, at least `1`; job pulls themselves use a fixed 1000 ms broker long-poll |
+| `heartbeatInterval` | `number` | `5000` (embedded) / `10000` (TCP) | Heartbeat for stall detection and lock renewal; non-positive disables it, otherwise at least `1` |
+| `idleTimeout` | `number` | `0` | Stop the pool after this many idle ms; `0`, a negative value or `Infinity` disables it |
+| `idleRecycleMs` | `number` | `30000` | Recycle idle threads after this many ms; `0`, a negative value or `Infinity` disables it |
 | `autoStart` | `boolean` | `false` | Restart the pool when new jobs arrive after an idle shutdown |
-| `autoStartPollMs` | `number` | `5000` | Poll interval while idle-stopped |
+| `autoStartPollMs` | `number` | `5000` | Wait in ms between queue checks while idle-stopped, at least `1` |
 | `connection` | `ConnectionOptions` | - | TCP connection (omit for embedded) |
+
+The constructor validates `concurrency` and every duration option. A numeric string
+(`'4'`) is read as that number. `concurrency` is rounded up, and a value below `1`
+starts one thread (`0` → 1, `2.5` → 3). `timeout`, `idleTimeout` and `idleRecycleMs`
+are disabled by `0`, a negative value, NaN or `Infinity`. Anything else the pool could
+not run throws, naming the option and the value it received: a `TypeError` for a
+non-number, and a `RangeError` for a `concurrency` of `NaN` or `Infinity` (endless
+thread spawning), or a `pollInterval`, `autoStartPollMs` or positive `heartbeatInterval`
+that is NaN, infinite or below 1 ms. For example:
+`SandboxedWorker: pollInterval must be a finite number of milliseconds >= 1 (got NaN)`.
+Long durations are honoured exactly, including ones above 2^31 - 1 ms (about 24.8
+days), which the runtime's own timers would otherwise fire after about 1 ms.
 
 SandboxedWorker emits eight local events: `ready`, `active`, `completed`,
 `failed`, `progress`, `log`, `error`, and `closed`. It does **not** emit

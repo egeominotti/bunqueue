@@ -1,5 +1,6 @@
 import type { JobId, JobLock, LockToken } from '../../domain/types/job';
 import { DEFAULT_LOCK_TTL } from '../../domain/types/job';
+import { assertLockDuration } from '../../domain/job/options';
 import * as lockMgr from '../lockManager';
 import { QueueManagerAck } from './ack';
 
@@ -29,6 +30,7 @@ export class QueueManagerLocks extends QueueManagerAck {
   }
 
   createLock(jobId: JobId, owner: string, ttl = DEFAULT_LOCK_TTL): LockToken | null {
+    assertLockDuration(ttl, 'lockTtl');
     return lockMgr.createLock(jobId, owner, this.contextFactory.getLockContext(), ttl);
   }
 
@@ -37,10 +39,12 @@ export class QueueManagerLocks extends QueueManagerAck {
   }
 
   renewJobLock(jobId: JobId, token: string, newTtl?: number): boolean {
+    assertLockDuration(newTtl, 'duration');
     return lockMgr.renewJobLock(jobId, token, this.contextFactory.getLockContext(), newTtl);
   }
 
   renewJobLockBatch(items: Array<{ id: JobId; token: string; ttl?: number }>): string[] {
+    for (const item of items) assertLockDuration(item.ttl, 'duration');
     return lockMgr.renewJobLockBatch(items, this.contextFactory.getLockContext());
   }
 

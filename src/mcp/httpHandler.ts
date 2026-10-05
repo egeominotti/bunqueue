@@ -8,6 +8,7 @@
  */
 
 import type { Job, WorkerOptions } from '../client/types';
+import { brokerConnectionFromEnv } from './backend/tcp/env';
 import { Worker } from '../client/worker/worker';
 
 export interface HttpHandler {
@@ -40,11 +41,7 @@ export function handlerConnectionFromEnv(
   env: Record<string, string | undefined> = process.env
 ): HandlerConnection | undefined {
   if ((env.BUNQUEUE_MODE ?? 'embedded') !== 'tcp') return undefined;
-  return {
-    host: env.BUNQUEUE_HOST,
-    port: env.BUNQUEUE_PORT ? parseInt(env.BUNQUEUE_PORT, 10) : undefined,
-    token: env.BUNQUEUE_TOKEN,
-  };
+  return brokerConnectionFromEnv(env);
 }
 
 /** Job processor that forwards the job to the handler's HTTP endpoint. */

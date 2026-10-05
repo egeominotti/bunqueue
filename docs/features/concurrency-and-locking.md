@@ -36,7 +36,7 @@ Internal:
 
 External / runtime:
 
-- Bun only: `Bun.env.LOCK_TIMEOUT_MS` (`lockTimeout.ts`), `Bun.randomUUIDv7()` for lease tokens (job.ts). No external libraries; timers via `setTimeout`/`setInterval`. SQLite is touched indirectly via `ctx.storage` for DLQ/delete persistence inside recovery paths.
+- Bun only: `Bun.env.LOCK_TIMEOUT_MS` through `lockTimeoutMs()` (`lockTimeout.ts`), `Bun.randomUUIDv7()` for lease tokens (job.ts). No external libraries; lock-wait timers via `safeTimeout` and the sweep intervals via `safeInterval` (`src/shared/timers.ts`, see [Shared Timers & Durations](./shared-timers.md)). SQLite is touched indirectly via `ctx.storage` for DLQ/delete persistence inside recovery paths.
 
 ## Public Interface
 
@@ -47,6 +47,14 @@ export interface LockGuard {
   release(): void;
 }
 export class LockTimeoutError extends Error {}
+// src/shared/lockError.ts: the timeout messages, one source for the locks and the Worker
+export const LOCK_TIMEOUT_MESSAGE: string; // 'Lock acquisition timed out' (AsyncLock)
+export const READ_LOCK_TIMEOUT_MESSAGE: string; // 'Read lock acquisition timed out'
+export const WRITE_LOCK_TIMEOUT_MESSAGE: string; // 'Write lock acquisition timed out'
+export const LOCK_TIMEOUT_MESSAGES: ReadonlySet<string>;
+
+export function lockTimeoutMs(): number; // src/shared/lockTimeout.ts: LOCK_TIMEOUT_MS, parsed once
+export function configureLockTimeoutMs(ms: number): void; // the server's resolved LOCK_TIMEOUT_MS
 
 export class AsyncLock {
   acquire(timeoutMs?: number): Promise<LockGuard>; // FIFO mutex, default LOCK_TIMEOUT_MS
@@ -128,6 +136,14 @@ Lease renewal / heartbeat flow through the TCP handlers (`src/infrastructure/ser
 
 - `JobHeartbeat` / `JobHeartbeatBatch` → `renewJobLock` when a `token` is present, else updates `job.lastHeartbeat` (`queue-manager/locks.ts`).
 - `ExtendLock` / `ExtendLocks` → `extendLock` → `renewJobLock`.
+- Lease durations (`PULL`/`PULLB` `lockTtl`, `ExtendLock` `duration`, `ExtendLocks`
+  `durations[i]`, a non-zero `JobHeartbeat` `duration`) must be finite numbers of at
+  least 1 ms (`validateLockDuration`, see
+  [Job Options Validation](./job-options-validation.md)). The handlers reply with a
+  protocol error before claiming a job or touching a lease; the embedded
+  `QueueManager.pullWithLock`/`pullBatchWithLock`/`createLock`/`extendLock`/
+  `renewJobLock(Batch)` throw the same message. A NaN or infinite TTL used to give a
+  lease that never expires, and a negative one revoked it.
 - `Heartbeat` → worker-level liveness (worker registry, not job leases).
 
 Leases are created implicitly by `PULL`/`PULLB` via `pullWithLock`/`pullBatchWithLock` (`queue-manager/delivery.ts`) and released by `ACK`/`FAIL` (`queue-manager/ack.ts`). See [TCP Server Command Handlers](./tcp-server-handlers.md).
@@ -321,7 +337,7 @@ Runs on the background timer at `stallCheckMs` (5 s), registered in `background/
   (the stall transition itself already detached it). The
   generation rule lives in one helper, `isLeaseFromEarlierGeneration`
   (`domain/job/locks.ts`): a lease is stale when `job.startedAt >
-  lock.createdAt`. Pull stamps `startedAt` before the lease is created, so a
+lock.createdAt`. Pull stamps `startedAt` before the lease is created, so a
   lease from the current pull has `createdAt >= startedAt` and the strict
   comparison keeps a same-millisecond lease current. `createLock`, the lease
   token checks in `queue-manager/delivery.ts`, cleanup's orphan liveness rule
@@ -338,7 +354,8 @@ Runs on the background timer at `stallCheckMs` (5 s), registered in `background/
 
 ## Edge Cases & Failure Modes
 
-- **Lock timeout** — `acquire`/`acquireRead`/`acquireWrite` throw `LockTimeoutError` after `LOCK_TIMEOUT_MS` (default 5 s). Callers using `withWriteLock` propagate the rejection; background sweeps wrap calls in `.catch(...)` (`background/lifecycle.ts`).
+- **Lock timeout** — `acquire`/`acquireRead`/`acquireWrite` throw `LockTimeoutError` after `LOCK_TIMEOUT_MS` (default 5 s). Callers using `withWriteLock` propagate the rejection; a TCP command handler returns its message unredacted (`sanitizeServerError` keeps it), and the Worker treats such a PULL/PULLB refusal as transient through `LOCK_TIMEOUT_MESSAGES` (see [Client Worker SDK](./client-worker-sdk.md)); background sweeps wrap calls in `.catch(...)` (`background/lifecycle.ts`). The default is read only on the contended path (`timeoutMs ?? lockTimeoutMs()`); the uncontended fast path is unchanged. An explicit `timeoutMs <= 0` rejects at once when contended; any longer wait is armed with `safeTimeout`, so a timeout above 2^31 - 1 ms is honoured instead of firing after about 1 ms. A `NaN` argument rejects with the helper's `TypeError` (a caller bug) and queues no waiter.
+- **Malformed `LOCK_TIMEOUT_MS`** — the variable must be whole milliseconds >= 1 (`0` would fail every contended acquire at once). `lockTimeoutMs()` parses it with `parseDurationEnv` on first use (never at import) and caches it; QueueManager construction calls it before opening storage, so `abc`, `-1`, `0` or `1e3` stops server startup and the first embedded `Queue`/`Worker` with `Invalid LOCK_TIMEOUT_MS: "abc" (expected a whole number of milliseconds >= 1)`. A server checks it earlier, in `resolveServerConfig` (one `Fatal error:` line, before storage opens), and applies the resolved value with `configureLockTimeoutMs` before the QueueManager is built (the config file's `timeouts.lock` is ignored with a warning, as it always was); the rule and default (`LOCK_TIMEOUT_SETTING`) are defined once, in `lockTimeout.ts`. Before, `parseInt` made `abc` or `99999999999` fail every contended acquire after about 1 ms and `-1` at once.
 - **Resource-slot leaks** — every reclaim path (`handleRecoveryBoundExceeded`, `requeueExpiredJob`, `moveStalliedJobToDlq`, `retryStalliedJob`) calls `shard.releaseJobResources(queue, uniqueKey, groupId, ownerId)` before moving the job; omitting it wedges the queue's concurrency limiter. Passing `ownerId` also prevents a stale generation from releasing a replacement job's unique key.
 - **Orphan SQLite rows (#97)** — DLQ moves must `saveDlqEntry` + `deleteJob`; missing the delete leaves a `jobs` row that collides on retry with `UNIQUE constraint failed: jobs.id`.
 - **Cron preventOverlap (#73/#75)** — `cron:`-prefixed jobs are discarded rather than requeued/DLQ'd on stall or lock expiry, since the scheduler re-creates them on the next tick; requeuing would cause "starts right away on reconnect".
@@ -353,16 +370,16 @@ Runs on the background timer at `stallCheckMs` (5 s), registered in `background/
 
 ## Configuration
 
-| Name                            | Default     | Effect                                                                                                                                               |
-| ------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LOCK_TIMEOUT_MS` (env)         | `5000`      | Default timeout for `AsyncLock`/`RWLock` acquisition (`lockTimeout.ts`).                                                                             |
-| `DEFAULT_LOCK_TTL`              | `30_000` ms | Job lease TTL when `pullWithLock` is called without an explicit `ttl` (`src/domain/job/constants.ts:3`, consumed by `src/domain/job/locks.ts:5-10`). |
-| `StallConfig.enabled`           | `true`      | Per-queue toggle for stall detection (stall.ts:21). `false` also opts the queue out of cleanup's orphan recovery (`orphanRecovery.ts`).            |
+| Name                            | Default     | Effect                                                                                                                                                 |
+| ------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `LOCK_TIMEOUT_MS` (env)         | `5000`      | Default timeout for `AsyncLock`/`RWLock` acquisition: whole ms >= 1, longer than 2^31 - 1 honoured (`lockTimeoutMs()`, `lockTimeout.ts`).              |
+| `DEFAULT_LOCK_TTL`              | `30_000` ms | Job lease TTL when `pullWithLock` is called without an explicit `ttl` (`src/domain/job/constants.ts:3`, consumed by `src/domain/job/locks.ts:5-10`).   |
+| `StallConfig.enabled`           | `true`      | Per-queue toggle for stall detection (stall.ts:21). `false` also opts the queue out of cleanup's orphan recovery (`orphanRecovery.ts`).                |
 | `StallConfig.stallInterval`     | `30_000` ms | No-heartbeat window before a job is a stall candidate; per-job `stallTimeout` overrides. Orphan window = `max(30 min, stallTimeout ?? stallInterval)`. |
-| `StallConfig.maxStalls`         | `3`         | Stalls before the job is moved to DLQ.                                                                                                               |
-| `StallConfig.gracePeriod`       | `5_000` ms  | Quiet period after start before stall checks apply.                                                                                                  |
-| `stallCheckMs` (config)         | `5_000` ms  | Interval for **both** `checkStalledJobs` and `checkExpiredLocks` (`application/types/config.ts`, `background/lifecycle.ts`).                         |
-| `MAX_CONCURRENT_PER_CONNECTION` | `50`        | Per-socket semaphore permits for pipelined TCP command processing (`server/tcp/constants.ts:1`, constructed at `server/tcp/connections.ts:42`).      |
+| `StallConfig.maxStalls`         | `3`         | Stalls before the job is moved to DLQ.                                                                                                                 |
+| `StallConfig.gracePeriod`       | `5_000` ms  | Quiet period after start before stall checks apply.                                                                                                    |
+| `stallCheckMs` (config)         | `5_000` ms  | Interval for **both** `checkStalledJobs` and `checkExpiredLocks`; finite ms >= 1 (`application/types/config.ts`, `background/lifecycle.ts`).           |
+| `MAX_CONCURRENT_PER_CONNECTION` | `50`        | Per-socket semaphore permits for pipelined TCP command processing (`server/tcp/constants.ts:6`, constructed at `server/tcp/connections.ts:43`).        |
 
 Per-queue `StallConfig` is set via `queue.setStallConfig({...})` (embedded) and read by the sweeps through `shard.getStallConfig(queue)`.
 

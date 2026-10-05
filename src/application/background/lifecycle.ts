@@ -6,6 +6,7 @@ import { runMonitoringChecks } from '../monitoringChecks';
 import { checkStalledJobs } from '../stallDetection';
 import { handleTaskError, handleTaskSuccess } from '../taskErrorTracking';
 import type { BackgroundContext, BackgroundTaskHandles, LockContext } from '../types';
+import { safeInterval, type SafeTimer } from '../../shared/timers';
 import { performDlqMaintenance } from './dlq';
 
 function getLockContext(ctx: BackgroundContext): LockContext {
@@ -31,9 +32,9 @@ export function startBackgroundTasks(
   cronScheduler: CronScheduler
 ): BackgroundTaskHandles {
   const timeoutScheduler = ctx.timeoutScheduler;
-  const intervals: ReturnType<typeof setInterval>[] = [];
+  const intervals: SafeTimer[] = [];
   try {
-    const cleanupInterval = setInterval(() => {
+    const cleanupInterval = safeInterval(() => {
       cleanup(ctx)
         .then(() => {
           handleTaskSuccess('cleanup');
@@ -54,7 +55,7 @@ export function startBackgroundTasks(
     intervals.push(cleanupInterval);
 
     timeoutScheduler.start(ctx);
-    const depCheckInterval = setInterval(() => {
+    const depCheckInterval = safeInterval(() => {
       if (ctx.pendingDepChecks.size === 0) return;
       processPendingDependencies(ctx)
         .then(() => handleTaskSuccess('dependency'))
@@ -62,14 +63,14 @@ export function startBackgroundTasks(
     }, ctx.config.dependencyCheckMs);
     intervals.push(depCheckInterval);
 
-    const stallCheckInterval = setInterval(() => checkStalledJobs(ctx), ctx.config.stallCheckMs);
+    const stallCheckInterval = safeInterval(() => checkStalledJobs(ctx), ctx.config.stallCheckMs);
     intervals.push(stallCheckInterval);
-    const dlqMaintenanceInterval = setInterval(
+    const dlqMaintenanceInterval = safeInterval(
       () => performDlqMaintenance(ctx),
       ctx.config.dlqMaintenanceMs
     );
     intervals.push(dlqMaintenanceInterval);
-    const lockCheckInterval = setInterval(() => {
+    const lockCheckInterval = safeInterval(() => {
       checkExpiredLocks(getLockContext(ctx))
         .then(() => handleTaskSuccess('lockExpiration'))
         .catch((error: unknown) => handleTaskError('lockExpiration', error));
@@ -87,7 +88,7 @@ export function startBackgroundTasks(
       cronScheduler,
     };
   } catch (error) {
-    for (const interval of intervals) clearInterval(interval);
+    for (const interval of intervals) interval.clear();
     timeoutScheduler.stop();
     cronScheduler.stop();
     throw error;
@@ -95,11 +96,11 @@ export function startBackgroundTasks(
 }
 
 export function stopBackgroundTasks(handles: BackgroundTaskHandles): void {
-  clearInterval(handles.cleanupInterval);
+  handles.cleanupInterval.clear();
   handles.timeoutScheduler.stop();
-  clearInterval(handles.depCheckInterval);
-  clearInterval(handles.stallCheckInterval);
-  clearInterval(handles.dlqMaintenanceInterval);
-  clearInterval(handles.lockCheckInterval);
+  handles.depCheckInterval.clear();
+  handles.stallCheckInterval.clear();
+  handles.dlqMaintenanceInterval.clear();
+  handles.lockCheckInterval.clear();
   handles.cronScheduler.stop();
 }

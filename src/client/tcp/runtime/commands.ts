@@ -2,6 +2,7 @@ import { FrameParser } from '../../../infrastructure/server/protocol';
 import { PROTOCOL_CAPABILITIES, PROTOCOL_VERSION } from '../../../domain/types/protocol';
 import type { HelloResponse } from '../../../domain/types/response';
 import { encodeMessagePack } from '../../../shared/msgpack';
+import { safeTimeout } from '../../../shared/timers';
 import type { PendingCommand, SendOptions } from '../types';
 import { TcpClientHealth } from './health';
 
@@ -38,7 +39,7 @@ export abstract class TcpClientCommands extends TcpClientHealth {
 
     let pendingRef!: PendingCommand;
     const promise = new Promise<Record<string, unknown>>((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      const timeout = safeTimeout(() => {
         const removed = this.commands.removeByReqId(reqId);
         if (removed) {
           this.health.recordError();
@@ -75,8 +76,8 @@ export abstract class TcpClientCommands extends TcpClientHealth {
       const next = this.commands.dequeue();
       if (!next) break;
 
-      clearTimeout(next.timeout);
-      const newTimeout = setTimeout(() => {
+      next.timeout.clear();
+      next.timeout = safeTimeout(() => {
         const removed = this.commands.removeByReqId(next.reqId);
         if (removed) {
           this.health.recordError();
@@ -84,8 +85,6 @@ export abstract class TcpClientCommands extends TcpClientHealth {
           this.handleCommandTimeout();
         }
       }, next.timeoutMs ?? this.options.commandTimeout);
-
-      next.timeout = newTimeout;
       this.commands.addInFlight(next);
       this.socket.write(FrameParser.frame(encodeMessagePack(next.command)));
     }
@@ -105,7 +104,9 @@ export abstract class TcpClientCommands extends TcpClientHealth {
 
     let pendingRef!: PendingCommand;
     const promise = new Promise<Record<string, unknown>>((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      // One native setTimeout for any delay up to 2^31 - 1 ms (the hot path); a longer
+      // one is chunked and Infinity (no deadline) arms nothing, so none fires early.
+      const timeout = safeTimeout(() => {
         if (this.commands.remove(id)) {
           this.health.recordError();
           reject(new Error('Command timeout'));

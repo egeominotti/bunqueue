@@ -1,7 +1,13 @@
 /**
  * S3 Backup Configuration
- * Types and configuration factory
+ * Types, defaults and validation. Env and config-file parsing lives in
+ * `src/config/backup.ts`, the single source shared by the server and the CLI.
  */
+
+import { resolveBackupConfig } from '../../config/backup';
+import { MIN_BACKUP_INTERVAL_MS, MIN_BACKUP_RETENTION } from './s3BackupDefaults';
+
+export { DEFAULTS, MIN_BACKUP_INTERVAL_MS, MIN_BACKUP_RETENTION } from './s3BackupDefaults';
 
 /** S3 Backup configuration */
 export interface S3BackupConfig {
@@ -31,6 +37,12 @@ export interface S3BackupConfig {
   databasePath: string;
   /** Timeout for S3 operations in milliseconds (default: 30000) */
   timeoutMs?: number;
+  /**
+   * Why the configured backup cannot run, each naming the setting (no bucket, an
+   * interval under a minute, an invalid retention). Set by the server configuration;
+   * the scheduler logs them and does not start, as `validateConfig` reports them.
+   */
+  configErrors?: readonly string[];
 }
 
 /** Backup result */
@@ -65,42 +77,38 @@ export interface BackupItem {
   lastModified: Date;
 }
 
-/** Default configuration values */
-export const DEFAULTS = {
-  intervalMs: 6 * 60 * 60 * 1000, // 6 hours
-  retention: 7,
-  prefix: 'backups/',
-  region: 'us-east-1',
-} as const;
-
 /**
- * Create configuration from environment variables
+ * Create configuration from environment variables. Delegates to the validated
+ * resolver (`src/config/backup.ts`): an invalid value is carried in `configErrors`
+ * (naming the variable), which `validateConfig` reports and the manager refuses to run.
  */
 export function configFromEnv(databasePath: string): S3BackupConfig {
-  const virtualHostedStyle = Bun.env.S3_VIRTUAL_HOSTED_STYLE;
-  return {
-    enabled: Bun.env.S3_BACKUP_ENABLED === '1' || Bun.env.S3_BACKUP_ENABLED === 'true',
-    accessKeyId: Bun.env.S3_ACCESS_KEY_ID ?? Bun.env.AWS_ACCESS_KEY_ID ?? '',
-    secretAccessKey: Bun.env.S3_SECRET_ACCESS_KEY ?? Bun.env.AWS_SECRET_ACCESS_KEY ?? '',
-    sessionToken: Bun.env.S3_SESSION_TOKEN ?? Bun.env.AWS_SESSION_TOKEN,
-    bucket: Bun.env.S3_BUCKET ?? Bun.env.AWS_BUCKET ?? '',
-    endpoint: Bun.env.S3_ENDPOINT ?? Bun.env.AWS_ENDPOINT,
-    virtualHostedStyle:
-      virtualHostedStyle === undefined
-        ? undefined
-        : virtualHostedStyle === '1' || virtualHostedStyle === 'true',
-    region: Bun.env.S3_REGION ?? Bun.env.AWS_REGION ?? DEFAULTS.region,
-    intervalMs: parseInt(Bun.env.S3_BACKUP_INTERVAL ?? '', 10) || DEFAULTS.intervalMs,
-    retention: parseInt(Bun.env.S3_BACKUP_RETENTION ?? '', 10) || DEFAULTS.retention,
-    prefix: Bun.env.S3_BACKUP_PREFIX ?? DEFAULTS.prefix,
-    databasePath,
-  };
+  return resolveBackupConfig(null, databasePath);
+}
+
+/**
+ * True when `retention` is a whole number of backups >= 1. The prune refuses to
+ * delete anything otherwise: `backups.slice(NaN)` is `slice(0)`, which would delete
+ * every backup, the one just uploaded included.
+ */
+export function isValidRetention(retention: unknown): retention is number {
+  return Number.isSafeInteger(retention) && (retention as number) >= MIN_BACKUP_RETENTION;
+}
+
+/** True when `intervalMs` is a whole number of milliseconds >= one minute. */
+function isValidInterval(intervalMs: unknown): intervalMs is number {
+  return Number.isSafeInteger(intervalMs) && (intervalMs as number) >= MIN_BACKUP_INTERVAL_MS;
 }
 
 /**
  * Validate configuration
  */
 export function validateConfig(config: S3BackupConfig): { valid: boolean; errors: string[] } {
+  // The server configuration already named every problem with its setting (file key or
+  // env var), the missing credentials included; the checks below would only repeat them.
+  if (config.configErrors !== undefined && config.configErrors.length > 0) {
+    return { valid: false, errors: [...config.configErrors] };
+  }
   const errors: string[] = [];
 
   if (!config.accessKeyId) {
@@ -116,11 +124,21 @@ export function validateConfig(config: S3BackupConfig): { valid: boolean; errors
     errors.push('Database path is required');
   }
 
-  if (config.retention < 1) {
-    errors.push('Retention must be at least 1');
+  if (!isValidRetention(config.retention)) {
+    errors.push(`Retention must be a whole number of backups >= 1 (got ${config.retention})`);
   }
-  if (config.intervalMs < 60000) {
-    errors.push('Backup interval must be at least 60 seconds');
+  if (!isValidInterval(config.intervalMs)) {
+    errors.push(
+      `Backup interval must be a whole number of milliseconds >= 60000 (got ${config.intervalMs})`
+    );
+  }
+  if (
+    config.timeoutMs !== undefined &&
+    !(Number.isSafeInteger(config.timeoutMs) && config.timeoutMs > 0)
+  ) {
+    errors.push(
+      `S3 operation timeout must be a positive whole number of milliseconds (got ${config.timeoutMs})`
+    );
   }
 
   return { valid: errors.length === 0, errors };

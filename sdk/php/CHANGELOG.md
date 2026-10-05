@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Breaking: invalid timeouts and lock TTLs now throw `\InvalidArgumentException`
+at construction instead of failing later.
+
+### Fixed
+
+- `Worker::run()` no longer re-polls at once after a pull that found no job.
+  It waits as the main client does (`src/client/worker/runtime/polling.ts`):
+  - 10 ms when `pollTimeoutMs > 0`. A 1 ms long-poll issued 340 `PULLB` per
+    second; it now issues about 67.
+  - 50 ms (the main client's default `drainDelay`) when the poll timeout is 0,
+    including a negative `pollTimeoutMs`, which clamps to 0. Before, an idle
+    worker issued about 10,000 `PULLB` per second until the broker's rate
+    limit rejected it.
+  `runOnce()` is unchanged and still returns at once.
+- `connectTimeout` and `commandTimeout` (Connection, Queue, Worker,
+  FlowProducer options) and the explicit `Connection::call()` timeout must
+  be finite numbers of seconds above 0. Before:
+  - `NAN`/`INF` turned every socket read non-blocking (`(int) NAN === 0`).
+    A read busy-spun until the response arrived and never timed out.
+  - `0` or a negative value timed out every command right after a fresh
+    connect, so each call opened a new connection.
+  - A non-finite `connectTimeout` made `stream_socket_client` throw a
+    `ValueError` that escaped `Worker::run()`.
+- `connectTimeout`, `commandTimeout` and an explicit `call()` timeout are capped
+  at 2,147,482 s (about 24.85 days, `OptionGuard::MAX_TIMEOUT_S`). That is the
+  longest stream timeout PHP honours: `php_tvtoto()` turns a longer one into an
+  infinite poll. Above `PHP_INT_MAX` the `(int)` cast wrapped:
+  - `1e300` became a 0 s timeout. A 504 ms long-poll burned 503 ms of CPU and
+    the read never timed out.
+  - `2^64 + 8192` became an early 8192 s timeout.
+  Larger values are clamped, so `1e9` still means "effectively never".
+- `lockTtlMs` must be a whole number of milliseconds >= 1. Before, any int
+  reached the wire. A lease of 0 or less is already expired when granted, so
+  a job could be delivered again while it was still running.
+- A non-number timeout or `lockTtlMs` now throws `\InvalidArgumentException`.
+  PHP already rejected it before, with a `TypeError` from the typed property.
+- `pollTimeoutMs` values that PHP's int cast broke now clamp to [0, 30000]
+  (sdk/CLAUDE.md rule 4). Before, each became a non-blocking pull or wrapped:
+  - `NAN` was 0; it now means the 5000 default.
+  - `INF` was 0; it now clamps to 30000.
+  - A float beyond the int range wrapped: `1e19` was 0, `-1e19` was 30000
+    and `2^64 + 8192` was 8192. They now clamp to 30000, 0 and 30000.
+  Every other value keeps its 0.2.0 setting. An int or finite float clamps as
+  before, and a numeric string such as `'5000'` from the environment is still
+  honoured. Any other value still means 0. `batchSize` and
+  `heartbeatIntervalS` keep their 0.2.0 conversion, and none of these options
+  throws.
+- `waitForJob()` takes `int|float|null`. `null` or `NAN` means 30000, and
+  `INF` waits for the 600000 maximum. Before, `null` and a non-finite float
+  threw PHP's own `TypeError`, as did any float in a `strict_types` file.
+  Every value 0.2.0 accepted keeps its result.
+
 ## [0.2.0] - 2026-10-02
 
 Breaking: `Job::data()` now returns `mixed` (it was `array`) and invalid options

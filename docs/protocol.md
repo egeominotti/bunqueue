@@ -147,8 +147,9 @@ the shapes and the rules a client MUST get right. All commands below answer
 | `PUSHB` | `queue`, `jobs: [{name, data, ...JobInput}]`      | `{ids: []}` |
 
 Job options on `PUSH` (all optional, exact names): `priority`, `delay`,
-`maxAttempts`, `backoff` (ms or `{type, delay, maxDelay?}`; `delay` and
-`maxDelay` are `0..86400000` ms, `maxDelay` defaults to a 1 h cap), `ttl`, `timeout`,
+`maxAttempts`, `backoff` (ms or `{type, delay?, maxDelay?}`; `delay` is a finite
+number `>= 0`, 1000 when missing, `maxDelay` is `0..86400000` ms and defaults to a 1 h
+cap), `ttl`, `timeout`,
 `jobId`, `uniqueKey`, `dedup {ttl, extend, replace}`, `dependsOn: []`,
 `parentId`, `childrenIds: []`, `tags: []`, `groupId`, `groupMaxSize`, `lifo`,
 `removeOnComplete`, `removeOnFail`, `stallTimeout`, `durable`, `repeat`,

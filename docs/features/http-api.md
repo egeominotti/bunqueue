@@ -10,7 +10,7 @@ This module is the HTTP-side transport for bunqueue, served on port `6790` by de
 
 Owns:
 
-- Bun HTTP server creation, binding (TCP port or Unix socket), and optional TLS termination (`createHttpServer`, `http.ts:74`).
+- Bun HTTP server creation, binding (TCP port or Unix socket), and optional TLS termination (`createHttpServer`, `http.ts:70`).
 - Request routing: URL/method → internal `Command`, via pre-compiled regexes and four sub-routers (jobs, queues, queue-config, resources).
 - Auth gate, CORS headers/preflight, and per-IP rate limiting on the HTTP edge.
 - Diagnostic/observability endpoints: `/health`, `/healthz`, `/live`, `/ready`, `/stats`, `/metrics`, `/prometheus`, `/gc`, `/heapstats`, `/dashboard*`.
@@ -42,7 +42,7 @@ External/runtime:
 
 Exported symbols:
 
-- `createHttpServer(queueManager: QueueManager, config: HttpServerConfig)` — `http.ts:65`. Returns `{ server, wsClients, sseClients, getWsClientCount(), getSseClientCount(), stop() }`. `stop()` unsubscribes from the event bus, stops WS broadcasts, closes all SSE streams, and stops the Bun server.
+- `createHttpServer(queueManager: QueueManager, config: HttpServerConfig)` — `http.ts:70`. Returns `{ server, wsClients, sseClients, getWsClientCount(), getSseClientCount(), stop() }`. `stop()` unsubscribes from the event bus, stops WS broadcasts, closes all SSE streams, and stops the Bun server.
 - `interface HttpServerConfig` — `http.ts`: `port?`, `hostname?`,
   `socketPath?`, `authTokens?: string[]`, `corsOrigins?: string[]`,
   `requireAuthForMetrics?: boolean`,
@@ -61,13 +61,13 @@ Diagnostics / observability (handled in `fetch`/`routeRequest`, `http.ts`):
 
 | Method · Path                                   | Auth        | Notes                                                                 |
 | ----------------------------------------------- | ----------- | --------------------------------------------------------------------- |
-| `OPTIONS *`                                     | no          | CORS preflight (`http.ts:116`)                                        |
+| `OPTIONS *`                                     | no          | CORS preflight (`http.ts:113`)                                        |
 | `GET /health`                                   | no          | health JSON + real TCP/WS/SSE counts; 503 when storage is degraded    |
-| `GET /healthz`, `GET /live`                     | no          | `200 "OK"` liveness (`http.ts:124`)                                   |
+| `GET /healthz`, `GET /live`                     | no          | `200 "OK"` liveness (`http.ts:128`)                                   |
 | `GET /ready`                                    | no          | `{ ok, ready }`; 503 for disk-full or any persistent storage error    |
-| `POST /gc`                                      | yes         | force `Bun.gc(true)` + `compactMemory` (`http.ts:132`)                |
-| `GET /heapstats`                                | yes         | `bun:jsc` heap breakdown (`http.ts:137`)                              |
-| `GET /prometheus`                               | conditional | text exposition; auth only if `requireAuthForMetrics` (`http.ts:179`) |
+| `POST /gc`                                      | yes         | force `Bun.gc(true)` + `compactMemory` (`http.ts:136`)                |
+| `GET /heapstats`                                | yes         | `bun:jsc` heap breakdown (`http.ts:141`)                              |
+| `GET /prometheus`                               | conditional | text exposition; auth only if `requireAuthForMetrics` (`http.ts:183`) |
 | `GET /stats`                                    | yes         | full stats + memory + per-sec rates (`httpRouter.ts:31`)              |
 | `GET /metrics`                                  | yes         | JSON totals only (`httpRouter.ts:34`)                                 |
 | `GET /dashboard`                                | yes         | aggregated overview (`httpRouter.ts:37`)                              |
@@ -137,8 +137,8 @@ Resources (`routeResourceRoutes`, `httpRouteResources.ts:21`):
 
 ### Streaming endpoints
 
-- `GET /events` and `GET /events/queues/:queue` — SSE stream; optional `Last-Event-ID` header for replay (`http.ts:168`).
-- `GET /ws` and `GET /ws/queues/:queue` — WebSocket upgrade (`http.ts:154`).
+- `GET /events` and `GET /events/queues/:queue` — SSE stream; optional `Last-Event-ID` header for replay (`http.ts:172`).
+- `GET /ws` and `GET /ws/queues/:queue` — WebSocket upgrade (`http.ts:158`).
 
 The periodic `stats:snapshot` payload is synchronous and process-local for
 memory/SQLite. PostgreSQL awaits its durable worker and cron registries, so the
@@ -158,30 +158,30 @@ Frame format (server → client): `{ event, ts, data }` (`wsHandler.ts:132-143`)
 
 See [data-model](../data-model.md) for full definitions. Key shapes here:
 
-- `HandlerContext` (`types.ts:8`): `{ queueManager, authTokens: Set<string>, authenticated: boolean, clientId? }`. For HTTP, `clientId` is intentionally absent (stateless; `http.ts:201`). For WS, `clientId = ws.data.id`.
+- `HandlerContext` (`types.ts:8`): `{ queueManager, authTokens: Set<string>, authenticated: boolean, clientId? }`. For HTTP, `clientId` is intentionally absent (stateless; `http.ts:214`). For WS, `clientId = ws.data.id`.
 - `WsData` (`types/ws.ts:1-6`): `{ id, authenticated, queueFilter: string | null, subscriptions: Set<string> | null }`. `subscriptions === null` = legacy mode (receives every job event in the raw `JobEvent` shape).
 - `SseClient` (`types/sse.ts:1-5`): `{ id, controller, queueFilter }`. `BufferedSseEvent` (`types/sse.ts:7-12`): `{ id, event, data, queue }` in the replay ring buffer.
 - `JobEvent` (from `domain/types/queue`) is the input to both `broadcast` methods; `WS_EVENT_MAP` (`ws/constants.ts:5-18`) renames legacy `eventType`s (`pushed`→`job:pushed`, `pulled`→`job:active`, `drained`→`queue:drained`, …), defaulting unknown types to `job:<eventType>`.
 
 ## Business Logic / Control Flow
 
-`fetch(req, server)` request pipeline (`http.ts:102-216`), short-circuiting in this order:
+`fetch(req, server)` request pipeline (`http.ts:108-221`), short-circuiting in this order:
 
-1. `OPTIONS` → `corsResponse` preflight (`http.ts:106-109`).
-2. Unauthenticated liveness: `/health`, `/healthz`, `/live`, `/ready` (`http.ts:111-127`). These skip both auth and rate limiting.
-3. Debug endpoints `POST /gc`, `GET /heapstats` → `checkAuth` then run (`http.ts:129-139`).
-4. Rate limiting: `clientIp` from `x-forwarded-for[0]` / `x-real-ip` / `'unknown'`; if `getRateLimiter().isAllowed(ip)` is false → emit `ratelimit:hit`, return `429` (`http.ts:141-149`).
-5. `/ws*` → auth, `wsHandler.canAccept()` (else `503`), then `server.upgrade(req, { data: { id: uuid(), authenticated: true, queueFilter, subscriptions: null } })` (`http.ts:151-163`).
-6. `/events*` → auth, build SSE response via `sseHandler.createResponse(queueFilter, corsOrigin, lastEventId)` (`http.ts:165-174`).
-7. `/prometheus` → conditional auth, return `text/plain; version=0.0.4` (`http.ts:176-195`).
-8. General `checkAuth` for everything else; failure emits `auth:failed` (`http.ts:197-204`).
+1. `OPTIONS` → `corsResponse` preflight (`http.ts:112-115`).
+2. Unauthenticated liveness: `/health`, `/healthz`, `/live`, `/ready` (`http.ts:117-133`). These skip both auth and rate limiting.
+3. Debug endpoints `POST /gc`, `GET /heapstats` → `checkAuth` then run (`http.ts:135-145`).
+4. Rate limiting: `clientIp` from `x-forwarded-for[0]` / `x-real-ip` / `'unknown'`; if `getRateLimiter().isAllowed(ip)` is false → emit `ratelimit:hit`, return `429` (`http.ts:147-155`).
+5. `/ws*` → auth, `wsHandler.canAccept()` (else `503`), then `server.upgrade(req, { data: { id: uuid(), authenticated: true, queueFilter, subscriptions: null } })` (`http.ts:157-169`).
+6. `/events*` → auth, build SSE response via `sseHandler.createResponse(queueFilter, corsOrigin, lastEventId)` (`http.ts:171-180`).
+7. `/prometheus` → conditional auth, return `text/plain; version=0.0.4` (`http.ts:182-201`).
+8. General `checkAuth` for everything else; failure emits `auth:failed` (`http.ts:203-210`).
 9. `routeHttpRequest` (`httpRouter.ts:23-70`): stats/metrics/dashboard, then cascade through `routeJobRoutes` → `routeQueueRoutes` → `routeQueueConfigRoutes` → `routeResourceRoutes`, each returning a `Response` or `null` (no match). Fallthrough → `404`. Any thrown error → `500` JSON.
 
 Each REST handler reads the body (`req.json()` or `parseJsonBody`, which tolerates empty body as `{}` and returns a `400` on malformed JSON — `httpEndpoints.ts:28`), builds the matching `Command`, awaits `handleCommand`, and maps the result to a status: typically `r.ok ? 200 : 400` (or `404` for read/lookup commands, plain `200` for list/idempotent commands).
 
-Auth (`checkAuth`, `http.ts:39-46`): no-op when `authTokens` is empty; otherwise extracts the `Authorization: Bearer <token>` header and compares against every configured token with `constantTimeEqual` (timing-safe).
+Auth (`checkAuth`, `http.ts:43-51`): no-op when `authTokens` is empty; otherwise extracts the `Authorization: Bearer <token>` header (a missing header reads as `''`) and compares against every configured token with `constantTimeEqual` (timing-safe). `validateAuthToken` (`http.ts:28-41`) never accepts a blank presented token and skips a blank configured one (`isBlankToken`, `src/config/auth.ts`), so an empty token cannot authenticate an anonymous request even if one reached the set. The `Auth` command used by TCP and WebSocket clients (`handleAuth`, `handler.ts`) applies the same rule to its `token`, which must also be a string.
 
-Event fan-out is wired once in `createHttpServer` (`http.ts:71-85`): `queueManager.subscribe` forwards each `JobEvent` to both `wsHandler.broadcast` and `sseHandler.broadcast`; `setDashboardEmit` routes non-job events (worker/queue/dlq/cron/…) to both handlers' `emitEvent`. Periodic broadcasters are started for both channels.
+Event fan-out is wired once in `createHttpServer` (`http.ts:77-91`): `queueManager.subscribe` forwards each `JobEvent` to both `wsHandler.broadcast` and `sseHandler.broadcast`; `setDashboardEmit` routes non-job events (worker/queue/dlq/cron/…) to both handlers' `emitEvent`. Periodic broadcasters are started for both channels.
 
 SSE broadcast (`sseHandler.broadcast`): assigns a monotonic `id`, maps and serializes the event, buffers it in the replay ring, writes to matching clients, and schedules the affected queue for a count refresh. `QueueCountsScheduler` deduplicates queue names for 10 ms and obtains all pending counts with one batch aggregation before emitting `queue:counts`. `createResponse` registers the client, sends the retry/connected frames, and replays buffered events newer than `Last-Event-ID`. Stream cancellation deletes the client and releases its jobs/workers.
 
@@ -191,17 +191,19 @@ WS broadcast (`wsHandler.broadcast`): for each client, skips on `queueFilter` mi
 
 The HTTP layer holds no shard locks itself; all locking happens inside `handleCommand`/`QueueManager` (see [Concurrency & Locking](./concurrency-and-locking.md)). Relevant connection-lifecycle behavior:
 
-- **Stateless HTTP, no job ownership**: HTTP requests carry no `clientId`, so jobs pulled over REST are not tracked to a connection; orphaned/in-flight jobs are recovered only by stall detection (`http.ts:206-208`, see [Background Tasks](./background-tasks.md)).
-- **WS/SSE own their pulled jobs**: on WS `close` (`http.ts:237-250`) and SSE stream `cancel` (`sseHandler.ts:255-260`), the handler calls `unregisterWorkersByClientId(clientId)` and `releaseClientJobs(clientId)` so jobs leased through that persistent connection are returned to the queue. WS additionally calls `getRateLimiter().removeClient(clientId)`.
-- **WS idle/keepalive**: Bun auto-pings with a `120s` idle timeout and `maxPayloadLength` of 1 MiB (`http.ts:218-224`). SSE sends a `:heartbeat` comment every 30 s and prunes clients that error on write (`sseHandler.ts:111-125`).
+- **Stateless HTTP, no job ownership**: HTTP requests carry no `clientId`, so jobs pulled over REST are not tracked to a connection; orphaned/in-flight jobs are recovered only by stall detection (`http.ts:212-214`, see [Background Tasks](./background-tasks.md)).
+- **WS/SSE own their pulled jobs**: on WS `close` (`http.ts:242-256`) and SSE stream `cancel` (`sseHandler.ts:255-260`), the handler calls `unregisterWorkersByClientId(clientId)` and `releaseClientJobs(clientId)` so jobs leased through that persistent connection are returned to the queue. WS additionally calls `getRateLimiter().removeClient(clientId)`.
+- **WS idle/keepalive**: Bun auto-pings with a `120s` idle timeout and `maxPayloadLength` of 1 MiB (`http.ts:224-230`). SSE sends a `:heartbeat` comment every 30 s and prunes clients that error on write (`sseHandler.ts:111-125`).
 
 ## Edge Cases & Failure Modes
 
 - **0-client early return** (perf invariant): both transport broadcast and typed-emit paths return immediately with no clients. With clients present, queue counts are batch-aggregated after a 10 ms coalescing window, so an event burst pays one shared O(total live jobs) pass rather than one queue/global scan per event.
-- **Connection limits**: SSE caps at `MAX_SSE_CLIENTS = 1000` → `503 "Too many SSE connections"` (`sseHandler.ts:230-233`, `sse/constants.ts:2`); WS caps at `MAX_WS_CLIENTS = 1000` via `canAccept()` → `503` (`wsHandler.ts:46-49`, `http.ts:151-162`). WS upgrade failure → `400`.
+- **Connection limits**: SSE caps at `MAX_SSE_CLIENTS = 1000` → `503 "Too many SSE connections"` (`sseHandler.ts:230-233`, `sse/constants.ts:2`); WS caps at `MAX_WS_CLIENTS = 1000` via `canAccept()` → `503` (`wsHandler.ts:46-49`, `http.ts:157-168`). WS upgrade failure → `400`.
 - **WS backpressure**: `safeSend` (`wsHandler.ts:51-64`) checks `ws.getBufferedAmount()`; above `WS_BACKPRESSURE_BYTES` (1 MiB) it increments `droppedMessages` and _skips_ the message (treats the client as alive but slow, does not disconnect). A `send` throw marks the client dead and removes it.
 - **SSE replay bounds**: ring buffer holds the last `EVENT_BUFFER_SIZE = 1000` events; reconnects requesting older IDs silently miss the gap. Heartbeat = 30 s, advertised `retry: 3000` ms.
 - **Body parsing**: routes using `parseJsonBody` treat empty body as `{}` (backward compat for optional-body routes); malformed JSON → `400 "Invalid JSON body"`. Routes using `req.json()` directly (PUSH, bulk, cron/webhook/worker create) also catch and return `400`. Worker heartbeat tolerates a missing/invalid body (`httpRouteResources.ts:189`).
+- **Query numbers read as 2.9.10 read them**: `GET /queues/:queue/jobs?timeout=` and `GET /queues/:queue/jobs/list?limit=&offset=` use `parseInt` (`http-routes/queueJobs.ts`): `5000ms` is 5000, `1e3` is 1, `10.0` is 10. The pull route always answers `200`; an invalid wait is reported by the PULL handler as `ok: false` (`timeout must be at most 60000`, `timeout must be at least 0`, `timeout must be a finite number` for an empty or non-numeric value). A 2.9.11 candidate answered `400` to these forms; that was reverted because working callers depended on the 2.9.10 results.
+- **Push forwards a fixed field set**: `POST /queues/:queue/jobs` forwards `name`, `data`, `priority`, `delay`, `maxAttempts` (or its `attempts` alias), `backoff`, `timeout`, `jobId`, `removeOnComplete`, `removeOnFail`, `durable`, `ttl`, `uniqueKey`, `groupId`, `dependsOn`, `tags`, `lifo` and `repeat`, exactly as on 2.9.10, and ignores every other key. Forwarding every PUSH option (as a candidate did) made bodies that worked fail (an ISO `timestamp`, `stallTimeout: "30000"`, `groupMaxSize: 0`) and changed the meaning of others (`timestamp: 1000` became the creation time, `parentId` was stored). `POST /queues/:queue/jobs/bulk` forwards whole PUSHB jobs, every option included. Forwarded fields follow the PUSH rules. See [Job Options Validation](./job-options-validation.md).
 - **State-filter aliasing (#95)**: `GET /queues/:queue/jobs/list` reads `state`, `status`, and `states`, each repeatable and comma-separated; previously only `state` was honored, so `?status=failed` silently returned the whole queue (`http-routes/queueJobs.ts:99-123`).
 - **Paused-queue count consistency (#92)**: `dashboardQueueDetailEndpoint` runs `pausedView` so a paused queue reports ready jobs under `paused` (not `waiting`/`prioritized`), matching the per-state job lists (`httpDashboardEndpoints.ts:142-156`).
 - **DLQ pagination robustness**: non-numeric `limit`/`offset` are ignored rather than producing an empty slice (`httpRouteQueueConfig.ts:44`).
@@ -210,15 +212,22 @@ The HTTP layer holds no shard locks itself; all locking happens inside `handleCo
   degraded state but their SQLSTATE/constraint/host/driver detail is replaced by
   `Internal server error` in health, readiness, dashboard, and command
   responses. SQLite disk-full keeps its existing actionable message.
-- **CORS injection on out-of-pipeline responses**: `withCors` (`http.ts:87-99`) adds `Access-Control-Allow-Origin` to health/ready/prometheus/debug responses only if not already set, never overwriting (audit #16–20).
-- **CORS default gotcha**: `HttpServerConfig.corsOrigins` defaults to `['*']` inside `createHttpServer` (`http.ts:65-68`), but the server entrypoint always passes the env-resolved array, which defaults to `[]` when `CORS_ALLOW_ORIGIN` is unset (`config/resolve.ts:51`). With `[]`, `getCorsOrigin()` yields an empty `Access-Control-Allow-Origin` string rather than `*`. See [Security: TLS, Auth, CORS](./security-tls-auth.md).
+- **CORS injection on out-of-pipeline responses**: `withCors` (`http.ts:95-105`) adds `Access-Control-Allow-Origin` to health/ready/prometheus/debug responses only if not already set, never overwriting (audit #16–20).
+- **CORS default gotcha**: `HttpServerConfig.corsOrigins` defaults to `['*']` inside `createHttpServer` (`http.ts:72-73`), but the server entrypoint always passes the env-resolved array, which defaults to `[]` when `CORS_ALLOW_ORIGIN` is unset (`config/resolve.ts:51`). With `[]`, `getCorsOrigin()` yields an empty `Access-Control-Allow-Origin` string rather than `*`. See [Security: TLS, Auth, CORS](./security-tls-auth.md).
+- **Empty auth tokens**: tokens must be non-empty. An empty or whitespace-only
+  `auth.tokens` entry stops startup (`auth.tokens[0] must not be empty or
+  whitespace-only (got "")`), and so does an `AUTH_TOKENS` value that yields no
+  token (`,`, ` `); `AUTH_TOKENS` entries are trimmed and stray commas ignored. An
+  empty token used to match the `''` a request without `Authorization` presents,
+  so every anonymous request was authenticated. The check above refuses blank
+  tokens as a second line of defense. See [Configuration](./configuration.md).
 - **Metrics auth asymmetry**: `/metrics` and `/stats` always require auth (when
   tokens are set) because they run after the general `checkAuth`;
   `/prometheus` requires auth only if `requireAuthForMetrics`
   (`METRICS_AUTH=true`). When required but no token is configured it returns
   503, preventing a configuration mistake from making metrics public.
   `/health*` and `/ready` never require auth.
-- **TLS fail-fast**: `loadTlsOptions(config.tls)` runs before binding so bad cert/key paths abort startup rather than serving plaintext (`http.ts:254-255`).
+- **TLS fail-fast**: `loadTlsOptions(config.tls)` runs before binding so bad cert/key paths abort startup rather than serving plaintext (`http.ts:259-260`).
 
 ## Configuration
 
@@ -228,12 +237,18 @@ Resolved in `config/resolve.ts` (config file > env > default) and passed into `H
 | ---------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------- |
 | `HTTP_PORT`                                                                  | `port`                  | `6790`                                                            |
 | `HOST`                                                                       | `hostname`              | `0.0.0.0`                                                         |
-| `HTTP_SOCKET_PATH`                                                           | `socketPath`            | unset (overrides host/port → Unix socket bind, `http.ts:257-263`) |
-| `AUTH_TOKENS` (comma-sep)                                                    | `authTokens`            | `[]` (auth disabled)                                              |
+| `HTTP_SOCKET_PATH`                                                           | `socketPath`            | unset (overrides host/port → Unix socket bind, `http.ts:262-268`) |
+| `AUTH_TOKENS` (comma-sep, trimmed, non-empty)                                | `authTokens`            | `[]` (auth disabled)                                              |
 | `CORS_ALLOW_ORIGIN` (comma-sep)                                              | `corsOrigins`           | `[]` (see CORS gotcha above)                                      |
 | `METRICS_AUTH`                                                               | `requireAuthForMetrics` | `false`                                                           |
 | `TLS_CERT_FILE` + `TLS_KEY_FILE`                                             | `tls`                   | unset (both required together)                                    |
 | `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` / `RATE_LIMIT_CLEANUP_MS` | rate limiter            | `60000` / `10000` / `60000` (`rateLimiter.ts`)                    |
+
+`createHttpServer` reads `rateLimiterEnvConfig()` before it subscribes or binds, so a
+malformed `RATE_LIMIT_*` value (whole numbers >= 1 only) fails server creation instead
+of every request; the standalone server reports it even earlier, from
+`resolveServerConfig`, before the banner. See
+[Rate Limiting & Concurrency](./rate-limiting-and-concurrency.md).
 
 WS/SSE tuning constants are compile-time, not env-configurable: SSE `MAX_CLIENTS=1000`, `HEARTBEAT_MS=30000`, `RETRY_MS=3000`, `EVENT_BUFFER_SIZE=1000`; WS `MAX_WS_CLIENTS=1000`, `BACKPRESSURE_BYTES=1048576`, idle `120s`, `maxPayloadLength=1 MiB`.
 

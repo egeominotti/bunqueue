@@ -5,9 +5,58 @@
 
 import { getSharedManager } from '../manager';
 import type { Job as InternalJob } from '../../domain/types/job';
+import { LOCK_TIMEOUT_MESSAGES, LockTimeoutError } from '../../shared/lockError';
+import { isTransientError, isTransientReply } from '../job-wait/types';
 import type { TcpConnection } from './types';
 import type { GroupWorkerOptions } from '../types';
 import { parseJobFromResponse } from './jobParser';
+
+/**
+ * The broker refused a PULL or PULLB (`ok: false`): a validation error, a missing auth
+ * token, the protocol rate limit. It is never an empty queue, which is `ok: true` with
+ * no job. `transient` marks a refusal that passes with time (see `isTransientRefusal`).
+ */
+export class PullRefusedError extends Error {
+  readonly command: string;
+  readonly reason: string;
+  readonly transient: boolean;
+
+  constructor(command: string, response: Record<string, unknown>) {
+    const reason = typeof response.error === 'string' ? response.error : 'no reason given';
+    super(`${command} refused by the broker: ${reason}`);
+    this.name = 'PullRefusedError';
+    this.command = command;
+    this.reason = reason;
+    this.transient = isTransientRefusal(response);
+  }
+}
+
+/**
+ * A refusal that passes with time: the broker's protocol rate limit (the same replies
+ * the job wait retries, `job-wait/types.ts`), a shard lock wait that outlasted
+ * LOCK_TIMEOUT_MS under contention (`shared/lockError.ts`, returned verbatim), or a
+ * storage failure the broker redacts to `Internal server error` (a busy database, a
+ * PostgreSQL broker shutting down).
+ */
+export function isTransientRefusal(response: Record<string, unknown>): boolean {
+  return (
+    isTransientReply(response) ||
+    response.error === 'Internal server error' ||
+    (typeof response.error === 'string' && LOCK_TIMEOUT_MESSAGES.has(response.error))
+  );
+}
+
+/**
+ * A pull failure that passes with time: a transient refusal (TCP), the shard lock
+ * timeout an embedded pull throws itself under contention (`LockTimeoutError`), or a
+ * command that timed out or was cut off while the connection is down. The Worker and
+ * the SandboxedWorker report it only to an attached `error` listener, so it never
+ * crashes one that has none.
+ */
+export function isTransientPullError(error: unknown): boolean {
+  if (error instanceof PullRefusedError) return error.transient;
+  return error instanceof LockTimeoutError || isTransientError(error);
+}
 
 export interface PullConfig {
   readonly name: string;
@@ -88,7 +137,9 @@ export async function pullTcp(
 
   const response = await tcp.send(cmd);
 
-  if (!response.ok) return [];
+  // A refusal is a pull error, not an empty queue: reading it as one hid a
+  // misconfigured Worker behind silent idle polling and false `drained` events.
+  if (response.ok !== true) throw new PullRefusedError(String(cmd.cmd), response);
 
   if (count === 1) {
     const job = response.job as Record<string, unknown> | null | undefined;

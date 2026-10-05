@@ -1,4 +1,5 @@
 import type { Job as DomainJob } from '../../../domain/types/job';
+import type { SafeTimer } from '../../../shared/timers';
 
 /**
  * The pool only posts jobs to and terminates a sandbox thread: Bun's Web Worker
@@ -16,9 +17,20 @@ export interface WorkerProcess {
   currentJob: DomainJob | null;
   currentToken: string | null;
   restarts: number;
-  timeoutId: ReturnType<typeof setTimeout> | null;
+  /** The per-job timeout armed for `currentJob`; cancel it with `clear()`. */
+  timeoutId: SafeTimer | null;
   lastIdleAt: number;
+  /** Not running: recycled while idle, terminated by its job timeout, or crashed. */
   terminated: boolean;
+  /** The thread's death was handled (its job failed, a restart decided); once only. */
+  crashed: boolean;
+  /** Crashed beyond the restart budget: never respawned and never given a job. */
+  retired: boolean;
+  /**
+   * Spawned, its processor module still loading: given no job until the thread posts
+   * `ready`. A message reaching a thread before then could be lost. Unset = loaded.
+   */
+  loading?: boolean;
 }
 
 export interface IPCRequest {
@@ -38,6 +50,7 @@ export interface IPCResponse {
   jobId?: string;
   result?: unknown;
   error?: string;
-  progress?: number;
+  /** What the processor passed to `job.progress()`: a number, or a BullMQ-style object. */
+  progress?: unknown;
   message?: string;
 }

@@ -507,6 +507,7 @@ describe('bunqueue-mcp bin', () => {
     const proc = spawnBin({ BUNQUEUE_MCP_TRANSPORT: 'websocket' });
     const stderr = await readStderr(proc, /Fatal error/);
     expect(await proc.exited).toBe(1);
-    expect(stderr).toContain('Fatal error: Error: BUNQUEUE_MCP_TRANSPORT must be stdio or http');
+    expect(stderr).toContain('Fatal error: BUNQUEUE_MCP_TRANSPORT must be stdio or http');
+    expect(stderr).not.toContain('Fatal error: Error:');
   }, 30_000);
 });

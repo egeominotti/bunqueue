@@ -1,4 +1,5 @@
 import type { Job as DomainJob } from '../../../domain/types/job';
+import { safeTimeout } from '../../../shared/timers';
 import type { Job } from '../../types';
 import type { IPCRequest, IPCResponse, WorkerProcess } from '../types';
 import { log } from './log';
@@ -11,8 +12,10 @@ export abstract class SandboxedDispatch<T = unknown> extends SandboxedPool<T> {
     worker.currentJob = job;
     worker.currentToken = token;
 
+    // Finite and >= 0 by construction (0 = disabled). safeTimeout honours a timeout
+    // above the 2^31 - 1 ms native limit instead of firing it after ~1 ms.
     if (this.options.timeout > 0) {
-      worker.timeoutId = setTimeout(() => {
+      worker.timeoutId = safeTimeout(() => {
         void this.handleTimeout(worker, job);
       }, this.options.timeout);
     }
@@ -73,13 +76,15 @@ export abstract class SandboxedDispatch<T = unknown> extends SandboxedPool<T> {
         break;
       case 'progress':
         if (message.progress !== undefined) {
+          const id = String(worker.currentJob.id);
+          // Mapped like any job object's progress; a value the broker refuses (not a
+          // number nor an object) is reported, not only logged.
           this.ops
             .updateProgress(worker.currentJob.id, message.progress)
-            .catch((error: unknown) => {
-              log('error', 'Failed to update job progress', {
-                jobId: String(worker.currentJob?.id),
-                error: error instanceof Error ? error.message : String(error),
-              });
+            .catch((cause: unknown) => {
+              const error = cause instanceof Error ? cause : new Error(String(cause));
+              log('error', 'Failed to update job progress', { jobId: id, error: error.message });
+              this.safeEmitError(Object.assign(error, { context: 'progress' as const, jobId: id }));
             });
           this.emit('progress', this.createEventJob(worker.currentJob), message.progress);
         }
@@ -102,7 +107,7 @@ export abstract class SandboxedDispatch<T = unknown> extends SandboxedPool<T> {
     // thread messages cannot send a second outcome for the same generation.
     worker.currentJob = null;
     if (worker.timeoutId) {
-      clearTimeout(worker.timeoutId);
+      worker.timeoutId.clear();
       worker.timeoutId = null;
     }
     try {
@@ -130,7 +135,7 @@ export abstract class SandboxedDispatch<T = unknown> extends SandboxedPool<T> {
     const token = worker.currentToken ?? undefined;
     worker.currentJob = null;
     if (worker.timeoutId) {
-      clearTimeout(worker.timeoutId);
+      worker.timeoutId.clear();
       worker.timeoutId = null;
     }
     try {
@@ -157,9 +162,12 @@ export abstract class SandboxedDispatch<T = unknown> extends SandboxedPool<T> {
     const token = worker.currentToken ?? undefined;
     worker.currentJob = null;
     if (worker.timeoutId) {
-      clearTimeout(worker.timeoutId);
+      worker.timeoutId.clear();
       worker.timeoutId = null;
     }
+    // Marked first, so the `close` this termination raises is not taken for a crash;
+    // handleCrash below decides on a restart once the outcome has settled.
+    worker.terminated = true;
     worker.worker.terminate();
     const errorMessage = `Job timed out after ${this.options.timeout}ms`;
     let applied = false;
@@ -181,8 +189,7 @@ export abstract class SandboxedDispatch<T = unknown> extends SandboxedPool<T> {
       );
     } finally {
       this.resetWorkerState(worker);
-      const index = this.workers.indexOf(worker);
-      if (index !== -1) this.handleCrash(worker, index, applied);
+      this.handleCrash(worker, `job timed out after ${this.options.timeout}ms`, applied);
     }
   }
 

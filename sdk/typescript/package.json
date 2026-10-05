@@ -1,6 +1,6 @@
 {
   "name": "bunqueue-client",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Cross-runtime TypeScript client for the bunqueue job queue server \u2014 Node.js, Bun, Deno and Cloudflare Workers",
   "license": "MIT",
   "type": "module",
@@ -35,7 +35,7 @@
     "test:parity": "bun ../../scripts/check-client-parity.ts && BUNQUEUE_EMBEDDED=1 bun test ../../test/typescript-client-parity.test.ts ../../test/client-parity-*.test.ts ../../test/tcp-parity-*.test.ts",
     "test:canonical": "bun tests/canonical-queue.mjs && bun tests/canonical-worker.mjs",
     "test:shared-contract": "BUNQUEUE_EMBEDDED=1 bun test --parallel=4 --preload ../../scripts/client-parity/preload.ts ../../test/docs-queue-guide ../../test/docs-worker-guide ../../test/docs-quickstart.test.ts",
-    "test:property": "bun test tests/flow-plan.property.test.ts tests/flow-identity.property.test.ts tests/flow-plan.validation.test.ts tests/flow-plan.limits.test.ts tests/flow-plan.contract.test.ts tests/flow-commit.test.ts tests/worker-slot-signal.test.ts",
+    "test:property": "bun test tests/flow-plan.property.test.ts tests/flow-identity.property.test.ts tests/flow-plan.validation.test.ts tests/flow-plan.limits.test.ts tests/flow-plan.contract.test.ts tests/flow-commit.test.ts tests/worker-slot-signal.test.ts tests/legacy-connection-durations.test.ts tests/legacy-worker-durations.test.ts tests/legacy-simple-mode-durations.test.ts tests/legacy-simple-mode-validation.test.ts tests/legacy-simple-mode-sync-throw.test.ts tests/legacy-compat-options.test.ts tests/legacy-compat-simple-mode.test.ts",
     "test:integration": "bun tests/integration.ts",
     "test:soak": "bun tests/soak.ts",
     "lint": "oxlint src tests",
@@ -43,7 +43,8 @@
     "format": "oxfmt --write src tests",
     "format:check": "oxfmt --check src tests",
     "check:oxc": "bun run lint && bun run format:check",
-    "check": "bun run check:oxc",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.legacy.json",
+    "check": "bun run check:oxc && bun run typecheck",
     "test:workers": "cd tests/workers && bun install --frozen-lockfile && cd ../.. && bun pm pack --destination tests/workers && cd tests/workers && mv bunqueue-client-*.tgz bunqueue-client.tgz && rm -rf node_modules/bunqueue-client && mkdir -p node_modules/bunqueue-client && tar -xzf bunqueue-client.tgz -C node_modules/bunqueue-client --strip-components=1 && node run.mjs"
   },
   "keywords": [

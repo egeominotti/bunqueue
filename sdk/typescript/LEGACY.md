@@ -399,6 +399,74 @@ Always attach a `worker.on('error', …)` listener: per Node `EventEmitter` sema
 
 Half-open links are detected via TCP keepalive and a consecutive-timeout teardown, so a silently dropped connection (cloud LB/NAT idle drop) recovers in seconds rather than minutes.
 
+### Option validation
+
+Constructors check durations and counts before anything connects or starts. A value that would become a hot loop, a hang, a timer that fires after about 1 ms instead of a long delay, or a timeout that fails every command throws a `TypeError` (not a number) or a `RangeError` (out of range) that names the option. A duration longer than the runtime's timer limit (about 24.8 days) is honoured; it does not fire after 1 ms.
+
+Every value that worked in 0.2.2 keeps 0.2.2's result:
+
+- A numeric string such as `'5000'` is read as its number, as 0.2.2's arithmetic and timers read it. A string that is not a number throws a `TypeError`, unless 0.2.2 ignored it (see `heartbeatIntervalS` and `batchSize` below).
+- A one-shot delay (`ackBatch.maxDelayMs`, Simple Mode `retry.delay`, `circuitBreaker.resetTimeout`, `batch.timeout`, the `cancel()` grace period, a `retry.customBackoff` result) that is `NaN` or negative runs at once, as `setTimeout` ran it.
+- Counts that 0.2.2 only compared are used as given, for example a `retry.maxAttempts` of 0 is one attempt.
+- `undefined` keeps the default. `null` keeps the default, except where 0.2.2 read it as 0: `waitForJob(id, null)` is a zero hold and Simple Mode `heartbeatInterval: null` disables heartbeats.
+
+Four options follow the clamps every official SDK applies (rule 4 of `sdk/CLAUDE.md` and `docs/protocol.md` in the bunqueue repository). A number never throws for these: an out-of-range value is clamped, and a non-finite value takes the default or disables the feature.
+
+| Option | Behavior |
+| --- | --- |
+| Worker `heartbeatIntervalS` | `0`, negative, `NaN`, `±Infinity` or a non-number disables heartbeats; any positive period is honoured |
+| Worker `batchSize` | clamped to [1, 1000]; `NaN`, `±Infinity` or a non-number means the default, 10 |
+| Worker `pollTimeoutMs` | clamped to [0, 30000]; `NaN` means the default, 5000. After an empty pull the worker pauses 50 ms with `0`, 10 ms after a long poll |
+| `waitForJob()` ttl | clamped to [0, 600000] ms; `NaN` (or omitted) means 30000, `null` means 0 |
+
+The other options:
+
+| Option | Accepted | Throws |
+| --- | --- | --- |
+| `connectTimeoutMs` | finite, >= 1 ms | `NaN`, 0, negative, `Infinity` |
+| `commandTimeoutMs`, `call()` `timeoutMs` | >= 1 ms, or `Infinity` for no client-side deadline | `NaN`, 0, negative |
+| `maxInFlight` | any number; 0, negative or `-Infinity` = unbounded | `NaN` |
+| `ConnectionPool` size | floored; below 1 = one connection | `NaN`, `undefined`, `Infinity`, above 65535 |
+| Queue `poolSize` | a truthy value above 1 builds a pool of the floored size; anything else is one connection | `Infinity`, above 65535 |
+| Worker `concurrency` | whole number >= 1 | below 1 (`concurrency must be >= 1`, as in 0.2.2), `NaN`, a fraction, `Infinity` |
+| Worker `lockTtlMs` | finite, >= 1 ms | `NaN`, below 1, `Infinity` |
+| `ackBatch.maxSize` | any value; 0 or below sends every ACK at once | never |
+| `ackBatch.maxDelayMs` | finite; `NaN` or negative flushes at once | `Infinity` |
+
+A Queue given its own `connection` reads no connection option, as in 0.2.2, so none is checked.
+
+Simple Mode (`Bunqueue`):
+
+| Option | Behavior |
+| --- | --- |
+| `retry.maxAttempts` | compared as given: 0 or below is one attempt, 2.5 is three, `NaN` or `Infinity` retries until success, `cancel()` or `close()` |
+| `retry.strategy` | an unknown strategy is a fixed delay |
+| `retry.customBackoff`, `retry.retryIf` | not checked; one that is not a function fails the job when it is called |
+| `retry.customBackoff` result | `NaN`, negative, `undefined` or `null` retries at once; `Infinity` or a non-numeric value fails the job with the processor error as `cause` |
+| `circuitBreaker.threshold` | compared as given: 0 opens on the first failure, `NaN` never opens |
+| `circuitBreaker.resetTimeout` | `Infinity` stays open until `resetCircuit()` |
+| `batch.size` | compared as given: 0 flushes every job, omitted or `NaN` flushes on `timeout` (or close) only |
+| `priorityAging.interval` | finite, >= 1 ms (a smaller one spins) |
+| `priorityAging.minAge`, `maxPriority` | used as given |
+| `priorityAging.boost` | any number, 0 changes no priority; a string throws (0.2.2 appended it to the priority) |
+| `priorityAging.maxScan` | used as given; `Infinity` throws (0.2.2's tick crashed on it) |
+| `rateLimit` / `limiter` `max` | a number > 0, fractions and `Infinity` included; 0, negative, `NaN` or omitted throws (0.2.2 waited forever) |
+| `rateLimit` / `limiter` `duration` | 0, negative, `NaN` or omitted means no limit; `Infinity` throws (the window never frees) |
+| `heartbeatInterval`, `pollTimeout` | forwarded to the Worker as `heartbeatInterval / 1000` and `pollTimeout`, under the clamps above |
+
+The retry configuration is read at each job, as in 0.2.2, so changing the object passed as `retry` affects later jobs.
+
+#### Differences from the default entry
+
+The default entry (`bunqueue-client`) follows `bunqueue/client`: it keeps every result its comparisons gave a usable value and throws only for values that cannot run. The legacy entry keeps the SDK contract instead:
+
+| Option | Default entry | Legacy entry |
+| --- | --- | --- |
+| Heartbeat interval | `0`, negative or `NaN` disables heartbeats; a positive value below 1 ms or `Infinity` throws a `RangeError` | disables heartbeats (a non-number too) |
+| `batchSize` | a number > 0 (a fraction rounds up) or `Infinity`, clamped to 1000; `0`, negative or `NaN` throws a `RangeError` | any number, clamped to [1, 1000]; `0` or below means 1, a fraction is kept, non-finite or a non-number means 10 |
+| Poll timeout | negative or `NaN` means 0 (no long poll); above 30000, `Infinity` included, clamps to 30000 | negative clamps to 0; `NaN` means 5000 |
+| Wait TTL | `waitUntilFinished` treats a non-positive, `NaN` or infinite TTL as no timeout and can wait past 600000 ms | one `WaitJob` hold clamped to [0, 600000] ms; `NaN` means 30000, `null` means 0 |
+
 Malformed or oversized commands reject with `SerializationError` before they
 occupy an in-flight slot or write to the socket. This keeps bounded connections
 usable after a local MessagePack encoding failure. Payloads may contain plain

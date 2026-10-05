@@ -6,10 +6,11 @@
 import type { Server, ServerWebSocket } from 'bun';
 import type { QueueManager } from '../../application/queueManager';
 import type { HandlerContext } from './types';
+import { isBlankToken } from '../../config/auth';
 import { constantTimeEqual, uuid } from '../../shared/hash';
 import type { JobEvent } from '../../domain/types/queue';
 import { httpLog } from '../../shared/logger';
-import { getRateLimiter } from './rateLimiter';
+import { getRateLimiter, rateLimiterEnvConfig } from './rateLimiter';
 import { SseHandler } from './sseHandler';
 import { WsHandler, type WsData } from './wsHandler';
 import {
@@ -25,11 +26,16 @@ import { routeHttpRequest } from './httpRouter';
 import { sanitizeServerError } from './errors';
 
 /**
- * Validate auth token against valid tokens set
+ * Validate auth token against valid tokens set, both sides trimmed (as the TCP `Auth`
+ * command compares them). A missing header reads as `''`, so a blank presented or
+ * configured token never matches, even if one reached the set (config validation
+ * already refuses it): an empty token must not authenticate.
  */
 function validateAuthToken(token: string, authTokens: Set<string>): boolean {
+  if (isBlankToken(token)) return false;
+  const presented = token.trim();
   for (const validToken of authTokens) {
-    if (constantTimeEqual(token, validToken)) {
+    if (!isBlankToken(validToken) && constantTimeEqual(presented, validToken.trim())) {
       return true;
     }
   }
@@ -64,6 +70,7 @@ export interface HttpServerConfig {
  * Create and start HTTP server
  */
 export function createHttpServer(queueManager: QueueManager, config: HttpServerConfig) {
+  rateLimiterEnvConfig(); // A malformed RATE_LIMIT_* fails startup, not every request.
   const authTokens = new Set(config.authTokens ?? []);
   const corsOrigins = new Set(config.corsOrigins ?? ['*']);
   const wsHandler = new WsHandler();

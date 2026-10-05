@@ -265,8 +265,8 @@ await this.fireCronJob(cron, now);
 There is no configurable polling interval. The scheduler is event-driven:
 
 ```typescript
-// Precise timer, chunked at the runtime's signed 32-bit timeout ceiling
-const delay = Math.min(Math.max(0, nextEntry.cron.nextRun - Date.now()), 2_147_483_647);
+// Precise timer, clamped to [0, 2^31 - 1] ms, the runtime's timeout ceiling
+const delay = clampTimerDelay(nextEntry.cron.nextRun - Date.now()); // src/shared/timers.ts
 this.nextTimer = setTimeout(() => void this.tick(), delay);
 
 // Safety fallback: catches timer drift and missed events
@@ -282,6 +282,11 @@ guard observes that the cron is still in the future, and the scheduler rearms
 for the remaining duration. This avoids Bun's overflow fallback to a 1ms timer
 without consuming an execution, persisting an intermediate timestamp, or
 creating a job early.
+
+A `nextRun` that is not a finite number (for example a corrupted persisted row)
+is never armed or fired: the scheduler reschedules that cron from the current
+time, as a restart with `skipMissedOnRestart` does, persists the new slot, logs a
+warning and emits `cron:missed`. Every other cron keeps its schedule.
 
 ## Usage Example
 

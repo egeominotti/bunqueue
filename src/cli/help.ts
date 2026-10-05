@@ -2,6 +2,8 @@
  * CLI Help Text Generator
  */
 
+import { stdoutColorEnabled } from '../shared/colorSupport';
+
 /** Print version information */
 export function printVersion(version: string): void {
   console.log(renderVersion(version));
@@ -12,7 +14,7 @@ export function renderVersion(version: string): string {
 }
 
 /** Render main help, optionally without terminal escapes for JSON output. */
-export function renderHelp(color = true): string {
+export function renderHelp(color = stdoutColorEnabled()): string {
   const magenta = color ? '\x1b[35m' : '';
   const reset = color ? '\x1b[0m' : '';
   const dim = color ? '\x1b[2m' : '';
@@ -103,6 +105,7 @@ BACKUP (S3):
   backup list                     List available backups
   backup restore <key> [-f]       Restore from backup
   backup status                   Show backup configuration
+  backup <cmd> --config <file>    Use this config file (default: ./bunqueue.config.ts)
 
 GLOBAL OPTIONS:
   -H, --host <host>               Server host (default: localhost)

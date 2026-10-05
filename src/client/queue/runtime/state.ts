@@ -8,7 +8,8 @@ import { rejectLegacyConnectionOptions } from '../../legacyConnectionOptions';
 import { getSharedManager } from '../../manager';
 import { resolveToken } from '../../resolveToken';
 import { TcpConnectionPool, getSharedPool, releaseSharedPool } from '../../tcpPool';
-import { AddBatcher } from '../addBatcher';
+import { AddBatcher, resolveAutoBatchConfig } from '../addBatcher';
+import { backgroundErrorRouter } from '../backgroundCommand';
 import { FORCE_EMBEDDED } from '../helpers';
 import * as addOps from '../operations/add';
 import type { QueueRuntime } from '../types';
@@ -24,6 +25,8 @@ export class QueueState<T> {
   protected readonly useSharedPool: boolean;
   protected readonly addBatcher: AddBatcher<unknown> | null;
   private connectionReleased = false;
+  /** Hears the failures of the fire-and-forget commands (see backgroundCommand.ts). */
+  private readonly onBackgroundError = backgroundErrorRouter(this);
 
   constructor(name: string, opts: QueueOptions = {}) {
     this.name = name;
@@ -72,18 +75,10 @@ export class QueueState<T> {
         this.useSharedPool = false;
       }
 
-      const autoBatch = opts.autoBatch;
-      if (autoBatch?.enabled === false) {
-        this.addBatcher = null;
-      } else {
-        this.addBatcher = new AddBatcher(
-          {
-            maxSize: autoBatch?.maxSize ?? 50,
-            maxDelayMs: autoBatch?.maxDelayMs ?? 5,
-          },
-          (jobs) => addOps.addBulk(this.addCtx, jobs)
-        );
-      }
+      const batcherConfig = resolveAutoBatchConfig(opts.autoBatch);
+      this.addBatcher = batcherConfig
+        ? new AddBatcher(batcherConfig, (jobs) => addOps.addBulk(this.addCtx, jobs))
+        : null;
     }
   }
 
@@ -94,6 +89,7 @@ export class QueueState<T> {
       tcp: this.tcpPool,
       prefixKey: this.prefixKey,
       dataPath: this.opts.dataPath,
+      onBackgroundError: this.onBackgroundError,
     };
   }
 

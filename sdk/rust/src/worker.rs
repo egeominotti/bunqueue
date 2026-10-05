@@ -8,7 +8,7 @@ use rmpv::Value;
 
 use crate::telemetry::{TelemetryEvent, emit};
 use crate::wire::{as_map, command, get, map};
-use crate::worker_limits::pull_count;
+use crate::worker_limits::{normalize_options, pull_count, wait_if_idle};
 pub(crate) use crate::worker_runtime::join_all;
 use crate::worker_runtime::now_ms;
 use crate::{Connection, ConnectionOptions, Job, ProcessError, Result};
@@ -21,7 +21,10 @@ pub struct WorkerOptions {
     pub connection: ConnectionOptions,
     pub concurrency: usize,
     pub batch_size: usize,
+    /// Long poll in ms, clamped to 0..=30000. After an empty pull `run` waits
+    /// 10 ms (50 ms when 0, a non-blocking pull), like the main client.
     pub poll_timeout_ms: i64,
+    /// Lease length in ms; a value <= 0 falls back to the 30000 default.
     pub lock_ttl_ms: i64,
     pub heartbeat_interval: Option<Duration>,
     pub name: Option<String>,
@@ -58,9 +61,7 @@ impl Worker {
         processor: impl Fn(Job) -> std::result::Result<Value, ProcessError> + Send + Sync + 'static,
         mut options: WorkerOptions,
     ) -> Self {
-        options.concurrency = options.concurrency.max(1);
-        options.batch_size = options.batch_size.clamp(1, 1_000);
-        options.poll_timeout_ms = options.poll_timeout_ms.clamp(0, 30_000);
+        normalize_options(&mut options);
         let id = format!(
             "rust-{}-{}",
             std::process::id(),
@@ -89,7 +90,10 @@ impl Worker {
         let mut backoff = Duration::from_millis(100);
         while !self.stopped.load(Ordering::Acquire) {
             match self.run_once() {
-                Ok(_) => backoff = Duration::from_millis(100),
+                Ok(pulled) => {
+                    backoff = Duration::from_millis(100);
+                    wait_if_idle(self.options.poll_timeout_ms, pulled);
+                }
                 Err(error) => {
                     if self.stopped.load(Ordering::Acquire) {
                         break;

@@ -163,14 +163,14 @@ describe('Invalid port number handling', () => {
     expect(() => parseBigIntArg('   ', 'id')).toThrow('Invalid ID for id');
   });
 
-  test('parseGlobalOptions falls back to default on invalid port', async () => {
+  test('parseGlobalOptions rejects an invalid port instead of falling back to 6789', async () => {
     const { parseGlobalOptions } = await import('../src/cli/index');
     const originalArgv = process.argv;
     try {
       process.argv = ['bun', 'script', '--port', 'xyz', 'stats'];
-      const { options } = parseGlobalOptions();
-      expect(Number.isNaN(options.port)).toBe(false);
-      expect(options.port).toBe(6789);
+      expect(() => parseGlobalOptions()).toThrow(
+        'Invalid --port: "xyz" (expected a whole number between 1 and 65535)'
+      );
     } finally {
       process.argv = originalArgv;
     }

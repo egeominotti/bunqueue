@@ -3,6 +3,17 @@ import { getSharedManager } from '../../manager';
 import type { ChangePriorityOpts } from '../../types';
 import type { TcpConnection } from '../types';
 import { assertFlowTcpOk } from '../../flowJobTypes';
+import {
+  assertJobDelay,
+  assertLockExtension,
+  assertLogsCleared,
+  assertPriorityChanged,
+  assertPromoted,
+  delayUntil,
+  lockExtensionResult,
+  requireDataUpdated,
+  requireDelayChanged,
+} from '../../queue/commandArgs';
 
 function tokenError(response: Record<string, unknown>): Error | null {
   if (response.ok === false && /token/i.test(String(response.error))) {
@@ -70,7 +81,7 @@ export function createUpdateDataHandler(
 ): (id: string, data: unknown) => Promise<void> {
   return async (id: string, data: unknown) => {
     if (embedded) {
-      await getSharedManager().updateJobData(jobId(id), data);
+      requireDataUpdated(await getSharedManager().updateJobData(jobId(id), data));
       return;
     }
     if (!tcp) return;
@@ -88,7 +99,7 @@ export function createPromoteHandler(
       return;
     }
     if (!tcp) return;
-    await tcp.send({ cmd: 'Promote', id });
+    assertPromoted(await tcp.send({ cmd: 'Promote', id }));
   };
 }
 
@@ -99,9 +110,10 @@ export function createChangeDelayHandler(
   onTransitionApplied?: () => void
 ): (id: string, delay: number) => Promise<void> {
   return async (id: string, delay: number) => {
+    assertJobDelay(delay);
     if (embedded) {
-      const changed = await getSharedManager().changeDelay(jobId(id), delay, token);
-      if (!changed) throw new Error(`Failed to change delay for job ${id}`);
+      // The broker's message, as over TCP (it used to be "Failed to change delay ...").
+      requireDelayChanged(await getSharedManager().changeDelay(jobId(id), delay, token));
       onTransitionApplied?.();
       return;
     }
@@ -129,12 +141,14 @@ export function createChangePriorityHandler(
       return;
     }
     if (!tcp) return;
-    await tcp.send({
-      cmd: 'ChangePriority',
-      id,
-      priority: options.priority,
-      lifo: options.lifo,
-    });
+    assertPriorityChanged(
+      await tcp.send({
+        cmd: 'ChangePriority',
+        id,
+        priority: options.priority,
+        lifo: options.lifo,
+      })
+    );
   };
 }
 
@@ -143,13 +157,16 @@ export function createExtendLockHandler(
   tcp: TcpConnection | null
 ): (id: string, token: string, duration: number) => Promise<number> {
   return async (id: string, token: string, duration: number) => {
+    // Both modes: an invalid duration throws, a missing lease resolves 0, and any other
+    // broker rejection throws (TCP used to resolve 0 for every rejection).
+    assertLockExtension(duration);
     if (embedded) {
       const ok = await getSharedManager().extendLock(jobId(id), token, duration);
       return ok ? duration : 0;
     }
     if (!tcp) return 0;
     const response = await tcp.send({ cmd: 'ExtendLock', id, token, duration });
-    return response.ok === true ? duration : 0;
+    return lockExtensionResult(response, duration);
   };
 }
 
@@ -163,7 +180,7 @@ export function createClearLogsHandler(
       return;
     }
     if (!tcp) return;
-    await tcp.send({ cmd: 'ClearLogs', id, keepLogs });
+    assertLogsCleared(await tcp.send({ cmd: 'ClearLogs', id, keepLogs }));
   };
 }
 
@@ -198,7 +215,7 @@ export function createMoveToDelayedHandler(
   onTransitionApplied?: () => void
 ): (id: string, timestamp: number, token?: string) => Promise<void> {
   return async (id: string, timestamp: number, token?: string) => {
-    const delay = Math.max(0, timestamp - Date.now());
+    const delay = delayUntil(timestamp);
     if (embedded) {
       const moved = await getSharedManager().moveToDelayed(jobId(id), delay, token);
       if (!moved) throw new Error(`Failed to move job ${id} to delayed`);

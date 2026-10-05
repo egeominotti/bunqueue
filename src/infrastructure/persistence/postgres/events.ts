@@ -1,4 +1,5 @@
 import type { SQL } from 'bun';
+import { safeInterval, safeTimeout, type SafeTimer } from '../../../shared/timers';
 import {
   latestPostgresEventJournalBaseline,
   loadPostgresJournalEventsAfter,
@@ -30,7 +31,7 @@ function requiresQueueInvalidation(event: PostgresStoreEvent): boolean {
 
 interface WakeRegistration {
   readonly resolve: WakeResolver;
-  readonly timer: ReturnType<typeof setTimeout>;
+  readonly timer: SafeTimer;
   readonly signal?: AbortSignal;
   readonly onAbort?: () => void;
 }
@@ -38,7 +39,7 @@ interface WakeRegistration {
 /** Commit-ordered journal polling with LISTEN/NOTIFY used only as a wakeup hint. */
 export class PostgresEventStream {
   private subscription: SQL.ListenSubscription | null = null;
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: SafeTimer | null = null;
   private readonly listeners = new Set<EventListener>();
   private readonly invalidationListeners = new Set<InvalidationListener>();
   private readonly drainStatusListeners = new Set<DrainStatusListener>();
@@ -77,7 +78,7 @@ export class PostgresEventStream {
       (payload) => this.handleNotification(payload),
       () => void this.drain()
     );
-    this.pollTimer = setInterval(() => void this.drain(), this.ctx.config.pollIntervalMs);
+    this.pollTimer = safeInterval(() => void this.drain(), this.ctx.config.pollIntervalMs);
   }
 
   subscribe(listener: EventListener): () => void {
@@ -97,7 +98,7 @@ export class PostgresEventStream {
 
   async close(): Promise<void> {
     this.closed = true;
-    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer?.clear();
     this.pollTimer = null;
     if (this.retentionRetryTimer) clearTimeout(this.retentionRetryTimer);
     this.retentionRetryTimer = null;
@@ -110,8 +111,9 @@ export class PostgresEventStream {
     await this.draining;
   }
 
+  /** Resolve on a wake-up, after `timeoutMs` (any length; NaN or <= 0: at once) or on abort. */
   wait(queue: string, timeoutMs: number, signal?: AbortSignal): Promise<void> {
-    if (this.closed || timeoutMs <= 0 || signal?.aborted) return Promise.resolve();
+    if (this.closed || !(timeoutMs > 0) || signal?.aborted) return Promise.resolve();
     return new Promise((resolve) => {
       const finish = () => {
         this.removeWaiter(queue, registration);
@@ -120,7 +122,7 @@ export class PostgresEventStream {
       const onAbort = () => finish();
       const registration: WakeRegistration = {
         resolve: finish,
-        timer: setTimeout(finish, timeoutMs),
+        timer: safeTimeout(finish, timeoutMs),
         ...(signal && { signal, onAbort }),
       };
       let registrations = this.waiters.get(queue);
@@ -174,7 +176,7 @@ export class PostgresEventStream {
     const registrations = this.waiters.get(queue);
     registrations?.delete(registration);
     if (registrations?.size === 0) this.waiters.delete(queue);
-    clearTimeout(registration.timer);
+    registration.timer.clear();
     if (registration.signal && registration.onAbort) {
       registration.signal.removeEventListener('abort', registration.onAbort);
     }

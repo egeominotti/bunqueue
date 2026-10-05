@@ -2,6 +2,7 @@ package bunqueue
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -111,6 +112,60 @@ func (w *Worker) finishJob(id string) {
 	w.mu.Unlock()
 }
 
+// signalStopLocked marks the worker stopped and wakes a pending waitOrStop.
+// The caller holds w.mu; the channel is closed at most once per Run.
+func (w *Worker) signalStopLocked() {
+	w.stopped = true
+	if w.stopCh != nil {
+		close(w.stopCh)
+		w.stopCh = nil
+	}
+}
+
+// waitOrStop waits for d, or returns as soon as Stop or Close is called, so a
+// pending empty-pull wait or error backoff never delays the loop's exit. The
+// timer is stopped when the stop wins. Outside Run (no channel) it is a plain
+// wait.
+func (w *Worker) waitOrStop(d time.Duration) {
+	w.mu.Lock()
+	stop, stopped := w.stopCh, w.stopped
+	w.mu.Unlock()
+	if stopped {
+		return
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-stop: // a nil channel (no Run) never fires
+	case <-timer.C:
+	}
+}
+
+// emptyPullDelay is the wait before the next pull after one that returned no
+// jobs: 10 ms after a long poll, 50 ms after a non-blocking one (polling.ts).
+func emptyPullDelay(pollTimeoutMs int) time.Duration {
+	if pollTimeoutMs > 0 {
+		return emptyLongPollDelay
+	}
+	return emptyPollDelay
+}
+
+// heartbeatPeriod converts a positive interval in seconds to a ticker period
+// in [1ms, max time.Duration]. Below 1 ns the product truncates to 0, and
+// beyond the int64 range the float conversion is implementation-defined
+// (MinInt64 on amd64); time.NewTicker panics on both. float64(MaxInt64)
+// rounds up to 2^63, so every product below it converts exactly.
+func heartbeatPeriod(seconds float64) time.Duration {
+	nanos := seconds * float64(time.Second)
+	if nanos >= float64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	if !(nanos >= float64(time.Millisecond)) {
+		return time.Millisecond
+	}
+	return time.Duration(nanos)
+}
+
 func (w *Worker) startHeartbeat() {
 	if w.heartbeatIntervalS <= 0 {
 		return
@@ -121,7 +176,7 @@ func (w *Worker) startHeartbeat() {
 	w.heartbeatWG.Add(1)
 	stop := w.stopHb
 	w.mu.Unlock()
-	ticker := time.NewTicker(time.Duration(w.heartbeatIntervalS * float64(time.Second)))
+	ticker := time.NewTicker(heartbeatPeriod(w.heartbeatIntervalS))
 	go func() {
 		defer w.heartbeatWG.Done()
 		defer ticker.Stop()

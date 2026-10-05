@@ -1,10 +1,29 @@
+import { assertDelayArgument } from '../../../domain/job/options';
+import { validateKeepLogs } from '../../../domain/job/mutations';
 import { jobId } from '../../../domain/types/job';
-import type { CloudCommandHandler } from '../types/command';
+import {
+  validateJobData,
+  validateJobOptions,
+  validateQueueName,
+} from '../../server/protocol/validation';
+import type { CloudCommand, CloudCommandHandler } from '../types/command';
 import { mapCloudCommandJob } from './jobMapper';
 
 function pageInteger(value: number | undefined, fallback: number): number {
   if (value === undefined || !Number.isFinite(value)) return fallback;
   return Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(value)));
+}
+
+/**
+ * The checks TCP PUSH applies to the same fields, in the same order and with the same
+ * messages, so a remote command cannot create a job the TCP server would reject.
+ */
+function assertPushable(command: CloudCommand): void {
+  const error =
+    validateQueueName(command.queue ?? '') ??
+    validateJobData(command.data) ??
+    validateJobOptions({ priority: command.priority, delay: command.delay });
+  if (error) throw new Error(error);
 }
 
 export const JOB_COMMANDS: Partial<Record<string, CloudCommandHandler>> = {
@@ -17,6 +36,7 @@ export const JOB_COMMANDS: Partial<Record<string, CloudCommandHandler>> = {
     return { promoted: ok };
   },
   'job:push': async (adapter, command) => {
+    assertPushable(command);
     const job = await adapter.push(command.queue ?? '', {
       name: command.name ?? 'default',
       data: command.data ?? {},
@@ -26,6 +46,8 @@ export const JOB_COMMANDS: Partial<Record<string, CloudCommandHandler>> = {
     return { jobId: String(job.id), queue: command.queue };
   },
   'job:priority': async (adapter, command) => {
+    // TCP ChangePriority's rule (QueueManager.changePriority): any finite priority, and a
+    // missing one is 0, as on 2.9.10 and in BullMQ.
     const ok = await adapter.changePriority(jobId(command.jobId ?? ''), command.priority ?? 0);
     return { changed: ok };
   },
@@ -34,7 +56,10 @@ export const JOB_COMMANDS: Partial<Record<string, CloudCommandHandler>> = {
     return { discarded: ok };
   },
   'job:delay': async (adapter, command) => {
-    await adapter.changeDelay(jobId(command.jobId ?? ''), command.delay ?? 0);
+    // TCP ChangeDelay's rule and messages: required (a missing delay used to make the job
+    // ready at once) and finite; the engine applies a negative delay as 0.
+    assertDelayArgument(command.delay);
+    await adapter.changeDelay(jobId(command.jobId ?? ''), command.delay as number);
     return { delayed: true };
   },
   'job:updateData': async (adapter, command) => {
@@ -42,6 +67,10 @@ export const JOB_COMMANDS: Partial<Record<string, CloudCommandHandler>> = {
     return { updated: ok };
   },
   'job:clearLogs': async (adapter, command) => {
+    // TCP ClearLogs' rule (both engines apply keepLogsArgument): NaN used to keep every
+    // log; a negative value or 0 clears them all, a fraction keeps its whole part.
+    const error = validateKeepLogs(command.keepLogs);
+    if (error) throw new Error(error);
     await adapter.clearLogs(jobId(command.jobId ?? ''), command.keepLogs);
     return { cleared: true };
   },
@@ -95,8 +124,8 @@ export const JOB_COMMANDS: Partial<Record<string, CloudCommandHandler>> = {
     };
   },
   'job:listAll': async (adapter, command) => {
-    const limit = command.limit ?? 50;
-    const offset = command.offset ?? 0;
+    const limit = pageInteger(command.limit, 50);
+    const offset = pageInteger(command.offset, 0);
     const states = command.state
       ? command.state.split(',')
       : ['waiting', 'active', 'delayed', 'completed', 'failed'];

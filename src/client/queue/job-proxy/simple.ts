@@ -4,7 +4,10 @@ import { waitJobUntilFinished } from '../../jobWait';
 import { getSharedManager } from '../../manager';
 import { jobId } from '../../../domain/types/job';
 import { buildFailCommand, failEmbeddedArgs } from '../failWire';
+// Argument checks and reply outcomes shared with every job object (commandArgs.ts).
+import * as args from '../commandArgs';
 import type { SimpleJobContext } from '../types/job';
+import { runInBackground, sendInBackground } from '../backgroundCommand';
 import { computeSimpleDependencies } from './dependencies';
 import { reflectFields } from './reflection';
 import { serializeReturnvalue } from '../jobMetadata';
@@ -47,11 +50,12 @@ export function createSimpleJob<T>(
     repeatJobKey: reflected.repeatJobKey,
     attemptsStarted,
     updateProgress: async (progress, message) => {
+      const update = args.progressUpdate(progress, message);
       if (embedded) {
-        await getSharedManager().updateProgress(jobId(id), progress, message);
+        await getSharedManager().updateProgress(jobId(id), update.progress, update.message);
         return;
       }
-      if (tcp) await tcp.send({ cmd: 'Progress', id, progress, message });
+      if (tcp) args.assertProgressUpdated(await tcp.send({ cmd: 'Progress', id, ...update }));
     },
     log: async (message) => {
       if (embedded) {
@@ -72,7 +76,7 @@ export function createSimpleJob<T>(
     isWaitingChildren: async () => (await ctx.getJobState(id)) === 'waiting-children',
     updateData: async (newData) => {
       if (embedded) {
-        await getSharedManager().updateJobData(jobId(id), newData);
+        args.requireDataUpdated(await getSharedManager().updateJobData(jobId(id), newData));
         return;
       }
       if (tcp) assertFlowTcpOk(await tcp.send({ cmd: 'Update', id, data: newData }), 'Update');
@@ -82,14 +86,16 @@ export function createSimpleJob<T>(
         await getSharedManager().promote(jobId(id));
         return;
       }
-      if (tcp) await tcp.send({ cmd: 'Promote', id });
+      if (tcp) args.assertPromoted(await tcp.send({ cmd: 'Promote', id }));
     },
     changeDelay: async (delay) => {
+      args.assertJobDelay(delay);
+      // A job that cannot be changed is not changed (2.9.10); an invalid delay throws.
       if (embedded) {
         await getSharedManager().changeDelay(jobId(id), delay);
         return;
       }
-      if (tcp) await tcp.send({ cmd: 'ChangeDelay', id, delay });
+      if (tcp) args.assertDelayChanged(await tcp.send({ cmd: 'ChangeDelay', id, delay }));
     },
     changePriority: async (opts: ChangePriorityOpts) => {
       if (embedded) {
@@ -97,24 +103,27 @@ export function createSimpleJob<T>(
         return;
       }
       if (tcp) {
-        await tcp.send({ cmd: 'ChangePriority', id, priority: opts.priority, lifo: opts.lifo });
+        args.assertPriorityChanged(
+          await tcp.send({ cmd: 'ChangePriority', id, priority: opts.priority, lifo: opts.lifo })
+        );
       }
     },
     extendLock: async (token, duration) => {
+      args.assertLockExtension(duration);
       if (embedded) {
         const ok = await getSharedManager().extendLock(jobId(id), token, duration);
         return ok ? duration : 0;
       }
       if (!tcp) return 0;
       const response = await tcp.send({ cmd: 'ExtendLock', id, token, duration });
-      return response.ok === true ? duration : 0;
+      return args.lockExtensionResult(response, duration);
     },
     clearLogs: async (keepLogs) => {
       if (embedded) {
         getSharedManager().clearLogs(jobId(id), keepLogs);
         return;
       }
-      if (tcp) await tcp.send({ cmd: 'ClearLogs', id, keepLogs });
+      if (tcp) args.assertLogsCleared(await tcp.send({ cmd: 'ClearLogs', id, keepLogs }));
     },
     getDependencies: () => computeSimpleDependencies(id, queueName, embedded, tcp),
     getDependenciesCount: async () => {
@@ -213,7 +222,7 @@ export function createSimpleJob<T>(
       return response.ok === true;
     },
     moveToDelayed: async (targetTimestamp, token) => {
-      const delay = Math.max(0, targetTimestamp - Date.now());
+      const delay = args.delayUntil(targetTimestamp);
       if (embedded) {
         await getSharedManager().moveToDelayed(jobId(id), delay, token);
         return;
@@ -249,11 +258,10 @@ export function createSimpleJob<T>(
     },
     waitUntilFinished: (queueEvents, ttl) => waitJobUntilFinished(ctx, id, queueEvents, ttl),
     discard: () => {
-      if (embedded) {
-        void getSharedManager().discard(jobId(id));
-        return;
-      }
-      if (tcp) void tcp.send({ cmd: 'Discard', id });
+      // Not awaited (sync API); a failure is reported by backgroundCommand.ts.
+      const reporting = { name: queueName };
+      if (embedded) runInBackground(reporting, 'Discard', getSharedManager().discard(jobId(id)));
+      else sendInBackground({ ...reporting, tcp: tcp ?? null }, { cmd: 'Discard', id });
     },
     getFailedChildrenValues: async () => {
       if (embedded) return await getSharedManager().getFailedChildrenValues(jobId(id));

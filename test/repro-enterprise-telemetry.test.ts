@@ -44,9 +44,15 @@ describe('enterprise telemetry regressions', () => {
     expect(
       resolveServerConfig({ telemetry: { maxPrometheusQueues: 42 } }).maxPrometheusQueues
     ).toBe(42);
-    expect(
-      resolveServerConfig({ telemetry: { maxPrometheusQueues: -1 } }).maxPrometheusQueues
-    ).toBe(100);
+    expect(resolveServerConfig({ telemetry: { maxPrometheusQueues: 0 } }).maxPrometheusQueues).toBe(
+      0
+    );
+    // An invalid value keeps the 2.9.10 fallback (100), now with a warning naming the key.
+    const invalid = resolveServerConfig({ telemetry: { maxPrometheusQueues: -1 } });
+    expect(invalid.maxPrometheusQueues).toBe(100);
+    expect(invalid.configWarnings).toEqual([
+      expect.stringContaining('telemetry.maxPrometheusQueues'),
+    ]);
   });
 
   test('backup telemetry is initialized before the first scheduled attempt', () => {

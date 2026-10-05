@@ -83,7 +83,8 @@ describe('server validation of backoff.maxDelay', () => {
   });
 
   test('rejects non-finite and out-of-range values with a named error', () => {
-    for (const maxDelay of [Number.NaN, Infinity, -1, MAX_BACKOFF_DELAY + 1, '5000']) {
+    // A numeric string ('5000') is its number since the 2.9.10-compatibility rules.
+    for (const maxDelay of [Number.NaN, Infinity, -1, MAX_BACKOFF_DELAY + 1, 'soon']) {
       expect(validateBackoffField({ type: 'fixed', delay: 10, maxDelay })).toContain(
         'backoff.maxDelay'
       );

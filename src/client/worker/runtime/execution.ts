@@ -1,4 +1,6 @@
 import { hostname } from 'os';
+import { processingTimeoutDelay } from '../../../domain/job/timeoutRule';
+import { safeInterval, safeTimeout, type SafeTimer } from '../../../shared/timers';
 import { getSharedManager } from '../../manager';
 import { BatchExecution } from '../batchExecution';
 import { processJob } from '../processor';
@@ -68,8 +70,10 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
   private fillPendingBatch(retryDelay: number): void {
     if (this.batchFillPending) return;
     this.batchFillPending = true;
+    let failed = false;
     void this.doPullBatch()
       .then((items) => {
+        this.consecutiveErrors = 0;
         if (items.length === 0) return;
         const deliveries = this.registerPulledJobs(items);
         if (this.pendingJobsHead >= this.pendingJobs.length) {
@@ -80,10 +84,15 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
           this.pendingJobsHead = 0;
         }
       })
-      .catch((error) => this.handlePullError(error))
+      .catch((error) => {
+        failed = true;
+        this.handlePullError(error);
+      })
       .finally(() => {
         this.batchFillPending = false;
-        setTimeout(() => this.scheduleProcessing(), retryDelay);
+        // After a failed refill the pull-error backoff poll retries; re-running on the
+        // short refill timer would bypass it and retry every 10 ms.
+        if (!failed) safeTimeout(() => this.scheduleProcessing(), retryDelay);
       });
   }
 
@@ -92,7 +101,7 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
     processor: Processor<T, R> | BatchExecution<T, R>
   ): void {
     const abortControllers: Array<{ id: string; controller: AbortController }> = [];
-    const timers: Array<ReturnType<typeof setTimeout>> = [];
+    const timers: SafeTimer[] = [];
 
     this.activeJobs++;
     for (const delivery of deliveries) {
@@ -106,12 +115,15 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
         const controller = this.createAbortController(jobId);
         let timedOut = false;
         abortControllers.push({ id: jobId, controller });
-        if (delivery.job.timeout !== null) {
+        // Abort (and abandon the outcome) only on a deadline the broker enforces too:
+        // its timeout transition then fails or retries the job (domain/job/timeoutRule.ts).
+        const timeoutMs = processingTimeoutDelay(delivery.job);
+        if (timeoutMs !== null) {
           timers.push(
-            setTimeout(() => {
+            safeTimeout(() => {
               timedOut = true;
               controller.abort(new Error(`Job ${jobId} timed out after ${delivery.job.timeout}ms`));
-            }, delivery.job.timeout)
+            }, timeoutMs)
           );
         }
         return processJob(delivery.job, {
@@ -136,7 +148,7 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
         }).finally(() => this.retireAckCandidate(delivery));
       })
     ).then(() => {
-      for (const timer of timers) clearTimeout(timer);
+      for (const timer of timers) timer.clear();
       for (const { id, controller } of abortControllers) {
         this.releaseAbortController(id, controller);
       }
@@ -175,7 +187,7 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
 
   protected startWorkerHeartbeat(): void {
     if (this.workerHeartbeatTimer) return;
-    this.workerHeartbeatTimer = setInterval(() => {
+    this.workerHeartbeatTimer = safeInterval(() => {
       if (!this.registered) return;
       if (this.embedded) {
         getSharedManager().workerManager.heartbeat(this.workerId, {

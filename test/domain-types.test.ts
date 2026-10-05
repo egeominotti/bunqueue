@@ -495,9 +495,11 @@ describe('job.ts', () => {
       expect(isTimedOut(j, 5999)).toBe(false);
     });
 
-    test('should return false exactly at timeout boundary', () => {
+    // The deadline itself is due: isTimedOut follows processingDeadline, the rule the
+    // broker's timeout scheduler applies (it fails the job at now >= deadline).
+    test('should return true exactly at timeout boundary', () => {
       const j = makeJob({ timeout: 5000, startedAt: 1000 });
-      expect(isTimedOut(j, 6000)).toBe(false);
+      expect(isTimedOut(j, 6000)).toBe(true);
     });
 
     test('should return true when past timeout', () => {

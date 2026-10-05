@@ -1,10 +1,12 @@
 import type { TransactionSQL } from 'bun';
+import { priorityChange } from '../../../domain/job/mutations';
 import { MAX_TIMELINE_ENTRIES, type Job, type JobId } from '../../../domain/types/job';
 import { decodePostgresJob, encodePostgresValue } from './codec';
 import { databaseNow, recordPostgresEvent, type PostgresContext } from './context';
 import { updatedPostgresJobData } from './jobData';
 import { updatePostgresRepeatSuccessorData } from './repeatMutations';
 import type { PostgresJobRow, PostgresJobState, PostgresStoredJob } from './types';
+import { postgresPriorityColumn } from './priorityColumn';
 
 async function lockJob(
   tx: TransactionSQL,
@@ -33,7 +35,8 @@ async function saveJob(
   const { job, state, eventType, now } = input;
   const rows = await tx<PostgresJobRow[]>`
     UPDATE bunqueue_jobs
-    SET payload = ${encodePostgresValue(job)}, state = ${state}, priority = ${job.priority},
+    SET payload = ${encodePostgresValue(job)}, state = ${state},
+        priority = ${postgresPriorityColumn(job.priority)},
         lifo = ${job.lifo}, run_at = ${job.runAt}, started_at = ${job.startedAt},
         completed_at = ${job.completedAt}, attempts = ${job.attempts},
         lease_owner = CASE WHEN ${state} = 'active' THEN lease_owner ELSE NULL END,
@@ -113,9 +116,16 @@ export async function changePostgresPriority(
 ): Promise<boolean> {
   return await ctx.sql.begin(async (tx) => {
     const row = await lockJob(tx, ctx, id);
-    if (!row || !['waiting', 'prioritized', 'delayed'].includes(row.state)) return false;
+    const queued = row !== null && ['waiting', 'prioritized', 'delayed'].includes(row.state);
+    // The base engine's rule and order: validate first, then report "not changed".
+    const change = priorityChange(priority, lifo);
+    if (!queued) return false;
     const stored = decodePostgresJob(row);
-    const job: Job = { ...stored.job, priority, lifo: lifo ?? stored.job.lifo };
+    const job: Job = {
+      ...stored.job,
+      priority: change.priority,
+      lifo: change.lifo ?? stored.job.lifo,
+    };
     const now = await databaseNow(tx);
     const state = pendingState(job, now);
     await saveJob(tx, ctx, { job, state, eventType: 'priority', now });

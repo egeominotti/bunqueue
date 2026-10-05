@@ -5,8 +5,10 @@
 
 import { getSharedManager } from '../../manager';
 import type { TcpConnectionPool } from '../../tcpPool';
+import { sendInBackground, type BackgroundReporting } from '../backgroundCommand';
 
-interface ControlContext {
+/** The sync controls send without awaiting; see backgroundCommand.ts for failures. */
+interface ControlContext extends BackgroundReporting {
   name: string;
   embedded: boolean;
   tcp: TcpConnectionPool | null;
@@ -15,7 +17,7 @@ interface ControlContext {
 /** Pause the queue */
 export function pause(ctx: ControlContext): void {
   if (ctx.embedded) getSharedManager().pause(ctx.name);
-  else if (ctx.tcp) void ctx.tcp.send({ cmd: 'Pause', queue: ctx.name });
+  else sendInBackground(ctx, { cmd: 'Pause', queue: ctx.name });
 }
 
 /** Pause the queue and resolve once the server has processed it. */
@@ -27,7 +29,7 @@ export async function pauseAsync(ctx: ControlContext): Promise<void> {
 /** Resume the queue */
 export function resume(ctx: ControlContext): void {
   if (ctx.embedded) getSharedManager().resume(ctx.name);
-  else if (ctx.tcp) void ctx.tcp.send({ cmd: 'Resume', queue: ctx.name });
+  else sendInBackground(ctx, { cmd: 'Resume', queue: ctx.name });
 }
 
 /** Resume the queue and resolve once the server has processed it. */
@@ -39,7 +41,7 @@ export async function resumeAsync(ctx: ControlContext): Promise<void> {
 /** Drain the queue (remove all waiting jobs) */
 export function drain(ctx: ControlContext): void {
   if (ctx.embedded) getSharedManager().drain(ctx.name);
-  else if (ctx.tcp) void ctx.tcp.send({ cmd: 'Drain', queue: ctx.name });
+  else sendInBackground(ctx, { cmd: 'Drain', queue: ctx.name });
 }
 
 /**
@@ -58,7 +60,7 @@ export async function drainAsync(ctx: ControlContext): Promise<number> {
 /** Obliterate the queue (remove all jobs and data) */
 export function obliterate(ctx: ControlContext): void {
   if (ctx.embedded) getSharedManager().obliterate(ctx.name);
-  else if (ctx.tcp) void ctx.tcp.send({ cmd: 'Obliterate', queue: ctx.name });
+  else sendInBackground(ctx, { cmd: 'Obliterate', queue: ctx.name });
 }
 
 /**

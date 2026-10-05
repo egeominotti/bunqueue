@@ -1,5 +1,6 @@
 import type { FlowJobData, Job, Processor, QueueOptions, WorkerOptions } from '../types';
 import { rejectLegacyConnectionOptions } from '../legacyConnectionOptions';
+import { errorEventListener, setBackgroundErrorListener } from '../queue/backgroundCommand';
 import { FORCE_EMBEDDED } from '../queue/helpers';
 import { Queue } from '../queue/queue';
 import { Worker } from '../worker/worker';
@@ -13,7 +14,11 @@ import { executeWithRetry } from './retry';
 import { TriggerManager } from './triggers';
 import { TtlChecker } from './ttl';
 import type { BunqueueMiddleware, BunqueueOptions } from './types';
+import { resolveBunqueueFeatures } from './validation';
 import { resolveProcessorResult } from '../worker/processorResult';
+
+/** Closing a Worker whose construction is being rolled back is best-effort. */
+const ignoreCloseFailure = (): void => undefined;
 
 /** Construction and processing pipeline shared by the compact Bunqueue façade. */
 export abstract class BunqueueRuntime<T, R> {
@@ -37,14 +42,17 @@ export abstract class BunqueueRuntime<T, R> {
     const modes = [options.processor, options.routes, options.batch].filter(Boolean).length;
     if (modes === 0) throw new Error('Bunqueue requires "processor", "routes", or "batch"');
     if (modes > 1) throw new Error('Bunqueue: use only one of "processor", "routes", or "batch"');
+    // Before the Queue and Worker exist: a rejected option must leave nothing running.
+    // Normalized copies, so the settings cannot be changed through the caller's objects.
+    const features = resolveBunqueueFeatures(options);
 
     this.name = name;
-    this.retryConfig = options.retry ?? null;
+    this.retryConfig = features.retry;
     this.ttlChecker = options.ttl ? new TtlChecker(options.ttl) : null;
     this.merger = new DedupDebounceMerger(options.deduplication ?? null, options.debounce ?? null);
 
-    if (options.batch) {
-      this.batchAcc = new BatchAccumulator<T, R>(options.batch);
+    if (features.batch) {
+      this.batchAcc = new BatchAccumulator<T, R>(features.batch);
       this.baseProcessor = this.batchAcc.buildProcessor();
     } else {
       this.batchAcc = null;
@@ -55,18 +63,36 @@ export abstract class BunqueueRuntime<T, R> {
 
     const wrappedProcessor: Processor<T, R> = (job: Job<T & FlowJobData>) => this.processJob(job);
     this.queue = new Queue<T>(name, this.buildQueueOptions(options));
-    this.worker = new Worker<T, R>(name, wrappedProcessor, this.buildWorkerOptions(options));
-    this.dlqrl = new DlqRateLimitManager<T>(this.queue);
-    if (options.dlq) this.dlqrl.setDlqConfig(options.dlq);
+    let worker: Worker<T, R> | null = null;
+    try {
+      // The Worker validates the options forwarded to it and may throw here.
+      worker = new Worker<T, R>(name, wrappedProcessor, this.buildWorkerOptions(options));
+      // Fire-and-forget failures (the `dlq` option's SetDlqConfig below, pause(),
+      // setGlobalRateLimit()...) go to the `error` event while it has a listener.
+      const onBackgroundError = errorEventListener(worker);
+      setBackgroundErrorListener(this.queue, onBackgroundError);
+      this.dlqrl = new DlqRateLimitManager<T>(this.queue);
+      if (options.dlq) this.dlqrl.setDlqConfig(options.dlq);
 
-    this.cb = options.circuitBreaker
-      ? new WorkerCircuitBreaker(options.circuitBreaker, this.worker as unknown as Worker)
-      : null;
-    this.triggerMgr = new TriggerManager<T, R>(this.queue, this.worker);
-    this.ager = options.priorityAging
-      ? new PriorityAger<T>(options.priorityAging, this.queue)
-      : null;
-    this.ager?.start();
+      this.cb = features.circuitBreaker
+        ? new WorkerCircuitBreaker(features.circuitBreaker, worker as unknown as Worker)
+        : null;
+      this.triggerMgr = new TriggerManager<T, R>(this.queue, worker, {
+        name: (options.prefixKey ?? '') + name,
+        onBackgroundError,
+      });
+      this.ager = features.priorityAging
+        ? new PriorityAger<T>(features.priorityAging, this.queue)
+        : null;
+      this.ager?.start();
+    } catch (error) {
+      // A failed construction leaves nothing running: no polling Worker, no Queue
+      // holding a reference on a shared TCP pool.
+      if (worker) worker.close(true).catch(ignoreCloseFailure);
+      this.queue.close();
+      throw error;
+    }
+    this.worker = worker;
   }
 
   private buildRouteProcessor(routes: Record<string, Processor<T, R>>): Processor<T, R> {

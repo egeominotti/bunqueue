@@ -4,8 +4,10 @@
 
 import { getSharedManager } from '../manager';
 import type { TcpConnectionPool } from '../tcpPool';
+import { sendInBackground, type BackgroundReporting } from './backgroundCommand';
 
-interface RateLimitContext {
+/** The sync setters send without awaiting; see backgroundCommand.ts for failures. */
+interface RateLimitContext extends BackgroundReporting {
   name: string;
   embedded: boolean;
   tcp: TcpConnectionPool | null;
@@ -31,8 +33,8 @@ async function getQueueLimits(ctx: RateLimitContext, maxJobs?: number): Promise<
 export function setGlobalConcurrency(ctx: RateLimitContext, concurrency: number): void {
   if (ctx.embedded) {
     getSharedManager().setConcurrency(ctx.name, concurrency);
-  } else if (ctx.tcp) {
-    void ctx.tcp.send({ cmd: 'SetConcurrency', queue: ctx.name, limit: concurrency });
+  } else {
+    sendInBackground(ctx, { cmd: 'SetConcurrency', queue: ctx.name, limit: concurrency });
   }
 }
 
@@ -50,8 +52,8 @@ export async function setGlobalConcurrencyAsync(
 export function removeGlobalConcurrency(ctx: RateLimitContext): void {
   if (ctx.embedded) {
     getSharedManager().clearConcurrency(ctx.name);
-  } else if (ctx.tcp) {
-    void ctx.tcp.send({ cmd: 'ClearConcurrency', queue: ctx.name });
+  } else {
+    sendInBackground(ctx, { cmd: 'ClearConcurrency', queue: ctx.name });
   }
 }
 
@@ -73,8 +75,8 @@ export async function getGlobalConcurrency(ctx: RateLimitContext): Promise<numbe
 export function setGlobalRateLimit(ctx: RateLimitContext, max: number, duration?: number): void {
   if (ctx.embedded) {
     getSharedManager().setRateLimit(ctx.name, max, duration);
-  } else if (ctx.tcp) {
-    void ctx.tcp.send({ cmd: 'RateLimit', queue: ctx.name, limit: max, duration });
+  } else {
+    sendInBackground(ctx, { cmd: 'RateLimit', queue: ctx.name, limit: max, duration });
   }
 }
 
@@ -92,8 +94,8 @@ export async function setGlobalRateLimitAsync(
 export function removeGlobalRateLimit(ctx: RateLimitContext): void {
   if (ctx.embedded) {
     getSharedManager().clearRateLimit(ctx.name);
-  } else if (ctx.tcp) {
-    void ctx.tcp.send({ cmd: 'RateLimitClear', queue: ctx.name });
+  } else {
+    sendInBackground(ctx, { cmd: 'RateLimitClear', queue: ctx.name });
   }
 }
 

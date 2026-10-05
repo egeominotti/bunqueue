@@ -289,13 +289,41 @@ low enough for the Prometheus retention and fleet size.
 
 ## Configuration
 
-| Setting              | Default  | Effect                                                                             |
-| -------------------- | -------- | ---------------------------------------------------------------------------------- |
-| `METRICS_AUTH`       | `false`  | Require an `AUTH_TOKENS` bearer token on `/prometheus`; fail closed if none exists |
-| `METRICS_MAX_QUEUES` | `100`    | Maximum queue names exported as labelled series; `0` disables per-queue metrics    |
-| `STATS_INTERVAL_MS`  | `300000` | Periodic server log interval; does not control scraping                            |
-| `LOG_LEVEL`          | `info`   | `debug`, `info`, `warn`, or `error`                                                |
-| `LOG_FORMAT`         | `text`   | `json` enables structured log lines                                                |
+| Setting                        | Default  | Effect                                                                                                                                                                            |
+| ------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `METRICS_AUTH`                 | `false`  | Require an `AUTH_TOKENS` bearer token on `/prometheus`; fail closed if none exists. Boolean (`1/0`, `true/false`, `yes/no`, `on/off`); another word keeps it off, with a warning  |
+| `METRICS_MAX_QUEUES`           | `100`    | Maximum queue names exported as labelled series (whole >= 0); `0` disables per-queue ones; `-1` or no number keeps 100, with a warning                                            |
+| `STATS_INTERVAL_MS`            | `300000` | Periodic server log interval (whole ms >= 1; `0` is refused); does not control scraping                                                                                           |
+| `LOG_LEVEL`                    | `info`   | `debug`, `info`, `warn`, or `error`, any case, aliases `warning`, `trace`, `verbose`, `fatal`, `critical` (file: `logging.level`); another word is a warning and leaves the level |
+| `LOG_FORMAT`                   | `text`   | `json` enables structured log lines, any case (file: `logging.format`); another word is a warning (text)                                                                          |
+| `QUEUE_IDLE_THRESHOLD_MS`      | `30000`  | `queue:idle` after this idle time (whole ms >= 0; `0` disables)                                                                                                                   |
+| `QUEUE_SIZE_THRESHOLD`         | `0`      | `queue:threshold` at this waiting count (whole >= 0; `0` disables)                                                                                                                |
+| `WORKER_OVERLOAD_THRESHOLD_MS` | `30000`  | `worker:overloaded` after this time at capacity (whole ms >= 0; `0` disables)                                                                                                     |
+| `MEMORY_WARNING_MB`            | `0`      | `server:memory-warning` at this heap size (whole MB >= 0, `512mb` accepted; `0` disables)                                                                                         |
+| `STORAGE_WARNING_MB`           | `0`      | `storage:size-warning` at this SQLite size (whole MB >= 0, `512mb` accepted; `0` disables)                                                                                        |
+
+Every value above is validated at startup; a value 2.9.10 misread (`30s` read as
+30, `1e3` as 1) stops the server with an error naming the variable (see
+[Configuration & Entrypoint](./configuration.md)). A monitoring threshold that is
+negative or holds no number (`-1`, `abc`) means `0` (disabled), with a warning:
+2.9.10 skipped a check `<= 0` and never fired one compared with NaN.
+
+The stats log (`src/infrastructure/server/statsLog.ts`) is armed with
+`safeInterval`. Its period used to be the raw `parseInt` of `STATS_INTERVAL_MS`:
+`0`, `abc` (NaN) and `1e12` (parsed as 1) all became a ~1 ms interval, and so did
+a valid period above 2^31 - 1 ms, which the runtime rewrites to 1 ms — about 870
+"Queue statistics" lines per second. `0` is refused; a sub-second period such as
+`500` worked in 2.9.10 and is still accepted.
+
+The monitoring thresholds (`src/application/monitoringChecks.ts`) are read by
+`createMonitoringState()` through `readMonitoringThresholds`
+(`src/config/componentEnv.ts`) when a `QueueManager` is constructed, not at module
+load, and live in `MonitoringState.thresholds`. Before, `1e12` (parsed as 1) fired
+`queue:idle` on the next pass; now it throws an error naming the variable, from
+`resolveServerConfig` on a server and from the `QueueManager` constructor in
+embedded mode. A NaN threshold silently disabled its check (`now - since >= NaN`
+is never true); `abc` and `-1` still disable it, now with a warning (logged once by
+the component in embedded mode).
 
 ## Related Documentation
 

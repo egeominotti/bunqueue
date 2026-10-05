@@ -6,8 +6,10 @@
 import type { TcpConnectionPool } from '../tcpPool';
 import type { StallConfig } from '../types';
 import * as dlqOps from './dlqOps';
+import { sendInBackground, type BackgroundReporting } from './backgroundCommand';
 
-interface StallContext {
+/** The sync setter sends without awaiting; see backgroundCommand.ts for failures. */
+interface StallContext extends BackgroundReporting {
   name: string;
   embedded: boolean;
   tcp: TcpConnectionPool | null;
@@ -31,7 +33,7 @@ export function setStallConfig(ctx: StallContext, config: Partial<StallConfig>):
     // Cache locally so getStallConfig() returns the correct value
     const current = tcpConfigCache.get(ctx.name) ?? { ...DEFAULT_STALL_CONFIG };
     tcpConfigCache.set(ctx.name, { ...current, ...config });
-    void ctx.tcp.send({ cmd: 'SetStallConfig', queue: ctx.name, config });
+    sendInBackground(ctx, { cmd: 'SetStallConfig', queue: ctx.name, config });
   }
 }
 

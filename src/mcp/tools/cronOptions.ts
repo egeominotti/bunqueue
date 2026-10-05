@@ -11,7 +11,7 @@ import {
   attemptsField,
   backoffField,
   deduplicationField,
-  delayField,
+  jobDelayField,
   jobNameField,
   priorityField,
   stallTimeoutField,
@@ -71,7 +71,9 @@ export function cronOptionsShape() {
     attempts: attemptsField('Max attempts of every job the schedule adds (default: 3)').optional(),
     backoff: backoffField().optional(),
     timeout: timeoutField().optional(),
-    delay: delayField('Delay in ms before each added job becomes ready').optional(),
+    delay: jobDelayField(
+      'Delay in ms before each added job becomes ready (a negative delay makes it ready at once)'
+    ).optional(),
     stallTimeout: stallTimeoutField().optional(),
     removeOnComplete: z.boolean().optional().describe('Delete each added job once it completes'),
     removeOnFail: z

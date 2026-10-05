@@ -86,7 +86,7 @@ defmodule Bunqueue.Queue do
   defdelegate get_progress(queue, id), to: Bunqueue.QueueQuery
   defdelegate get_job_counts(queue), to: Bunqueue.QueueQuery
   defdelegate count(queue), to: Bunqueue.QueueQuery
-  defdelegate wait_for_job(queue, id, timeout_ms), to: Bunqueue.QueueQuery
+  defdelegate wait_for_job(queue, id, timeout_ms \\ 30_000), to: Bunqueue.QueueQuery
   defdelegate get_logs(queue, id), to: Bunqueue.QueueQuery
   defdelegate get_logs(queue, id, start), to: Bunqueue.QueueQuery
   defdelegate get_logs(queue, id, start, finish), to: Bunqueue.QueueQuery

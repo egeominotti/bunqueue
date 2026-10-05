@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Wait after an empty pull, as the main client does
+  (`pollTimeout > 0 ? 10 : drainDelay`): 50 ms when the poll timeout is 0
+  (non-blocking), 10 ms when it is positive. An idle `Worker::run` re-issued
+  `PULLB` with zero delay at poll timeout 0 (about 10,000 per second on
+  loopback) and about 715 per second at 1 ms; it now sends about 20 and 71.
+  `run_once` still returns immediately.
+- Fall back to the 30000 ms default for a `lock_ttl_ms` of zero or less. The
+  value was sent as-is, and the broker granted a lease that had already
+  expired, so a job could be delivered again while it was still running.
+- Reject a zero `connect_timeout`, `command_timeout`, or `call_timeout`
+  duration with `Error::Connection` before any socket opens. A zero command
+  timeout used to open a connection, fail on `set_read_timeout`, and drop the
+  connection on every call.
+
 ## 0.2.0 - 2026-10-02
 
 Breaking: flow options the broker cannot honor are rejected. Requires a bunqueue

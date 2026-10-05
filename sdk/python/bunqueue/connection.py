@@ -10,6 +10,7 @@ reader thread demultiplexes responses to their pending futures.
 
 from __future__ import annotations
 
+import math
 import socket
 import struct
 import threading
@@ -20,6 +21,7 @@ from typing import Any, Dict, Optional
 import msgpack
 
 from .connection_lifecycle import ConnectionLifecycle
+from .durations import command_timeout_s, connect_timeout_s
 from .errors import (
     CommandError,
     CommandTimeoutError,
@@ -46,16 +48,16 @@ class Connection(ConnectionLifecycle):
         port: int = 6789,
         token: Optional[str] = None,
         tls: TlsOption = None,
-        connect_timeout: float = 5.0,
-        command_timeout: float = 10.0,
+        connect_timeout: Optional[float] = 5.0,
+        command_timeout: Optional[float] = 10.0,
         on_telemetry: Optional[TelemetryHandler] = None,
     ) -> None:
+        self.connect_timeout = connect_timeout_s(connect_timeout)  # seconds; None blocks
+        self.command_timeout = command_timeout_s(command_timeout)
         self.host = host
         self.port = port
         self.token = token
         self.tls = tls
-        self.connect_timeout = connect_timeout
-        self.command_timeout = command_timeout
         self._telemetry = Telemetry(on_telemetry)
 
         self._sock: Optional[socket.socket] = None
@@ -82,8 +84,11 @@ class Connection(ConnectionLifecycle):
         """Send a command and wait for its response.
 
         Raises :class:`CommandError` when the server answers ``ok=false``.
-        Reconnects lazily if the connection was lost.
+        Reconnects lazily if the connection was lost. ``timeout`` (seconds)
+        overrides ``command_timeout``; ``math.inf`` waits without a deadline.
         """
+        if timeout is not None:
+            timeout = command_timeout_s(timeout, "timeout")
         if not self._connected:
             self.connect()
         return self._send(command, timeout)
@@ -124,7 +129,8 @@ class Connection(ConnectionLifecycle):
             raise ConnectionClosedError(f"send failed: {exc}") from exc
 
         try:
-            response = fut.result(timeout if timeout is not None else self.command_timeout)
+            wait = timeout if timeout is not None else self.command_timeout
+            response = fut.result(None if math.isinf(wait) else wait)
         except FutureTimeoutError:
             with self._pending_lock:
                 self._pending.pop(req_id, None)

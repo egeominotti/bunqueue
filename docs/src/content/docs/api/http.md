@@ -109,8 +109,8 @@ Some endpoints, such as `DELETE /jobs/:id`, queue control, DLQ, rate-limit/concu
 **Validation rules applied to all endpoints:**
 
 - **Queue names**: 1-256 characters, alphanumeric + `-_.:`
-- **Numeric fields**: Validated for type, range, and finiteness (e.g., `delay` must be 0 to 365 days, `priority` must be -1M to +1M)
-- **Job data**: Max 10MB per job payload
+- **Numeric fields**: Validated by the same validator as the TCP commands, embedded `Queue.add` and flows, which rejects only what no job can run with: a non-number, `NaN` or an infinity, a negative `timeout`, `ttl` or `backoff.delay` (a missing `backoff.delay` is the 1000 ms default). A negative `delay` makes the job ready at once with a past run time (as in 2.9.10), a move-to-delayed/delay `delay` is required, and a lock `duration` must be a finite number. Every value 2.9.10 accepted keeps its 2.9.10 result.
+- **Job data**: Max 10MB per pushed job payload (updating an existing job's data has no size limit, as in 2.9.10)
 - **Job IDs**: UUID v7 format (auto-generated) or custom string (via `jobId` field)
 
 ---
@@ -228,12 +228,12 @@ curl -X POST http://localhost:6790/queues/emails/jobs \
 | ------------------ | -------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `data`             | `any`                | _(required)_ | Job payload. Any JSON-serializable value. Max 10MB.                                                                                                                                                                                                |
 | `name`             | `string`             | `"default"`  | Job name, stored as the top-level `job.name`.                                                                                                                                                                                                      |
-| `priority`         | `number`             | `0`          | Higher value = processed sooner. Range: -1,000,000 to 1,000,000.                                                                                                                                                                                   |
-| `delay`            | `number`             | `0`          | Milliseconds before the job becomes available for processing. Max: 1 year.                                                                                                                                                                         |
-| `maxAttempts`      | `number`             | `3`          | Maximum retry attempts before the job moves to the DLQ. Range: 1-1000. `attempts` is accepted as an alias.                                                                                                                                         |
-| `backoff`          | `number` or `object` | `1000`       | Base retry delay in milliseconds (exponential: `backoff * 2^attempt`, max: 1 day). Also accepts `{ "type": "fixed" \| "exponential", "delay": ms, "maxDelay": ms }`; the optional `maxDelay` (0 to 1 day) caps each retry delay (default: 1 hour). |
-| `ttl`              | `number`             | -            | Time-to-live from creation in milliseconds. Job is discarded if not processed within this window. Max: 1 year.                                                                                                                                     |
-| `timeout`          | `number`             | -            | Processing timeout in milliseconds. The broker fails the active attempt at its absolute deadline; a later outcome from that lease generation is ignored. Max: 1 day.                                                                               |
+| `priority`         | `number`             | `0`          | Higher value = processed sooner. Any finite number.                                                                                                                                                                                                |
+| `delay`            | `number`             | `0`          | Milliseconds before the job becomes available for processing. A negative delay makes it ready at once (past run time).                                                                                                                      |
+| `maxAttempts`      | `number`             | `3`          | Maximum attempts before the job moves to the DLQ. `1` or less runs once, a fraction rounds up, at most 2,147,483,647. `attempts` is accepted as an alias.                                                                                         |
+| `backoff`          | `number` or `object` | `1000`       | Base retry delay in milliseconds (exponential: `backoff * 2^attempt`). Also accepts `{ "type": "fixed" \| "exponential", "delay": ms, "maxDelay": ms }` (any other type runs as exponential); the optional `maxDelay` (0 to 1 day) caps each retry delay (default: 1 hour). |
+| `ttl`              | `number`             | -            | Time-to-live from creation in milliseconds (0 or more). Job is discarded if not processed within this window.                                                                                                                                      |
+| `timeout`          | `number`             | -            | Processing timeout in milliseconds (0 or more; 0 means none). The broker fails the active attempt at its absolute deadline; a later outcome from that lease generation is ignored.                                                                 |
 | `uniqueKey`        | `string`             | -            | Deduplication key. If a job with the same `uniqueKey` already exists in the queue, the push is silently ignored.                                                                                                                                   |
 | `jobId`            | `string`             | -            | Broker-wide custom job ID. If a live job with this ID already exists in any queue, the push is idempotent and returns the existing ID.                                                                                                             |
 | `tags`             | `string[]`           | `[]`         | Metadata tags for filtering and querying.                                                                                                                                                                                                          |
@@ -244,6 +244,13 @@ curl -X POST http://localhost:6790/queues/emails/jobs \
 | `durable`          | `boolean`            | `false`      | SQLite: bypass the write buffer and commit before returning (slower, but no 10 ms buffer-loss window). PostgreSQL admissions are already transactional and do not use the SQLite buffer.                                                           |
 | `dependsOn`        | `string[]`           | `[]`         | Job IDs that must complete before this job becomes available. The job enters `waiting-children` state until all dependencies are met.                                                                                                              |
 | `repeat`           | `object`             | -            | Repeat configuration: `{ every: ms, limit: n }` for interval-based, or `{ pattern: "cron expression" }` for cron-based (optional `tz`, `startDate`, `endDate`, `immediately`).                                                                     |
+
+Any other key in the body is ignored, as it always was: this route forwards only the
+fields above. To set the other options of the TCP [`PUSH`](/api/tcp/jobs/#push)
+command (`stallTimeout`, `timestamp`, `keepLogs`, `stackTraceLimit`, `sizeLimit`,
+`dedup`, `debounceId`/`debounceTtl`, `groupMaxSize`, `parentId`, the flow failure
+policies), use [`POST /queues/:queue/jobs/bulk`](#push-jobs-in-bulk), which forwards
+each job object whole.
 
 **Success response** (`200`):
 
@@ -263,8 +270,10 @@ the existing job's ID is returned (idempotent).
 | `400`  | `Queue name is required`                 | Empty queue name                             |
 | `400`  | `Queue name contains invalid characters` | Queue name has chars outside `a-zA-Z0-9_-.:` |
 | `400`  | `Job data too large (max 10MB)`          | Serialized data exceeds 10MB                 |
-| `400`  | `priority must be an integer`            | Non-integer priority                         |
-| `400`  | `delay must be at least 0`               | Negative delay                               |
+| `400`  | `priority must be a number`              | Non-numeric priority (`"high"`)              |
+| `400`  | `delay must be a number`                 | Non-numeric delay (a negative delay is 0)    |
+| `400`  | `timeout must be at least 0`             | Negative processing timeout                  |
+| `400`  | `backoff.delay must be at least 0`       | Negative object-form `backoff.delay` (a missing one is 1000) |
 
 ---
 
@@ -319,6 +328,11 @@ curl http://localhost:6790/queues/emails/jobs?timeout=5000
 | Parameter | Type     | Default | Max     | Description                                                            |
 | --------- | -------- | ------- | ------- | ---------------------------------------------------------------------- |
 | `timeout` | `number` | `0`     | `60000` | Long-poll timeout in ms. `0` = return immediately if no job available. |
+
+`timeout` is read with `parseInt`, as in every release (`5000ms` is 5000, `1e3` is 1).
+The route always answers `200`; an invalid wait is reported in the body with
+`"ok": false`: `timeout must be at most 60000`, `timeout must be at least 0`, or
+`timeout must be a finite number` for an empty or non-numeric value.
 
 **Response with job** (`200`):
 
@@ -1000,6 +1014,8 @@ curl "http://localhost:6790/queues/emails/jobs/list?status=failed,completed"
 | `status`  | `string` | all     | State filter: `waiting`, `prioritized`, `delayed`, `active`, `completed`, `failed`, `waiting-children`. Aliases: `state`, `states`. Repeatable and comma-separated for multiple states. |
 | `limit`   | `number` | `100`   | Max jobs to return                                                                                                                                                                      |
 | `offset`  | `number` | `0`     | Skip first N jobs                                                                                                                                                                       |
+
+`limit` and `offset` are read with `parseInt`, as in every release (`limit=1e2` is 1).
 
 **Response** (`200`):
 

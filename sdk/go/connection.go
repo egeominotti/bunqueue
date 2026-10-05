@@ -26,8 +26,8 @@ type Options struct {
 	Port           int
 	Token          string
 	TLS            *TLSOptions
-	ConnectTimeout time.Duration // default 10s
-	CommandTimeout time.Duration // default 30s
+	ConnectTimeout time.Duration // default 10s; zero or negative uses the default
+	CommandTimeout time.Duration // default 30s; zero or negative uses the default
 	OnEvent        TelemetryCallback
 }
 
@@ -38,10 +38,13 @@ func (o Options) withDefaults() Options {
 	if o.Port == 0 {
 		o.Port = 6789
 	}
-	if o.ConnectTimeout == 0 {
+	// A negative timeout puts every deadline in the past: each dial fails at
+	// once, and each command times out and tears the socket down (one
+	// reconnect per call). Treat it like zero, as the default.
+	if o.ConnectTimeout <= 0 {
 		o.ConnectTimeout = 10 * time.Second
 	}
-	if o.CommandTimeout == 0 {
+	if o.CommandTimeout <= 0 {
 		o.CommandTimeout = 30 * time.Second
 	}
 	return o

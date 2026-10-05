@@ -11,6 +11,7 @@ import { buildClientTls } from '../client/tcp/connection';
 import type { ClientTlsOptions } from '../client/tcp/types';
 import { buildCommand } from './commandRouter';
 import { decodeMessagePack, encodeMessagePack } from '../shared/msgpack';
+import { safeTimeout } from '../shared/timers';
 
 /** Client options */
 export interface ClientOptions {
@@ -39,7 +40,9 @@ interface SocketData {
  * request") get the server-side timeout plus a 10s network buffer so the
  * client never gives up first. On every other command a `timeout` field has
  * a different meaning (e.g. PUSH: job execution timeout) and must not
- * stretch the client wait.
+ * stretch the client wait. Any length is armed safely (`safeTimeout`), so a
+ * `--timeout` beyond 2^31 - 1 ms reaches the server, which answers with its
+ * own range error, instead of tripping the client timer after 1 ms.
  */
 export function clientTimeoutFor(cmd: Record<string, unknown>): number {
   const isLongPoll = cmd.cmd === 'PULL' || cmd.cmd === 'WaitJob';
@@ -54,18 +57,18 @@ function sendCommand(
   timeoutMs = 30000
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
+    const timer = safeTimeout(() => {
       socket.data.resolve = null;
       socket.data.reject = null;
       reject(new Error('Command timeout'));
     }, timeoutMs);
 
     socket.data.resolve = (value) => {
-      clearTimeout(timeoutId);
+      timer.clear();
       resolve(value);
     };
     socket.data.reject = (error) => {
-      clearTimeout(timeoutId);
+      timer.clear();
       reject(error);
     };
     socket.write(FrameParser.frame(encodeMessagePack(command)));

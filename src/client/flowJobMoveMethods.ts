@@ -2,6 +2,7 @@ import { jobId } from '../domain/types/job';
 import { getSharedManager } from './manager';
 import { buildFailCommand, failEmbeddedArgs } from './queue/failWire';
 import { assertFlowTcpOk, type FlowJobRuntime } from './flowJobTypes';
+import { delayUntil } from './queue/commandArgs';
 import { removeJobDeduplicationKey } from './jobDeduplication';
 import { waitJobUntilFinished } from './jobWait';
 
@@ -44,7 +45,7 @@ export function buildFlowJobMoveMethods(runtime: FlowJobRuntime) {
       return true;
     },
     moveToDelayed: async (timestamp: number, token?: string) => {
-      const delay = Math.max(0, timestamp - Date.now());
+      const delay = delayUntil(timestamp);
       if (embedded) return void (await getSharedManager().moveToDelayed(jobId(id), delay, token));
       if (!tcp) return;
       assertFlowTcpOk(

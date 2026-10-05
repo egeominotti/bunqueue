@@ -1,3 +1,5 @@
+import { effectiveJobDelay } from '../../../../domain/job/options';
+import { clampDuration, coerceNumericString } from '../../../../domain/job/optionBounds';
 import type { JobOptions } from '../../../types';
 import type { ExtendedJobOptions } from '../../types/add';
 import { normalizeGroupId } from '../../../groupId';
@@ -97,14 +99,27 @@ export function buildJobData(data: unknown, options: ExtendedJobOptions): unknow
   };
 }
 
+/**
+ * The public `delay`/`priority`/`opts` of a job just added, as the broker reports them: a
+ * negative delay (a ready job whose run time is in the past) is reported as 0, as a job
+ * read back from the broker is; a numeric string is its number, and a delay beyond the
+ * honoured range is clamped (see normalizeJobInput).
+ */
 export function reflectionMeta(options: ExtendedJobOptions): {
   priority?: number;
   delay?: number;
   opts: JobOptions;
 } {
+  const delay =
+    options.delay === undefined
+      ? undefined
+      : clampDuration(effectiveJobDelay(coerceNumericString(options.delay)));
+  const priority = coerceNumericString(options.group?.priority ?? options.priority) as
+    | number
+    | undefined;
   return {
-    priority: options.group?.priority ?? options.priority,
-    delay: options.delay,
-    opts: options,
+    priority,
+    delay,
+    opts: delay === options.delay ? options : { ...options, delay },
   };
 }

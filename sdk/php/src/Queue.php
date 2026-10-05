@@ -21,7 +21,7 @@ final class Queue
     public readonly Connection $connection;
     private readonly bool $ownsConnection;
 
-    /** @param array{host?: string, port?: int, token?: string, tls?: bool|array, connectTimeout?: float, commandTimeout?: float} $options */
+    /** @param array{host?: string, port?: int, token?: string, tls?: bool|array, connectTimeout?: int|float, commandTimeout?: int|float} $options */
     public function __construct(
         public readonly string $name,
         array $options = [],

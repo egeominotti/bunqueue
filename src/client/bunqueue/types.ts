@@ -21,15 +21,26 @@ export type BunqueueMiddleware<T = unknown, R = unknown> = (
 /** Retry strategy for advanced backoff */
 export type RetryStrategy = 'fixed' | 'exponential' | 'jitter' | 'fibonacci' | 'custom';
 
-/** Advanced retry configuration */
+/**
+ * Advanced retry configuration. Every computed delay is honoured exactly, even one
+ * beyond the runtime's 2^31 - 1 ms timer limit; growth has no cap and saturates at
+ * Number.MAX_SAFE_INTEGER ms instead of overflowing.
+ */
 export interface RetryConfig {
-  /** Max attempts (default: 3) */
+  /**
+   * Max attempts, the first one included (default: 3): a whole number >= 1, or
+   * Infinity to retry until success, cancel() or close().
+   */
   maxAttempts?: number;
-  /** Base delay in ms (default: 1000) */
+  /** Base delay in ms (default: 1000): a finite number >= 0 */
   delay?: number;
   /** Strategy (default: exponential) */
   strategy?: RetryStrategy;
-  /** Custom backoff function: attempt → delay in ms */
+  /**
+   * Custom backoff function: attempt → delay in ms. It must return a finite number
+   * >= 0; any other result fails the job with a TypeError or RangeError whose `cause`
+   * is the processor error, instead of retrying.
+   */
   customBackoff?: (attempt: number, error: Error) => number;
   /** Only retry if this returns true */
   retryIf?: (error: Error, attempt: number) => boolean;
@@ -37,9 +48,12 @@ export interface RetryConfig {
 
 /** Circuit breaker configuration */
 export interface CircuitBreakerConfig {
-  /** Max consecutive failures before opening (default: 5) */
+  /** Max consecutive failures before opening (default: 5): a whole number >= 1, or Infinity */
   threshold?: number;
-  /** Time in ms before half-open retry (default: 30000) */
+  /**
+   * Time in ms before half-open retry (default: 30000): a finite number >= 0, or
+   * Infinity to stay open until resetCircuit()
+   */
   resetTimeout?: number;
   /** Callback when circuit opens */
   onOpen?: (failures: number) => void;
@@ -70,15 +84,15 @@ export interface TriggerRule<T = unknown> {
 
 /** Priority aging configuration */
 export interface PriorityAgingConfig {
-  /** Check interval in ms (default: 60000) */
+  /** Check interval in ms (default: 60000): a finite number >= 1 */
   interval?: number;
-  /** Min age in ms before boost (default: 60000) */
+  /** Min age in ms before boost (default: 60000): a finite number >= 0 */
   minAge?: number;
-  /** Priority boost per interval (default: 1) */
+  /** Priority boost per interval (default: 1): a finite number > 0 */
   boost?: number;
-  /** Max priority cap (default: 100) */
+  /** Max priority cap (default: 100): a finite number */
   maxPriority?: number;
-  /** Max jobs to scan per tick (default: 100) */
+  /** Max jobs to scan per tick (default: 100): a whole number >= 1 */
   maxScan?: number;
 }
 
@@ -87,9 +101,9 @@ export type BatchProcessor<T = unknown, R = unknown> = (jobs: Array<Job<T>>) => 
 
 /** Batch processing configuration */
 export interface BatchConfig<T = unknown, R = unknown> {
-  /** Batch size (default: 10) */
+  /** Batch size (required): a whole number >= 1, or Infinity to flush on `timeout` only */
   size: number;
-  /** Max wait in ms before flushing partial batch (default: 5000) */
+  /** Max wait in ms before flushing partial batch (default: 5000): a finite number >= 0 */
   timeout?: number;
   /** Batch processor function */
   processor: BatchProcessor<T, R>;

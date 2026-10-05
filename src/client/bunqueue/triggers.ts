@@ -1,8 +1,13 @@
 /**
  * Bunqueue — Event Triggers
  * When a job completes/fails, automatically create another job.
+ *
+ * The add is not awaited (it runs from an event listener); a failed add is reported
+ * as an `add` background failure (src/client/queue/backgroundCommand.ts), never left
+ * as an unhandled rejection.
  */
 
+import { runInBackground, type BackgroundReporting } from '../queue/backgroundCommand';
 import type { Queue } from '../queue/queue';
 import type { Worker } from '../worker/worker';
 import type { Job } from '../types';
@@ -13,10 +18,12 @@ export class TriggerManager<T = unknown, R = unknown> {
   private active = false;
   private readonly queue: Queue<T>;
   private readonly worker: Worker<T, R>;
+  private readonly reporting: BackgroundReporting;
 
-  constructor(queue: Queue<T>, worker: Worker<T, R>) {
+  constructor(queue: Queue<T>, worker: Worker<T, R>, reporting: BackgroundReporting) {
     this.queue = queue;
     this.worker = worker;
+    this.reporting = reporting;
   }
 
   add(rule: TriggerRule<T>): void {
@@ -44,7 +51,7 @@ export class TriggerManager<T = unknown, R = unknown> {
       if (rule.condition && !rule.condition(resultOrError, job)) continue;
 
       const data = rule.data(resultOrError, job);
-      void this.queue.add(rule.create, data, rule.opts);
+      runInBackground(this.reporting, 'add', this.queue.add(rule.create, data, rule.opts));
     }
   }
 }

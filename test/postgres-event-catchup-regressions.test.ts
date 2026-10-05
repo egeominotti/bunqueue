@@ -10,12 +10,12 @@ const namespaces: string[] = [];
 interface PausableEventStream {
   cursor: number;
   subscription: { unlisten(): Promise<void> } | null;
-  pollTimer: ReturnType<typeof setInterval> | null;
+  pollTimer: { clear(): void } | null;
   drain(): Promise<void>;
 }
 
 interface RefreshInspectableManager {
-  readonly refreshes: Map<string, Promise<void>>;
+  readonly queueRefreshes: { settled(): Promise<unknown> };
 }
 
 function namespace(label: string): string {
@@ -87,7 +87,7 @@ async function failTerminal(
 
 async function pauseNotifications(value: PostgresQueueManager): Promise<PausableEventStream> {
   const stream = eventStream(value);
-  if (stream.pollTimer) clearInterval(stream.pollTimer);
+  stream.pollTimer?.clear();
   stream.pollTimer = null;
   await stream.subscription?.unlisten();
   stream.subscription = null;
@@ -239,12 +239,12 @@ describe('PostgreSQL event catch-up regressions', () => {
           expect(await active.trimQueueEventsDurable(queue, 1)).toBe(2);
           await stream.drain();
           const inspectable = active as unknown as RefreshInspectableManager;
-          await Promise.all(inspectable.refreshes.values());
+          await inspectable.queueRefreshes.settled();
           expect(refreshReads).toBe(0);
 
           await paused.drain();
           const staleInspectable = stale as unknown as RefreshInspectableManager;
-          await Promise.all(staleInspectable.refreshes.values());
+          await staleInspectable.queueRefreshes.settled();
           expect(stale.getJobs(queue)).toHaveLength(3);
         } finally {
           store.list = originalList;

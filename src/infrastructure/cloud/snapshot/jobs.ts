@@ -1,5 +1,6 @@
 import type { QueueManager } from '../../../application/queueManager';
 import { redactData } from '../redact';
+import { cloudTimestamp, optionalCloudTimestamp } from '../timestamps';
 import type { CloudSnapshot } from '../types';
 import type { RedactOptions } from '../types/redact';
 import type { CloudSnapshotSource } from '../queueAdapter/types';
@@ -71,10 +72,10 @@ function mapJobCore(
     state,
     data: safeData,
     priority: job.priority,
-    createdAt: job.createdAt,
-    startedAt: nullUndef(job.startedAt),
-    completedAt: nullUndef(job.completedAt),
-    runAt: job.runAt,
+    createdAt: cloudTimestamp(job.createdAt),
+    startedAt: optionalCloudTimestamp(job.startedAt),
+    completedAt: optionalCloudTimestamp(job.completedAt),
+    runAt: cloudTimestamp(job.runAt, cloudTimestamp(job.createdAt)),
     failedReason:
       state === 'active' && job.attempts > 0
         ? `Retry ${job.attempts}/${job.maxAttempts}`
@@ -103,7 +104,7 @@ function mapJobExtended(job: DomainJob): Partial<SnapshotJob> {
     childrenIds: job.childrenIds.length > 0 ? job.childrenIds.map(String) : undefined,
     dependsOn: job.dependsOn.length > 0 ? job.dependsOn.map(String) : undefined,
     childrenCompleted: posOrUndef(job.childrenCompleted),
-    lastHeartbeat: posOrUndef(job.lastHeartbeat),
+    lastHeartbeat: optionalCloudTimestamp(posOrUndef(job.lastHeartbeat)),
     stallCount: posOrUndef(job.stallCount),
     stallTimeout: nullUndef(job.stallTimeout),
     removeOnComplete: orUndef(job.removeOnComplete),

@@ -16,6 +16,10 @@ the public entry points are listed in [`README.md`](README.md).
 - A timeout, truncated frame, decode error, or I/O failure makes the current
   stream unusable. The next command may reconnect; it must not continue reading
   the old stream.
+- A zero `connect_timeout`, `command_timeout`, or per-call timeout is rejected
+  with `Error::Connection` before any socket opens; the socket layer refuses a
+  zero timeout only after connecting, which would open and drop a connection
+  on every call.
 - When a token is configured, `Auth` is the first exchange on every connection
   generation. Authentication failures are typed separately.
 - rustls verifies the certificate and requested host against system roots plus
@@ -61,6 +65,14 @@ the public entry points are listed in [`README.md`](README.md).
 - `batch_size` is clamped to `1..=1000`, poll timeout to `0..=30_000`, and a
   pull is bounded by concurrency. A lease must not wait outside the processor
   pool without heartbeat ownership.
+- A `lock_ttl_ms` of zero or less falls back to the 30000 ms default; the broker
+  would grant a lease that had already expired, so a job could be delivered
+  again while still running.
+- After a pull that found no jobs, `run` waits like the main client
+  (`pollTimeout > 0 ? 10 : drainDelay`): 50 ms with a poll timeout of 0
+  (non-blocking pull), 10 ms with a positive one. An idle worker never
+  re-polls with zero delay or every few milliseconds. `run_once` itself never
+  waits.
 - Each pulled job and lease token travel together into an owned worker thread.
   ACK/FAIL uses that exact token. `run_once` counts settled handler attempts;
   an acknowledged `already-finalized` no-op cannot replace the broker's

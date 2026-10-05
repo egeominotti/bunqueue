@@ -7,10 +7,13 @@ CLOSED -> failures >= threshold -> OPEN (worker paused)
 
 from __future__ import annotations
 
+import math
 import threading
 from typing import Any, Dict, Optional
 
+from ..durations import wait_seconds
 from ..worker import Worker
+from .validation import option
 
 
 class WorkerCircuitBreaker:
@@ -46,7 +49,10 @@ class WorkerCircuitBreaker:
     def on_failure(self) -> None:
         with self._lock:
             self._failures += 1
-            threshold = int(self._config.get("threshold") or 5)
+            # 0.2.0 reading: 0 means 5, int() coerces; math.inf never opens.
+            threshold = option(self._config, "threshold", None, 5)
+            if threshold != math.inf:
+                threshold = int(threshold)
             should_open = self._state == "half-open" or self._failures >= threshold
         if should_open:
             self._open()
@@ -57,12 +63,15 @@ class WorkerCircuitBreaker:
             failures = self._failures
             if self._timer:
                 self._timer.cancel()
-            reset_timeout = float(
-                self._config.get("reset_timeout") or self._config.get("resetTimeout") or 30000
-            )
-            self._timer = threading.Timer(reset_timeout / 1000.0, self._half_open)
-            self._timer.daemon = True
-            self._timer.start()
+            self._timer = None
+            reset_timeout = float(option(self._config, "reset_timeout", "resetTimeout", 30000))
+            # math.inf stays open until reset(); arming it crashed the Timer thread.
+            # NaN or a negative timeout half-opens at once, as in 0.2.0.
+            if reset_timeout != math.inf:
+                delay = wait_seconds(reset_timeout) if reset_timeout > 0 else 0.0
+                self._timer = threading.Timer(delay, self._half_open)
+                self._timer.daemon = True
+                self._timer.start()
         on_open = self._config.get("on_open") or self._config.get("onOpen")
         if on_open:
             on_open(failures)

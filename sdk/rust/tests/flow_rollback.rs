@@ -33,7 +33,8 @@ fn invalid_chain_is_rejected_atomically_without_visible_jobs() {
             queue_name: queue_name.clone(),
             data: Value::Map(Vec::new()),
             options: JobOptions {
-                attempts: Some(0),
+                // The broker refuses a negative timeout (attempts 0 is valid: one run).
+                timeout: Some(-1),
                 ..Default::default()
             },
         },

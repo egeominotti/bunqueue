@@ -1,6 +1,6 @@
 # Client SDK: Queue
 
-> **Category:** Client SDK · **Source:** `src/client/queue/queue.ts`, `src/client/queue/runtime/`, `src/client/queue/types/`, `src/client/queue/operations/`, `src/client/queue/job-proxy/`, `src/client/queue/dlq.ts`, `src/client/queue/addBatcher.ts`, `src/client/events.ts`, `src/client/queue-events/`, `src/client/types/events.ts`, `src/client/jobConversion.ts`, `src/client/jobWait.ts`, `src/client/job-wait/`, `src/client/manager.ts`, `src/client/queueGroup.ts`
+> **Category:** Client SDK · **Source:** `src/client/queue/queue.ts`, `src/client/queue/runtime/`, `src/client/queue/types/`, `src/client/queue/operations/`, `src/client/queue/job-proxy/`, `src/client/queue/dlq.ts`, `src/client/queue/backgroundCommand.ts`, `src/client/queue/addBatcher.ts`, `src/client/events.ts`, `src/client/queue-events/`, `src/client/types/events.ts`, `src/client/jobConversion.ts`, `src/client/jobWait.ts`, `src/client/job-wait/`, `src/client/manager.ts`, `src/client/queueGroup.ts`
 
 ## Purpose
 
@@ -39,6 +39,8 @@ Owns:
 - Job-add option translation: merging `defaultJobOptions`, injecting `__parentId`/`__parentQueue` into data, mapping public `JobOptions` to the embedded `manager.push` shape and to the compacted `PUSH`/`PUSHB` wire payload (`add.ts`).
 - Constructing the public `Job<T>` object via three builders — `createJobProxy` (TCP single add), `createSimpleJob` (embedded + TCP query results), and `toPublicJob`/`createPublicJob` (`jobProxy.ts`, `jobConversion.ts`). Conversion helpers receive grouped presentation metadata, including the effective `group.priority`, so name, data, priority, result, failure, token, and serialization fields cannot drift between construction paths.
 - Auto-batching `add()` calls into `PUSHB` in TCP mode (`addBatcher.ts`).
+- Reporting the failures of fire-and-forget commands sent by the synchronous
+  mutators (`backgroundCommand.ts`; see "Background command failures" below).
 - BullMQ Pro-compatible group admission and broker-authoritative group reads,
   overrides, pause/resume, and cleanup (`operations/groups.ts`,
   `runtime/queries.ts`).
@@ -47,9 +49,10 @@ Owns:
 - The one job wait behind `Queue.waitJobUntilFinished` and every
   `Job.waitUntilFinished` — jobs from `add`/`addBulk`, queries, FlowProducer,
   DLQ entries, and Worker/SandboxedWorker events (`client/jobWait.ts`, with
-  `client/job-wait/`: `session.ts`, `deadlineTimer.ts`, `readers.ts`,
-  `managerDispatch.ts`, `emitterDispatch.ts`, `brokerWait.ts`, `holdLimiter.ts`,
-  `readScheduler.ts`, `types.ts`).
+  `client/job-wait/`: `session.ts`, `readers.ts`, `managerDispatch.ts`,
+  `emitterDispatch.ts`, `brokerWait.ts`, `holdLimiter.ts`, `readScheduler.ts`,
+  `types.ts`; the deadline timer is `safeDeadline` from
+  [`shared/timers.ts`](./shared-timers.md)).
 - BullMQ-compatible error classes `UnrecoverableError` / `DelayedError` (`errors.ts`).
 
 Does NOT own:
@@ -119,7 +122,8 @@ delayed), while active depth is separate. Public `JobOptions.group` accepts
 pending-depth admission check atomic for single, bulk, and flow adds.
 
 Control (`queue/runtime/control.ts`, `queue/operations/control.ts`): `pause()`,
-`resume()`, `drain()`, `obliterate()` (all sync, fire-and-forget),
+`resume()`, `drain()`, `obliterate()` (all sync, fire-and-forget; a failure is
+reported, see "Background command failures"),
 `pauseAsync()`, `resumeAsync()`, `drainAsync()` (resolves with the removed
 count), `obliterateAsync()`, `isPaused()` / `isPausedAsync()`,
 `waitUntilReady()`.
@@ -167,6 +171,33 @@ worker failure path. `moveJobToDelayed(id, timestamp)` takes an **absolute**
 timestamp; embedded routes waiting/active jobs via
 `changeWaitingDelay`/`changeDelay`, while the TCP path sends `MoveToDelayed`
 with `delay = max(0, timestamp - now)` and surfaces `ok:false` as an error.
+Both modes first check the arguments with the broker's validators
+(`queue/commandArgs.ts`): `moveToDelayed` needs a finite `timestamp` or its plain decimal string (a past one means
+now), `changeJobDelay`/`job.changeDelay` a finite `delay` (a negative one makes the job
+ready at once with a past run time, as on 2.9.10), and `extendJobLock`/`job.extendLock` a finite `duration` (any
+sign, as the broker applies it; `extendLock(token, 0)` resolves 0, as on 2.9.10). They
+throw the message a TCP command returns for NaN or an infinity, because several TCP
+paths ignore the reply.
+`changeJobDelay`, `changeJobPriority` and `extendJobLock` live in
+`queue/operations/jobSetters.ts` (re-exported by `management.ts`). Every TCP
+`changePriority`/`changeJobPriority` path reads the reply (`assertPriorityChanged`): a
+job that is not queued is not changed, as in embedded mode, and any other rejection (a
+NaN or non-numeric priority) throws; the reply used to be ignored. A missing priority is
+0 and a non-boolean `lifo` is normalized to a boolean, as on PUSH. `updateProgress` goes
+through `progressUpdate` (`normalizeProgress`) on every job object and never throws for
+the value: object progress is sent as `0` plus its JSON as the message (as
+`Queue.updateJobProgress` and flow jobs already did), NaN is 0, `'50'`/`true`/`null` are
+50/1/0 and other text is 0 with the text as the message, as 2.9.10 stored them.
+`clearJobLogs`/`job.clearLogs` read the `ClearLogs` reply on every TCP path
+(`assertLogsCleared`), so an invalid `keepLogs` throws the broker's message as it does
+embedded, and the TCP Job from `Queue.add` forwards `keepLogs` (it used to drop it and
+clear every entry). `updateJobData` throws the broker's message for a job it cannot
+update, while `changeJobDelay`, `promoteJob`, `updateJobProgress` and `changeJobPriority`
+resolve without change, in both modes (2.9.10's result), and every TCP path reads the
+reply; see the setter outcome table in [Job Options Validation](./job-options-validation.md).
+`updateJobProgress` maps progress with `progressUpdate` like the job objects and never
+throws for the value. `upsertJobScheduler` reports a refused schedule as 2.9.10 did:
+embedded mode throws the reason, TCP mode resolves `null`.
 
 Stall and DLQ configuration live in `queue/runtime/configuration.ts`, backed by
 `queue/stall.ts`, `queue/dlq.ts`, and `queue/dlqOps.ts`:
@@ -238,7 +269,26 @@ without the intended token or TLS. The message names the keys and points to
 warms `getSharedManager(opts.dataPath)` and leaves `tcpPool` / `addBatcher`
 null. TCP mode reuses the shared pool for the default unauthenticated
 four-connection case, otherwise creates a dedicated `TcpConnectionPool`. The
-`AddBatcher` is created unless `autoBatch.enabled === false`.
+`AddBatcher` is created unless batching is disabled; `resolveAutoBatchConfig`
+(`addBatcher.ts`) resolves the options, keeping every result 2.9.10 had:
+
+- `enabled`: a boolean, or a recognized word or number with its meaning (`'false'`,
+  `0`, `'0'` disable; `'true'`, `1`, `'1'` enable; any case, trimmed). `null` and
+  `undefined` mean enabled. Anything else keeps batching enabled, the 2.9.10 result
+  (it disabled only for `false`), and logs one `console.warn` naming the value.
+- `maxSize` (default 50): the flush threshold is `pending >= maxSize`, so a value below
+  1 flushes every add, as 1 does, and is stored as 1; a fraction rounds up; `Infinity`,
+  NaN or a non-number (`pending >= NaN` is never true) and a value above
+  `Number.MAX_SAFE_INTEGER` never flush by size and are stored as `Infinity` (the idle
+  flush, the `maxDelayMs` window and the 10000-entry `maxPending` bound still apply).
+- `maxDelayMs` (default 5): a finite number >= 0, honoured exactly even beyond the
+  native timer limit. A negative value, NaN, `Infinity` or a non-number is 0: 2.9.10's
+  timer ran each of them after ~1 ms, an immediate flush.
+- A numeric string (plain decimal digits) is that number (`tcp/numeric.ts`). Nothing
+  in `autoBatch` throws.
+
+With `enabled: false` (or its word) the other two are not read. Embedded mode does not
+read `autoBatch`.
 
 The embedded manager is process-wide. Its first effective `dataPath` is
 resolved to a canonical absolute file identity (`:memory:` remains a distinct
@@ -251,8 +301,13 @@ client and call `shutdownManager()` first. Concurrent databases require
 separate processes or TCP brokers.
 
 **add()** (`queue/operations/add/single.ts`): merges `defaultJobOptions` then
-per-call `opts`, injects `__parentId` / `__parentQueue` when a parent is set,
-and maps to `manager.push` in embedded mode. TCP uses `buildPushPayload` from
+per-call `opts`, validates the bounded options with the broker's
+`validateJobOptions` under their wire names (`add/validation.ts`, see
+[Job Options Validation](./job-options-validation.md)) and throws the same message
+a TCP `PUSH` returns, injects `__parentId` / `__parentQueue` when a parent is set,
+and maps to `manager.push` in embedded mode. In TCP mode `Queue.add` runs the same
+check before handing the add to the `AddBatcher`, so an invalid add rejects on its
+own instead of failing its whole `PUSHB` batch. TCP uses `buildPushPayload` from
 `add/payload.ts`, throws on `!response.ok`, and builds a live job through the
 split proxy modules under `queue/job-proxy/`. A `parent` option is authoritative:
 the broker locks both queue shards, persists the child and parent edge together,
@@ -260,7 +315,8 @@ and moves the existing pending parent to `waiting-children` before the child is
 visible. A non-linkable parent rejects the add without publishing the child.
 
 **addBulk()** (`queue/operations/add/bulk.ts`): returns `[]` immediately for an
-empty input and merges defaults once per job. Embedded uses
+empty input and merges defaults once per job, then validates every job and throws
+`jobs[i]: <error>` (the `PUSHB` message) before anything is sent or admitted. Embedded uses
 `manager.pushBatch`; TCP sends one `PUSHB`. A non-ok response throws so the
 batcher rejects every caller; an ok response with zero IDs is a legitimate
 empty result. Parent references are preflighted for the complete batch while
@@ -270,8 +326,13 @@ under that parent's shard lock, so concurrent adds cannot overwrite an edge.
 
 **Job object construction.** `queue/job-proxy/tcp.ts` builds a TCP-backed job;
 `queue/job-proxy/simple.ts` builds the dual-mode form used by query results;
-`queue/job-proxy/reflection.ts` derives reflected option fields. Public
-conversion lives in `client/jobConversion.ts`. Full DLQ entries use
+`queue/job-proxy/reflection.ts` derives reflected option fields. The job returned by
+`add`/`addBulk` reflects its options through `reflectionMeta`
+(`queue/operations/add/payload.ts`), which reports a negative `delay` as 0 in
+`job.delay` and `job.opts.delay`, as a job read back from the broker does (the broker
+keeps the past run time, so the job is ready at once in both modes, see
+[Job Options Validation](./job-options-validation.md)).
+Public conversion lives in `client/jobConversion.ts`. Full DLQ entries use
 `queue/dlqJobMethods.ts` so broker-returned jobs keep live methods rather than
 detached placeholders. Each of these builders, the FlowProducer job
 (`client/flowJobMoveMethods.ts`), and Worker/SandboxedWorker event jobs
@@ -304,7 +365,7 @@ zero.
 
 `Queue` itself takes no shard/job locks; in embedded mode all locking happens inside `QueueManager` (see [Concurrency & Locking](./concurrency-and-locking.md)). The client-side concurrency surface is the `AddBatcher`:
 
-- **Strategy** (`addBatcher.ts:61`): if no flush is in flight, flush immediately (zero latency for sequential `await`); if a flush is in flight, buffer until `maxSize` or a `maxDelayMs` timer fires. After each flush completes, accumulated items are drained immediately (`doFlush` loops while `pending.length > 0`, `addBatcher.ts:108`).
+- **Strategy** (`addBatcher.ts`): if no flush is in flight, flush immediately (zero latency for sequential `await`); if a flush is in flight, buffer until `maxSize` or a `maxDelayMs` timer fires. The window timer is a `safeTimeout`, so a `maxDelayMs` above 2^31 - 1 ms no longer fires after ~1 ms. After each flush completes, accumulated items are drained immediately (`doFlush` loops while `pending.length > 0`, `addBatcher.ts:108`).
 - **In-flight tracking**: `triggerFlush` registers each flush promise in
   `inFlightFlushes`; `disconnect()` in `queue/runtime/connection.ts` calls
   `flush()` then `waitForInFlight()` before closing.
@@ -319,6 +380,32 @@ zero.
   batcher rejects queued callers (e.g. auth failure) rather than resolving them
   with `undefined` jobs (`operations/add/single.ts:109-113`,
   `operations/add/bulk.ts:130-133`).
+- **Background command failures** (`backgroundCommand.ts`): the synchronous
+  mutators cannot await their round trip, so they send through
+  `sendInBackground` (or `runInBackground` for embedded `cancel`/`discard`
+  promises). This covers `pause`, `resume`, `drain`, `obliterate`, `remove`,
+  `setStallConfig`, `setDlqConfig`, `retryDlq`, `retryDlqByFilter`, `purgeDlq`,
+  `retryCompleted`, `setGlobalConcurrency`, `removeGlobalConcurrency`,
+  `setGlobalRateLimit`, `removeGlobalRateLimit`, and `job.discard()` on every job
+  builder, including DLQ entries. A rejection (broker unreachable, `Command
+  timeout` after `commandTimeout`, `Connection pool is closed` for a call made
+  after `close()`, or an embedded lock or storage error) never becomes an unhandled
+  rejection, which would end a Bun process. It becomes a `BackgroundCommandError`
+  (`name` `BackgroundCommandError`, `context` `'background-command'`, `command` (the
+  TCP command name, `Cancel`/`Discard` for embedded ones), `queue` (the prefixed
+  key), and `cause`). That error goes to the Queue's background-error listener
+  when one takes it: `Queue` has no `error` event of its own, so only Simple Mode
+  registers one, through `setBackgroundErrorListener` (a `WeakMap` keyed by the
+  Queue, consulted when the failure arrives through the stable
+  `onBackgroundError` router that `runtime/state.ts` puts on every operation
+  context). Otherwise it becomes one `console.error` line:
+  `[bunqueue] <command> for queue "<queue>" failed in the background: <reason>`.
+  If the listener throws, the line also names the listener's error. Reporting
+  never throws. A `ClientClosedError` (the command was still pending when the
+  caller closed the client) is not reported, matching the process-wide filter in
+  `tcp/errors.ts`. A server reply with `ok: false` is not a rejection and stays
+  ignored by these forms. The `...Async` variants are unchanged: they reject to
+  their caller, so use them when the outcome matters.
 - **Synchronous TCP boundaries**: `getJobs`/`getWaiting`/… (sync) return `[]`, `count()` returns `0`, `getCountsPerPriority()` returns `{}`, and `isPaused()` returns `false` in TCP mode because their signatures cannot await a round trip. Use the corresponding `Async` variants for authoritative remote results. The same rule applies to synchronous DLQ reads and fire-and-forget mutation forms; use `getDlqAsync`, `getDlqStatsAsync`, `retryDlqAsync`, `retryDlqByFilterAsync`, `purgeDlqAsync`, and `retryCompletedAsync` when the result matters. Selective `removeDlqJob` is deliberately Promise-based even without the suffix, and `removeDlqJobAsync` is its explicit alias. Limit getters, worker discovery, dependency methods, deduplication methods, and `moveToWaitingChildren` are asynchronous and now query or mutate the selected broker runtime directly.
 - **Detached conversion helpers**: broker-returned `Job` instances always receive a complete live operation context. Low-level callers that invoke `createPublicJob` without a context receive only detached fallback behavior and must not treat that helper as a broker client.
 - **Idempotency**: `jobId`/`deduplication.id` make `add` idempotent (custom-id dedup, server-side, only while the job is live: completion or the DLQ releases the id). `forward()` uses deterministic remote ids (`fwd:<queue>:<localId>`) so re-forwards don't duplicate (see [Store-and-Forward](./store-and-forward.md)).
@@ -348,11 +435,11 @@ zero.
     (with QueueEvents) or `waitUntilFinished timed out after <ttl>ms` (without).
     A TTL of any length holds: Bun and Node.js accept a timer delay of at most
     2^31 - 1 ms (about 24.8 days) and fire a longer one after 1 ms, so the
-    deadline (an absolute epoch-ms `WaitLimit.deadline`) is armed in chunks of at
-    most 24 days (`DEADLINE_CHUNK_MS`, `armDeadlineTimer` in
-    `job-wait/deadlineTimer.ts`). Each chunk measures what remains against
-    `Date.now()`, so clock drift does not accumulate across chunks and the
-    deadline never fires early; the session keeps the chunk armed now, and
+    deadline (an absolute epoch-ms `WaitLimit.deadline`) is armed with
+    `safeDeadline` ([Shared Timers](./shared-timers.md)) in chunks of at most
+    2^31 - 1 ms. Each chunk, the last one included, measures what remains
+    against `Date.now()`, so clock drift does not accumulate across chunks and
+    the deadline never fires early; the session keeps the chunk armed now, and
     settling clears it (`test/job-wait-long-deadline.test.ts`,
     `test/repro-wait-long-ttl.test.ts`).
   - **Embedded**: every wait registers with one subscription per manager
@@ -434,9 +521,24 @@ zero.
     before the wait saw that event, including a job missing when the wait starts
     (BullMQ rejects with "Missing key" there). The outcome of such a job is
     unknown, so the wait reports neither a result nor a failure reason. Over TCP
-    with QueueEvents a `Job not found` read is confirmed through a fresh
-    `waitUntilReady()` round trip on the event connection first, so a
-    `completed` event already sent for a job removed on completion still wins.
+    a state read that finds no job first asks the broker's completion lookup
+    (`WaitJob` with a 0 ms hold, the lookup a hold uses; `brokerReader` in
+    `job-wait/readers.ts`). A broker that retains the completion of a job removed
+    on completion (PostgreSQL keeps a completion tombstone) answers with the
+    result, and the wait settles on it; `completed: false` (a job back under the
+    same custom ID) keeps waiting, a transient refusal is retried, and any other
+    reply counts as not found, as the state read did. The outcome depends on
+    the broker's state only, not on whether a hold or a scheduled read reaches it
+    first. Before, the read path said `not found` while a hold on the same broker
+    returned the result: with 64 waits per connection and 40 hold slots, a queued
+    wait whose read was served after the removal rejected
+    (`postgres-public-api-extreme`, 256 remote waiters, flaked this way under
+    load; `test/repro-job-wait-removed-on-complete.test.ts`). Memory and SQLite
+    retain nothing for a job removed on completion, so such a job still settles
+    as not found there. Over TCP with QueueEvents a `Job not found` read is then
+    confirmed through a fresh `waitUntilReady()` round trip on the event
+    connection, so a `completed` event already sent for a job removed on
+    completion still wins.
   - **Errors**: a read that fails for a transient reason (the broker's
     `Rate limit exceeded`, `Command timeout`, `Connection lost`, `Not
     connected`; `isTransientError` in `job-wait/types.ts`) says nothing about
@@ -468,7 +570,8 @@ zero.
     acked 3 s after the broker returned resolved its waits 19 s later. A job
     removed on completion whose `completed` event the wait missed (it completed
     before the wait started, or while a TCP QueueEvents was disconnected)
-    reports `Job <id> not found`, because its result is not retained. A
+    reports `Job <id> not found` on memory and SQLite, because its result is not
+    retained; over TCP to a PostgreSQL broker it settles on the retained result. A
     `QueueManager` shut down directly (`manager.shutdown()` instead of
     `shutdownManager()`) sends no shutdown signal, so its waits settle from their
     next read. An emitter whose `on()` throws for an event name loses only that
@@ -553,7 +656,7 @@ unaffected.
 `port = 6789`. Timeout, ping, pipelining, and in-flight defaults are owned by
 the transport — see [Client Transport](./client-transport.md).
 
-`AutoBatchOptions`: `enabled` default true for TCP / disabled for embedded, `maxSize = 50`, `maxDelayMs = 5`.
+`AutoBatchOptions`: `enabled` default true for TCP / disabled for embedded (must be a boolean), `maxSize = 50` (a positive integer), `maxDelayMs = 5` (a finite number of ms >= 0).
 
 Embedded data path env precedence (via `getSharedManager`): `BUNQUEUE_DATA_PATH > BQ_DATA_PATH > DATA_PATH > SQLITE_PATH`. The environment is read only when a fresh manager is created; `shutdownManager()` resets both the manager and its path identity. `StallConfig` defaults (TCP cache + fallback): `enabled: true`, `stallInterval: 30000`, `maxStalls: 3`, `gracePeriod: 5000` (`stall.ts:16`).
 

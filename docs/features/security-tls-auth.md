@@ -1,6 +1,6 @@
 # Security: TLS, Auth, CORS
 
-> **Category:** Infrastructure · **Source:** `src/infrastructure/server/tls.ts`, `src/client/resolveToken.ts`, `src/shared/webhookValidation.ts`, `src/config/resolve.ts`, `src/infrastructure/server/http.ts`, `src/infrastructure/server/tcp.ts`, `src/infrastructure/server/handler.ts`, `src/client/tcp/connection.ts`, `src/shared/hash.ts`, `src/application/webhookManager.ts`, `src/infrastructure/cloud/httpSender.ts`
+> **Category:** Infrastructure · **Source:** `src/infrastructure/server/tls.ts`, `src/client/resolveToken.ts`, `src/shared/webhookValidation.ts`, `src/config/resolve.ts`, `src/config/auth.ts`, `src/infrastructure/server/http.ts`, `src/infrastructure/server/tcp.ts`, `src/infrastructure/server/handler.ts`, `src/client/tcp/connection.ts`, `src/shared/hash.ts`, `src/application/webhookManager.ts`, `src/infrastructure/cloud/httpSender.ts`
 
 ## Purpose
 
@@ -49,22 +49,31 @@ Exported functions / types:
 
 ```typescript
 // src/infrastructure/server/tls.ts
-interface TlsServerOptions { certFile: string; keyFile: string; }
+interface TlsServerOptions {
+  certFile: string;
+  keyFile: string;
+}
 function loadTlsOptions(tls: TlsServerOptions): { cert: BunFile; key: BunFile };
 
 // src/config/resolve.ts
-function resolveTlsServerOptions(config: { tlsCertFile?: string; tlsKeyFile?: string })
-  : { certFile: string; keyFile: string } | null;
+function resolveTlsServerOptions(config: {
+  tlsCertFile?: string;
+  tlsKeyFile?: string;
+}): { certFile: string; keyFile: string } | null;
 
 // src/client/resolveToken.ts
 function resolveToken(explicitToken: string | undefined): string | undefined;
 
 // src/client/tcp/types.ts
-interface ClientTlsOptions { rejectUnauthorized?: boolean; caFile?: string; }
+interface ClientTlsOptions {
+  rejectUnauthorized?: boolean;
+  caFile?: string;
+}
 
 // src/client/tcp/connection.ts
-function buildClientTls(tls: boolean | ClientTlsOptions | undefined)
-  : true | Record<string, unknown> | undefined;
+function buildClientTls(
+  tls: boolean | ClientTlsOptions | undefined
+): true | Record<string, unknown> | undefined;
 
 // src/shared/webhookValidation.ts
 function validateWebhookUrl(url: string): string | null; // null = valid
@@ -120,15 +129,34 @@ Events emitted (via `queueManager.emitDashboardEvent`):
 
 ### HTTP auth gate
 
-`authTokens` is a `Set` built from config (`http.ts:65-68`). `checkAuth` (`http.ts:38-46`): if the set is empty it returns `null` (open server); otherwise it strips the `Bearer ` prefix from `Authorization` and runs `validateAuthToken`, which loops the valid tokens comparing each with `constantTimeEqual` (`http.ts:26-35`). On mismatch it returns a `401 { ok:false, error:'Unauthorized' }`. The gate is applied per-endpoint as described in Public Interface; the catch-all gate at `http.ts:197-204` also emits `auth:failed`.
+`authTokens` is a `Set` built from config (`http.ts:72`). `checkAuth` (`http.ts:43-51`): if the set is empty it returns `null` (open server); otherwise it strips the `Bearer ` prefix from `Authorization` (a missing header reads as `''`) and runs `validateAuthToken` (`http.ts:28-41`). That returns `false` at once for a blank presented token (empty or whitespace-only, `isBlankToken` in `src/config/auth.ts`), then loops the valid tokens, skipping blank ones, comparing the trimmed presented token with each trimmed configured one with `constantTimeEqual`. On mismatch `checkAuth` returns a `401 { ok:false, error:'Unauthorized' }`. The gate is applied per-endpoint as described in Public Interface; the catch-all gate at `http.ts:203-210` also emits `auth:failed`.
+
+### Blank tokens are never credentials
+
+An empty token in the set used to match the `''` of a request without `Authorization`, so every anonymous HTTP request was authenticated (and a TCP `Auth` with `token: ''`, or with a non-string token, was accepted). It reached the set from a config file such as `tokens: [process.env.API_TOKEN ?? '']` with the variable unset. Every source now refuses a blank token at startup:
+
+- `auth.tokens` (config file): an empty or whitespace-only entry is an error naming it, `auth.tokens[0] must not be empty or whitespace-only (got "")`, and so is an entry that is not a string (`[process.env.API_TOKEN!]` with the variable unset): `auth.tokens[0] must be a non-empty string (got undefined)` (`src/config/schemaFields.ts`). Valid entries are trimmed, like `AUTH_TOKENS`.
+- `AUTH_TOKENS` and `bunqueue start --auth-tokens`: both go through `parseTokenList` (`src/config/auth.ts`). The value is split on commas, each entry is trimmed, and empty entries (stray or trailing commas) are dropped. An unset or empty `AUTH_TOKENS` means no tokens. A value that yields no token at all (`,`, `,`) is an error naming its source, `Invalid AUTH_TOKENS: "," (expected a comma-separated list of non-empty tokens)` or `Invalid --auth-tokens: ...`. Before, `--auth-tokens ,` produced `auth.tokens: []`, which replaced `AUTH_TOKENS` and started the server with auth disabled.
+- `auth.tokens: []` is still accepted and means "no auth"; the file wins over `AUTH_TOKENS`, and the flag wins over the file.
+
+The HTTP and TCP checks refuse blank tokens again at request time as a second line of defense.
+
+### Both sides are compared trimmed
+
+Configured tokens are trimmed (`AUTH_TOKENS`, `--auth-tokens`, `auth.tokens`), and the
+`Auth` command (TCP and WebSocket) and the HTTP check trim the presented token too.
+A secret read from a file with a trailing newline (`AUTH_TOKENS=$'s3cret\n'`) by the
+server and by its clients (`token: "s3cret\n"`) authenticated on 2.9.10, which compared
+both raw; trimming only the configured side would have locked every such client out.
+Only surrounding whitespace is ignored; a blank token never matches.
 
 ### TCP auth gate
 
-On `open`, `authenticated` is initialized to `authTokens.size === 0` — i.e. auto-authenticated when no tokens are configured (`TcpConnectionRegistry.init`, `tcp/connections.ts:27-48`). In `handleCommand` (`handler.ts:48-60`): `Auth` is always routed to `handleAuth`; any other command is rejected with `error('Not authenticated')` when tokens exist and the connection is not yet authenticated. `handleAuth` (`handler.ts:30-43`) compares the supplied token against each configured token with `constantTimeEqual`, sets `ctx.authenticated = true` on the first match, and emits `auth:failed` otherwise.
+On `open`, `authenticated` is initialized to `authTokens.size === 0` — i.e. auto-authenticated when no tokens are configured (`TcpConnectionRegistry.init`, `tcp/connections.ts:27-48`). In `handleCommand` (`handler.ts:55-67`): `Auth` is always routed to `handleAuth`; any other command is rejected with `error('Not authenticated')` when tokens exist and the connection is not yet authenticated. `handleAuth` (`handler.ts:29-50`, also used by WebSocket clients) requires the supplied token to be a non-blank string, compares it trimmed against each non-blank configured token (trimmed) with `constantTimeEqual`, sets `ctx.authenticated = true` on the first match, and otherwise emits `auth:failed` and returns `Invalid token` (a missing or non-string token included).
 
 ### CORS
 
-`corsOrigins` is a `Set` (`http.ts:65-68`). `getCorsOrigin()` returns `'*'` if the set contains `'*'`, else the comma-joined origins (`http.ts:87-88`). `OPTIONS` preflights return 204 from `corsResponse` with `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`, `Access-Control-Allow-Headers: Content-Type, Authorization`, and `Access-Control-Max-Age: 86400` (`httpEndpoints.ts:32-45`). `withCors` attaches `Access-Control-Allow-Origin` to out-of-pipeline responses (health/prometheus/debug) without overwriting an origin the endpoint already set (`http.ts:89-99`).
+`corsOrigins` is a `Set` (`http.ts:73`). `getCorsOrigin()` returns `'*'` if the set contains `'*'`, else the comma-joined origins (`http.ts:94`). `OPTIONS` preflights return 204 from `corsResponse` with `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`, `Access-Control-Allow-Headers: Content-Type, Authorization`, and `Access-Control-Max-Age: 86400` (`httpEndpoints.ts:32-45`). `withCors` attaches `Access-Control-Allow-Origin` to out-of-pipeline responses (health/prometheus/debug) without overwriting an origin the endpoint already set (`http.ts:95-105`).
 
 ### Webhook SSRF validation
 
@@ -147,7 +175,7 @@ No queue locks are taken in this module. The only per-connection mutable securit
 
 - **TLS all-or-nothing:** exactly one of cert/key set → startup throw + `process.exit(1)` (`resolve.ts:75-91`, `bootstrap.ts:114-121`). Missing file at a configured path → throw at server creation before bind (`tls.ts:22-29`).
 - **Open server:** with no `AUTH_TOKENS`, HTTP `checkAuth` returns null for everything and TCP connections start pre-authenticated. `/gc` and `/heapstats` then have **no** auth (known gotcha — debug endpoints lack auth unless tokens are configured).
-- **CORS default discrepancy:** `createHttpServer` defaults to `['*']` only when `corsOrigins` is `undefined` (`http.ts:65-68`). The server bootstrap always passes an array, and an unset `CORS_ALLOW_ORIGIN` resolves to `[]` (`resolve.ts:51`) → empty Set → `getCorsOrigin()` returns the empty string, so `Access-Control-Allow-Origin` is `""` rather than `*`. The permissive `*` default applies only to direct `createHttpServer` calls.
+- **CORS default discrepancy:** `createHttpServer` defaults to `['*']` only when `corsOrigins` is `undefined` (`http.ts:73`). The server bootstrap always passes an array, and an unset `CORS_ALLOW_ORIGIN` resolves to `[]` (`resolve.ts:51`) → empty Set → `getCorsOrigin()` returns the empty string, so `Access-Control-Allow-Origin` is `""` rather than `*`. The permissive `*` default applies only to direct `createHttpServer` calls.
 - **constantTimeEqual length leak:** it folds `a.length ^ b.length` into the result and iterates over `minLen`, so it compares content in constant time for equal-length inputs but does reveal a length mismatch via early divergence — acceptable for fixed-format tokens.
 - **Token compare is O(validTokens):** every check loops all configured tokens; intended for small token lists.
 - **Webhook delivery:** fire-and-forget with up to `WEBHOOK_MAX_RETRIES` attempts (default 3), linear backoff `WEBHOOK_RETRY_DELAY_MS * (attempt+1)` (default 1000ms), and a 10s per-request `AbortSignal.timeout` (`webhookManager.ts:142-171`). Signature is computed once and reused across retries.
@@ -156,20 +184,20 @@ No queue locks are taken in this module. The only per-connection mutable securit
 
 ## Configuration
 
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `TLS_CERT_FILE` | unset | PEM cert/chain path. Both or neither with key, else startup error. |
-| `TLS_KEY_FILE` | unset | PEM private-key path. |
-| `AUTH_TOKENS` | unset → `[]` | Comma-separated bearer tokens; empty = open server. |
-| `METRICS_AUTH` | `false` | When `true`, `/prometheus` requires a valid token; an empty `AUTH_TOKENS` set returns 503 instead of exposing metrics. |
-| `CORS_ALLOW_ORIGIN` | unset → `[]` | Comma-separated allowed origins; via bootstrap an unset value yields empty `Access-Control-Allow-Origin`. |
-| `BQ_TOKEN` | unset | Client/CLI token fallback (after explicit `connection.token`). |
-| `BUNQUEUE_TOKEN` | unset | Client/CLI token fallback (after `BQ_TOKEN`). |
-| `WEBHOOK_MAX_RETRIES` | `3` | Webhook delivery attempts. |
-| `WEBHOOK_RETRY_DELAY_MS` | `1000` | Base linear-backoff delay between webhook retries. |
-| `BUNQUEUE_CLOUD_SIGNING_SECRET` | unset | HMAC-SHA256 key for Cloud uploads (`X-Signature`). |
+| Variable                        | Default      | Effect                                                                                                                                                                                                                                                                                       |
+| ------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TLS_CERT_FILE`                 | unset        | PEM cert/chain path. Both or neither with key, else startup error.                                                                                                                                                                                                                           |
+| `TLS_KEY_FILE`                  | unset        | PEM private-key path.                                                                                                                                                                                                                                                                        |
+| `AUTH_TOKENS`                   | unset → `[]` | Comma-separated bearer tokens, each trimmed; stray commas are ignored. Unset or empty = open server; a value with no token (`,`) is a startup error.                                                                                                                                         |
+| `METRICS_AUTH`                  | `false`      | When true (`1`, `true`, `yes`, `on`, any case), `/prometheus` requires a valid token; an empty `AUTH_TOKENS` set returns 503 instead of exposing metrics, as in 2.9.10, and the server logs a startup warning. Another word keeps it off, with a startup warning (2.9.10 compared `'true'`). |
+| `CORS_ALLOW_ORIGIN`             | unset → `[]` | Comma-separated allowed origins; via bootstrap an unset value yields empty `Access-Control-Allow-Origin`. The file's `cors.origins` takes an array or the same comma-separated string; `undefined`/`null`/`''` entries are dropped with a warning.                                           |
+| `BQ_TOKEN`                      | unset        | Client/CLI token fallback (after explicit `connection.token`).                                                                                                                                                                                                                               |
+| `BUNQUEUE_TOKEN`                | unset        | Client/CLI token fallback (after `BQ_TOKEN`).                                                                                                                                                                                                                                                |
+| `WEBHOOK_MAX_RETRIES`           | `3`          | Webhook delivery attempts.                                                                                                                                                                                                                                                                   |
+| `WEBHOOK_RETRY_DELAY_MS`        | `1000`       | Base linear-backoff delay between webhook retries.                                                                                                                                                                                                                                           |
+| `BUNQUEUE_CLOUD_SIGNING_SECRET` | unset        | HMAC-SHA256 key for Cloud uploads (`X-Signature`).                                                                                                                                                                                                                                           |
 
-Client SDK options: `connection.token`, `connection.tls = true | { caFile } | { rejectUnauthorized }`. Webhook `secret` (per-webhook) enables `X-Webhook-Signature`. CLI: `--auth-tokens <list>`, `--token`, plus `--tls`/CA flags.
+Client SDK options: `connection.token`, `connection.tls = true | { caFile } | { rejectUnauthorized }`. Webhook `secret` (per-webhook) enables `X-Webhook-Signature`. CLI: `--auth-tokens <list>` (parsed like `AUTH_TOKENS`, errors name the flag), `--token`, plus `--tls`/CA flags.
 
 ## Related Docs
 

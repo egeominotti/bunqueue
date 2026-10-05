@@ -28,6 +28,9 @@ require __DIR__ . '/e2e-edge.php';
 require __DIR__ . '/e2e-spec.php';
 require __DIR__ . '/e2e-production.php';
 require __DIR__ . '/e2e-hardening.php';
+require __DIR__ . '/e2e-durations.php';
+require __DIR__ . '/e2e-clamps.php';
+require __DIR__ . '/e2e-compat.php';
 
 $count = \count($GLOBALS['__bq_tests']);
 echo "collected {$count} shared-server tests + 2 auth tests\n\n";

@@ -51,7 +51,8 @@ export interface SerializedJob extends SerializedJobOptions {
   progress: number;
   attempts: number;
   maxAttempts: number;
-  createdAt: string;
+  /** ISO time; null for a legacy creation time outside the JavaScript Date range. */
+  createdAt: string | null;
   startedAt?: string;
 }
 

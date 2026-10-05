@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A negative `PollTimeoutMs` (non-blocking pulls) no longer spins: the worker
+  sent about 10,000 `PULLB` per second to an empty queue. It now waits 50 ms
+  after an empty non-blocking pull, the main client's default `drainDelay`.
+- A short long poll no longer re-polls an empty queue hundreds of times per
+  second: with `PollTimeoutMs: 1` the worker sent about 705 `PULLB` per second.
+  Like the main client (`pollTimeout > 0 ? 10 : drainDelay`), it now waits
+  10 ms after an empty long poll (about 77 per second at 1 ms).
+- `Stop` now ends `Run` promptly even while the pull loop is waiting. The
+  waits were plain sleeps, and `Run` returned only after they ended:
+  - the empty-pull wait (10/50 ms; measured 47 ms);
+  - the error backoff (0.5–5 s; measured 480 ms);
+  - the 20 ms wait while every slot is busy.
+
+  Each wait now selects on the worker's stop channel and a timer, stopping the
+  timer when stop wins. `Run` returns in under 1 ms.
+- A positive `HeartbeatIntervalS` below 1 ns, or above the `time.Duration`
+  range on amd64, no longer panics `time.NewTicker` inside `Run()`. The period
+  is clamped to [1 ms, max `time.Duration`], and `HeartbeatIntervalS()` reports
+  the effective value.
+- A negative `LockTtlMs` uses the 30000 ms default instead of reaching the
+  broker, which granted a lease that had already expired, so a job could be
+  delivered again while it was still running.
+- A negative `Options.ConnectTimeout` or `Options.CommandTimeout` uses its
+  default instead of a deadline in the past, which failed every dial, or timed
+  out every command and reconnected once per call.
+
 ## [0.2.0] - 2026-10-02
 
 Breaking: `Job.Data()` now returns `any` (it was `map[string]any`) and invalid

@@ -5,6 +5,7 @@
 
 import { existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { ConfigError } from './numbers';
 import type { BunqueueConfig } from './types';
 
 const CONFIG_FILENAMES = ['bunqueue.config.ts', 'bunqueue.config.js', 'bunqueue.config.mjs'];
@@ -14,7 +15,7 @@ export async function loadConfigFile(explicitPath?: string): Promise<BunqueueCon
   if (explicitPath) {
     const abs = resolve(explicitPath);
     if (!existsSync(abs)) {
-      throw new Error(`Config file not found: ${abs}`);
+      throw new ConfigError([`Config file not found: ${abs}`]);
     }
     return importConfig(abs);
   }

@@ -1,12 +1,18 @@
 /**
  * Bunqueue — Graceful Job Cancellation
  * AbortController-based cancellation with optional grace period.
+ *
+ * Grace periods are armed with `safeTimeout` and compared on the same monotonic clock,
+ * so one longer than the runtime's timer limit (about 24.8 days) aborts at its
+ * deadline instead of after about 1 ms. `Bunqueue.cancel()` validates the value.
  */
+
+import { safeTimeout, type SafeTimer } from '../../shared/timers';
 
 interface CancellationRegistration {
   readonly jobId: string;
   readonly controller: AbortController;
-  timer: ReturnType<typeof setTimeout> | null;
+  timer: SafeTimer | null;
   deadline: number | null;
 }
 
@@ -46,11 +52,11 @@ export class CancellationManager {
     }
 
     if (registration.controller.signal.aborted) return;
-    const deadline = Date.now() + gracePeriodMs;
+    const deadline = performance.now() + gracePeriodMs;
     if (registration.deadline !== null && registration.deadline <= deadline) return;
     this.clearTimer(registration);
 
-    const timer = setTimeout(() => {
+    const timer = safeTimeout(() => {
       if (registration.timer !== timer) return;
       registration.timer = null;
       registration.deadline = null;
@@ -83,6 +89,6 @@ export class CancellationManager {
     const timer = registration.timer;
     registration.timer = null;
     registration.deadline = null;
-    if (timer !== null) clearTimeout(timer);
+    timer?.clear();
   }
 }

@@ -11,6 +11,7 @@
 import type { Connection } from './connection.js';
 import { compact } from './frame.js';
 import { ignoredAckIndices } from './terminal-outcome.js';
+import { type SafeTimer, safeTimeout } from './timing.js';
 
 export interface AckItem {
   id: string;
@@ -22,7 +23,7 @@ export interface AckItem {
 
 export class AckBatcher {
   private buffer: AckItem[] = [];
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private timer: SafeTimer | null = null;
 
   constructor(
     private readonly connection: Connection,
@@ -35,15 +36,16 @@ export class AckBatcher {
     if (this.buffer.length >= this.maxSize) {
       void this.flush();
     } else if (!this.timer) {
-      this.timer = setTimeout(() => void this.flush(), this.maxDelayMs);
-      this.timer.unref?.(); // don't keep the process alive for a pending flush
+      // maxDelayMs is validated by the Worker (finite >= 0); safeTimeout honours any length.
+      // unref: don't keep the process alive for a pending flush.
+      this.timer = safeTimeout(() => void this.flush(), this.maxDelayMs).unref();
     }
   }
 
   /** Send the buffered ACKs as one ACKB (no-op when empty). */
   async flush(): Promise<void> {
     if (this.timer) {
-      clearTimeout(this.timer);
+      this.timer.clear();
       this.timer = null;
     }
     if (this.buffer.length === 0) return;

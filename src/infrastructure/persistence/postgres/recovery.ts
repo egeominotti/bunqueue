@@ -19,6 +19,7 @@ import { discardPostgresProtectedCronLease } from './leaseRelease';
 import type { PostgresJobRow } from './types';
 import { lockPostgresDependencyCompletions } from './dependencyPromotion';
 import { partitionPostgresDestructionCandidates } from './dependencyDestruction';
+import { processingDeadline } from '../../../domain/job/timeoutRule';
 
 async function retryExpiredLease(
   tx: TransactionSQL,
@@ -172,8 +173,9 @@ export async function recoverExpiredPostgresLeases(
     for (const row of rows) {
       if (await discardPostgresProtectedCronLease(tx, ctx, row, now)) continue;
       const job = decodePostgresJob(row).job;
-      const timedOut =
-        job.timeout !== null && job.startedAt !== null && job.startedAt + job.timeout <= now;
+      // The shared rule (domain/job/timeoutRule.ts), as the SQLite scheduler and the Worker.
+      const deadline = processingDeadline(job);
+      const timedOut = deadline !== null && deadline <= now;
       const { stall } = await getPostgresQueuePolicies(tx, ctx, job.queue);
       job.attempts++;
       if (!timedOut) job.stallCount++;

@@ -8,7 +8,9 @@ import { jobId } from '../../domain/types/job';
 import type { SharedManager } from '../manager';
 import type { TcpConnectionPool } from '../tcpPool';
 import { parseJobFromResponse } from '../worker/jobParser';
+import { progressUpdate } from '../queue/commandArgs';
 import { outcomeWasApplied } from '../worker/ackOutcome';
+import { PullRefusedError } from '../worker/workerPull';
 
 /** Unified queue operations interface */
 export interface QueueOps {
@@ -19,7 +21,12 @@ export interface QueueOps {
   ): Promise<{ job: DomainJob | null; token: string | null }>;
   ack(id: JobId, result: unknown, token?: string): Promise<boolean>;
   fail(id: JobId, error: string, token?: string): Promise<boolean>;
-  updateProgress(id: JobId, progress: number): Promise<void>;
+  /**
+   * Store the progress a processor reported from its thread, mapped as every job object
+   * maps it (`progressUpdate`): an object is progress 0 with its JSON as the message, a
+   * number is stored as-is, anything else rejects with `progress must be a number`.
+   */
+  updateProgress(id: JobId, progress: unknown): Promise<void>;
   addLog(id: JobId, message: string): void;
   sendHeartbeat(ids: string[], tokens: string[]): Promise<void>;
   countWaiting(queue: string): Promise<number>;
@@ -38,7 +45,8 @@ export function createEmbeddedOps(manager: SharedManager): QueueOps {
       return outcome?.applied !== false;
     },
     updateProgress: async (id, progress) => {
-      await manager.updateProgress(id, progress);
+      const update = progressUpdate(progress);
+      await manager.updateProgress(id, update.progress, update.message);
     },
     addLog: (id, message) => {
       manager.addLog(id, message);
@@ -61,7 +69,10 @@ export function createTcpOps(tcp: TcpConnectionPool): QueueOps {
   return {
     async pull(queue, workerId, timeout) {
       const res = await tcp.send({ cmd: 'PULL', queue, owner: workerId, timeout });
-      if (!res.ok || !res.job) return { job: null, token: null };
+      // A refusal (`ok: false`) is a pull error, as for Worker, never an empty queue:
+      // reading it as one hid a misconfigured worker behind silent idle polling.
+      if (res.ok !== true) throw new PullRefusedError('PULL', res);
+      if (!res.job) return { job: null, token: null };
       return {
         job: parseJobFromResponse(res.job as Record<string, unknown>, queue),
         token: (res.token as string | null | undefined) ?? null,
@@ -92,7 +103,8 @@ export function createTcpOps(tcp: TcpConnectionPool): QueueOps {
       return outcomeWasApplied(response.data);
     },
     async updateProgress(id, progress) {
-      await tcp.send({ cmd: 'Progress', id: String(id), progress });
+      // Checked before sending, as Worker's job handler does: the reply is not read.
+      await tcp.send({ cmd: 'Progress', id: String(id), ...progressUpdate(progress) });
     },
     addLog(id, message) {
       tcp.send({ cmd: 'AddLog', id: String(id), message }).catch(() => {

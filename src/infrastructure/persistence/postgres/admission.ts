@@ -2,6 +2,7 @@ import type { TransactionSQL } from 'bun';
 import { MAX_TIMELINE_ENTRIES, type Job, type JobId } from '../../../domain/types/job';
 import { decodePostgresJob, encodePostgresValue, postgresStateForJob } from './codec';
 import { databaseNow, recordPostgresEvent, type PostgresContext } from './context';
+import { postgresPriorityColumn } from './priorityColumn';
 import {
   clearPostgresDeduplication,
   extendPostgresDeduplication,
@@ -121,7 +122,7 @@ async function insertRow(
       unique_expires_at, custom_id, group_id, group_order, parent_id
     ) VALUES (
       ${ctx.config.namespace}, ${String(job.id)}, ${job.queue}, ${encodePostgresValue(job)},
-      ${state}, ${job.priority}, ${job.lifo}, ${job.runAt}, ${job.createdAt},
+      ${state}, ${postgresPriorityColumn(job.priority)}, ${job.lifo}, ${job.runAt}, ${job.createdAt},
       ${job.startedAt}, ${job.completedAt}, ${job.attempts}, ${job.maxAttempts}, ${job.ttl},
       ${job.timeout}, ${job.uniqueKey},
       ${job.uniqueKey && job.deduplicationTtl !== null ? now + job.deduplicationTtl : null},

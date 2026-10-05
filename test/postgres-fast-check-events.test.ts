@@ -21,7 +21,7 @@ const scope = createPostgresFastCheckScope('events');
 
 interface PausableEventStream {
   subscription: { unlisten(): Promise<void> } | null;
-  pollTimer: ReturnType<typeof setInterval> | null;
+  pollTimer: { clear(): void } | null;
   drain(): Promise<void>;
 }
 
@@ -32,7 +32,7 @@ function eventStream(value: PostgresQueueManager): PausableEventStream {
 
 async function pauseNotifications(value: PostgresQueueManager): Promise<PausableEventStream> {
   const stream = eventStream(value);
-  if (stream.pollTimer) clearInterval(stream.pollTimer);
+  stream.pollTimer?.clear();
   stream.pollTimer = null;
   await stream.subscription?.unlisten();
   stream.subscription = null;

@@ -20,15 +20,15 @@ stall detection.
 
 Owns:
 
-- An in-memory `Map<WorkerId, Worker>` of registered workers (`workerManager.ts:23`).
+- An in-memory `Map<WorkerId, Worker>` of registered workers (`workerManager.ts:21`).
 - Worker registration / re-registration / unregistration, including bulk
-  removal by TCP `clientId` on disconnect (`unregisterByClientId`, `workerManager.ts:76`).
+  removal by TCP `clientId` on disconnect (`unregisterByClientId`, `workerManager.ts:75`).
 - Worker-level heartbeat (`lastSeen` refresh) and client-reported stats
-  ingestion (`heartbeat`, `workerManager.ts:95`).
+  ingestion (`heartbeat`, `workerManager.ts:94`).
 - Aggregate O(1) fleet counters: `totalProcessedCounter`,
-  `totalFailedCounter`, `totalActiveJobsCounter` (`workerManager.ts:28-30`).
+  `totalFailedCounter`, `totalActiveJobsCounter` (`workerManager.ts:26-28`).
 - Liveness classification via `WORKER_TIMEOUT_MS` and stale-worker reaping
-  via a background cleanup interval (`cleanupStale`, `workerManager.ts:216`).
+  via a background cleanup interval (`cleanupStale`, `workerManager.ts:217`).
 - Emitting dashboard events for worker lifecycle (`worker:disconnected`,
   `worker:idle`, `worker:error`, `worker:removed-stale`).
 
@@ -65,17 +65,27 @@ Internal:
 
 External / runtime:
 
-- `Bun.env` for `WORKER_TIMEOUT_MS` and `WORKER_CLEANUP_INTERVAL_MS`
-  (`workerManager.ts:14,17`).
-- `setInterval` / `clearInterval` for the cleanup loop.
+- `src/shared/workerTimeouts.ts` — `workerTimeoutMs()` and
+  `workerCleanupIntervalMs()`, the single accessors for `WORKER_TIMEOUT_MS` and
+  `WORKER_CLEANUP_INTERVAL_MS`. Each parses its env var with `parseDurationEnv` on
+  first use (not at import) and caches it for the process; the server views
+  (`ListWorkers`, dashboard overview, WebSocket/SSE stats, `GET /queues/:q/workers`,
+  and the PostgreSQL Cloud adapter's worker stats) read the same accessor. The rules
+  and defaults are exported (`WORKER_TIMEOUT_SETTING`,
+  `WORKER_CLEANUP_INTERVAL_SETTING`) and reused by the server configuration table,
+  and `configureWorkerTimeoutMs(ms)` lets the server apply its resolved
+  `WORKER_TIMEOUT_MS` before the QueueManager is built (the config file's
+  `timeouts.worker` is ignored with a warning, as it always was).
+- `safeInterval` (`src/shared/timers.ts`) for the cleanup loop, stopped with
+  `clear()`.
 - No external packages, no SQLite, no disk.
 
 ## Public Interface
 
-### Exported class — `WorkerManager` (`workerManager.ts:22`)
+### Exported class — `WorkerManager` (`workerManager.ts:20`)
 
 ```typescript
-constructor()                                              // starts cleanup interval
+constructor()                                              // reads both settings (throws on a malformed value), starts cleanup interval
 setDashboardEmit(callback: (event: string, data: Record<string, unknown>) => void): void
 register(name: string, queues: string[], concurrency?: number /* =1 */, opts?: CreateWorkerOptions): Worker
 unregister(id: WorkerId): boolean
@@ -249,13 +259,16 @@ broker's in-memory registry is updated with the same absolute statistics.
 ### Liveness & stale reaping
 
 - A worker is "active" when `now - lastSeen < WORKER_TIMEOUT_MS` (default 30s).
-  `listActive`, `getForQueue`, `getStats.active`, and `computeWorkerStatus` all
-  use this window (`workerManager.ts:197,204,245`; `src/infrastructure/server/handlers/monitoring/workers.ts:10-13`).
-- The cleanup interval runs every `WORKER_CLEANUP_INTERVAL_MS` (default 60s,
-  `workerManager.ts:210`) and removes workers whose `lastSeen` is older than
-  `WORKER_TIMEOUT_MS * 3` (90s by default, `workerManager.ts:218`) — i.e. a
-  worker can read as "stale" for up to ~60s before being physically reaped,
-  giving a flapping connection time to recover.
+  `listActive`, `getForQueue`, `getStats.active`, `computeWorkerStatus` and the
+  dashboard/snapshot/HTTP worker views all use this window through
+  `workerTimeoutMs()` (`workerManager.ts:194-206,240`;
+  `src/infrastructure/server/handlers/monitoring/workers.ts:23`).
+- The cleanup interval (`safeInterval`) runs every `WORKER_CLEANUP_INTERVAL_MS`
+  (default 60s, `workerManager.ts:210`) and removes workers whose `lastSeen` is
+  older than `WORKER_TIMEOUT_MS * 3` (90s by default, `workerManager.ts:219`) —
+  i.e. a worker can read as "stale" for up to ~60s before being physically
+  reaped, giving a flapping connection time to recover. A period above
+  2^31 - 1 ms is honoured, never shortened to a 1 ms spin.
 
 ### `skipIfNoWorker` integration
 
@@ -306,12 +319,12 @@ renewal live in the job subsystem (`renewJobLock`), reached via `JobHeartbeat`.
 
 - **Idempotent re-registration:** re-registering a known `workerId` updates in
   place and preserves counters; an unknown/absent `workerId` creates a new
-  record (`workerManager.ts:49-62`).
+  record (`workerManager.ts:48-61`).
 - **Heartbeat on unknown worker:** returns `false`; the `Heartbeat` handler then
   responds `Worker not found` (`src/infrastructure/server/handlers/monitoring/health.ts:68-73`). A client that was
   reaped must re-register.
 - **Counter underflow guard:** `jobCompleted`/`jobFailed` only decrement
-  `activeJobs` when `> 0` (`workerManager.ts:139,157`). However, the aggregate
+  `activeJobs` when `> 0` (`workerManager.ts:138,156`). However, the aggregate
   `totalActiveJobsCounter` can still drift if `heartbeat` stats and the mutators
   are mixed, or if `unregister`/`unregisterByClientId` subtract a stale
   `activeJobs` value — these counters are best-effort.
@@ -321,7 +334,7 @@ renewal live in the job subsystem (`renewJobLock`), reached via `JobHeartbeat`.
   of distinct `workerId`s heartbeating faster than the timeout could grow the
   map; in normal operation it tracks one record per live consumer connection.
 - **`getStats` cost:** `total`/counters are O(1), but `active` requires an O(n)
-  pass over the map (time-based, can't be cached, `workerManager.ts:244`).
+  pass over the map (time-based, can't be cached, `workerManager.ts:240`).
 - **Stale-but-not-reaped window:** between `WORKER_TIMEOUT_MS` and the reaper
   cutoff a worker reports `status: 'stale'` and is excluded from `listActive` /
   `getForQueue`, but still counts toward `getStats.total` and appears in `list`.
@@ -331,16 +344,28 @@ renewal live in the job subsystem (`renewJobLock`), reached via `JobHeartbeat`.
   shutdown removes the rows it owns.
 - **Cleanup leak on shutdown:** `stop()` must be called to clear the interval;
   `QueueManager.shutdown` calls `workerManager.stop()` (`queue-manager/lifecycle.ts`).
+- **Malformed env value:** both variables must be whole milliseconds >= 1 (digits
+  only; an empty value keeps the default). `abc`, `-1`, `0`, `1e12` or `60s` throws
+  `Invalid WORKER_TIMEOUT_MS: "1e12" (expected a whole number of milliseconds >= 1)`
+  when the QueueManager is constructed, so the server exits at startup and the
+  first embedded `Queue`/`Worker` throws. Before, such values were read with
+  `parseInt`: the sweep spun about every millisecond (`-1`, `0`, `abc`, an empty
+  value, or anything above 2^31 - 1) or every worker read as stale (`1e12` as 1,
+  `abc` as NaN).
 
 ## Configuration
 
-| Env var                      | Default | Effect                                                                                                                                                                       |
-| ---------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WORKER_TIMEOUT_MS`          | `30000` | Liveness window: a worker is "active"/"stale" relative to `lastSeen` (`workerManager.ts:14`). Also re-read in `src/infrastructure/server/handlers/monitoring/workers.ts:10`. |
-| `WORKER_CLEANUP_INTERVAL_MS` | `60000` | How often `cleanupStale` runs (`workerManager.ts:17`).                                                                                                                       |
+| Env var                      | Default | Effect                                                                                                                                                                                                                                |
+| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WORKER_TIMEOUT_MS`          | `30000` | Liveness window: a worker is "active"/"stale" relative to `lastSeen`. Whole ms >= 1; read by `workerTimeoutMs()` for the WorkerManager and every server worker view. The config file's `timeouts.worker` is ignored (with a warning). |
+| `WORKER_CLEANUP_INTERVAL_MS` | `60000` | How often `cleanupStale` runs. Whole ms >= 1; values above 2^31 - 1 are honoured (`safeInterval`). Read by `workerCleanupIntervalMs()`.                                                                                               |
 
 The stale-removal threshold is derived, not configurable directly:
-`WORKER_TIMEOUT_MS * 3` (`workerManager.ts:218`).
+`WORKER_TIMEOUT_MS * 3` (`workerManager.ts:219`). Both variables are parsed when
+the first QueueManager is constructed and cached for the process; a malformed
+value fails that construction (see Edge Cases). A server validates both earlier,
+in `resolveServerConfig`, so the error is a configuration error printed as one
+`Fatal error:` line, before storage opens.
 
 ## Related Docs
 

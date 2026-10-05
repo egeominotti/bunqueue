@@ -13,7 +13,7 @@ Owns:
 - Per-queue rate limiting (token bucket, jobs per configured window) and concurrency capping, stored per-shard in `LimiterManager` (`src/domain/queue/limiterManager.ts:10`).
 - Token-bucket refill math and concurrency slot accounting (`src/domain/types/queue.ts:33`, `:84`).
 - Broker-authoritative per-group fixed windows, active counts, and stored local overrides (`src/domain/queue/groupLimiterManager.ts`, `src/infrastructure/persistence/postgres/groups.ts`).
-- Protocol-level per-client sliding-window request limiting for TCP and HTTP (`src/infrastructure/server/rateLimiter.ts:70`).
+- Protocol-level per-client sliding-window request limiting for TCP and HTTP (`src/infrastructure/server/rateLimiter.ts:129`).
 - Worker-local rate limiting and per-group concurrency in the client SDK (`src/client/worker/workerRateLimiter.ts:12`, `src/client/worker/groupConcurrency.ts:11`).
 - Queue and group rate/concurrency TCP commands, plus queue-level HTTP routes and CLI subcommands.
 
@@ -58,7 +58,7 @@ External/runtime:
   - `deleteQueue(queue): void`, `getQueueNames(): string[]`, `getStateMap(): Map<string, QueueState>`
 - `class RateLimiter` (`src/domain/types/queue.ts:33-81`) — token bucket. `constructor(capacity, refillRate = capacity)`, `tryAcquire(): boolean`, `getTokens(): number`, `getTtl(maxJobs?)`.
 - `class ConcurrencyLimiter` (`src/domain/types/queue.ts:84-119`) — `constructor(limit)`, `tryAcquire(): boolean`, `release(): void`, `getActive()`, `getLimit()`, `setLimit(limit)`.
-- `class ProtocolRateLimiter` (`src/infrastructure/server/rateLimiter.ts:70`) — `constructor(config?: Partial<RateLimiterConfig>)`, `isAllowed(clientId): boolean`, `getRemaining(clientId): number`, `removeClient(clientId)`, `stop()`. Module helpers `getRateLimiter(config?)` (lazy singleton) and `stopRateLimiter()`.
+- `class ProtocolRateLimiter` (`src/infrastructure/server/rateLimiter.ts:129`) — `constructor(config?: Partial<RateLimiterConfig>)`, `isAllowed(clientId): boolean`, `getRemaining(clientId): number`, `removeClient(clientId)`, `stop()`. Module helpers `getRateLimiter(config?)` (lazy singleton), `stopRateLimiter()` and `rateLimiterEnvConfig()` (the `RATE_LIMIT_*` defaults, parsed on first use and cached; `createTcpServer`/`createHttpServer` call it first so a malformed value fails startup). Programmatic fields are validated in the constructor (`windowMs` finite ms >= 1, `maxRequests` whole number >= 1, `cleanupIntervalMs` finite ms >= 1 or `0` to disable the sweep, a test-only opt-out); a missing field takes the env default.
 
 ### Client-side classes
 
@@ -127,11 +127,11 @@ interface QueueState {
   activeCount: number;
 }
 
-// src/infrastructure/server/rateLimiter.ts:7 — protocol abuse limiter config
+// src/infrastructure/server/rateLimiter.ts:11 — protocol abuse limiter config
 interface RateLimiterConfig {
-  windowMs: number; // default 60000
-  maxRequests: number; // default 10000
-  cleanupIntervalMs?: number; // default 60000
+  windowMs: number; // default 60000 (RATE_LIMIT_WINDOW_MS), finite ms >= 1
+  maxRequests: number; // default 10000 (RATE_LIMIT_MAX_REQUESTS), whole number >= 1
+  cleanupIntervalMs?: number; // default 60000 (RATE_LIMIT_CLEANUP_MS); 0 disables (tests only)
 }
 
 // src/client/types/worker.ts:3 — worker limiter (BullMQ v5 compatible)
@@ -198,7 +198,7 @@ without mutating capacity except for the intentional lazy TTL expiry.
 
 ### Protocol-level limiting
 
-Every inbound TCP frame and HTTP request first calls `getRateLimiter().isAllowed(clientId)` (`src/infrastructure/server/tcp.ts:34-103`, `src/infrastructure/server/http.ts:141-149`). `clientId` is the socket-derived id (TCP) or `x-forwarded-for`/`x-real-ip`/`'unknown'` (HTTP). `isAllowed` reads the per-client `SlidingWindowDeque` count and rejects when `count >= maxRequests` within `windowMs`; otherwise it records the timestamp (`src/infrastructure/server/rateLimiter.ts:81-100`). On disconnect, `removeClient` drops the client's deque (`src/infrastructure/server/tcp/connections.ts:87-97`, `src/infrastructure/server/http.ts:237-240`). The singleton is torn down via `stopRateLimiter()` on shutdown (`src/infrastructure/server/bootstrap.ts:234-237`).
+Every inbound TCP frame and HTTP request first calls `getRateLimiter().isAllowed(clientId)` (`src/infrastructure/server/tcp.ts:34-103`, `src/infrastructure/server/http.ts:141-149`). `clientId` is the socket-derived id (TCP) or `x-forwarded-for`/`x-real-ip`/`'unknown'` (HTTP). `isAllowed` reads the per-client `SlidingWindowDeque` count and rejects when `count >= maxRequests` within `windowMs`; otherwise it records the timestamp (`src/infrastructure/server/rateLimiter.ts:140-158`). On disconnect, `removeClient` drops the client's deque (`src/infrastructure/server/tcp/connections.ts:87-97`, `src/infrastructure/server/http.ts:237-240`). The singleton is torn down via `stopRateLimiter()` on shutdown (`src/infrastructure/server/bootstrap.ts:234-237`).
 
 ### Worker-side rate limiting
 
@@ -271,7 +271,8 @@ Key invariant: **if `limiter.groupKey` is set, the `WorkerRateLimiter` is disabl
 - **TTL sentinel:** `getRateLimitTtl` returns `-2` when no rate limit exists. A temporary limit returns its remaining broker-side lifetime; a permanent token bucket returns the wait required for the requested token count.
 - **`isMaxed` scope:** it reflects the global concurrency limiter, not worker-local concurrency or rate-token availability. With no configured global concurrency it is `false`.
 - **Memory bounds.**
-  - `SlidingWindowDeque` advances a head pointer for O(1) amortized expiry and compacts the array when `head > 1000` (`rateLimiter.ts:36`); the cleanup interval deletes empty per-client deques every `cleanupIntervalMs` (`rateLimiter.ts:130`). The maintenance timer is unreferenced: it continues while TCP/HTTP work keeps the process alive but cannot prevent a stopped broker from exiting. Request-time lazy expiry remains authoritative, so timer scheduling never changes admission correctness.
+  - `SlidingWindowDeque` advances a head pointer for O(1) amortized expiry and compacts the array when `head > 1000` (`rateLimiter.ts:95`); the cleanup interval (`safeInterval`) deletes empty per-client deques every `cleanupIntervalMs` (`rateLimiter.ts:180-205`). The maintenance timer is unreferenced: it continues while TCP/HTTP work keeps the process alive but cannot prevent a stopped broker from exiting. Request-time lazy expiry remains authoritative, so timer scheduling never changes admission correctness.
+  - The sweep is the only eviction for HTTP clients (TCP clients are also dropped on disconnect), so `RATE_LIMIT_CLEANUP_MS` rejects `0`: before, `0` or a non-number skipped the `if (ms)` guard, no sweep ever ran and the per-client map grew without bound. `-1`, `1e12` (`parseInt`: 1) or a period above 2^31 - 1 used to spin the sweep about every millisecond; a long period is now honoured. A `NaN` window (`RATE_LIMIT_WINDOW_MS=abc`) never expired a timestamp, so a client that reached the limit stayed blocked forever, and `RATE_LIMIT_MAX_REQUESTS=abc` disabled the limit silently. Each of these now fails startup with `Invalid NAME: "value" (expected ...)`.
   - `WorkerRateLimiter.evictExpired` advances head and compacts when more than half the token array is dead space (`workerRateLimiter.ts:108`).
   - `GroupConcurrencyLimiter.decrement` deletes a group's map entry once its count hits 0, so idle groups don't accumulate (`groupConcurrency.ts:74`).
 - **Negative/non-positive limits:** CLI rejects `limit <= 0`; TCP handlers only require a finite number, so `RateLimit limit:0` would create a token bucket that never refills enough to grant a token (effectively blocks the queue). `ConcurrencyLimiter` with limit `0` blocks all pulls.
@@ -283,13 +284,19 @@ Key invariant: **if `limiter.groupKey` is set, the `WorkerRateLimiter` is disabl
 
 ## Configuration
 
-Protocol-level limiter (`src/infrastructure/server/rateLimiter.ts:13`):
+Protocol-level limiter (`rateLimiterEnvConfig()`, `src/infrastructure/server/rateLimiter.ts`).
+Values are whole numbers (digits only; an empty value keeps the default). The rules
+are exported (`RATE_LIMIT_WINDOW_SETTING`, `RATE_LIMIT_MAX_REQUESTS_SETTING`,
+`RATE_LIMIT_CLEANUP_SETTING`) and the standalone server validates them in
+`resolveServerConfig`, so a bad value prints one `Fatal error:` line before storage
+opens or the banner prints. Embedded and programmatic servers keep the lazy
+accessor, which applies the same rules when the TCP or HTTP server is created:
 
-| Env var                   | Default | Meaning                                |
-| ------------------------- | ------- | -------------------------------------- |
-| `RATE_LIMIT_WINDOW_MS`    | 60000   | Sliding window size per client         |
-| `RATE_LIMIT_MAX_REQUESTS` | 10000   | Max raw requests per client per window |
-| `RATE_LIMIT_CLEANUP_MS`   | 60000   | Interval to evict idle client deques   |
+| Env var                   | Default | Accepted                     | Meaning                                |
+| ------------------------- | ------- | ---------------------------- | -------------------------------------- |
+| `RATE_LIMIT_WINDOW_MS`    | 60000   | ms >= 1                      | Sliding window size per client         |
+| `RATE_LIMIT_MAX_REQUESTS` | 10000   | >= 1                         | Max raw requests per client per window |
+| `RATE_LIMIT_CLEANUP_MS`   | 60000   | ms >= 1 (above 2^31 - 1 too) | Interval to evict idle client deques   |
 
 Per-queue limits are runtime-set (TCP/HTTP/CLI/SDK), persisted in `queue_state`, and have no env defaults (unset = unlimited).
 

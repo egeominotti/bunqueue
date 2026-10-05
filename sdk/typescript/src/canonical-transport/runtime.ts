@@ -2,6 +2,7 @@
 import { access, unlink } from 'node:fs/promises';
 import { createHash, randomBytes } from 'node:crypto';
 import { availableParallelism } from 'node:os';
+import { safeTimeout } from '../../../../src/shared/timers.js';
 export { ThreadWorker } from './thread-worker.js';
 
 export const hardwareConcurrency = (() => {
@@ -15,12 +16,29 @@ export const hardwareConcurrency = (() => {
     return 4;
   }
 })();
-export const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Pool identities need a stable token fingerprint, never the token itself. */
-export function hash(value: string): number {
-  return createHash('sha256').update(value).digest().readUInt32BE(0);
+/**
+ * `Bun.sleep` for Node.js, with Bun's semantics: a delay above 2^31 - 1 ms, and
+ * Infinity, stay pending (a raw setTimeout ran them after about 1 ms) and keep the
+ * process alive; NaN, negative and sub-millisecond delays resolve on the next timer
+ * tick; a non-number throws a TypeError at once.
+ */
+export function sleep(ms: number): Promise<void> {
+  if (typeof ms !== 'number') throw new TypeError('sleep expects a number (milliseconds)');
+  return new Promise((resolve) => {
+    // Infinity as the largest finite delay: never due, and, as in Bun, the pending
+    // sleep keeps the process alive (safeTimeout arms nothing for Infinity itself).
+    const delay = ms !== ms ? 0 : ms === Infinity ? Number.MAX_VALUE : ms;
+    safeTimeout(() => resolve(), delay);
+  });
+}
+
+/**
+ * Pool identities need a stable token fingerprint, never the token itself: 64 bits of
+ * SHA-256, as wide as `Bun.hash`, so two tokens never share a pool in practice.
+ */
+export function hash(value: string): bigint {
+  return createHash('sha256').update(value).digest().readBigUInt64BE(0);
 }
 
 /** RFC 9562 UUIDv7, retaining the canonical public ID format. */

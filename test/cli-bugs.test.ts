@@ -19,69 +19,41 @@ import { describe, test, expect } from 'bun:test';
 // BUG 1: Port validation - parseInt("abc") returns NaN, no validation
 // =============================================================================
 describe('BUG 1: Port validation in parseGlobalOptions', () => {
-  test('rejects non-numeric port value', async () => {
-    // Simulate parseGlobalOptions behavior with invalid port
+  // An invalid port must never reach options.port. It used to be replaced by 6789 with a
+  // warning (which could reach another server); it now stops the command with an error
+  // naming the flag (see test/repro-config-global-port.test.ts).
+  async function parseWith(...args: string[]) {
     const { parseGlobalOptions } = await import('../src/cli/index');
-
-    // Save original argv
     const originalArgv = process.argv;
-
     try {
-      process.argv = ['bun', 'script', '--port', 'abc', 'stats'];
-      const { options } = parseGlobalOptions();
-
-      // BUG: port is NaN, no validation
-      expect(Number.isNaN(options.port)).toBe(false);
-      expect(options.port).toBeGreaterThan(0);
-      expect(options.port).toBeLessThanOrEqual(65535);
+      process.argv = ['bun', 'script', ...args];
+      return parseGlobalOptions();
     } finally {
       process.argv = originalArgv;
     }
+  }
+
+  test('rejects non-numeric port value', async () => {
+    await expect(parseWith('--port', 'abc', 'stats')).rejects.toThrow('Invalid --port: "abc"');
   });
 
   test('rejects port out of range (negative)', async () => {
-    const { parseGlobalOptions } = await import('../src/cli/index');
-    const originalArgv = process.argv;
-
-    try {
-      process.argv = ['bun', 'script', '--port', '-1', 'stats'];
-      const { options } = parseGlobalOptions();
-
-      // BUG: negative port accepted
-      expect(options.port).toBeGreaterThan(0);
-    } finally {
-      process.argv = originalArgv;
-    }
+    await expect(parseWith('--port', '-1', 'stats')).rejects.toThrow('Invalid --port: "-1"');
   });
 
   test('rejects port out of range (too high)', async () => {
-    const { parseGlobalOptions } = await import('../src/cli/index');
-    const originalArgv = process.argv;
-
-    try {
-      process.argv = ['bun', 'script', '--port', '99999', 'stats'];
-      const { options } = parseGlobalOptions();
-
-      // BUG: port > 65535 accepted
-      expect(options.port).toBeLessThanOrEqual(65535);
-    } finally {
-      process.argv = originalArgv;
-    }
+    await expect(parseWith('--port', '99999', 'stats')).rejects.toThrow('Invalid --port: "99999"');
   });
 
   test('rejects --port= with non-numeric value', async () => {
-    const { parseGlobalOptions } = await import('../src/cli/index');
-    const originalArgv = process.argv;
+    await expect(parseWith('--port=notanumber', 'stats')).rejects.toThrow(
+      'Invalid --port: "notanumber"'
+    );
+  });
 
-    try {
-      process.argv = ['bun', 'script', '--port=notanumber', 'stats'];
-      const { options } = parseGlobalOptions();
-
-      // BUG: port is NaN from parseInt("notanumber")
-      expect(Number.isNaN(options.port)).toBe(false);
-    } finally {
-      process.argv = originalArgv;
-    }
+  test('a valid port is used as given', async () => {
+    const { options } = await parseWith('--port', '7000', 'stats');
+    expect(options.port).toBe(7000);
   });
 });
 

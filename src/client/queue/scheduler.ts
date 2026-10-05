@@ -6,8 +6,16 @@
 import { getSharedManager } from '../manager';
 import type { TcpConnectionPool } from '../tcpPool';
 import type { JobOptions } from '../types';
-import type { CronJobOptions } from '../../domain/types/cron';
 import { paginateSchedulers } from './schedulerPagination';
+import {
+  buildCronData,
+  buildCronDedup,
+  buildCronJobOptions,
+  cronTemplateOptionsError,
+  type JobTemplate,
+} from './schedulerTemplate';
+
+export type { JobTemplate } from './schedulerTemplate';
 
 interface SchedulerContext {
   /** Server-side queue key (already prefixed with `prefixKey` if set). */
@@ -55,12 +63,6 @@ export interface RepeatOpts {
   preventOverlap?: boolean;
 }
 
-export interface JobTemplate<T = unknown> {
-  name?: string;
-  data?: T;
-  opts?: JobOptions;
-}
-
 export interface SchedulerInfo {
   id: string;
   name: string;
@@ -69,43 +71,6 @@ export interface SchedulerInfo {
   every?: number;
   /** Max number of times the scheduler will fire (RepeatOpts.limit). #111 */
   limit?: number;
-}
-
-/** Build cron job data from template */
-function buildCronData(jobTemplate?: JobTemplate): unknown {
-  return jobTemplate?.data ?? {};
-}
-
-/**
- * Build the job options carried by every cron-spawned job (issue #86).
- * Queue defaultJobOptions are the base; per-scheduler template opts override.
- * Returns undefined when nothing relevant is set so the server keeps its
- * own JOB_DEFAULTS fallback.
- */
-function buildCronJobOptions(
-  defaultJobOptions: JobOptions | undefined,
-  jobTemplate?: JobTemplate
-): CronJobOptions | undefined {
-  const merged: JobOptions = { ...defaultJobOptions, ...jobTemplate?.opts };
-  const opts: { -readonly [K in keyof CronJobOptions]: CronJobOptions[K] } = {};
-  if (merged.attempts !== undefined) opts.maxAttempts = merged.attempts;
-  if (merged.backoff !== undefined) opts.backoff = merged.backoff;
-  if (merged.timeout !== undefined) opts.timeout = merged.timeout;
-  if (merged.delay !== undefined) opts.delay = merged.delay;
-  if (merged.stallTimeout !== undefined) opts.stallTimeout = merged.stallTimeout;
-  if (typeof merged.removeOnComplete === 'boolean') opts.removeOnComplete = merged.removeOnComplete;
-  if (typeof merged.removeOnFail === 'boolean') opts.removeOnFail = merged.removeOnFail;
-  return Object.keys(opts).length > 0 ? opts : undefined;
-}
-
-/** Extract dedup config from job template */
-function buildCronDedup(jobTemplate?: JobTemplate) {
-  const dedup = jobTemplate?.opts?.deduplication;
-  if (!dedup) return { uniqueKey: undefined, dedup: undefined };
-  return {
-    uniqueKey: dedup.id,
-    dedup: { ttl: dedup.ttl, extend: dedup.extend, replace: dedup.replace },
-  };
 }
 
 /** Create or update a job scheduler */
@@ -124,8 +89,12 @@ export async function upsertJobScheduler(
   // Priority of spawned jobs: carried on the top-level Cron field (the handler
   // reads cmd.priority), which buildCronJobOptions does not cover.
   const priority = jobTemplate?.opts?.priority ?? ctx.defaultJobOptions?.priority;
+  // A refused schedule is reported as on 2.9.10: embedded mode throws the reason (as
+  // addCron does), TCP mode resolves null (boot code written for 2.9.10 checks for it).
+  const templateError = cronTemplateOptionsError(ctx.defaultJobOptions, jobTemplate);
 
   if (ctx.embedded) {
+    if (templateError) throw new Error(templateError);
     const manager = getSharedManager();
     const cron = manager.addCron({
       name: cronName,
@@ -155,6 +124,7 @@ export async function upsertJobScheduler(
     };
   }
 
+  if (templateError) return null;
   const response = await ctx.tcp!.send({
     cmd: 'Cron',
     name: cronName,

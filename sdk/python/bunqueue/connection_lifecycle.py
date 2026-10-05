@@ -85,7 +85,9 @@ class ConnectionLifecycle:
 
     def _note_connect_failure(self) -> None:
         self._failed_attempts += 1
-        backoff = min(0.5 * (2 ** (self._failed_attempts - 1)), 5.0)
+        # 0.5 s doubling to a 5 s cap. The exponent is bounded so a long outage
+        # (2**1024 after ~1025 failures) can never overflow the float math.
+        backoff = min(0.5 * 2.0 ** min(self._failed_attempts - 1, 4), 5.0)
         self._next_attempt_at = time.monotonic() + backoff
         self._telemetry.emit(
             "reconnect_scheduled",

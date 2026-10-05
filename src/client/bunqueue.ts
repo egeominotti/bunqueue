@@ -1,4 +1,6 @@
 /* oxlint-disable typescript/no-explicit-any -- implementation signatures forward typed overloads */
+import { assertDuration } from '../shared/durations';
+import { coerceNumericString } from './tcp/numeric';
 import type { SchedulerInfo } from './queue/scheduler';
 import type { DlqConfig, DlqEntry, DlqFilter, DlqStats, Job, JobOptions } from './types';
 import { BunqueueRuntime } from './bunqueue/runtime';
@@ -89,8 +91,19 @@ export class Bunqueue<T = unknown, R = unknown> extends BunqueueRuntime<T, R> {
     return this.queue.getJobSchedulers();
   }
 
-  cancel(jobId: string, gracePeriodMs = 0): void {
-    this.cancellation.cancel(jobId, gracePeriodMs);
+  /**
+   * Cancel a running job: at once (the default, `0` or, as on 2.9.10, a negative value
+   * or NaN), or after `gracePeriodMs` (a numeric string is that number). Throws a
+   * RangeError for Infinity (2.9.10 cancelled after ~1 ms) and a TypeError for another
+   * non-number; any finite grace is honoured, even beyond 24.8 days.
+   */
+  cancel(jobId: string, gracePeriodMs?: number): void {
+    const requested = coerceNumericString(gracePeriodMs ?? 0);
+    const grace =
+      typeof requested === 'number' && !(requested >= 0)
+        ? 0
+        : assertDuration(requested, 'Bunqueue: cancel() gracePeriodMs');
+    this.cancellation.cancel(jobId, grace);
   }
 
   isCancelled(jobId: string): boolean {

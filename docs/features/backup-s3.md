@@ -23,8 +23,13 @@ recovery tooling.
 
 - `s3Backup.ts` — scheduler, per-manager overlap guard, S3 client construction,
   dashboard events and orchestration.
-- `s3BackupConfig.ts` — public types, defaults, environment parsing and
-  validation.
+- `s3BackupConfig.ts` — public types and validation (`validateConfig`,
+  `isValidRetention`, and the module-private `isValidInterval`); `configFromEnv`
+  delegates to the validated resolver in `src/config/backup.ts`, the single
+  env/file parser shared with the server. `configErrors` carries the problems the
+  resolver found; `validateConfig` reports them instead of its own checks.
+- `s3BackupDefaults.ts` — `DEFAULTS` and the limits (`MIN_BACKUP_INTERVAL_MS`,
+  `MIN_BACKUP_RETENTION`), a dependency-free leaf read by `src/config/settings.ts`.
 - `s3BackupOperations.ts` — backup, listing, restore and retention operations.
 - `sqliteBackupFiles.ts` — WAL-safe SQLite snapshot creation, integrity checks,
   live-file installation and sidecar quarantine.
@@ -63,28 +68,80 @@ interface S3BackupConfig {
   prefix: string;
   databasePath: string;
   timeoutMs?: number;
+  /** Problems found by the configuration resolver, each naming the setting. */
+  configErrors?: readonly string[];
 }
 ```
 
-| Environment                                      | Field                | Default / rule                                                        |
-| ------------------------------------------------ | -------------------- | --------------------------------------------------------------------- |
-| `S3_BACKUP_ENABLED`                              | `enabled`            | `false`; `1` or `true` enables                                        |
-| `S3_ACCESS_KEY_ID` / `AWS_ACCESS_KEY_ID`         | `accessKeyId`        | required                                                              |
-| `S3_SECRET_ACCESS_KEY` / `AWS_SECRET_ACCESS_KEY` | `secretAccessKey`    | required                                                              |
-| `S3_SESSION_TOKEN` / `AWS_SESSION_TOKEN`         | `sessionToken`       | optional temporary-credential token                                   |
-| `S3_BUCKET` / `AWS_BUCKET`                       | `bucket`             | required                                                              |
-| `S3_ENDPOINT` / `AWS_ENDPOINT`                   | `endpoint`           | unset for AWS                                                         |
-| `S3_VIRTUAL_HOSTED_STYLE`                        | `virtualHostedStyle` | provider/client default; `1` or `true` forces bucket-in-host requests |
-| `S3_REGION` / `AWS_REGION`                       | `region`             | `us-east-1`                                                           |
-| `S3_BACKUP_INTERVAL`                             | `intervalMs`         | `21600000`; minimum 60000 ms                                          |
-| `S3_BACKUP_RETENTION`                            | `retention`          | `7`; minimum 1                                                        |
-| `S3_BACKUP_PREFIX`                               | `prefix`             | `backups/`                                                            |
-| data-path aliases above                          | `databasePath`       | required                                                              |
-| constructor only                                 | `timeoutMs`          | 30000 ms per S3 attempt                                               |
+| Environment                                      | Field                | Default / rule                                                                                     |
+| ------------------------------------------------ | -------------------- | -------------------------------------------------------------------------------------------------- |
+| `S3_BACKUP_ENABLED`                              | `enabled`            | `false`; boolean (`1/0`, `true/false`, `yes/no`, `on/off`, any case; another word: false, warning) |
+| `S3_ACCESS_KEY_ID` / `AWS_ACCESS_KEY_ID`         | `accessKeyId`        | required                                                                                           |
+| `S3_SECRET_ACCESS_KEY` / `AWS_SECRET_ACCESS_KEY` | `secretAccessKey`    | required                                                                                           |
+| `S3_SESSION_TOKEN` / `AWS_SESSION_TOKEN`         | `sessionToken`       | optional temporary-credential token                                                                |
+| `S3_BUCKET` / `AWS_BUCKET`                       | `bucket`             | required                                                                                           |
+| `S3_ENDPOINT` / `AWS_ENDPOINT`                   | `endpoint`           | unset for AWS                                                                                      |
+| `S3_VIRTUAL_HOSTED_STYLE`                        | `virtualHostedStyle` | provider/client default; boolean; true forces bucket-in-host requests                              |
+| `S3_REGION` / `AWS_REGION`                       | `region`             | `us-east-1`                                                                                        |
+| `S3_BACKUP_INTERVAL`                             | `intervalMs`         | `21600000`; whole ms >= 60000 (`0` / no number: default, warning)                                  |
+| `S3_BACKUP_RETENTION`                            | `retention`          | `7`; whole number >= 1 (`0` / no number: default, warning)                                         |
+| `S3_BACKUP_PREFIX`                               | `prefix`             | `backups/`                                                                                         |
+| data-path aliases above                          | `databasePath`       | required                                                                                           |
+| constructor only                                 | `timeoutMs`          | 30000 ms per S3 attempt                                                                            |
 
-`validateConfig` rejects missing credentials, bucket or database path,
-retention below one, and intervals shorter than one minute. File configuration
-wins over environment configuration in `resolveBackupConfig`.
+`backupSettings` (`src/config/backup.ts`) is the only parser of these variables
+and of the `backup` config-file section: `resolveServerConfig` and `bootServer`
+(before anything binds), `S3BackupManager.fromEnv` → `configFromEnv`, and the
+`bunqueue backup` CLI all go through it, and file configuration wins over
+environment configuration. A boolean honours `yes`/`on` too (`yes` used to mean
+false); another word keeps 2.9.10's value (false for `S3_BACKUP_ENABLED` and
+`S3_VIRTUAL_HOSTED_STYLE`) with a warning. A file key given as a string keeps its
+2.9.10 truthiness, with a warning (`enabled: process.env.S3_BACKUP_ENABLED` with
+`'false'` or `'0'` keeps backups on; use a real boolean); `interval` / `retention`
+accept numeric strings, and `null` means "unset".
+
+The `bunqueue backup` command loads the same config file as the server
+(`--config`/`-c <file>`, else `bunqueue.config.{ts,js,mjs}` in the working
+directory) through `resolveBackupCommandConfig`, so `storage.dataPath` and the
+`backup` section apply with the server's precedence and validation. The data path
+comes from the server's storage selection (`selectStorage`); a configuration that
+selects PostgreSQL or memory is refused with a message instead of backing up an
+unrelated file. Before, the command read only the env and reported
+`BUNQUEUE_DATA_PATH not set` for a server configured through the file.
+
+A backup problem never stops the server, as in 2.9.10 (upgrade compatibility). An
+interval or retention that is not a whole number in range (`backup.retention: NaN`
+or `0`, `backup.interval: 30000`, `S3_BACKUP_RETENTION=-1`, `S3_BACKUP_INTERVAL=1e12`
+or `30000`) is never applied: `resolveBackupConfig` puts it in `configErrors`, naming
+the key or variable, and keeps the default as a placeholder. When the backup is
+enabled, a missing bucket, access key ID or secret access key (from the file,
+`S3_*` and `AWS_*`) is added: `S3 backup required settings are missing: bucket
+(backup.bucket, S3_BUCKET or AWS_BUCKET), ...`. `start()` then logs `S3 backup
+configuration invalid` with those errors at error level and schedules nothing, and
+a manual `backup()` (the Cloud trigger) returns `{ success: false }` without
+uploading or pruning. `S3_BACKUP_INTERVAL` / `S3_BACKUP_RETENTION` keep their 2.9.10
+fallback, `parseInt(...) || default`: `0` or a value without a number means the
+default, with a warning. With backups disabled, an invalid value is a startup
+warning only. The `bunqueue backup` command (`resolveBackupCommandConfig`) refuses
+an invalid interval or retention with a `ConfigError` naming it.
+
+`validateConfig` returns the `configErrors` when there are any. Otherwise it
+rejects missing credentials, bucket or database path, a retention that is not a
+whole number >= 1, an interval that is not a whole number of milliseconds >= 60000
+(NaN included), and a `timeoutMs` that is not a positive whole number. `start()`
+refuses to schedule anything when it fails.
+
+Two guards hold even for a config that bypassed validation (a programmatic
+`S3BackupManager`):
+
+- **Retention.** `cleanupOldBackups` deletes nothing unless `retention` is a
+  whole number >= 1. The prune is `backups.slice(retention)`, and
+  `slice(NaN)` is `slice(0)`: a `NaN` retention used to delete every backup,
+  the one just uploaded included.
+- **Interval.** The periodic backup is armed with `safeInterval`, so an interval
+  above the native timer limit (2^31 - 1 ms, about 24.8 days) is honoured
+  instead of being rewritten to 1 ms (back-to-back uploads). Each S3 operation
+  timeout is armed with `safeTimeout`.
 
 ## Backup State Machine
 

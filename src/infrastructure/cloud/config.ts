@@ -1,41 +1,14 @@
 /**
  * bunqueue Cloud Configuration
- * Parses environment variables for Cloud agent
+ * Env-only entry point used by `CloudAgent.create` (the MCP server). Parsing and
+ * validation live in `src/config/cloud.ts`, shared with the server, so the two
+ * cannot drift: an invalid value throws an error naming the variable.
  */
 
 import type { CloudConfig } from './types';
-import { hostname } from 'os';
+import { resolveCloudConfig } from '../../config/cloud';
 
 /** Parse Cloud configuration from environment. Returns null if disabled. */
 export function loadCloudConfig(dataPath?: string): CloudConfig | null {
-  const url = Bun.env.BUNQUEUE_CLOUD_URL;
-  const apiKey = Bun.env.BUNQUEUE_CLOUD_API_KEY;
-
-  // Both URL and API key required to enable
-  if (!url || !apiKey) return null;
-
-  const instanceId = Bun.env.BUNQUEUE_CLOUD_INSTANCE_ID;
-  if (!instanceId) {
-    console.error('[Cloud] BUNQUEUE_CLOUD_INSTANCE_ID is required for cloud mode.');
-    return null;
-  }
-
-  return {
-    url: url.replace(/\/+$/, ''), // Strip trailing slashes
-    apiKey,
-    instanceId,
-    signingSecret: Bun.env.BUNQUEUE_CLOUD_SIGNING_SECRET ?? null,
-    instanceName: Bun.env.BUNQUEUE_CLOUD_INSTANCE_NAME ?? hostname(),
-    intervalMs: parseInt(Bun.env.BUNQUEUE_CLOUD_INTERVAL_MS ?? '15000', 10),
-    includeJobData: Bun.env.BUNQUEUE_CLOUD_INCLUDE_JOB_DATA !== 'false',
-    redactFields: Bun.env.BUNQUEUE_CLOUD_REDACT_FIELDS?.split(',').filter(Boolean) ?? [],
-    eventFilter: Bun.env.BUNQUEUE_CLOUD_EVENTS?.split(',').filter(Boolean) ?? [],
-    bufferSize: parseInt(Bun.env.BUNQUEUE_CLOUD_BUFFER_SIZE ?? '720', 10),
-    circuitBreakerThreshold: parseInt(Bun.env.BUNQUEUE_CLOUD_CIRCUIT_BREAKER_THRESHOLD ?? '5', 10),
-    circuitBreakerResetMs: parseInt(Bun.env.BUNQUEUE_CLOUD_CIRCUIT_BREAKER_RESET_MS ?? '60000', 10),
-    useWebSocket: Bun.env.BUNQUEUE_CLOUD_USE_WEBSOCKET !== 'false',
-    useHttp: Bun.env.BUNQUEUE_CLOUD_USE_HTTP !== 'false',
-    dataPath: dataPath ?? null,
-    remoteCommands: Bun.env.BUNQUEUE_CLOUD_REMOTE_COMMANDS !== 'false',
-  };
+  return resolveCloudConfig(null, dataPath);
 }

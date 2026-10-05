@@ -5,6 +5,7 @@ import { uuid } from '../../../shared/hash';
 import { tcpLog } from '../../../shared/logger';
 import { encodeMessagePack } from '../../../shared/msgpack';
 import { Semaphore } from '../../../shared/semaphore';
+import { safeTimeout } from '../../../shared/timers';
 import { FrameParser, createConnectionState } from '../protocol';
 import { getRateLimiter } from '../rateLimiter';
 import { SocketWriteQueue } from '../socketWriteQueue';
@@ -50,7 +51,7 @@ export class TcpConnectionRegistry {
 
   clearStallTimer(socket: Socket<TcpConnectionData>): void {
     if (socket.data.stallTimer !== null) {
-      clearTimeout(socket.data.stallTimer);
+      socket.data.stallTimer.clear();
       socket.data.stallTimer = null;
     }
   }
@@ -59,7 +60,7 @@ export class TcpConnectionRegistry {
     if (this.idleTimeoutMs <= 0) return;
     this.clearStallTimer(socket);
     if (!socket.data.frameParser.hasPartialFrame) return;
-    socket.data.stallTimer = setTimeout(() => {
+    socket.data.stallTimer = safeTimeout(() => {
       socket.data.stallTimer = null;
       tcpLog.warn('Closing stalled connection (incomplete frame)', {
         clientId: socket.data.state.clientId,

@@ -1,3 +1,6 @@
+import { assertDuration } from '../../../shared/durations';
+import { safeTimeout, type SafeTimer } from '../../../shared/timers';
+
 interface PendingMaintenance {
   operation: () => Promise<unknown>;
   readonly waiters: Array<() => void>;
@@ -12,16 +15,24 @@ interface MaintenanceFlight {
 
 type MaintenanceReporter = (subsystem: string, error: unknown) => void;
 
-/** Coalesce, serialize, and retry idempotent work after a committed transition. */
+/**
+ * Coalesce, serialize, and retry idempotent work after a committed transition.
+ *
+ * A failed flight keeps a `retry` entry that only the shared retry timer starts, once
+ * `retryDelayMs` has elapsed (any length, see `safeTimeout`); new work for the same
+ * subsystem replaces the retry and runs at once.
+ */
 export class PostgresPostCommitMaintenance {
   private readonly flights = new Map<string, MaintenanceFlight>();
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private timer: SafeTimer | null = null;
   private closed = false;
 
   constructor(
     private readonly report: MaintenanceReporter,
     private readonly retryDelayMs: number
-  ) {}
+  ) {
+    assertDuration(retryDelayMs, 'PostgresPostCommitMaintenance: retryDelayMs');
+  }
 
   run(subsystem: string, operation: () => Promise<unknown>): Promise<void> {
     if (this.closed) return Promise.resolve();
@@ -54,7 +65,7 @@ export class PostgresPostCommitMaintenance {
 
   close(): void {
     this.closed = true;
-    if (this.timer) clearTimeout(this.timer);
+    this.timer?.clear();
     this.timer = null;
     for (const [subsystem, flight] of this.flights) {
       if (flight.pending?.retry) flight.pending = null;
@@ -77,7 +88,8 @@ export class PostgresPostCommitMaintenance {
     const loop = this.runLoop(subsystem, flight).finally(() => {
       flight.running = false;
       flight.loop = null;
-      if (flight.pending && (!this.closed || !flight.pending.retry)) {
+      // New work runs at once; a failed attempt waits for the retry timer.
+      if (flight.pending && !flight.pending.retry) {
         this.startFlight(subsystem, flight);
       } else if (!flight.pending && this.flights.get(subsystem) === flight) {
         this.flights.delete(subsystem);
@@ -114,7 +126,7 @@ export class PostgresPostCommitMaintenance {
 
   private scheduleRetry(): void {
     if (this.closed || this.timer) return;
-    this.timer = setTimeout(() => {
+    this.timer = safeTimeout(() => {
       this.timer = null;
       for (const [subsystem, flight] of this.flights) this.startFlight(subsystem, flight);
     }, this.retryDelayMs);

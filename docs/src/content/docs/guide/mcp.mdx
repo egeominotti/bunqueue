@@ -370,7 +370,7 @@ The agent discovers the tools on its own; this table shows what is available. Ev
 | `monitoring` | 7 | `get_stats`, `get_queue_stats`, `get_memory_stats`, `get_prometheus_metrics` |
 | `workflows` (optional) | 3 | `list_workflow_executions`, `get_workflow_execution`, `signal_workflow` |
 
-Errors come back as plain messages, never stack traces. Inputs are checked before anything reaches the queue, with the same limits the server applies (for example: names cannot be empty, priorities are whole numbers within ±1,000,000, attempts go from 1 to 1000), and a rejected call changes nothing.
+Errors come back as plain messages, never stack traces. Inputs are checked by each tool's schema before anything reaches the queue (for example: names cannot be empty, priorities are whole numbers within ±1,000,000, attempts go from 1 to 1000; these tool limits are stricter than the broker, which accepts any finite priority), and a rejected call changes nothing.
 
 The server also offers 3 prompts, `bunqueue_health_report`, `bunqueue_debug_queue` and `bunqueue_incident_response`, and 5 read-only resources: `bunqueue://stats`, `bunqueue://queues`, `bunqueue://crons`, `bunqueue://workers` and `bunqueue://webhooks`.
 
@@ -415,8 +415,8 @@ Set them in the `env` block of the server config. An invalid `BUNQUEUE_MCP_*` va
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BUNQUEUE_MODE` | `embedded` | `embedded` or `tcp` |
-| `BUNQUEUE_HOST` | `localhost` | Your bunqueue server (TCP mode) |
-| `BUNQUEUE_PORT` | `6789` | Its TCP port |
+| `BUNQUEUE_HOST` | `localhost` | Your bunqueue server (TCP mode); empty means `localhost` |
+| `BUNQUEUE_PORT` | `6789` | Its TCP port, from 1 to 65535; any other value stops the server at startup |
 | `BUNQUEUE_TOKEN` | none | Its auth token |
 | `DATA_PATH` | none (in memory) | SQLite file for embedded mode (`BUNQUEUE_DATA_PATH` and `BQ_DATA_PATH` take priority) |
 

@@ -167,11 +167,11 @@ PostgreSQL uses the database clock for processing leases, broker heartbeats, and
 stale-session takeover. `leaseDurationMs` defaults to 30,000 ms and drives the
 background coordination cadence:
 
-| Operation                          | Formula                                        | Default |
-| ---------------------------------- | ---------------------------------------------- | ------: |
-| Broker heartbeat                   | `max(1000, floor(leaseDurationMs / 3))`        |    10 s |
-| Duplicate broker-ID stale takeover | `max(leaseDurationMs, 3 × heartbeat interval)` |    30 s |
-| Expired processing-lease scan      | `max(500, floor(leaseDurationMs / 2))`         |    15 s |
+| Operation                          | Formula                                              | Default |
+| ---------------------------------- | ---------------------------------------------------- | ------: |
+| Broker heartbeat                   | `max(1000, floor(leaseDurationMs / 3))`              |    10 s |
+| Duplicate broker-ID stale takeover | `max(leaseDurationMs, 3 × heartbeat interval)`       |    30 s |
+| Expired processing-lease scan      | `min(15000, max(500, floor(leaseDurationMs / 2)))`   |    15 s |
 
 A worker's `lockDuration` still determines when its processing generation
 expires. A surviving broker normally recovers that generation on the next
@@ -180,7 +180,23 @@ one scan interval, before database and scheduler latency. A replacement process
 reusing the same `brokerId` must wait for the stale-takeover window; a different
 unique broker ID can start immediately. Lowering the coordination duration also
 increases heartbeat and recovery traffic, so tune it from measured database
-latency and pause behavior rather than desired failover time alone.
+latency and pause behavior rather than desired failover time alone. The scan is
+capped at 15 s so that a long `leaseDurationMs` never delays the recovery of a
+shorter lock TTL or job timeout.
+
+Long values are honoured as configured. Every interval above, `pollIntervalMs`
+(durable-event and cron polling), and long-poll waits keep their full length
+even beyond about 24.8 days, the longest delay a single JavaScript timer
+accepts. Retries after a transient failure (post-commit maintenance, projection
+and queue refreshes) follow `pollIntervalMs` but wait at most 1 s. Both
+`leaseDurationMs` and `pollIntervalMs` accept up to 9007199254740991 ms
+(`Number.MAX_SAFE_INTEGER`). `statementTimeoutMs`, `lockTimeoutMs`, and
+`idleTransactionTimeoutMs` accept 1 to 2147483647 ms, PostgreSQL's own upper
+limit for those settings: `0`, a negative or sub-millisecond value is rejected,
+because a 1 ms `statement_timeout` would fail nearly every statement. A value out of range stops startup with an error that
+names the setting, whether it comes from the environment, the config file or
+programmatic configuration. Lease and poll values below their runtime minimum
+are still raised to that minimum.
 
 ### PostgreSQL 18 performance settings
 
@@ -294,7 +310,9 @@ Completed-only queues remain visible in queue listings while any durable row
 exists, including after restart; the cleanup tick unregisters the name after
 the last row is committed away. Invalid direct retention values cannot make
 that deletion immediate: negative, non-finite, and unsafe values disable the
-policy, while finite non-negative fractions are floored to milliseconds.
+policy, while finite non-negative fractions are floored to milliseconds. In the
+server's own configuration (config file, environment or CLI flag) such a value
+is rejected instead, and the server does not start.
 
 Deleting retained rows makes their SQLite pages reusable, which bounds future
 growth for a steady workload, but it does not automatically shrink a database

@@ -1,5 +1,10 @@
 import type { Job, JobId, JobInput, JobLock } from '../../domain/types/job';
 import { DEFAULT_LOCK_TTL, isLeaseFromEarlierGeneration } from '../../domain/types/job';
+import {
+  assertLockDuration,
+  normalizeJobInput,
+  pullTimeoutArgument,
+} from '../../domain/job/options';
 import type { AtomicFlowBatchInput, AtomicFlowBatchResult } from '../../domain/types/flow';
 import type { GroupPullOptions } from '../../domain/types/group';
 import { EventType } from '../../domain/types/queue';
@@ -16,12 +21,15 @@ import { QueueManagerState } from './state';
 export class QueueManagerDelivery extends QueueManagerState {
   async push(queue: string, input: JobInput): Promise<Job> {
     const ctx = this.contextFactory.getPushContext();
-    return withPendingQueueAdmissions([queue], ctx, () => pushJob(queue, input, ctx));
+    // Every caller (embedded, TCP, HTTP, cron, direct) stores the same normalized options.
+    const normalized = normalizeJobInput(input);
+    return withPendingQueueAdmissions([queue], ctx, () => pushJob(queue, normalized, ctx));
   }
 
   async pushBatch(queue: string, inputs: JobInput[]): Promise<JobId[]> {
     const ctx = this.contextFactory.getPushContext();
-    return withPendingQueueAdmissions([queue], ctx, () => pushJobBatch(queue, inputs, ctx));
+    const normalized = inputs.map(normalizeJobInput);
+    return withPendingQueueAdmissions([queue], ctx, () => pushJobBatch(queue, normalized, ctx));
   }
 
   async pushFlow(batch: AtomicFlowBatchInput): Promise<AtomicFlowBatchResult> {
@@ -36,7 +44,7 @@ export class QueueManagerDelivery extends QueueManagerState {
   ): Promise<Job | null> {
     const job = await pullJob(
       queue,
-      timeoutMs,
+      pullTimeoutArgument(timeoutMs),
       this.contextFactory.getPullContext(),
       signal,
       groupOptions
@@ -54,9 +62,11 @@ export class QueueManagerDelivery extends QueueManagerState {
     signal?: AbortSignal,
     groupOptions?: GroupPullOptions
   ): Promise<{ job: Job | null; token: string | null }> {
+    // 2.9.10's results: a wait outside 0..60 s is clamped, any finite lease is granted.
+    assertLockDuration(lockTtl, 'lockTtl');
     const job = await pullJob(
       queue,
-      timeoutMs,
+      pullTimeoutArgument(timeoutMs),
       this.contextFactory.getPullContext(),
       signal,
       groupOptions
@@ -74,7 +84,8 @@ export class QueueManagerDelivery extends QueueManagerState {
     signal?: AbortSignal,
     groupOptions?: GroupPullOptions
   ): Promise<Job[]> {
-    const jobs = await pullJobBatch(queue, count, timeoutMs, this.contextFactory.getPullContext(), {
+    const wait = pullTimeoutArgument(timeoutMs);
+    const jobs = await pullJobBatch(queue, count, wait, this.contextFactory.getPullContext(), {
       signal,
       group: groupOptions,
     });
@@ -92,7 +103,9 @@ export class QueueManagerDelivery extends QueueManagerState {
     signal?: AbortSignal,
     groupOptions?: GroupPullOptions
   ): Promise<{ jobs: Job[]; tokens: string[] }> {
-    const jobs = await pullJobBatch(queue, count, timeoutMs, this.contextFactory.getPullContext(), {
+    assertLockDuration(lockTtl, 'lockTtl');
+    const wait = pullTimeoutArgument(timeoutMs);
+    const jobs = await pullJobBatch(queue, count, wait, this.contextFactory.getPullContext(), {
       signal,
       group: groupOptions,
     });

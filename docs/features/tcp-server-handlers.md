@@ -41,8 +41,13 @@ Internal:
 - `src/domain/types/response.ts` — the `Response` union and the `resp.*` builders (`ok`, `error`, `batch`, `job`, `nullableJob`, `pulledJob`, `pulledJobs`, `jobs`, `counts`, `stats`, `metrics`, `data`, `hello`).
 - `src/domain/types/job.ts` — `jobId()` branding of wire strings to the `JobId` type.
 - `src/infrastructure/server/protocol.ts` — `validateQueueName`,
-  `validateGroupId`, `validateJobData`, `validateJobOptions`,
-  `validateNumericField`, `validateWebhookUrl`.
+  `validateGroupId`, `validateJobData`, `validateWebhookUrl`, and (re-exported
+  from `src/domain/job/options.ts`, see
+  [Job Options Validation](./job-options-validation.md)) `validateJobOptions`,
+  `validateBackoffField`, `validateNumericField`, `validateDelayArgument`,
+  `validateLockDuration`, `validatePullTimeout` (`PULL`/`PULLB` `timeout`, also
+  enforced by `QueueManager.pull*`). `ExtendLock` replies `LOCK_NOT_EXTENDED_ERROR`
+  for a missing lease, which clients report as `0`.
 - `src/shared/hash.ts` — `constantTimeEqual` (auth), `SHARD_COUNT` (bootstrap banner/events).
 - `src/shared/pausedView.ts` — `pausedView` (paused-aware count bucketing, #92).
 - `src/shared/storageHealth.ts` — common degraded-state predicate and the
@@ -253,19 +258,26 @@ Concurrency relevant to this layer:
 - **Auth bypass surface:** `Auth` is processed before the auth gate, so it is always reachable; failed attempts emit `auth:failed` but otherwise return a generic `Invalid token`. There is no per-connection attempt counter at this layer.
 - **`ConnectionState.authenticated` is vestigial:** `protocol/commands.ts:29-31` sets it to `false`, but the authoritative auth flag is `HandlerContext.authenticated` (set to `authTokens.size === 0` at `tcp/connections.ts:35-40`). Do not read `state.authenticated` for gating.
 - **Bootstrap fail-fast:** partial TLS, ambiguous/missing storage configuration,
-  unsupported backup mode, PostgreSQL initialization failure, or a port-bind
-  failure prevents a half-started server. A manager created before bind failure
-  is shut down.
-- **Shutdown drain bound:** active jobs are awaited only up to `shutdownTimeoutMs`; jobs still active after the deadline are abandoned to the next process's stall detector.
+  unsupported backup mode, PostgreSQL initialization failure, a malformed
+  server-runtime env var, or a port-bind failure prevents a half-started server.
+  A manager created before bind failure is shut down. The standalone server
+  validates `LOCK_TIMEOUT_MS`, `WORKER_*`, `TCP_*` and `RATE_LIMIT_*` in
+  `resolveServerConfig`, before storage opens and before the banner, and prints one
+  `Fatal error:` line naming the variable and the value
+  (`Invalid TCP_IDLE_TIMEOUT_MS: "1e12" (expected ...)`). For embedded and
+  programmatic use, QueueManager construction (`LOCK_TIMEOUT_MS`, `WORKER_*`) and
+  `createTcpServer`/`createHttpServer` (`TCP_*`, `RATE_LIMIT_*`) still apply the
+  same rules before anything binds.
+- **Shutdown drain bound:** active jobs are awaited only up to `shutdownTimeoutMs`; jobs still active after the deadline are abandoned to the next process's stall detector. The drain polls once per second with `sleep`, never one timer for the whole window, so any `shutdownTimeoutMs` (including one above 2^31 - 1 ms) is waited in full and never skipped; the Cloud and storage step timeouts use `safeTimeout` (`test/server-runtime-shutdown-drain.test.ts`).
 
 ## Configuration
 
 Environment variables read directly within this module's files:
 
-| Var                        | Default | Effect                                                                                                     |
-| -------------------------- | ------- | ---------------------------------------------------------------------------------------------------------- |
-| `WORKER_TIMEOUT_MS`        | `30000` | `handlers/monitoring/workers.ts:10-13` — threshold for `ListWorkers` to mark a worker `active` vs `stale`. |
-| `LOG_FORMAT` / `LOG_LEVEL` | unset   | `bootstrap.ts:75` — JSON mode and log level (overridden by file config if present).                        |
+| Var                        | Default | Effect                                                                                                                                                                                                                                     |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WORKER_TIMEOUT_MS`        | `30000` | `handlers/monitoring/workers.ts:23` — threshold for `ListWorkers` to mark a worker `active` vs `stale`, read through `workerTimeoutMs()` (`src/shared/workerTimeouts.ts`) like the dashboard, WS/SSE and HTTP worker views. Whole ms >= 1. |
+| `LOG_FORMAT` / `LOG_LEVEL` | unset   | `bootstrap.ts:75` — JSON mode and log level (overridden by file config if present).                                                                                                                                                        |
 
 Resolved-config fields consumed by `bootServer` include the existing transport,
 auth, telemetry, timeout, SQLite path, TLS, Cloud, and S3 fields plus
@@ -275,7 +287,7 @@ auth, telemetry, timeout, SQLite path, TLS, Cloud, and S3 fields plus
 [PostgreSQL 15–18 Multi-Broker Persistence](./postgres-multibroker.md), and
 [Security: TLS, Auth, CORS](./security-tls-auth.md).
 
-Input-validation limits enforced by the handlers (from `protocol.ts`): queue name ≤256 chars and `^[a-zA-Z0-9_\-.:]+$`; job data ≤10MB; `PULL`/`PULLB` timeout `[0,60000]`; `PULLB` count `[1,1000]`; `WaitJob` timeout `[0,600000]`; option bounds for `priority` `[-1e6,1e6]`, `delay`/`ttl` ≤1yr, `timeout`/`backoff`/`stallTimeout` ≤1day, `maxAttempts` `[1,1000]`. `backoff` accepts either a number (ms) or the object form `{ type: 'fixed'|'exponential', delay, maxDelay? }` (`validateBackoffField`) — `type` must be `fixed`/`exponential`, `delay` must be in `[0, 1day]`, and an optional `maxDelay` (per-job retry-delay cap; `null` = absent) must be a finite number in `[0, 1day]` (`MAX_BACKOFF_DELAY`), matching embedded parity; `PUSH`, `PUSHB` (per job, via `validatePushBatchJobs`) and `PUSHF` validate the applicable bounds. `PUSHF` additionally caps the full graph as described above.
+Input-validation limits enforced by the handlers (from `protocol.ts`): queue name ≤256 chars and `^[a-zA-Z0-9_\-.:]+$`; job data ≤10MB; `PULL`/`PULLB` timeout `[0,60000]`; `PULLB` count `[1,1000]`; `WaitJob` timeout `[0,600000]`. Job options go through the shared `validateJobOptions` (the same validator and rules as atomic flows, embedded `Queue.add`/`addBulk` and cron templates), which refuses only what no job can run with and admits every value 2.9.10 accepted in either mode ([Job Options Validation](./job-options-validation.md)): a non-number, `NaN` or an infinity is refused (a plain numeric string counts as its number); `priority` is any finite number (grouped: `group.priority` integer `[0,2097151]`); a negative job `delay` keeps its past run time (ready at once, ahead of later ready jobs, as on 2.9.10); `timeout` and `ttl` cannot be negative; `maxAttempts` of 1 or less runs once (`Infinity` is stored as 2,147,483,647); `stallTimeout`, `stackTraceLimit`, `keepLogs`, `sizeLimit`, `dedup.ttl` and `debounceTtl` only need to be finite; `timestamp` within ±4.32e15; `groupMaxSize` a positive safe integer; `repeat.every` positive. Durations above `MAX_JOB_DURATION_MS` (4.32e15 ms) are clamped by `normalizeJobInput`, which also stores the normalized values. `PUSH` passes the whole command. `backoff` accepts either a number (ms) or the object form `{ type, delay?, maxDelay? }` (`validateBackoffField`) — any `type` (`fixed` is fixed, anything else runs as exponential), a missing `delay` is the 1000 ms default, a given `delay` must be a finite number `>= 0`, and an optional `maxDelay` (per-job retry-delay cap; `null` = absent) must be a finite number in `[0, 1day]` (`MAX_BACKOFF_DELAY`); `PUSH`, `PUSHB` (per job, via `validatePushBatchJobs`, error `jobs[i]: ...`) and `PUSHF` validate the applicable rules. `PUSHF` additionally caps the full graph as described above. `ChangeDelay`/`MoveToDelayed` require a finite `delay` (`validateDelayArgument`; the engine keeps a negative one as a past run time, `now + delay`); `PULL`/`PULLB` `lockTtl`, `ExtendLock` `duration`, `ExtendLocks` `durations[i]` and a non-zero `JobHeartbeat` `duration` must be finite numbers, any sign, passed through as on 2.9.10 (`validateLockDuration`; `NaN`, an infinity or a string is refused before any job is claimed or lease changed). `ChangePriority` takes any finite priority (missing = 0) and normalizes `lifo` to a boolean; `Progress` is never refused (`normalizeProgress`); `Update` needs only JSON-serializable data (no size limit); `ClearLogs` applies `keepLogsArgument`. `Cron` template options, spawned `priority`/`dedup.ttl` and `repeatEvery` (at most `MAX_JOB_DURATION_MS`) are validated by `assertValidCronInput` with the same rules, and the thrown message is returned as the protocol error.
 
 ## Related Docs
 

@@ -1,3 +1,5 @@
+import { assertDuration } from '../../shared/durations';
+
 /** Queue Manager configuration. */
 export interface QueueManagerConfig {
   dataPath?: string;
@@ -14,11 +16,18 @@ export interface QueueManagerConfig {
   maxQueueEvents?: number;
   /** Maximum retained one-minute metric buckets per queue and terminal state. */
   maxMetricDataPoints?: number;
+  // The five background periods below must each be a finite number of milliseconds
+  // >= 1 (undefined keeps the default); anything else throws a RangeError or TypeError
+  // from the constructor. Periods above 2^31 - 1 ms are honoured, not shortened.
+  /** Memory-cleanup period (default 10000). */
   cleanupIntervalMs?: number;
-  /** Retry delay after a processing-timeout transition fails. */
+  /** Retry delay after a processing-timeout transition fails (default 5000). */
   jobTimeoutCheckMs?: number;
+  /** Dependency safety-net period (default 30000). */
   dependencyCheckMs?: number;
+  /** Stall-detection and lock-expiration period (default 5000). */
   stallCheckMs?: number;
+  /** DLQ maintenance period (default 60000). */
   dlqMaintenanceMs?: number;
   validateWebhookUrls?: boolean;
 }
@@ -44,4 +53,38 @@ export function normalizeCompletedRetentionMs(value: number | null | undefined):
   if (value === null || value === undefined || !Number.isFinite(value) || value < 0) return null;
   const normalized = Math.floor(value);
   return Number.isSafeInteger(normalized) ? normalized : null;
+}
+
+/** The config fields that are timer periods or retry delays. */
+const BACKGROUND_PERIODS = [
+  'cleanupIntervalMs',
+  'jobTimeoutCheckMs',
+  'dependencyCheckMs',
+  'stallCheckMs',
+  'dlqMaintenanceMs',
+] as const;
+
+/**
+ * Merge `config` over DEFAULT_CONFIG for the QueueManager constructor. Each background
+ * period must be a finite number of milliseconds >= 1 (`undefined` keeps the default);
+ * NaN, 0, negatives, Infinity and non-numbers throw a RangeError or TypeError naming the
+ * option (`QueueManager: stallCheckMs must be ...`) instead of becoming a 1 ms interval.
+ * Periods above the native timer limit are valid: the intervals use `safeInterval`.
+ */
+export function resolveQueueManagerConfig(
+  config: QueueManagerConfig
+): typeof DEFAULT_CONFIG & { dataPath?: string } {
+  const resolved = {
+    ...DEFAULT_CONFIG,
+    ...config,
+    completedRetentionMs: normalizeCompletedRetentionMs(config.completedRetentionMs),
+  };
+  for (const field of BACKGROUND_PERIODS) {
+    const value = config[field];
+    resolved[field] =
+      value === undefined
+        ? DEFAULT_CONFIG[field]
+        : assertDuration(value, `QueueManager: ${field}`, { min: 1 });
+  }
+  return resolved;
 }

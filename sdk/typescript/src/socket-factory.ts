@@ -5,6 +5,7 @@ import { connect as netConnect, type Socket } from 'node:net';
 import { type ConnectionOptions as TlsConnectOptions, connect as tlsConnect } from 'node:tls';
 import type { TlsOption } from './connection-types.js';
 import { ConnectionClosedError } from './errors.js';
+import { safeTimeout } from './timing.js';
 
 export function openSocket(
   host: string,
@@ -14,7 +15,8 @@ export function openSocket(
 ): Promise<Socket> {
   return new Promise((resolve, reject) => {
     let settled = false;
-    const timer = setTimeout(() => {
+    // connectTimeoutMs is validated finite >= 1; safeTimeout honours any length.
+    const timer = safeTimeout(() => {
       if (settled) return;
       settled = true;
       socket.destroy();
@@ -24,13 +26,13 @@ export function openSocket(
     const onError = (err: Error) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      timer.clear();
       reject(new ConnectionClosedError(`connect failed: ${err.message}`));
     };
     const onReady = () => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      timer.clear();
       socket.off('error', onError);
       resolve(socket);
     };

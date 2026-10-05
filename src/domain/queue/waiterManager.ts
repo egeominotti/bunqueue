@@ -1,14 +1,20 @@
 /**
  * WaiterManager - Manages queue-scoped job availability notifications.
  * Handles worker polling with timeout-based waiting.
+ *
+ * The wait timer is a `safeTimeout`: a timeout above 2^31 - 1 ms waits instead of
+ * firing after ~1 ms, and Infinity waits for a notification or an abort. A NaN timeout
+ * is rejected (TypeError): handed to the runtime it would re-poll every ~1 ms.
  */
+
+import { safeTimeout, type SafeTimer } from '../../shared/timers';
 
 const DEFAULT_QUEUE = '';
 const COMPACT_MIN_HEAD = 1024;
 
 interface Waiter {
   resolve: () => void;
-  timer: ReturnType<typeof setTimeout>;
+  timer: SafeTimer;
   cancelled: boolean;
   signal?: AbortSignal;
   onAbort?: () => void;
@@ -57,6 +63,9 @@ export class WaiterManager {
         ? (maybeTimeoutOrSignal as AbortSignal | undefined)
         : maybeSignal;
     if (timeoutMs <= 0 || signal?.aborted) return Promise.resolve();
+    if (timeoutMs !== timeoutMs) {
+      return Promise.reject(new TypeError('waitForJob timeout must be a number of milliseconds'));
+    }
 
     const state = this.queues.get(queue);
     if (state?.pending) {
@@ -70,14 +79,14 @@ export class WaiterManager {
       const waiter = {
         resolve,
         cancelled: false,
-        timer: undefined as unknown as ReturnType<typeof setTimeout>,
+        timer: undefined as unknown as SafeTimer,
         signal,
         onAbort: undefined as (() => void) | undefined,
       };
       const settle = () => {
         if (waiter.cancelled) return;
         waiter.cancelled = true;
-        clearTimeout(waiter.timer);
+        waiter.timer.clear();
         if (waiter.signal && waiter.onAbort) {
           waiter.signal.removeEventListener('abort', waiter.onAbort);
         }
@@ -86,7 +95,7 @@ export class WaiterManager {
         resolve();
         this.compact(queue, queueState);
       };
-      waiter.timer = setTimeout(settle, timeoutMs);
+      waiter.timer = safeTimeout(settle, timeoutMs);
       waiter.onAbort = settle;
       signal?.addEventListener('abort', settle, { once: true });
       queueState.entries.push(waiter);
@@ -108,7 +117,7 @@ export class WaiterManager {
       const waiter = state.entries[state.head++];
       if (!waiter || waiter.cancelled) continue;
       waiter.cancelled = true;
-      clearTimeout(waiter.timer);
+      waiter.timer.clear();
       if (waiter.signal && waiter.onAbort) {
         waiter.signal.removeEventListener('abort', waiter.onAbort);
       }

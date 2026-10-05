@@ -2,7 +2,13 @@ import type { Command } from '../../../../domain/types/command';
 import { jobId } from '../../../../domain/types/job';
 import type { Response } from '../../../../domain/types/response';
 import * as response from '../../../../domain/types/response';
-import { validateNumericField } from '../../protocol';
+import {
+  DATA_NOT_UPDATED_ERROR,
+  DELAY_NOT_CHANGED_ERROR,
+  JOB_NOT_DELAYED_ERROR,
+  PRIORITY_NOT_CHANGED_ERROR,
+} from '../../../../domain/job/mutations';
+import { validateDelayArgument, validateNumericField } from '../../protocol';
 import type { HandlerContext } from '../../types';
 import { sanitizeServerError } from '../../errors';
 
@@ -15,7 +21,7 @@ export async function handleUpdate(
   if (success) context.queueManager.emitDashboardEvent('job:data-updated', { jobId: command.id });
   return success
     ? response.ok(undefined, requestId)
-    : response.error('Job not found or cannot be updated', requestId);
+    : response.error(DATA_NOT_UPDATED_ERROR, requestId);
 }
 
 export async function handleChangePriority(
@@ -36,7 +42,7 @@ export async function handleChangePriority(
   }
   return success
     ? response.ok(undefined, requestId)
-    : response.error('Job not found or not in queue', requestId);
+    : response.error(PRIORITY_NOT_CHANGED_ERROR, requestId);
 }
 
 export async function handlePromote(
@@ -48,7 +54,7 @@ export async function handlePromote(
   if (success) context.queueManager.emitDashboardEvent('job:promoted', { jobId: command.id });
   return success
     ? response.ok(undefined, requestId)
-    : response.error('Job not found or not delayed', requestId);
+    : response.error(JOB_NOT_DELAYED_ERROR, requestId);
 }
 
 export async function handleUpdateParent(
@@ -69,6 +75,8 @@ export async function handleMoveToDelayed(
   context: HandlerContext,
   requestId?: string
 ): Promise<Response> {
+  const delayError = validateDelayArgument(command.delay);
+  if (delayError) return response.error(delayError, requestId);
   const id = jobId(command.id);
   const success = await context.queueManager.moveToDelayed(id, command.delay, command.token);
   if (success) {
@@ -142,6 +150,8 @@ export async function handleChangeDelay(
   context: HandlerContext,
   requestId?: string
 ): Promise<Response> {
+  const delayError = validateDelayArgument(command.delay);
+  if (delayError) return response.error(delayError, requestId);
   const success = await context.queueManager.changeDelay(
     jobId(command.id),
     command.delay,
@@ -155,7 +165,7 @@ export async function handleChangeDelay(
   }
   return success
     ? response.ok(undefined, requestId)
-    : response.error('Job not found or cannot change delay', requestId);
+    : response.error(DELAY_NOT_CHANGED_ERROR, requestId);
 }
 
 export async function handleMoveToWait(
@@ -175,7 +185,7 @@ export async function handleMoveToWait(
     const success = await context.queueManager.promote(id);
     return success
       ? response.ok(undefined, requestId)
-      : response.error('Job not found or not delayed', requestId);
+      : response.error(JOB_NOT_DELAYED_ERROR, requestId);
   }
   if (state === 'failed') {
     const job = await context.queueManager.getJob(id);

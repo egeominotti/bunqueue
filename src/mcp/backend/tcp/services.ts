@@ -18,8 +18,8 @@ function serializeTcpCron(value: unknown): SerializedCron {
   if (
     typeof cron.name !== 'string' ||
     typeof cron.queue !== 'string' ||
-    !isFiniteNumber(cron.nextRun) ||
-    Number.isNaN(new Date(cron.nextRun).getTime()) ||
+    // A legacy nextRun outside the Date range is reported as null, not as a bad reply.
+    typeof cron.nextRun !== 'number' ||
     (schedule != null && typeof schedule !== 'string') ||
     (repeatEvery != null && !isFiniteNumber(repeatEvery)) ||
     (jobName != null && typeof jobName !== 'string') ||

@@ -4,11 +4,9 @@
  * Kept separate from runner.ts so the runner stays focused on state transitions.
  */
 
+import { clampTimerDelay } from '../../shared/timers';
 import { clock, type TimerHandle } from './clock';
 import { describeError } from './identity';
-
-/** Largest delay accepted by Bun/Node timers without wrapping to 1ms. */
-const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 /** Exponential retry backoff with jitter. */
 export function retryBackoffDelay(attempt: number, baseMs = 500, maxMs = 30_000): number {
@@ -46,7 +44,7 @@ export function runWithTimeout<T>(
       if (settled) return;
       const remaining = deadline - scheduler.now();
       if (remaining > 0) {
-        timer = scheduler.setTimeout(onTimeout, Math.min(remaining, MAX_TIMER_DELAY_MS));
+        timer = scheduler.setTimeout(onTimeout, clampTimerDelay(remaining));
         return;
       }
       settled = true;
@@ -56,7 +54,7 @@ export function runWithTimeout<T>(
       reject(error);
     };
 
-    timer = scheduler.setTimeout(onTimeout, Math.min(timeoutMs, MAX_TIMER_DELAY_MS));
+    timer = scheduler.setTimeout(onTimeout, clampTimerDelay(timeoutMs));
     operation.then(
       (result) => {
         if (settled) return;

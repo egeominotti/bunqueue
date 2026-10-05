@@ -3,6 +3,7 @@ import { decodePostgresJob, encodePostgresValue, postgresByteaBase64 } from './c
 import { databaseNow, type PostgresContext } from './context';
 import type { PostgresJobRow, PostgresStoredJob } from './types';
 import { lockPostgresBrokerSession } from './brokerSessions';
+import { postgresLeaseUntil, postgresRequestedLeaseMs } from './leaseDeadline';
 
 export interface PostgresLeaseRenewalInput {
   readonly id: JobId;
@@ -45,11 +46,13 @@ function prepareRenewal(
 ): PreparedLeaseRenewal {
   const stored = decodePostgresJob(row);
   stored.job.lastHeartbeat = now;
-  const requestedLeaseUntil = now + Math.max(1, input.durationMs);
-  const leaseUntil =
-    row.timeout === null
-      ? requestedLeaseUntil
-      : Math.min(requestedLeaseUntil, Number(row.started_at ?? now) + Number(row.timeout));
+  // Never past the job timeout; not shortened to the stall timeout (2.9.10's renewal).
+  const leaseUntil = postgresLeaseUntil(
+    now,
+    postgresRequestedLeaseMs(input.durationMs, ctx.config.leaseDurationMs),
+    Number(row.started_at ?? now),
+    stored.job
+  );
   return {
     id: stored.job.id,
     token: input.token,

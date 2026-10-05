@@ -350,6 +350,11 @@ worker.rateLimit(5_000); // do not start another job for at least five seconds
 
 This override works with or without a configured `limiter`, including workers
 using `groupKey`, and never alters tokens already consumed by previous starts.
+`ms` is a number of milliseconds. As in 2.9.10 and BullMQ, a value that is not
+a positive finite number (`0`, a negative value, `NaN`, `Infinity`, `null`)
+does nothing, and a numeric string such as `'5000'` is read as that number;
+any other non-number throws a `TypeError`. A long override is honoured
+exactly: the worker starts no job until it ends.
 
 *The worker `limiter` option is available in both TypeScript packages. In the
 other SDKs, use the queue-level rate limit shown in each tab or a client-side
@@ -367,12 +372,16 @@ Agents connected via [MCP](/guide/mcp/) can set and clear both limits in natural
 | Concurrency limit | Queue (all workers) | n/a | `bunqueue concurrency set`, `queue.setGlobalConcurrency(n)` |
 | Worker concurrency | One worker | n/a | `new Worker(..., { concurrency })` |
 | Worker limiter | One worker | Rolling duration | `new Worker(..., { limiter: { max, duration } })` |
-| Temporary worker override | One worker | Explicit TTL | `worker.rateLimit(ms)` |
+| Temporary worker override | One worker | Explicit TTL (a value that is not a positive finite number is a no-op) | `worker.rateLimit(ms)` |
 
 ## Gotchas
 
 :::note[Older servers ignore the duration]
 Servers older than 2.8.35 ignore the `duration` argument and always use a 1-second window. Upgrade the server to get custom windows; the client remains compatible in both directions.
+:::
+
+:::note[The synchronous setters report failures, they do not throw]
+`setGlobalRateLimit()`, `removeGlobalRateLimit()`, `setGlobalConcurrency()`, and `removeGlobalConcurrency()` return before the server answers. Over TCP, a change that fails (broker unreachable, `commandTimeout` elapsed, queue already closed) never crashes the process: it is logged as one `[bunqueue] <command> for queue "<name>" failed in the background: <reason>` line on `console.error`, or, in [Simple Mode](/guide/simple-mode/), emitted on the `error` event while a listener is attached. Await the `Async` variants when your code must know the limit is in place.
 :::
 
 :::note[Temporary throttle expires server-side]

@@ -25,6 +25,8 @@ import './e2e-realistic.ts';
 import './e2e-observability.ts';
 import './e2e-resilience.ts';
 import './e2e-hardening.ts';
+import './e2e-durations.ts';
+import './e2e-legacy-compat.ts';
 
 import { runSuite } from './harness.ts';
 

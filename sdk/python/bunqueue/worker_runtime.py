@@ -6,7 +6,6 @@ with the lifecycle surface (start/run/pause/close).
 
 from __future__ import annotations
 
-import logging
 import os
 import socket as _socket
 import time
@@ -15,31 +14,30 @@ from typing import Any, Dict, Optional
 
 from .ack_batcher import AckItem
 from .ack_outcome import transition_was_applied
-from .errors import BunqueueError, UnrecoverableError
+from .errors import UnrecoverableError
 from .job import Job
 from .wire import _compact
+from .worker_errors import RECONNECT_BACKOFF_S, report_wire_failure  # noqa: F401 - re-export
+from .worker_options import MAX_POLL_TIMEOUT_MS  # noqa: F401 - re-export
 
-logger = logging.getLogger("bunqueue")
-
-MAX_POLL_TIMEOUT_MS = 30000
 # The server persists the FIRST `stackTraceLimit` lines (default 10) of the
 # stack we send. A Python traceback ends with the raise site, so we send the
 # LAST lines — but no more than the server keeps, or the raise site would be
 # truncated away by the server-side first-N cap.
 MAX_STACK_LINES = 10
-RECONNECT_BACKOFF_S = (0.5, 1.0, 2.0, 5.0)
 
 
 class WorkerRuntime:
     """Mixin: requires the attributes initialized in ``Worker.__init__``."""
 
-    def _poll_once(self) -> None:
+    def _poll_once(self) -> bool:
+        """One PULLB; False when it returned no jobs (the caller may idle)."""
         with self._active_lock:
             free = self.concurrency - len(self._active)
         if free <= 0:
             self._slot_available.wait(0.05)
             self._slot_available.clear()
-            return
+            return True
 
         # The registration is per-connection server state: after a reconnect
         # the server no longer knows this worker (ListWorkers, skipIfNoWorker
@@ -69,7 +67,7 @@ class WorkerRuntime:
             if self._was_busy and idle:
                 self._was_busy = False
                 self.emit("drained")
-            return
+            return False
 
         self._was_busy = True
         assert self._executor is not None
@@ -78,6 +76,7 @@ class WorkerRuntime:
             with self._active_lock:
                 self._active[job_id] = tok
             self._executor.submit(self._run_job, raw, tok)
+        return True
 
     def _run_job(self, raw: Dict[str, Any], token: str) -> None:
         job = Job(raw, self.connection, token, on_progress=lambda j, p: self.emit("progress", j, p))
@@ -201,9 +200,8 @@ class WorkerRuntime:
                     "startedAt": int(time.time() * 1000),
                 }
             )
-        except BunqueueError as exc:
-            logger.warning("RegisterWorker failed (will retry next poll): %s", exc)
-            self.emit("error", exc)
+        except Exception as exc:  # noqa: BLE001 - must not end the loop (run() calls it first)
+            report_wire_failure(self, "RegisterWorker failed (will retry next poll)", exc)
             return
         self._registered_generation = generation
 
@@ -216,9 +214,8 @@ class WorkerRuntime:
         try:
             self.connection.call(command)
             return True
-        except BunqueueError as exc:
-            logger.warning("swallowed %s failure: %s", command.get("cmd"), exc)
-            self.emit("error", exc)
+        except Exception as exc:  # noqa: BLE001 - never kill the heartbeat/loop thread
+            report_wire_failure(self, f"swallowed {command.get('cmd')} failure", exc)
             return False
 
     def _safe_transition(self, command: Dict[str, Any]) -> Optional[bool]:
@@ -226,9 +223,8 @@ class WorkerRuntime:
         try:
             response = self.connection.call(command)
             return transition_was_applied(response)
-        except BunqueueError as exc:
-            logger.warning("swallowed %s failure: %s", command.get("cmd"), exc)
-            self.emit("error", exc)
+        except Exception as exc:  # noqa: BLE001 - the job slot must still be released
+            report_wire_failure(self, f"swallowed {command.get('cmd')} failure", exc)
             return None
 
     def _shutdown(self) -> None:

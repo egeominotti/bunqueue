@@ -8,12 +8,9 @@ import { EventEmitter } from 'node:events';
 import { hostname } from 'node:os';
 import { Connection } from './connection.js';
 import type { Response } from './connection-types.js';
-import {
-  MAX_POLL_TIMEOUT_MS,
-  sleep,
-  type WorkerEventMap,
-  type WorkerOptions,
-} from './worker-types.js';
+import type { SafeTimer } from './timing.js';
+import { type ResolvedWorkerOptions, resolveWorkerOptions } from './validation.js';
+import { sleep, type WorkerEventMap, type WorkerOptions } from './worker-types.js';
 
 export class WorkerBase<T = unknown, R = unknown> extends EventEmitter {
   readonly queue: string;
@@ -39,22 +36,24 @@ export class WorkerBase<T = unknown, R = unknown> extends EventEmitter {
   protected readyResolve: (() => void) | null = null;
   protected readyFired = false;
   protected loopPromise: Promise<void> | null = null;
-  protected heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  protected heartbeatTimer: SafeTimer | null = null;
+  /** Validated ACK batching settings; null when batching is off. */
+  protected readonly ackBatchOptions: ResolvedWorkerOptions['ackBatch'];
   protected registeredGeneration = -1;
 
   constructor(queue: string, opts: WorkerOptions = {}) {
     super();
-    if ((opts.concurrency ?? 4) < 1) throw new Error('concurrency must be >= 1');
+    // Validated before anything exists: a bad value throws a TypeError or RangeError
+    // naming the option (see validation.ts) instead of becoming a hot loop. The server
+    // rejects a PULLB count above 1000, so batchSize is clamped to [1, 1000].
+    const resolved = resolveWorkerOptions(opts);
     this.queue = queue;
-    this.concurrency = opts.concurrency ?? 4;
-    // The server rejects PULLB count > 1000 (handlers/core.ts) — an unclamped
-    // batchSize would wedge the pull loop in a permanent error cycle. The
-    // finite-guard also catches NaN, which would otherwise pass both bounds.
-    const rawBatch = opts.batchSize ?? 10;
-    this.batchSize = Number.isFinite(rawBatch) ? Math.min(Math.max(1, rawBatch), 1000) : 10;
-    this.pollTimeoutMs = Math.min(opts.pollTimeoutMs ?? 5000, MAX_POLL_TIMEOUT_MS);
-    this.lockTtlMs = opts.lockTtlMs ?? 30_000;
-    this.heartbeatIntervalS = opts.heartbeatIntervalS ?? 10;
+    this.concurrency = resolved.concurrency;
+    this.batchSize = resolved.batchSize;
+    this.pollTimeoutMs = resolved.pollTimeoutMs;
+    this.lockTtlMs = resolved.lockTtlMs;
+    this.heartbeatIntervalS = resolved.heartbeatIntervalS;
+    this.ackBatchOptions = resolved.ackBatch;
     this.workerId = `ts-${hostname()}-${process.pid}-${randomBytes(4).toString('hex')}`;
     this.name = opts.name ?? this.workerId;
     this.connection = new Connection({
@@ -169,7 +168,7 @@ export class WorkerBase<T = unknown, R = unknown> extends EventEmitter {
     await this.beforeClose(); // flush any batched ACKs before draining
     while (!force && this.active.size > 0) await sleep(20);
     if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer.clear();
       this.heartbeatTimer = null;
     }
     // Only unregister when the loop actually registered (autorun: false and

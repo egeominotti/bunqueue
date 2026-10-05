@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Union
 from .connection import _compact
 from .errors import CommandError, CommandTimeoutError
 from .job import Job
+from .sdk_clamps import wait_job_ttl
 
 
 def _values_payload(response: Dict[str, Any]) -> Dict[str, Any]:
@@ -96,7 +97,7 @@ class QueueQueryOps:
         response = self.connection.call({"cmd": "GetProgress", "id": job_id})
         return {"progress": response.get("progress"), "message": response.get("message")}
 
-    def wait_for_job(self, job_id: str, timeout_ms: int = 30000) -> Any:
+    def wait_for_job(self, job_id: str, timeout_ms: Optional[float] = 30000) -> Any:
         """Block until the job completes; returns its result.
 
         The server's ``WaitJob`` waiter resolves only on completion, answering
@@ -105,8 +106,9 @@ class QueueQueryOps:
         non-completion we probe the job state: a ``failed`` job raises
         :class:`CommandError` (it will not complete), everything else raises
         :class:`CommandTimeoutError`."""
-        # The server validates 0 <= timeout <= 600000: clamp instead of erroring.
-        timeout_ms = max(0, min(timeout_ms, 600_000))
+        # The server validates 0 <= timeout <= 600000: clamp instead of erroring
+        # (sdk rule 4: [0, 600000]; None or NaN means 30000; TypeError otherwise).
+        timeout_ms = wait_job_ttl(timeout_ms)
         response = self.connection.call(
             {"cmd": "WaitJob", "id": job_id, "timeout": timeout_ms},
             timeout=timeout_ms / 1000 + 5,

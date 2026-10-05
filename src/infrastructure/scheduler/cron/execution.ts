@@ -26,6 +26,11 @@ export class CronExecution extends CronRuntime {
         toRemove.push(cron.name);
         continue;
       }
+      // A non-finite nextRun compares as due; reschedule it instead of firing it.
+      if (!Number.isFinite(cron.nextRun)) {
+        if (this.repairNextRun(cron, now)) toReinsert.push(entry);
+        continue;
+      }
 
       try {
         const newExecutions = cron.executions + 1;

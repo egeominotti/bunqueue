@@ -1,4 +1,7 @@
 import { resolveToken } from '../client/resolveToken';
+import { parseNumericFlag, parsePortFlagLeniently, shownFlagValue } from '../config/cliFlags';
+import { parseWholeEnv, type WholeRule } from '../config/numbers';
+import { SETTINGS } from '../config/settings';
 
 export interface GlobalOptions {
   host: string;
@@ -18,20 +21,62 @@ interface TlsFlagState {
 
 interface HostPortState {
   host: string;
-  port: number;
   hostExplicit: boolean;
-  portExplicit: boolean;
+  /** The port flag as typed (`-p`, `--port`) and its raw value; parsed after the loop. */
+  portFlag?: { flag: string; raw: string | boolean };
 }
 
-function resolveEnvPort(currentPort: number): number {
-  const envPort = Bun.env.TCP_PORT ?? Bun.env.BUNQUEUE_TCP_PORT ?? Bun.env.BQ_TCP_PORT;
-  if (!envPort) return currentPort;
-  const parsed = parseInt(envPort, 10);
-  if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
-    console.warn(`Warning: Invalid env port "${envPort}". Using ${currentPort}.`);
-    return currentPort;
+const DEFAULT_CLIENT_PORT = 6789;
+/** A client connects to a real port: 0 (OS-assigned) only makes sense for a server. */
+const CLIENT_PORT: WholeRule = { min: 1, max: 65_535 };
+const ENV_PORTS = ['TCP_PORT', 'BUNQUEUE_TCP_PORT', 'BQ_TCP_PORT'] as const;
+
+/**
+ * The client port from the env, resolved as `TCP_PORT ?? BUNQUEUE_TCP_PORT ?? BQ_TCP_PORT`
+ * (an empty TCP_PORT means the default; the aliases are not read). A value that is not a
+ * port warns and uses 6789, as 2.9.10 did: Kubernetes injects
+ * `BUNQUEUE_TCP_PORT=tcp://10.96.0.12:6789` for a Service named `bunqueue-tcp`, which
+ * must not break every client command. An explicit `--port` stays strict.
+ */
+function resolveEnvPort(): number {
+  const name = ENV_PORTS.find((key) => Bun.env[key] !== undefined);
+  const raw = name === undefined ? undefined : Bun.env[name];
+  if (name === undefined || !raw) return DEFAULT_CLIENT_PORT;
+  try {
+    return parseWholeEnv(name, raw, DEFAULT_CLIENT_PORT, CLIENT_PORT);
+  } catch {
+    console.warn(
+      `Warning: Invalid env port "${raw}" (${name}: expected a whole number between 1 and 65535). Using ${DEFAULT_CLIENT_PORT}.`
+    );
+    return DEFAULT_CLIENT_PORT;
   }
-  return parsed;
+}
+
+/**
+ * The global port flag. On a client command it must be 1-65535, and an invalid or
+ * missing value throws a ConfigError naming the flag as typed. In server mode it is
+ * re-injected as `--tcp-port` (0-65535, 0 = OS-assigned); a value that is not a port is
+ * dropped with a warning (undefined), as in 2.9.10, and a misread still throws.
+ */
+function parsePortFlag(
+  portFlag: NonNullable<HostPortState['portFlag']>,
+  serverMode: boolean
+): number | undefined {
+  if (!serverMode) {
+    return parseNumericFlag(
+      { ...SETTINGS.tcpPort, flag: portFlag.flag, rule: CLIENT_PORT },
+      portFlag.raw
+    );
+  }
+  // On `start`, 2.9.10 warned about a value that is not a port and dropped it (the
+  // server then used TCP_PORT or 6789); a misread still stops startup.
+  const port = parsePortFlagLeniently(portFlag.flag, portFlag.raw, SETTINGS.tcpPort.rule);
+  if (port === undefined) {
+    console.warn(
+      `Warning: Invalid ${portFlag.flag} ${shownFlagValue(portFlag.raw)} (expected a whole number between 0 and 65535). Ignoring it; the server port applies.`
+    );
+  }
+  return port;
 }
 
 function resolveEnvHost(currentHost: string): string {
@@ -117,20 +162,19 @@ function applyHostFlag(allArgs: string[], index: number, state: HostPortState): 
   return index + 1;
 }
 
-function applyPortFlag(allArgs: string[], index: number, state: HostPortState): number {
+function applyPortFlag(
+  flag: string,
+  allArgs: string[],
+  index: number,
+  state: HostPortState
+): number {
   const value = allArgs[index + 1];
-  if (value === undefined || value.startsWith('-')) {
-    console.warn('Warning: --port requires a value. Using default port 6789.');
+  // `-p -1` is a (wrong) number, `-p --json` is a missing value, `-p ''` is not given.
+  if (value === undefined || (value.startsWith('-') && !/^-\d/.test(value))) {
+    state.portFlag = { flag, raw: true };
     return index;
   }
-  const parsed = parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
-    console.warn(`Warning: Invalid port "${value}". Using default port 6789.`);
-    state.port = 6789;
-  } else {
-    state.port = parsed;
-    state.portExplicit = true;
-  }
+  if (value !== '') state.portFlag = { flag, raw: value };
   return index + 1;
 }
 
@@ -147,12 +191,7 @@ export function parseGlobalOptions(allArgs = process.argv.slice(2)): {
   options: GlobalOptions;
   commandArgs: string[];
 } {
-  const hp: HostPortState = {
-    host: 'localhost',
-    port: 6789,
-    hostExplicit: false,
-    portExplicit: false,
-  };
+  const hp: HostPortState = { host: 'localhost', hostExplicit: false };
   const tokenState: { token?: string } = {};
   const tlsState: TlsFlagState = { enabled: false, noVerify: false };
   const commandArgs: string[] = [];
@@ -169,7 +208,7 @@ export function parseGlobalOptions(allArgs = process.argv.slice(2)): {
     if (arg === '--host' || arg === '-H') {
       index = applyHostFlag(allArgs, index, hp);
     } else if (arg === '--port' || arg === '-p') {
-      index = applyPortFlag(allArgs, index, hp);
+      index = applyPortFlag(arg, allArgs, index, hp);
     } else if (arg === '--token' || arg === '-t') {
       index = applyTokenFlag(arg, allArgs, index, tokenState, commandArgs);
     } else if (arg.startsWith('--tls')) {
@@ -181,18 +220,13 @@ export function parseGlobalOptions(allArgs = process.argv.slice(2)): {
     } else if (arg === '--version' || (arg === '-v' && commandArgs.length === 0)) {
       version = true;
     } else if (arg.startsWith('--host=')) {
-      hp.host = arg.slice(7);
-      hp.hostExplicit = true;
-    } else if (arg.startsWith('--port=')) {
-      const raw = arg.slice(7);
-      const parsed = parseInt(raw, 10);
-      if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
-        console.warn(`Warning: Invalid port "${raw}". Using default port 6789.`);
-        hp.port = 6789;
-      } else {
-        hp.port = parsed;
-        hp.portExplicit = true;
+      // `--host=` / `--port=` (empty) mean "not given": env or default, as in 2.9.10.
+      if (arg.length > 7) {
+        hp.host = arg.slice(7);
+        hp.hostExplicit = true;
       }
+    } else if (arg.startsWith('--port=')) {
+      if (arg.length > 7) hp.portFlag = { flag: '--port', raw: arg.slice(7) };
     } else if (arg.startsWith('--token=')) {
       const value = arg.slice(8);
       if (value) tokenState.token = value;
@@ -205,15 +239,17 @@ export function parseGlobalOptions(allArgs = process.argv.slice(2)): {
 
   const serverMode =
     commandArgs[0] === 'start' || commandArgs.length === 0 || commandArgs[0]?.startsWith('-');
+  const explicitPort = hp.portFlag ? parsePortFlag(hp.portFlag, serverMode) : undefined;
   if (serverMode) {
     if (hp.hostExplicit) commandArgs.push('--host', hp.host);
-    if (hp.portExplicit) commandArgs.push('--tcp-port', String(hp.port));
+    if (explicitPort !== undefined) commandArgs.push('--tcp-port', String(explicitPort));
   }
 
   return {
     options: {
       host: hp.hostExplicit ? hp.host : resolveEnvHost(hp.host),
-      port: hp.portExplicit ? hp.port : resolveEnvPort(hp.port),
+      // In server mode the port is the server's (validated by resolveServerConfig).
+      port: explicitPort ?? (serverMode ? DEFAULT_CLIENT_PORT : resolveEnvPort()),
       token: resolveToken(tokenState.token),
       tls: buildTlsOption(tlsState),
       json,

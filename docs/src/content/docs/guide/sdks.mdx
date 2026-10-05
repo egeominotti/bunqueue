@@ -529,7 +529,7 @@ the runtime:
 | Mechanism                 | Availability and behavior                                                                                                                                                    |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Lazy reconnect            | All six: a lost connection reconnects on the next call; workers re-register after every connection generation                                                                |
-| Worker retry backoff      | All six retry a failed pull loop without spinning; TypeScript, Python, PHP, Go, and Rust use bounded backoff, while Elixir uses a short fixed delay                          |
+| Worker retry backoff      | All six retry a failed pull without spinning; TypeScript, Python, PHP, Go, and Rust use bounded backoff, while Elixir uses a short fixed delay. Python, as in 0.2.0, ends `run()` with the error on a permanent refusal (a bad token, a validation error) unless an `error` listener is attached |
 | Producer fast-fail window | Legacy TypeScript and Python throttle repeated failed connection attempts (500 ms → 5 s); canonical TypeScript uses the shared client's reconnect policy |
 | TCP keepalive             | TypeScript and Python enable an approximately 15 s idle probe where the OS exposes the controls                                                                              |
 | Timeout-driven teardown   | All six discard a stream whose framing state is ambiguous; TypeScript/Python tolerate a consecutive-timeout threshold (configurable via `maxCommandTimeouts` in canonical TypeScript, fixed at 3 in Python), PHP/Go/Rust/Elixir tear down immediately |
@@ -554,12 +554,12 @@ builders: runtime handling of unknown keys differs by language.
 
 | Option                                       | Type                                         | Default | Notes                                                                                                   |
 | -------------------------------------------- | -------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------- |
-| `priority`                                   | number                                       | 0       | Higher runs sooner; −1 000 000 … 1 000 000                                                              |
-| `delay`                                      | ms                                           | 0       | Up to 1 year                                                                                            |
-| `attempts`                                   | number                                       | 3       | Max attempts including the first; up to 1000                                                            |
-| `backoff`                                    | number \| `{ type, delay, maxDelay? }`       | 1000    | `type`: `'fixed'` or `'exponential'`; `delay` and `maxDelay` (retry cap, default 1 h) up to 1 day       |
+| `priority`                                   | number                                       | 0       | Higher runs sooner; any finite number                                                                   |
+| `delay`                                      | ms                                           | 0       | A negative delay makes the job ready at once                                                            |
+| `attempts`                                   | number                                       | 3       | Max attempts including the first; 1 or less runs once                                                   |
+| `backoff`                                    | number \| `{ type, delay, maxDelay? }`       | 1000    | `type`: `'fixed'` or `'exponential'`; `delay` (1000 when missing); `maxDelay` retry cap, default 1 h, up to 1 day |
 | `ttl`                                        | ms                                           | -       | Expires the job if not processed in time                                                                |
-| `timeout`                                    | ms                                           | -       | Per-job processing timeout, up to 1 day                                                                 |
+| `timeout`                                    | ms                                           | -       | Per-job processing timeout (0 = none)                                                                   |
 | `jobId`                                      | string                                       | -       | Custom id; **idempotent**, re-adding an unfinished id is a no-op                                        |
 | `deduplication`                              | `{ id, ttl?, extend?, replace? }`            | -       | Dedup window keyed on `id`                                                                              |
 | `debounce`                                   | `{ id, ttl? }`                               | -       | Persists compatibility metadata; use `deduplication` with `replace: true` for last-write-wins execution |

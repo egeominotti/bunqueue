@@ -34,7 +34,13 @@ A bare `bunqueue` invocation boots the full server; any other argv goes through 
 CLI, which can itself boot the server (`start`) or act as a one-shot TCP client
 ([`src/main.ts:11`](../src/main.ts)). Both server paths funnel through one
 `bootServer()` so they cannot drift
-([`src/infrastructure/server/bootstrap.ts:94`](../src/infrastructure/server/bootstrap.ts)).
+([`src/infrastructure/server/bootstrap.ts`](../src/infrastructure/server/bootstrap.ts)).
+Before that, `resolveServerConfig` validates every setting from CLI flags, the
+config file and env vars against one table
+([`src/config/settings.ts`](../src/config/settings.ts)); a value the server cannot
+use stops startup with an error naming it, before anything binds, while a value
+2.9.10 ran with keeps working (with a warning where it was ignored; see
+[Configuration](./features/configuration.md#upgrade-compatibility-with-2910)).
 
 ```
 Producers ──add()──┐                          ┌──process()── Consumers
@@ -62,7 +68,7 @@ Producers ──add()──┐                          ┌──process()──
 | **Bun `SQL` + PostgreSQL 15–18**         | [`src/infrastructure/persistence/postgres/`](../src/infrastructure/persistence/postgres)                                                                                                                           | Optional server-only multi-broker coordination. PostgreSQL is the source of truth; row/advisory locks, `SKIP LOCKED`, database-clock leases, and durable events provide distributed ownership without adding a JavaScript database dependency.                           |
 | **Bun `cron`**                           | [`src/infrastructure/scheduler/cronParser.ts`](../src/infrastructure/scheduler/cronParser.ts)                                                                                                                      | Native five-field calendar, timezone and DST evaluation. A small seconds-field adapter preserves bunqueue's documented six-field syntax without an external parser.                                                                                                      |
 | **MessagePack** (`msgpackr`)             | [`src/shared/msgpack.ts`](../src/shared/msgpack.ts), [`src/infrastructure/persistence/sqliteSerializer.ts`](../src/infrastructure/persistence/sqliteSerializer.ts)                                                 | Compact binary storage and wire format. The shared hybrid decoder keeps the fast common path while preserving dangerous-looking JSON keys as safe own properties.                                                                                                        |
-| **Native TCP + TLS**                     | [`src/infrastructure/server/tcp.ts`](../src/infrastructure/server/tcp.ts), [`src/config/resolve.ts:75`](../src/config/resolve.ts)                                                                                  | Length-prefixed binary frames over `Bun.listen` give ~100k+ ops/s without an HTTP/serialization tax. TLS is the same socket with `tls: { certFile, keyFile }`; partial cert/key fails fast at startup rather than silently serving plaintext.                            |
+| **Native TCP + TLS**                     | [`src/infrastructure/server/tcp.ts`](../src/infrastructure/server/tcp.ts), [`src/config/resolve.ts`](../src/config/resolve.ts)                                                                                     | Length-prefixed binary frames over `Bun.listen` give ~100k+ ops/s without an HTTP/serialization tax. TLS is the same socket with `tls: { certFile, keyFile }`; partial cert/key fails fast at startup rather than silently serving plaintext.                            |
 | **One runtime npm dependency**           | [`package.json`](../package.json)                                                                                                                                                                                  | Only `msgpackr` ships at runtime; `@modelcontextprotocol/sdk` is an **optional** peer needed only for the MCP binary. Cron and PostgreSQL use Bun's built-ins.                                                                                                           |
 | **4-ary heaps / queue-local skip-lists** | [`src/shared/minHeap.ts:2`](../src/shared/minHeap.ts), [`src/domain/queue/priorityQueue.ts:56`](../src/domain/queue/priorityQueue.ts), [`src/domain/queue/temporalIndex.ts`](../src/domain/queue/temporalIndex.ts) | 4-ary branching improves cache locality vs binary heaps; one skip-list per queue orders cleanup candidates, with a reverse job-ID index for direct deletion. A compacting 4-ary min-heap tracks delayed jobs.                                                            |
 
@@ -104,8 +110,15 @@ be claimed.
   `GroupLimiterManager`, `DependencyTracker`,
   `TemporalManager`/`TemporalIndex`, queue-scoped `WaiterManager`, `ShardCounters`
   ([`src/domain/queue/shard.ts`](../src/domain/queue/shard.ts)). Plus all type
-  definitions in `domain/types/`. → [Data Structures](./features/data-structures.md),
-  [Core Queue Engine](./features/core-queue-engine.md), [`./data-model.md`](./data-model.md).
+  definitions in `domain/types/`, and the job-option validator every admission path
+  shares ([`src/domain/job/options.ts`](../src/domain/job/options.ts), with its numeric
+  rules in `optionBounds.ts`, the stored form `normalizeJobInput` in
+  `optionNormalize.ts` and the command arguments in `commandArguments.ts`), and the
+  processing-timeout rule shared by the broker's timeout scheduler and the Worker
+  ([`src/domain/job/timeoutRule.ts`](../src/domain/job/timeoutRule.ts)).
+  → [Data Structures](./features/data-structures.md),
+  [Core Queue Engine](./features/core-queue-engine.md), [`./data-model.md`](./data-model.md),
+  [Job Options Validation](./features/job-options-validation.md).
 - **`application/`** — The six-line public `QueueManager` façade inherits a
   responsibility-ordered capability chain under `queue-manager/`. `state.ts`
   owns the shards, global indexes, and managers; delivery, ACK/failure, queries,
@@ -171,8 +184,14 @@ be claimed.
   `groupClaims.ts`, `groupSchema.ts`, `groupSchemaFingerprint.ts`, and
   `groupStateRetention.ts`.
   PostgreSQL lease renewal is split between the `leaseStore.ts` facade layer and
-  the set-based transaction in `leaseRenewal.ts`; exact journal cardinality and
-  its guarded trigger definitions live in `eventRetention.ts` and
+  the set-based transaction in `leaseRenewal.ts`; `leaseDeadline.ts` turns every
+  claim and renewal length into a valid `lease_until` (only a claim is shortened to
+  the job's `stallTimeout`), `priorityColumn.ts` keeps the INTEGER `priority` column in
+  range for any finite job priority, and
+  `maintenanceSchedule.ts` arms the runtime's periodic maintenance on
+  [safe timers](./features/shared-timers.md). The manager's full-queue refresh
+  retries live in `postgres-queue-manager/queueRefreshes.ts`. Exact journal
+  cardinality and its guarded trigger definitions live in `eventRetention.ts` and
   `eventRetentionSchema.ts`.
   Server handler routing, protocol parsing, TCP connection/event-subscription
   state, HTTP routes, SSE and WebSocket state are likewise split by
@@ -220,10 +239,18 @@ be claimed.
   `workflow/forEachRunner.ts` keeps each orchestration module below 300 lines.
 - **`shared/`** — Cross-cutting primitives: `fnv1a`/`uuid`/`shardIndex`
   ([`src/shared/hash.ts`](../src/shared/hash.ts)), the stable lock façade
-  (`lock.ts`) with focused `asyncLock.ts`/`rwLock.ts` implementations, `Semaphore`,
+  (`lock.ts`) with focused `asyncLock.ts`/`rwLock.ts` implementations, the
+  single accessors for runtime env settings parsed on first use (`lockTimeout.ts`:
+  `lockTimeoutMs()`; `workerTimeouts.ts`: `workerTimeoutMs()`/`workerCleanupIntervalMs()`), `Semaphore`,
   `LRUMap`/`BoundedSet`/`BoundedMap`/`TtlMap`, `MinHeap`, `SkipList`, `Histogram`,
-  `Logger`, `webhookValidation`, and the storage-health predicates/client-safe
-  projection ([`src/shared/storageHealth.ts`](../src/shared/storageHealth.ts)).
+  `Logger`, `webhookValidation`, the storage-health predicates/client-safe
+  projection ([`src/shared/storageHealth.ts`](../src/shared/storageHealth.ts)),
+  and the timer/duration helpers that own the runtime's 2^31 - 1 ms timer limit
+  (`timers.ts`: `safeTimeout`/`safeInterval`/`safeDeadline`/`clampTimerDelay`;
+  `durations.ts`: `assertDuration`/`assertInteger` for options and arguments,
+  `parseIntegerEnv`/`parseDurationEnv` for env vars, and the shared message
+  formatter `describeValue`), used by server and client alike.
+  → [Shared Timers & Durations](./features/shared-timers.md).
 - **`cli/`** — `bunqueue` executable: server boot detection + thin TCP client that
   maps verbs to protocol commands.
 - **`mcp/`** — `bunqueue-mcp` binary exposing the queue to AI agents over MCP:
@@ -606,7 +633,8 @@ try {
 `RWLock` supports multiple concurrent readers or one writer. Writer ownership is
 handed off FIFO and reserved before the waiter's promise resolves, so a newly
 arriving operation cannot starve an older batched ACK. `LOCK_TIMEOUT_MS` (default
-5000ms) bounds acquisition so a stuck holder cannot wedge a shard forever.
+5000ms, whole ms >= 1, read by `lockTimeoutMs()`) bounds acquisition so a stuck
+holder cannot wedge a shard forever.
 `Semaphore` bounds worker concurrency. Job **leasing** issues a token on pull;
 ACK/FAIL is rejected if the token no longer matches. Together with
 `stalledCandidates`, exact `RetiredTimeoutGeneration` records, and post-claim
@@ -1123,10 +1151,12 @@ against on-disk SQLite) and asserts hard invariants — not just "it ran".
 - [Core Queue Engine (QueueManager & Shards)](./features/core-queue-engine.md) — Central coordinator that shards queues, owns global job indexes, and orchestrates all job operations by delegating to operation modules via context objects.
 - [Data Structures (PriorityQueue, heaps, maps)](./features/data-structures.md) — Generic, dependency-free in-memory building blocks: an indexed 4-ary priority heap for queued jobs, a skip-list temporal cleanup index plus a 4-ary min-heap tracking delayed jobs, and bounded/LRU/TTL containers plus a latency histogram.
 - [Concurrency & Locking](./features/concurrency-and-locking.md) — In-process synchronization primitives (RWLock, Semaphore) plus job-leasing and stall detection that keep bunqueue's sharded state consistent under concurrent access.
+- [Shared Timers & Durations](./features/shared-timers.md) — `safeTimeout`/`safeInterval`/`safeDeadline`/`clampTimerDelay` for delays of any length (chunked past the 2^31 - 1 ms runtime limit, Infinity never fires, NaN throws) and boundary validation: `assertDuration`/`assertInteger` for options and arguments, `parseIntegerEnv`/`parseDurationEnv` for env vars, `describeValue` for their messages.
 
 ### Job operations
 
 - [Job Lifecycle (push / pull / ack / fail)](./features/job-lifecycle.md) — The four primitive pure-logic operations (push, pull, ack, fail) that move a job through its state machine beneath the TCP/HTTP servers and embedded SDK.
+- [Job Options Validation](./features/job-options-validation.md) — One validator and one set of messages for job options on every path (TCP/HTTP PUSH/PUSHB, flows, embedded add/addBulk, cron templates), the ChangeDelay/MoveToDelayed/lease duration bounds, and the engine guards for NaN run times, backoff and pull waits.
 - [Job Queries & Queue Control](./features/job-queries-and-control.md) — Read/control surface of QueueManager: point/list job queries, single-job mutations, and queue-wide lifecycle operations as pure context-driven functions.
 - [Dead Letter Queue (DLQ)](./features/dead-letter-queue.md) — Terminal sink for jobs that exhausted retries/stalled/lost their lock, with inspect/filter/retry/purge plus opt-in time-based auto-retry and age-based auto-purge.
 - [Deduplication & Unique Jobs](./features/deduplication-and-unique.md) — Prevents duplicate jobs via custom job-ID idempotency and TTL-scoped unique keys with reject/extend/replace strategies, checked atomically inside the shard write lock.
@@ -1176,6 +1206,6 @@ against on-disk SQLite) and asserts hard invariants — not just "it ran".
 
 - [Native MCP Server](./features/mcp-server.md) — Exposes bunqueue to AI agents via the bunqueue-mcp binary over MCP stdio (default) or the opt-in Streamable HTTP transport (bearer auth, Host/Origin checks, one server per session), registering 75 tools, 5 resources, and 3 prompts backed by either an embedded QueueManager or a remote TCP server; opt-in toolset disclosure, confirmation of guarded calls, SystemOne decision models (Jev, Clef, Clef-flash, Kev 9B, Laya, DiffusionGemma Jev) and 3 workflow-engine tools (list/inspect executions, deliver signals).
 - [CLI](./features/cli.md) — The bunqueue executable: boots the server or acts as a thin one-shot TCP client that maps CLI verbs to msgpack protocol commands and renders responses.
-- [Configuration & Entrypoint](./features/configuration.md) — Config layer and process entrypoint: resolves config-file/env/default precedence into typed config, dispatches the bunqueue executable, and provides the Logger, VERSION, and Bun-only runtime guards.
+- [Configuration & Entrypoint](./features/configuration.md) — Config layer and process entrypoint: resolves and validates CLI/config-file/env/default precedence into typed config (an invalid setting stops startup, naming it), dispatches the bunqueue executable, and provides the Logger, VERSION, and Bun-only runtime guards.
 
 See also the data dictionary in [`./data-model.md`](./data-model.md).

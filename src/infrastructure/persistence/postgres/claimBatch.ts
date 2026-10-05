@@ -7,29 +7,23 @@ import { decodePostgresJob, encodePostgresValue, postgresByteaBase64 } from './c
 import type { PostgresContext } from './context';
 import type { ClaimedPostgresJob, PostgresJobRow } from './types';
 import { commitPostgresGroupClaims } from './groupClaims';
+import { postgresClaimLeaseUntil, postgresRequestedLeaseMs } from './leaseDeadline';
 
 function prepareClaims(
   rows: readonly PostgresJobRow[],
   input: {
     owner: string;
-    requestedLeaseMs: number;
+    leaseMs: number;
     now: number;
     brokerId: string;
   }
 ): ClaimedPostgresJob[] {
-  const { owner, requestedLeaseMs, now, brokerId } = input;
+  const { owner, leaseMs, now, brokerId } = input;
   return rows.map((row) => {
     const job: Job = decodePostgresJob(row).job;
     const token = String(generateLockToken());
-    const leaseDuration = Math.max(
-      1,
-      Math.min(
-        requestedLeaseMs,
-        job.timeout === null ? requestedLeaseMs : job.timeout,
-        job.stallTimeout === null ? requestedLeaseMs : job.stallTimeout
-      )
-    );
-    const leaseUntil = now + leaseDuration;
+    // Any stored timeout/stallTimeout or requested TTL yields a valid BIGINT deadline.
+    const leaseUntil = postgresClaimLeaseUntil(now, leaseMs, job);
     job.startedAt = now;
     job.lastHeartbeat = now;
     if (job.timeline.length < MAX_TIMELINE_ENTRIES) {
@@ -108,7 +102,7 @@ export async function claimPostgresCandidates(
   });
   const claimed = prepareClaims(rows, {
     owner,
-    requestedLeaseMs,
+    leaseMs: postgresRequestedLeaseMs(requestedLeaseMs, ctx.config.leaseDurationMs),
     now,
     brokerId: ctx.config.brokerId,
   });

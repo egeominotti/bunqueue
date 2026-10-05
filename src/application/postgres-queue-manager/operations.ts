@@ -1,3 +1,9 @@
+import { delayArgument } from '../../domain/job/options';
+import {
+  normalizeProgress,
+  priorityChange,
+  validateUpdatedJobData,
+} from '../../domain/job/mutations';
 import type { JobId } from '../../domain/types/job';
 import { PostgresQueueManagerCloud } from './cloud';
 
@@ -20,15 +26,20 @@ export class PostgresQueueManagerOperations extends PostgresQueueManagerCloud {
   }
 
   override async updateProgress(id: JobId, progress: number, message?: string): Promise<boolean> {
+    // The base engine's setter rules (domain/job/mutations.ts): these overrides skip super.
+    const update = normalizeProgress(progress, message);
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
-      const updated = await this.postgresStore.updateProgress(id, progress, message);
+      const updated = await this.postgresStore.updateProgress(id, update.progress, update.message);
       if (updated) await this.refreshJob(id);
       return updated;
     });
   }
 
   override async updateJobData(id: JobId, data: unknown): Promise<boolean> {
+    // Serializable, with no size limit: 2.9.10 accepted any update size.
+    const dataError = validateUpdatedJobData(data);
+    if (dataError) throw new Error(dataError);
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
       const updated = await this.postgresStore.updateData(id, data);
@@ -38,9 +49,11 @@ export class PostgresQueueManagerOperations extends PostgresQueueManagerCloud {
   }
 
   override async changePriority(id: JobId, priority: number, lifo?: boolean): Promise<boolean> {
+    // The base engine's change (no super call): missing priority 0, a boolean lifo.
+    const change = priorityChange(priority, lifo);
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
-      const updated = await this.postgresStore.changePriority(id, priority, lifo);
+      const updated = await this.postgresStore.changePriority(id, change.priority, change.lifo);
       if (updated) await this.refreshJob(id);
       return updated;
     });
@@ -68,13 +81,17 @@ export class PostgresQueueManagerOperations extends PostgresQueueManagerCloud {
     return await this.runPostgresOperation(() => this.changeDelay(id, delay, token));
   }
 
-  override async changeDelay(id: JobId, delay: number, token?: string): Promise<boolean> {
+  override async changeDelay(id: JobId, rawDelay: number, token?: string): Promise<boolean> {
+    // The base engine's argument rule (moveToDelayed delegates here): no super call. A
+    // negative delay is clamped to now, as this engine did on 2.9.10 (`now + max(0, delay)`;
+    // the SQLite engine kept the past run time, and each keeps its own result).
+    const delay = Math.max(0, delayArgument(rawDelay));
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
       const now = await this.postgresStore.now();
       const changed = await this.postgresStore.changeDelay(
         id,
-        now + Math.max(0, delay),
+        now + delay,
         this.tokenFor(id, token) ?? undefined
       );
       if (changed) {

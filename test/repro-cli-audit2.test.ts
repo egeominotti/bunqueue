@@ -148,9 +148,9 @@ describe('global value flags do not swallow a following flag', () => {
     const h = parseWith(['stats', '-H', '--json']);
     expect(h.options.host).toBe('localhost');
     expect(h.options.json).toBe(true);
-    const p = parseWith(['stats', '-p', '--json']);
-    expect(p.options.port).toBe(6789);
-    expect(p.options.json).toBe(true);
+    // `-p` without a value is an error now (it used to fall back to 6789); the error
+    // proves `--json` was not swallowed as the port value.
+    expect(() => parseWith(['stats', '-p', '--json'])).toThrow('Invalid -p: missing value');
   });
 });
 

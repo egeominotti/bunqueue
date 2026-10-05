@@ -21,6 +21,7 @@ import { resolvePostgresRuntimeConfig } from './runtimeConfig';
 import { PostgresEventCommitGc } from './eventCommitGc';
 import { createPostgresConnection } from './connection';
 import { PostgresStorageHealthTracker } from './storageHealth';
+import { PostgresMaintenanceSchedule, postgresRetryDelayMs } from './maintenanceSchedule';
 import {
   heartbeatPostgresBroker,
   PostgresBrokerSessionFencedError,
@@ -32,10 +33,7 @@ import {
 export class PostgresQueueStoreRuntime {
   readonly context: PostgresContext;
   readonly events: PostgresEventStream;
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-  private recoveryTimer: ReturnType<typeof setInterval> | null = null;
-  private dlqTimer: ReturnType<typeof setInterval> | null = null;
-  private cronTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly maintenanceSchedule = new PostgresMaintenanceSchedule();
   private readyPromise: Promise<void> | null = null;
   private closing = false;
   private closed = false;
@@ -59,7 +57,7 @@ export class PostgresQueueStoreRuntime {
     this.healthTracker = new PostgresStorageHealthTracker(resolved);
     this.postCommitMaintenance = new PostgresPostCommitMaintenance(
       (subsystem, error) => this.reportMaintenance(subsystem, error),
-      Math.max(25, resolved.pollIntervalMs)
+      postgresRetryDelayMs(resolved)
     );
     this.maintenanceFlights = new PostgresMaintenanceFlights((subsystem, error) =>
       this.reportMaintenance(subsystem, error)
@@ -106,14 +104,7 @@ export class PostgresQueueStoreRuntime {
     this.postCommitMaintenance.close();
     this.maintenanceFlights.close();
     this.eventCommitGc.close();
-    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
-    if (this.recoveryTimer) clearInterval(this.recoveryTimer);
-    if (this.dlqTimer) clearInterval(this.dlqTimer);
-    if (this.cronTimer) clearInterval(this.cronTimer);
-    this.heartbeatTimer = null;
-    this.recoveryTimer = null;
-    this.dlqTimer = null;
-    this.cronTimer = null;
+    this.maintenanceSchedule.stop();
   }
 
   private async closeOnce(): Promise<void> {
@@ -253,32 +244,27 @@ export class PostgresQueueStoreRuntime {
 
   private startMaintenance(): void {
     this.eventCommitGc.start();
-    const heartbeatMs = Math.max(1000, Math.floor(this.config.leaseDurationMs / 3));
-    this.heartbeatTimer = setInterval(
-      () => void this.runMaintenance(() => this.heartbeatBroker(), 'heartbeat'),
-      heartbeatMs
+    this.maintenanceSchedule.start(this.config, {
+      heartbeat: () => void this.runMaintenance(() => this.heartbeatBroker(), 'heartbeat'),
+      recovery: () =>
+        void this.runMaintenance(() => recoverExpiredPostgresLeases(this.context), 'recovery'),
+      sweeps: () => this.runPeriodicSweeps(),
+      cron: () => void this.runMaintenance(() => processPostgresCrons(this.context), 'cron'),
+    });
+  }
+
+  private runPeriodicSweeps(): void {
+    void this.runMaintenance(async () => {
+      await maintainPostgresDlq(this.context);
+      await purgeStalePostgresWorkers(this.context);
+      await purgeStalePostgresBrokers(this.context);
+    }, 'dlq');
+    void this.runMaintenance(() => sweepPostgresEventRetention(this.context), 'event-retention');
+    void this.postCommitMaintenance.run('completion-retention', () =>
+      prunePostgresCompletionTombstones(this.context)
     );
-    this.recoveryTimer = setInterval(
-      () => void this.runMaintenance(() => recoverExpiredPostgresLeases(this.context), 'recovery'),
-      Math.max(500, Math.floor(this.config.leaseDurationMs / 2))
-    );
-    this.dlqTimer = setInterval(() => {
-      void this.runMaintenance(async () => {
-        await maintainPostgresDlq(this.context);
-        await purgeStalePostgresWorkers(this.context);
-        await purgeStalePostgresBrokers(this.context);
-      }, 'dlq');
-      void this.runMaintenance(() => sweepPostgresEventRetention(this.context), 'event-retention');
-      void this.postCommitMaintenance.run('completion-retention', () =>
-        prunePostgresCompletionTombstones(this.context)
-      );
-      void this.postCommitMaintenance.run('group-state-retention', () =>
-        prunePostgresGroupStates(this.context)
-      );
-    }, 60_000);
-    this.cronTimer = setInterval(
-      () => void this.runMaintenance(() => processPostgresCrons(this.context), 'cron'),
-      this.config.pollIntervalMs
+    void this.postCommitMaintenance.run('group-state-retention', () =>
+      prunePostgresGroupStates(this.context)
     );
   }
 

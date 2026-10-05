@@ -7,6 +7,10 @@ import type { Command } from '../../../domain/types/command';
 import type { Response } from '../../../domain/types/response';
 import * as resp from '../../../domain/types/response';
 import { jobId } from '../../../domain/types/job';
+import {
+  PROGRESS_JOB_NOT_FOUND_ERROR,
+  PROGRESS_NOT_ACTIVE_ERROR,
+} from '../../../domain/job/mutations';
 import type { HandlerContext } from '../types';
 import { throughputTracker } from '../../../application/throughputTracker';
 import { latencyTracker } from '../../../application/latencyTracker';
@@ -40,9 +44,9 @@ export async function handleProgress(
   // distinction (e.g. retry on transient state vs surface a missing-ID error).
   const state = await ctx.queueManager.getJobState(id);
   if (state === 'unknown') {
-    return resp.error('Job not found', reqId);
+    return resp.error(PROGRESS_JOB_NOT_FOUND_ERROR, reqId);
   }
-  return resp.error(`Job is not active (current state: ${state})`, reqId);
+  return resp.error(`${PROGRESS_NOT_ACTIVE_ERROR} (current state: ${state})`, reqId);
 }
 
 /** Handle GetProgress command */

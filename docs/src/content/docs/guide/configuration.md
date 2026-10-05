@@ -63,6 +63,38 @@ bunqueue start --config ./config/production.config.ts
 bunqueue start -c ./config/staging.config.ts
 ```
 
+## Validation
+
+The server checks the whole file when it starts, before it binds a port:
+
+- A value the server cannot use stops startup with an error that names the key,
+  for example `timeouts.stats must be a finite number of milliseconds >= 1 (got 0)`
+  or `auth.tokens must be an array of strings (got "secret")`. Every problem is
+  reported at once, together with invalid environment variables and CLI flags.
+- Numbers must be finite; a fractional value is rounded down to a whole number.
+  Ports, `timeouts.shutdown`, `timeouts.stats` and the backup `interval` /
+  `retention` also accept a numeric string, so `tcpPort: process.env.PORT` works.
+- Boolean keys take `true` or `false`. Any other value is read as earlier releases
+  read it, by JavaScript truthiness, and logged as a warning: a non-empty string is
+  true (`'false'` and `'0'` included) and `''` is false. With
+  `enabled: process.env.S3_BACKUP_ENABLED`, convert the variable to a boolean
+  (`process.env.S3_BACKUP_ENABLED === 'true'`).
+- `null` means "not set" for any key or section (`bucket: process.env.S3_BUCKET ?? null`).
+- Auth tokens must be non-empty strings: an empty or whitespace-only entry in
+  `auth.tokens` stops startup, `auth.tokens[0] must not be empty or whitespace-only
+(got "")`, and so does a missing one, `auth.tokens[0] must be a non-empty string
+(got undefined)`. Tokens are trimmed.
+- Values that earlier releases replaced with a default keep that default and are
+  logged as a warning, for example a negative `telemetry.maxPrometheusQueues` (100)
+  or an invalid `storage.completedRetentionMs` (retention off).
+- An unknown key (a typo such as `completedRetentionMS`, or a key from a newer
+  version) does not stop the server: it is logged as a warning,
+  `Unknown config key "storage.completedRetentionMS" is ignored`, and the setting
+  keeps its default. `defineConfig()` already flags such keys in your editor.
+
+`defineConfig()` itself stays a plain pass-through: the checks run when the
+server loads the file.
+
 ## Full configuration reference
 
 Every section is **optional**. Only specify what you need.
@@ -98,6 +130,15 @@ defineConfig({
 });
 ```
 
+Every token must contain at least one non-whitespace character. An empty or
+whitespace-only token stops startup with an error naming the entry, because it would
+match a request that carries no credentials. Watch for a fallback such as
+`tokens: [process.env.API_TOKEN ?? '']`: it type-checks, and it yields `['']` when the
+variable is unset, so the server refuses to start. `tokens: []` is accepted and
+disables authentication, and `auth.tokens` takes precedence over `AUTH_TOKENS`.
+Tokens are trimmed on both sides of the comparison: a client that sends the same
+secret with a trailing newline still authenticates.
+
 :::note[Secrets]
 The config file is code, don't hardcode secrets that get committed to git. Use `process.env.*` for sensitive values.
 :::
@@ -118,15 +159,16 @@ defineConfig({
 });
 ```
 
-`maxCompletedJobs` bounds the in-memory completed-job projection; it does not
-delete SQLite rows. Set `completedRetentionMs` to opt into age-based durable
-cleanup (up to 1,000 oldest eligible rows per 10-second cleanup tick). The
-default is `null`, so completed rows remain until `queue.clean(...)`,
-`obliterate`, or another explicit policy removes them. Results still needed by
-live dependency consumers are protected until the consumer leaves the graph.
-Finite non-negative values are rounded down to whole milliseconds. Negative,
-non-finite, and unsafe integer values disable automatic retention (`null`) in
-both server configuration and direct embedded `QueueManager` construction.
+`maxCompletedJobs` bounds the in-memory completed-job projection (a whole
+number ≥ 1); it does not delete SQLite rows. Set `completedRetentionMs` to opt
+into age-based durable cleanup (up to 1,000 oldest eligible rows per 10-second
+cleanup tick). The default is `null`, so completed rows remain until
+`queue.clean(...)`, `obliterate`, or another explicit policy removes them.
+Results still needed by live dependency consumers are protected until the
+consumer leaves the graph. Finite non-negative values are rounded down to whole
+milliseconds and `null` disables retention. A negative, non-finite or
+non-numeric value also disables retention, as in earlier releases, and the server
+logs a warning naming the key.
 
 The server CLI equivalents are `--max-completed-jobs` and
 `--completed-retention-ms`; environment equivalents are documented in the
@@ -173,8 +215,8 @@ defineConfig({
 });
 ```
 
-The environment equivalent is `METRICS_MAX_QUEUES`. The default is `100`;
-invalid or negative values fall back to the default.
+The environment equivalent is `METRICS_MAX_QUEUES`. The default is `100`; an
+invalid or negative value keeps 100 and logs a warning.
 
 ### `cors`
 
@@ -187,6 +229,11 @@ defineConfig({
   },
 });
 ```
+
+`origins` also accepts a comma-separated string, like `CORS_ALLOW_ORIGIN`
+(`'*'`, `'https://a.example,https://b.example'`). An `undefined`, `null` or empty
+entry (`[process.env.FRONTEND_URL!]` with the variable unset) is dropped with a
+warning.
 
 ### `backup`
 
@@ -203,37 +250,48 @@ defineConfig({
     region: 'eu-west-1', // Default: us-east-1
     endpoint: undefined, // Custom S3 endpoint (MinIO, R2, etc.)
     virtualHostedStyle: undefined, // Force bucket-in-host addressing
-    interval: 6 * 60 * 60 * 1000, // Backup interval in ms (default: 6h)
-    retention: 7, // Backups to keep (default: 7)
+    interval: 6 * 60 * 60 * 1000, // Backup interval in ms (default: 6h, minimum 60000)
+    retention: 7, // Backups to keep (default: 7, minimum 1)
     prefix: 'backups/', // S3 key prefix (default: 'backups/')
   },
 });
 ```
 
 The server also needs `storage.dataPath` (or a data-path environment variable);
-automatic backup is unavailable in in-memory and PostgreSQL modes.
+automatic backup is unavailable in in-memory and PostgreSQL modes. A backup that
+cannot run (no bucket or credentials, an interval under a minute, an invalid
+retention) does not stop the server: it logs `S3 backup configuration invalid` with
+the settings to fix and runs without backups. An invalid value is never used.
 
 ### `timeouts`
 
 ```typescript
 defineConfig({
   timeouts: {
-    shutdown: 30000, // Graceful shutdown timeout in ms (default: 30000)
-    stats: 300000, // Stats logging interval in ms (default: 300000)
+    shutdown: 30000, // Graceful shutdown timeout in ms (default: 30000, 0 = do not wait)
+    stats: 300000, // Stats logging interval in ms (default: 300000, minimum 1)
   },
 });
 ```
 
-Only `shutdown` and `stats` are read from the config file. The type also
-accepts `worker` and `lock`, but those values are currently ignored — set the
-`WORKER_TIMEOUT_MS` and `LOCK_TIMEOUT_MS` environment variables instead.
+The environment equivalents are `SHUTDOWN_TIMEOUT_MS` and `STATS_INTERVAL_MS`; the
+config file wins.
+
+`timeouts.worker` and `timeouts.lock` are accepted but **ignored**: they never took
+effect, and the server logs a warning when they are present. Set the worker
+heartbeat freshness window with `WORKER_TIMEOUT_MS` (default 30000; a worker whose
+last heartbeat is older is shown as stale and is removed after three times that
+window) and the internal lock acquisition timeout with `LOCK_TIMEOUT_MS` (default
+5000), both in milliseconds.
 
 ### `webhooks`
 
-Delivery retries for [webhooks](/guide/webhooks/) are configured via the
-`WEBHOOK_MAX_RETRIES` (default: 3) and `WEBHOOK_RETRY_DELAY_MS` (default: 1000)
-environment variables. The config-file type accepts a `webhooks` key for
-forward compatibility, but its values are currently ignored.
+`webhooks.maxRetries` and `webhooks.retryDelay` are accepted but **ignored**: they
+never took effect, and the server logs a warning when they are present. Configure
+[webhook](/guide/webhooks/) delivery retries with `WEBHOOK_MAX_RETRIES` (delivery
+attempts per event, first try included, default 3, minimum 1) and
+`WEBHOOK_RETRY_DELAY_MS` (base delay in ms; attempt n + 1 waits n × the delay,
+default 1000).
 
 ### `logging`
 
@@ -245,6 +303,12 @@ defineConfig({
   },
 });
 ```
+
+Values are matched in any case, like the `LOG_LEVEL` and `LOG_FORMAT`
+environment variables they override, and the level also accepts `warning`, `trace`,
+`verbose`, `fatal` and `critical`. Any other value is logged as a warning and
+ignored. With the Docker image, `LOG_FORMAT=json` keeps JSON output even when the
+file says `text`.
 
 ## Complete examples
 

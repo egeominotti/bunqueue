@@ -70,7 +70,7 @@ export class CommandQueue {
 
   rejectAll(error: Error): void {
     for (const command of this.pendingCommands.values()) {
-      clearTimeout(command.timeout);
+      command.timeout.clear();
       command.promise?.catch(() => {});
       command.reject(error);
     }
@@ -78,14 +78,14 @@ export class CommandQueue {
     this.pendingQueue = [];
 
     for (const command of this.inFlightByReqId.values()) {
-      clearTimeout(command.timeout);
+      command.timeout.clear();
       command.promise?.catch(() => {});
       command.reject(error);
     }
     this.inFlightByReqId.clear();
 
     if (this.currentCommand) {
-      clearTimeout(this.currentCommand.timeout);
+      this.currentCommand.timeout.clear();
       this.currentCommand.reject(error);
       this.currentCommand = null;
     }
@@ -93,7 +93,7 @@ export class CommandQueue {
 
   clearCurrent(error?: Error): void {
     if (this.currentCommand) {
-      clearTimeout(this.currentCommand.timeout);
+      this.currentCommand.timeout.clear();
       if (error) this.currentCommand.reject(error);
       this.currentCommand = null;
     }

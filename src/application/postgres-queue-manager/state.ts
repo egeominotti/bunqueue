@@ -15,14 +15,15 @@ import { PostgresQueueSnapshot } from './snapshot';
 import { PostgresStartupEventBuffer } from './startupEventBuffer';
 import { PostgresOperationGate } from './operationGate';
 import { applyPostgresJobProjection, PostgresProjectionRefreshes } from './projectionRefreshes';
+import { PostgresQueueRefreshes } from './queueRefreshes';
+import { postgresRetryDelayMs } from '../../infrastructure/persistence/postgres/maintenanceSchedule';
 
 export abstract class PostgresQueueManagerState extends QueueManager {
   protected readonly postgresStore: PostgresQueueStore;
   protected readonly postgresSnapshot: PostgresQueueSnapshot;
   protected readonly activeTokens = new Map<JobId, string>();
   protected readonly postgresReady: Promise<void>;
-  private readonly refreshes = new Map<string, Promise<void>>();
-  private readonly dirtyQueues = new Set<string>();
+  private readonly queueRefreshes: PostgresQueueRefreshes;
   private readonly queueEventVersions = new Map<string, number>();
   private snapshotEventBuffer: PostgresStartupEventBuffer | null = new PostgresStartupEventBuffer();
   private terminalMetricBaselineCommitSeq = 0;
@@ -34,7 +35,6 @@ export abstract class PostgresQueueManagerState extends QueueManager {
   private shutdownPromise: Promise<void> | null = null;
   private shutdownComplete = false;
   private baseStopped = false;
-  private stopQueueRefreshes = false;
 
   constructor(config: PostgresQueueManagerConfig) {
     const { postgres, ...baseConfig } = config;
@@ -60,12 +60,18 @@ export abstract class PostgresQueueManagerState extends QueueManager {
       (id, projection) =>
         applyPostgresJobProjection(this.postgresSnapshot, this.activeTokens, id, projection),
       (queue, id, error) => this.postgresStore.reportProjectionRefresh(queue, id, error),
-      this.postgresStore.config.pollIntervalMs
+      postgresRetryDelayMs(this.postgresStore.config)
     );
     this.unsubscribeEvent = this.postgresStore.onEvent((event) => this.onStoreEvent(event));
     this.unsubscribeInvalidation = this.postgresStore.onInvalidation((queue) => {
       this.scheduleQueueRefresh(queue);
     });
+    this.queueRefreshes = new PostgresQueueRefreshes(
+      () => this.postgresReady,
+      (queue) => this.refreshQueue(queue),
+      (queue, error) => this.postgresStore.reportQueueRefresh(queue, error),
+      postgresRetryDelayMs(this.postgresStore.config)
+    );
     this.postgresReady = this.initializePostgres();
   }
   async waitUntilReady(): Promise<void> {
@@ -99,8 +105,7 @@ export abstract class PostgresQueueManagerState extends QueueManager {
   }
 
   private async performPostgresShutdown(): Promise<void> {
-    this.stopQueueRefreshes = true;
-    this.dirtyQueues.clear();
+    this.queueRefreshes.stop();
     this.projectionRefreshes.close();
     const operationDrain = this.operations.closeAndDrain();
     await operationDrain;
@@ -113,7 +118,7 @@ export abstract class PostgresQueueManagerState extends QueueManager {
     } catch (error) {
       errors.push(error);
     }
-    await Promise.allSettled([...this.refreshes.values(), this.projectionRefreshes.drain()]);
+    await Promise.allSettled([this.queueRefreshes.settled(), this.projectionRefreshes.drain()]);
     try {
       await this.postgresStore.close();
     } catch (error) {
@@ -169,7 +174,7 @@ export abstract class PostgresQueueManagerState extends QueueManager {
     const eventVersion = this.queueEventVersions.get(queue) ?? 0;
     const { rows, state, exists, results } = await this.postgresStore.loadQueueReadModel(queue);
     if (eventVersion !== (this.queueEventVersions.get(queue) ?? 0)) {
-      this.dirtyQueues.add(queue);
+      this.queueRefreshes.markDirty(queue);
       return false;
     }
     this.projectionRefreshes.supersedeQueue(queue);
@@ -223,39 +228,7 @@ export abstract class PostgresQueueManagerState extends QueueManager {
   }
 
   private scheduleQueueRefresh(queue: string): void {
-    if (this.stopQueueRefreshes) return;
-    this.dirtyQueues.add(queue);
-    if (this.refreshes.has(queue)) return;
-    const refresh = this.postgresReady
-      .then(() => this.refreshDirtyQueue(queue))
-      .catch(() => {
-        this.dirtyQueues.delete(queue);
-      })
-      .finally(() => {
-        this.refreshes.delete(queue);
-        if (this.dirtyQueues.has(queue)) this.scheduleQueueRefresh(queue);
-      });
-    this.refreshes.set(queue, refresh);
-  }
-
-  private async refreshDirtyQueue(queue: string): Promise<void> {
-    let retryDelay = this.postgresStore.config.pollIntervalMs;
-    while (!this.stopQueueRefreshes && this.dirtyQueues.delete(queue)) {
-      try {
-        const applied = await this.refreshQueue(queue);
-        if (!applied && !this.stopQueueRefreshes) {
-          await Bun.sleep(this.postgresStore.config.pollIntervalMs);
-        }
-        this.postgresStore.reportQueueRefresh(queue, null);
-        retryDelay = this.postgresStore.config.pollIntervalMs;
-      } catch (error) {
-        this.postgresStore.reportQueueRefresh(queue, error);
-        if (this.stopQueueRefreshes) return;
-        this.dirtyQueues.add(queue);
-        await Bun.sleep(retryDelay);
-        retryDelay = Math.min(retryDelay * 2, 1_000);
-      }
-    }
+    this.queueRefreshes.schedule(queue);
   }
 
   private onStoreEvent(event: PostgresDeliveredStoreEvent): void {

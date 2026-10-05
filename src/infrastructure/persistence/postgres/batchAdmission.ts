@@ -4,6 +4,7 @@ import { postgresAdvisoryLockName } from './advisoryLocks';
 import { recordPostgresJobEvents } from './batchEvents';
 import { encodePostgresValue, postgresStateForJob } from './codec';
 import { databaseNow, type PostgresContext } from './context';
+import { postgresPriorityColumn } from './priorityColumn';
 import { retirePostgresCompletionGenerations } from './completionLifecycle';
 import { lockPostgresDependencyCompletions } from './dependencyPromotion';
 import type { PostgresJobState } from './types';
@@ -114,7 +115,7 @@ function toRecords(
     queue: job.queue,
     payload: encodePostgresValue(job),
     state,
-    priority: job.priority,
+    priority: postgresPriorityColumn(job.priority),
     lifo: job.lifo,
     run_at: job.runAt,
     created_at: job.createdAt,

@@ -146,8 +146,17 @@ admitted, so an invalid or full group rejects the complete flow.
 not trusted. It checks:
 
 - strict runtime types for queue names, string IDs, link arrays, booleans, tags,
-  internal metadata, JSON-serializable payloads, and numeric option bounds
-  (including `backoff.delay` and `backoff.maxDelay`, each `0..86_400_000` ms);
+  internal metadata, and JSON-serializable payloads;
+- numeric option rules through the shared `validateJobOptions`, the same
+  validator as `PUSH`, `PUSHB` and embedded `Queue.add`, with messages that name the
+  FlowProducer option (see [Job Options Validation](./job-options-validation.md)):
+  for example `attempts must be a number` and `timestamp` within ±4.32e15; values
+  2.9.10's embedded add ran (`attempts: 0` or `-1`, a 25 h timeout, priority 2,097,152) are
+  admitted, and an object-form `backoff` without `delay` uses the 1000 ms default
+  base (`{ type: 'fixed' }` used to be admitted and then fail the SQLite commit on
+  `NOT NULL`); `backoff.delay` must be a finite number `>= 0` and `backoff.maxDelay`
+  `0..86_400_000` ms. Unsupported repeat, deduplication and debounce inputs are
+  rejected before the rules;
 - a 10 MB per-job and 64 MB aggregate flow-data bound;
 - unique IDs, dependencies, children, and parent/metadata back-references;
 - duplicate edges and graph cycles;
@@ -331,7 +340,15 @@ the Job properties and graph structure. Reading that node back through
 `Queue.getJob()` after `updateData()` returns the new caller fields plus the
 preserved engine-owned topology fields; this is intentional and identical in
 embedded and TCP runtimes. Every TCP-backed Job mutation and
-`waitUntilReady()` checks `{ ok: false }` and throws the broker error; object
+`waitUntilReady()` checks `{ ok: false }` and throws the broker error, with one
+exception shared with embedded mode and BullMQ: `extendLock` resolves `0` when the
+broker has no matching lease (`Lock not found or invalid token`). Embedded flow jobs follow
+the same rules: `changeDelay` and `updateData` on a job they cannot change throw the broker's
+message in both modes, while `promote`, progress and `changePriority` on a job that is no
+longer delayed, active or queued resolve without change (the setter outcome table in
+[Job Options Validation](./job-options-validation.md)). `changeDelay`,
+`moveToDelayed` and `extendLock` validate their argument first in both modes (see
+[Job Options Validation](./job-options-validation.md)); object
 progress is carried as numeric progress plus a JSON message, matching the queue
 client. `close()`/`disconnect()` share one stable, failure-preserving shutdown
 promise, release a shared-pool reference at most once, and forward connection

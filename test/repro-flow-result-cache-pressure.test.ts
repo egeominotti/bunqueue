@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 async function complete(queue: string, result: unknown): Promise<void> {
-  const pulled = await manager!.pull(queue, 'result-pressure-worker');
+  const pulled = await manager!.pull(queue);
   if (!pulled) throw new Error(`No job available in ${queue}`);
   await manager!.ack(pulled.id, result, pulled.token);
 }

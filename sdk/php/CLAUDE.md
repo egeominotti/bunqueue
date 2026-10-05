@@ -30,6 +30,7 @@ both are mandatory for every change here. The correctness checklist is
 | `src/Connection.php` + `ConnectionTLS.php` | Socket, framing, Auth-first, lazy reconnect, verified TLS, absolute write/read deadline and timeout teardown |
 | `src/ConnectionTelemetry.php` | Optional payload-free lifecycle/command telemetry with callback isolation |
 | `src/Options.php` | SDK options → wire fields (`attempts`→`maxAttempts`, dedup, debounce); unknown keys throw |
+| `src/OptionGuard.php` | Boundary checks: connect/command timeouts (finite seconds > 0, capped at `MAX_TIMEOUT_S`), `lockTtlMs` (int >= 1), rule-4 clamps for heartbeat/`batchSize`/`pollTimeoutMs`/`waitForJob` ttl (never throw; 0.2.0 conversions kept, pinned by `tests/e2e-compat.php`), empty-pull delay (10 ms / 50 ms, `polling.ts` rule) |
 | `src/Job.php` | Job wrapper + per-id ops (progress, log, extendLock) |
 | `src/Queue.php` + `QueueQuery/Control/Admin` traits | Produce, query, control, DLQ, schedulers, webhooks, monitoring |
 | `src/Worker.php` + `WorkerEvents.php` | Sequential worker: `run()` / `runOnce()`, time-based heartbeats, safe registration, clamps, events and signal handlers |

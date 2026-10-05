@@ -11,7 +11,7 @@ import {
   attemptsField,
   backoffField,
   customJobIdField,
-  delayField,
+  jobDelayField,
   jobNameField,
   priorityField,
   queueField,
@@ -28,7 +28,7 @@ import { withErrorHandler } from './withErrorHandler';
 const jobOptsSchema = z
   .strictObject({
     priority: priorityField().optional(),
-    delay: delayField().optional(),
+    delay: jobDelayField().optional(),
     attempts: attemptsField().optional(),
     backoff: backoffField().optional(),
     timeout: timeoutField().optional(),

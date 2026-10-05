@@ -3,6 +3,7 @@
  * Monitors connection health with ping and latency tracking
  */
 
+import { safeInterval, type SafeTimer } from '../../shared/timers';
 import type { ConnectionHealth } from './types';
 
 /** Health tracker configuration */
@@ -31,7 +32,7 @@ export class HealthTracker {
   private totalCommands = 0;
   private totalErrors = 0;
   private readonly latencyHistory: number[] = [];
-  private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private pingTimer: SafeTimer | null = null;
 
   private static readonly MAX_LATENCY_HISTORY = 10;
 
@@ -116,11 +117,15 @@ export class HealthTracker {
     };
   }
 
-  /** Start ping timer */
+  /**
+   * Start ping timer. 0 disables the ping, and so does anything not above 0 (NaN
+   * included, which TcpClient rejects at construction), so no value can arm a spin.
+   * `safeInterval` honours a period above 2^31 - 1 ms and arms nothing for Infinity.
+   */
   startPing(pingFn: () => Promise<void>): void {
-    if (this.config.pingInterval <= 0) return;
+    if (!(this.config.pingInterval > 0)) return;
     this.stopPing();
-    this.pingTimer = setInterval(() => {
+    this.pingTimer = safeInterval(() => {
       void pingFn();
     }, this.config.pingInterval);
   }
@@ -128,7 +133,7 @@ export class HealthTracker {
   /** Stop ping timer */
   stopPing(): void {
     if (this.pingTimer) {
-      clearInterval(this.pingTimer);
+      this.pingTimer.clear();
       this.pingTimer = null;
     }
   }

@@ -21,6 +21,9 @@ defmodule Bunqueue.Connection do
   }
 
   @default_timeout 30_000
+  # `do_call/3` adds 2 s of headroom to `GenServer.call/3`, and the BEAM rejects
+  # timer values above 2^32 - 1 ms with `:timeout_value`.
+  @max_timeout 4_294_967_295 - 2_000
   @max_frame_size 64 * 1024 * 1024
   @type option ::
           {:host, String.t()}
@@ -38,7 +41,15 @@ defmodule Bunqueue.Connection do
   @spec call(GenServer.server(), map(), non_neg_integer() | nil) ::
           {:ok, map()} | {:error, Exception.t()}
   def call(connection, command, timeout \\ nil) do
-    command_timeout = normalize_timeout(timeout || connection_timeout(connection))
+    # As in 0.1.1, `nil` or `false` uses the connection's timeout and any other
+    # value is normalized: a negative or non-number one means the 30 s default.
+    # A value of at least 0 but below 1 ms, which would time out at once, uses
+    # the connection's timeout too.
+    command_timeout =
+      if timeout && not sub_millisecond?(timeout),
+        do: normalize_timeout(timeout),
+        else: connection_timeout(connection)
+
     do_call(connection, command, command_timeout)
   end
 
@@ -68,6 +79,9 @@ defmodule Bunqueue.Connection do
   def close(connection) do
     if Process.alive?(connection), do: GenServer.stop(connection, :normal)
     :ok
+  catch
+    # It exited between the liveness check and the stop: already closed.
+    :exit, _reason -> :ok
   end
 
   @impl true
@@ -247,6 +261,13 @@ defmodule Bunqueue.Connection do
     :exit, _reason -> @default_timeout
   end
 
-  defp normalize_timeout(value) when is_number(value) and value >= 0, do: trunc(value)
-  defp normalize_timeout(_value), do: @default_timeout
+  # A timeout below 1 ms would make every connect and recv fail at once, so it
+  # falls back to the default like any other invalid value; a longer one is
+  # capped at the BEAM timer limit instead of raising `:timeout_value`.
+  defp normalize_timeout(value) do
+    if valid_timeout?(value), do: value |> trunc() |> min(@max_timeout), else: @default_timeout
+  end
+
+  defp valid_timeout?(value), do: is_number(value) and value >= 1
+  defp sub_millisecond?(value), do: is_number(value) and value >= 0 and value < 1
 end

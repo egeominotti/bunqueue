@@ -6,6 +6,7 @@
 import type { PendingAck, TcpConnection } from './types';
 import { getSharedManager } from '../manager';
 import { jobId } from '../../domain/types/job';
+import { safeTimeout, type SafeTimer } from '../../shared/timers';
 import { ignoredAckIndices } from './ackOutcome';
 
 /** ACK batcher configuration */
@@ -29,7 +30,7 @@ const DEFAULT_RETRY_DELAY_MS = 100;
 export class AckBatcher {
   private readonly MAX_PENDING_ACKS = 10000;
   private readonly pendingAcks: PendingAck[] = [];
-  private ackTimer: ReturnType<typeof setTimeout> | null = null;
+  private ackTimer: SafeTimer | null = null;
   private readonly config: AckBatcherConfig;
   private tcp: TcpConnection | null = null;
   private stopped = false;
@@ -83,7 +84,7 @@ export class AckBatcher {
       });
 
       if (!this.flushIfThresholdReached()) {
-        this.ackTimer ??= setTimeout(() => {
+        this.ackTimer ??= safeTimeout(() => {
           this.ackTimer = null;
           void this.startTrackedFlush();
         }, this.config.interval);
@@ -102,10 +103,8 @@ export class AckBatcher {
 
     const batch = this.pendingAcks.splice(0, this.pendingAcks.length);
 
-    if (this.ackTimer) {
-      clearTimeout(this.ackTimer);
-      this.ackTimer = null;
-    }
+    this.ackTimer?.clear();
+    this.ackTimer = null;
 
     await this.sendBatchWithRetry(batch);
   }
@@ -186,10 +185,8 @@ export class AckBatcher {
   /** Stop and cleanup - clears pending acks without processing */
   stop(): void {
     this.stopped = true;
-    if (this.ackTimer) {
-      clearTimeout(this.ackTimer);
-      this.ackTimer = null;
-    }
+    this.ackTimer?.clear();
+    this.ackTimer = null;
     // Clear any pending acks (they should have been flushed before stop)
     this.pendingAcks.length = 0;
   }

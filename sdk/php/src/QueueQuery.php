@@ -66,11 +66,11 @@ trait QueueQuery
      * Block until the job completes and return its result.
      * Non-completion probes the state: `failed` throws CommandException (it
      * will never complete), everything else throws CommandTimeoutException.
+     * The ttl is clamped to the server's [0, 600000] ms; null or NAN means 30000.
      */
-    public function waitForJob(string $id, int $timeoutMs = 30000): mixed
+    public function waitForJob(string $id, int|float|null $timeoutMs = 30000): mixed
     {
-        // The server validates 0 <= timeout <= 600000: clamp instead of erroring.
-        $timeoutMs = max(0, min($timeoutMs, 600_000));
+        $timeoutMs = OptionGuard::waitJobTtlMs($timeoutMs);
         $response = $this->call(
             ['cmd' => 'WaitJob', 'id' => $id, 'timeout' => $timeoutMs],
             $timeoutMs / 1000 + 5

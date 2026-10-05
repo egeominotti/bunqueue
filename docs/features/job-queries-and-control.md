@@ -340,6 +340,17 @@ are PostgreSQL-specific and do not alter the synchronous SQLite implementation.
   generation. If obliteration wins that gap, the late transition is ignored
   instead of resurrecting a completed or failed job.
 - **Idempotency / not-found:** all mutations return `false` (or `[]`) when the job is absent or in the wrong location; `cancelJob`/`promoteJob`/`changeJobPriority` only act on queued jobs, and `updateJobProgress` plus the low-level `moveJobToDelayed` claim operation require an active job. The public manager-level `moveToDelayed`/`changeDelay` dispatcher supports both queued and active jobs as described above. `promoteJob` no-ops if `runAt <= now` (already due).
+- **Argument validation (2.9.10 results):** `QueueManager.changePriority` accepts any
+  finite priority, grouped jobs included (a numeric string is its number), and requires a
+  boolean `lifo` when given; `updateProgress` never rejects (`normalizeProgress`: NaN is
+  0, `'50'`/`true`/`null` are 50/1/0, other text is 0 with the text as the message);
+  `updateJobData` requires JSON-serializable data, with no size limit; `changeDelay`/
+  `moveToDelayed`/`changeWaitingDelay` take any finite delay (`delayArgument`: a negative
+  one keeps its past run time, `now + delay`, so the job is ready at once and sorts
+  ahead of later ready jobs, as on 2.9.10); `clearLogs` applies `keepLogsArgument` (0 or less
+  clears all, a fraction keeps its whole part) and rejects only NaN or text; `pull*`
+  honour any `timeoutMs` (`pullTimeoutArgument`: negative or NaN is no wait, no 60 s cap) and `pullWithLock`/`extendLock`
+  grant any finite lease. See [Job Options Validation](./job-options-validation.md).
 - **Progress clamping and durability:** `updateJobProgress` clamps to `[0,100]`,
   preserves the prior message when a later update omits one, refreshes
   `lastHeartbeat`, and writes all three values through to SQLite while the

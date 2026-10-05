@@ -37,9 +37,20 @@ export function priorityField(description = 'Priority (higher = processed first)
   return z.number().int().min(-MAX_PRIORITY).max(MAX_PRIORITY).describe(description);
 }
 
-/** Delay before a job becomes ready, in milliseconds (0 to one year). */
+/** A new delay for an existing job (move to delayed, change delay), in ms: 0 to one year. */
 export function delayField(description = 'Delay in milliseconds before processing') {
   return z.number().min(0).max(MAX_DELAY_MS).describe(description);
+}
+
+/**
+ * The `delay` option of a job being added, in ms: at most one year (this tool's own
+ * limit). A negative delay (a run time already in the past) is accepted: the job is ready
+ * at once with that past run time, as the broker stores it.
+ */
+export function jobDelayField(
+  description = 'Delay in milliseconds before processing (a negative delay makes the job ready at once)'
+) {
+  return z.number().max(MAX_DELAY_MS).describe(description);
 }
 
 /** Maximum attempts: an integer of at least 1. */
@@ -149,7 +160,7 @@ export function tagsField() {
 export function jobOptionsShape() {
   return {
     priority: priorityField().optional(),
-    delay: delayField().optional(),
+    delay: jobDelayField().optional(),
     attempts: attemptsField().optional(),
     backoff: backoffField().optional(),
     timeout: timeoutField().optional(),

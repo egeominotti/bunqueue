@@ -44,20 +44,15 @@ final class Worker
     private const MAX_STACK_LINES = 10; // server persists the FIRST stackTraceLimit lines (default 10)
     private const BACKOFF_US = [500_000, 1_000_000, 2_000_000, 5_000_000];
 
-    /** @param array{host?: string, port?: int, token?: string, tls?: bool|array, batchSize?: int, pollTimeoutMs?: int, lockTtlMs?: int, heartbeatIntervalS?: float, name?: string, commandTimeout?: float, onEvent?: callable} $options */
+    /** @param array{host?: string, port?: int, token?: string, tls?: bool|array, batchSize?: int, pollTimeoutMs?: int|float, lockTtlMs?: int, heartbeatIntervalS?: int|float, name?: string, connectTimeout?: int|float, commandTimeout?: int|float, onEvent?: callable} $options */
     public function __construct(public readonly string $queue, callable $processor, array $options = [])
     {
         $this->processor = $processor;
-        // The server rejects PULLB count > 1000: clamp, never wedge the loop.
-        $rawBatch = $options['batchSize'] ?? 10;
-        $this->batchSize = \is_int($rawBatch) ? min(max(1, $rawBatch), 1000) : 10;
-        $rawPoll = $options['pollTimeoutMs'] ?? 5000;
-        $poll = \is_numeric($rawPoll) && is_finite((float) $rawPoll) ? (int) $rawPoll : 0;
-        $this->pollTimeoutMs = max(0, min($poll, 30_000));
-        $this->lockTtlMs = $options['lockTtlMs'] ?? 30_000;
-        // 0 (or negative / non-finite) disables heartbeats.
-        $hb = $options['heartbeatIntervalS'] ?? 10.0;
-        $this->heartbeatIntervalS = (is_finite((float) $hb) && (float) $hb > 0) ? (float) $hb : 0.0;
+        // Rule 4 clamps (OptionGuard): the server rejects PULLB count > 1000.
+        $this->batchSize = OptionGuard::batchSize($options['batchSize'] ?? 10);
+        $this->pollTimeoutMs = OptionGuard::pollTimeoutMs($options['pollTimeoutMs'] ?? 5000);
+        $this->lockTtlMs = OptionGuard::milliseconds($options['lockTtlMs'] ?? 30_000, 'lockTtlMs');
+        $this->heartbeatIntervalS = OptionGuard::heartbeatIntervalS($options['heartbeatIntervalS'] ?? 10.0);
         $this->workerId = sprintf('php-%s-%d-%s', gethostname() ?: 'host', getmypid() ?: 0, bin2hex(random_bytes(4)));
         $this->name = $options['name'] ?? $this->workerId;
         $this->connection = new Connection($options);
@@ -71,8 +66,11 @@ final class Worker
         $this->emit('ready');
         while (!$this->stopped) {
             try {
-                $this->runOnce();
+                $handled = $this->runOnce();
                 $backoffIdx = 0;
+                if ($handled === 0 && !$this->stopped) {
+                    usleep(OptionGuard::emptyPullDelayUs($this->pollTimeoutMs)); // never re-poll at once
+                }
             } catch (BunqueueException $e) {
                 $this->emit('error', $e);
                 usleep(self::BACKOFF_US[min($backoffIdx, \count(self::BACKOFF_US) - 1)]);

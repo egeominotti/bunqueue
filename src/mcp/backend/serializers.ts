@@ -2,6 +2,7 @@ import type { JobNode } from '../../client/flowTypes';
 import type { CronJob } from '../../domain/types/cron';
 import type { Job } from '../../domain/types/job';
 import type { FlowNodeResult, SerializedCron, SerializedJob } from '../types/adapter';
+import { isoTime } from '../workflow/jsonSafe';
 import { serializeJobOptions } from './jobOptionsView';
 
 /** Serialize a job for MCP output; `state` is included when the caller resolved it. */
@@ -16,8 +17,9 @@ export function serializeMcpJob(job: Job, state?: string): SerializedJob {
     progress: job.progress,
     attempts: job.attempts,
     maxAttempts: job.maxAttempts,
-    createdAt: new Date(job.createdAt).toISOString(),
-    startedAt: job.startedAt ? new Date(job.startedAt).toISOString() : undefined,
+    // A legacy time outside the Date range (or ±Infinity) is null, never a thrown RangeError.
+    createdAt: isoTime(job.createdAt),
+    startedAt: job.startedAt ? (isoTime(job.startedAt) ?? undefined) : undefined,
     ...serializeJobOptions(job),
   };
 }
@@ -43,7 +45,7 @@ export function serializeMcpCron(cron: McpCronFields): SerializedCron {
     queue: cron.queue,
     schedule: cron.schedule ?? undefined,
     repeatEvery: cron.repeatEvery ?? undefined,
-    nextRun: cron.nextRun ? new Date(cron.nextRun).toISOString() : null,
+    nextRun: cron.nextRun ? isoTime(cron.nextRun) : null,
     executions: cron.executions,
     jobName: cron.jobName,
     priority: cron.priority,

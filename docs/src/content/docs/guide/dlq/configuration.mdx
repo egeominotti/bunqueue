@@ -143,7 +143,7 @@ connection.call(vec![
 *The DLQ policy is server-side state per queue: set it once from any client and it governs jobs failed by workers in every language. A dedicated helper ships in the Bun package, the TypeScript SDK and the Python SDK; the other tabs issue the same `SetDlqConfig` command through each SDK's public TCP connection.*
 
 :::note[Confirming the write in TCP mode]
-In the Bun client `setDlqConfig()` is fire-and-forget over TCP: it updates the local cache and sends the command without waiting, so a transport failure is not reported to you. Use `await queue.setDlqConfigAsync(config)` when you need the call to resolve only once the server has applied the policy. In embedded mode the two are equivalent.
+In the Bun client `setDlqConfig()` is fire-and-forget over TCP: it updates the local cache and sends the command without waiting, so it cannot report a transport failure to the caller. The failure is logged as one `console.error` line naming the command and the queue (in Simple Mode it is emitted on the `error` event while a listener is attached), and it never crashes the process. Use `await queue.setDlqConfigAsync(config)` when you need the call to resolve only once the server has applied the policy. In embedded mode the two are equivalent.
 :::
 
 | Option | Default | Description |

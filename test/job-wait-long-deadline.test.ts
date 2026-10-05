@@ -2,23 +2,19 @@ import { afterEach, expect, setDefaultTimeout, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  armDeadlineTimer,
-  DEADLINE_CHUNK_MS,
-  type DeadlineTimer,
-} from '../src/client/job-wait/deadlineTimer';
+import { MAX_TIMER_DELAY_MS, safeDeadline, type SafeTimer } from '../src/shared/timers';
 
 // A wait's deadline can lie beyond the runtime's timer limit (2^31 - 1 ms, about
-// 24.8 days): one setTimeout that long fires after 1 ms. The deadline is therefore
-// armed in chunks that each fit in one timer, every chunk measured against the clock,
-// and the callback runs once, never before the deadline. Clearing the deadline clears
-// whichever chunk is armed. A fake clock checks the exact chunks; real timers with a
-// 20 ms chunk check the same without waiting days; fresh processes check that a wait
-// with a 30-day TTL keeps a script alive and lets it exit once it settles.
+// 24.8 days): one setTimeout that long fires after 1 ms. The session therefore arms it
+// with `safeDeadline` (src/shared/timers.ts): chunks that each fit in one timer, every
+// chunk measured against the clock, and the callback runs once, never before the
+// deadline. Clearing the deadline clears whichever chunk is armed. A fake clock checks
+// the exact chunks; real timers with a 20 ms chunk check the same without waiting
+// days; fresh processes check that a wait with a 30-day TTL keeps a script alive and
+// lets it exit once it settles. test/shared-timers*.test.ts covers the helper itself.
 
 setDefaultTimeout(30_000);
 
-const TIMER_LIMIT_MS = 2_147_483_647;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const realSetTimeout = globalThis.setTimeout;
@@ -67,7 +63,7 @@ test('a deadline beyond one chunk is re-armed per chunk and fires once, at the d
   const timers = fakeTimers();
   const deadline = timers.fake.now + 90;
   const firedAt: number[] = [];
-  armDeadlineTimer(deadline, () => firedAt.push(Date.now()), 20);
+  safeDeadline(() => firedAt.push(Date.now()), deadline, 20);
 
   while (timers.pending.size > 0) timers.runNext();
 
@@ -79,7 +75,7 @@ test('a chunk that fires early, or a clock set back, re-arms for what remains', 
   const timers = fakeTimers();
   const deadline = timers.fake.now + 50;
   let fired = 0;
-  armDeadlineTimer(deadline, () => fired++, 20);
+  safeDeadline(() => fired++, deadline, 20);
 
   timers.runNext(deadline - 30); // first chunk, on time
   timers.runNext(deadline - 3_600_000); // the clock was set back an hour
@@ -96,7 +92,7 @@ test('a chunk that fires early, or a clock set back, re-arms for what remains', 
 test('clearing between chunks clears the chunk armed now, so nothing fires', () => {
   const timers = fakeTimers();
   let fired = 0;
-  const deadline = armDeadlineTimer(timers.fake.now + 90, () => fired++, 20);
+  const deadline = safeDeadline(() => fired++, timers.fake.now + 90, 20);
   timers.runNext();
   timers.runNext();
 
@@ -110,7 +106,7 @@ test('clearing between chunks clears the chunk armed now, so nothing fires', () 
 test('a deadline already past fires on the next tick, not synchronously', () => {
   const timers = fakeTimers();
   let fired = 0;
-  armDeadlineTimer(timers.fake.now - 1_000, () => fired++, 20);
+  safeDeadline(() => fired++, timers.fake.now - 1_000, 20);
   expect(fired).toBe(0);
   expect(timers.fake.armed).toEqual([0]);
 
@@ -118,17 +114,17 @@ test('a deadline already past fires on the next tick, not synchronously', () => 
   expect(fired).toBe(1);
 });
 
-test('a 30-day deadline arms a 24-day chunk, then the rest, all within the timer limit', () => {
-  expect(DEADLINE_CHUNK_MS).toBe(24 * DAY_MS);
-  expect(DEADLINE_CHUNK_MS).toBeLessThanOrEqual(TIMER_LIMIT_MS);
+test('a 30-day deadline arms one full-size chunk, then the rest, all within the timer limit', () => {
+  expect(MAX_TIMER_DELAY_MS).toBe(2 ** 31 - 1);
   const timers = fakeTimers();
   const deadline = timers.fake.now + 30 * DAY_MS;
   let fired = 0;
-  armDeadlineTimer(deadline, () => fired++);
+  safeDeadline(() => fired++, deadline);
 
   while (timers.pending.size > 0) timers.runNext();
 
-  expect(timers.fake.armed).toEqual([24 * DAY_MS, 6 * DAY_MS]);
+  expect(timers.fake.armed).toEqual([MAX_TIMER_DELAY_MS, 30 * DAY_MS - MAX_TIMER_DELAY_MS]);
+  expect(Math.max(...timers.fake.armed)).toBeLessThanOrEqual(MAX_TIMER_DELAY_MS);
   expect(fired).toBe(1);
 });
 
@@ -147,12 +143,12 @@ test('with real timers and a 20 ms chunk, the callback fires once, not before th
   const deadline = Date.now() + 100;
   const firedAt: number[] = [];
   const fired = Promise.withResolvers<null>();
-  armDeadlineTimer(
-    deadline,
+  safeDeadline(
     () => {
       firedAt.push(Date.now());
       fired.resolve(null);
     },
+    deadline,
     20
   );
 
@@ -170,7 +166,7 @@ test('with real timers, clearing after a re-arm keeps the callback from firing',
   const delays = countTimers();
   const deadline = Date.now() + 600;
   let fired = 0;
-  const timer: DeadlineTimer = armDeadlineTimer(deadline, () => fired++, 20);
+  const timer: SafeTimer = safeDeadline(() => fired++, deadline, 20);
   while (delays.length < 3) await Bun.sleep(1);
 
   timer.clear();
@@ -184,7 +180,7 @@ test('with real timers, clearing after a re-arm keeps the callback from firing',
 test('with real timers, a deadline already past fires promptly', async () => {
   const started = Date.now();
   const fired = Promise.withResolvers<number>();
-  armDeadlineTimer(started - 5_000, () => fired.resolve(Date.now()), 20);
+  safeDeadline(() => fired.resolve(Date.now()), started - 5_000, 20);
   expect((await fired.promise) - started).toBeLessThan(1_000);
 });
 

@@ -68,8 +68,10 @@ describe('Issue #73: cron job re-queued on client disconnect', () => {
     await (scheduler as any).tick();
     flushStorage(manager);
 
-    // Worker pulls job with clientId (simulating TCP worker ownership)
-    const job = await manager.pull(queueName, { clientId });
+    // Worker pulls job (simulating TCP worker ownership; ownership is registered below).
+    // The second argument of pull() is the long-poll timeout, validated like TCP PULL,
+    // so the clientId is not passed there.
+    const job = await manager.pull(queueName);
     expect(job).not.toBeNull();
     expect(job!.uniqueKey).toBe('cron:start-new-test-job');
 
@@ -107,7 +109,7 @@ describe('Issue #73: cron job re-queued on client disconnect', () => {
     flushStorage(manager);
 
     // Worker pulls with clientId
-    const job = await manager.pull(queueName, { clientId });
+    const job = await manager.pull(queueName);
     expect(job).not.toBeNull();
     expect(job!.uniqueKey).toBeNull();
 
@@ -208,7 +210,7 @@ describe('Issue #73: cron job re-queued on client disconnect', () => {
     flushStorage(manager);
 
     // Worker pulls with clientId
-    const job = await manager.pull(queueName, { clientId });
+    const job = await manager.pull(queueName);
     expect(job).not.toBeNull();
     expect(job!.uniqueKey).toBeNull();
 

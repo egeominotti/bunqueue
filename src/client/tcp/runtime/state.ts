@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
 import { CommandQueue } from '../connection';
 import { HealthTracker } from '../health';
+import { resolveConnectionOptions } from '../options';
 import { ReconnectManager } from '../reconnect';
 import type { ConnectionOptions, SocketWrapper } from '../types';
-import { DEFAULT_CONNECTION } from '../types';
 import type { JobEvent } from '../../../domain/types/queue';
 
 /** Shared TCP client state and event contract. */
@@ -45,6 +45,15 @@ export class TcpClientState extends EventEmitter {
   protected socket: SocketWrapper | null = null;
   protected connected = false;
   protected connecting = false;
+  /**
+   * Which socket is current. Bumped when an attempt starts, by close() and when a
+   * forced reconnect retires the socket: events of an older socket are ignored, and an
+   * attempt that finishes after its generation was retired closes its socket and fails
+   * instead of taking over (close() and a newer attempt always win).
+   */
+  protected generation = 0;
+  /** Callers of connect() waiting on the attempt in flight; close() rejects them. */
+  protected readonly connectWaiters = new Set<(error: Error) => void>();
   protected readonly options: Required<ConnectionOptions>;
   protected readonly health: HealthTracker;
   protected readonly reconnect: ReconnectManager;
@@ -53,7 +62,9 @@ export class TcpClientState extends EventEmitter {
 
   constructor(options: Partial<ConnectionOptions> = {}) {
     super();
-    this.options = { ...DEFAULT_CONNECTION, ...options };
+    // Throws on an invalid duration or limit, before any timer can be armed with it;
+    // `undefined` keeps the default (spreading it would have replaced the default).
+    this.options = resolveConnectionOptions('TcpClient', options);
     this.commands = new CommandQueue();
     this.health = new HealthTracker({
       pingInterval: this.options.pingInterval,

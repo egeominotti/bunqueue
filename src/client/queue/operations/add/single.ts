@@ -13,6 +13,8 @@ import {
   reflectionMeta,
   resolveGroupId,
 } from './payload';
+import { addOptionsError } from './validation';
+import { progressUpdate } from '../../commandArgs';
 
 export async function add<T>(
   context: AddContext,
@@ -21,6 +23,8 @@ export async function add<T>(
   options: JobOptions = {}
 ): Promise<Job<T>> {
   const merged = { ...context.opts.defaultJobOptions, ...options } as ExtendedJobOptions;
+  const optionsError = addOptionsError(merged);
+  if (optionsError) throw new Error(optionsError);
   const jobData = buildJobData(data, merged);
 
   if (context.embedded) {
@@ -75,7 +79,8 @@ export async function add<T>(
       job,
       name: jobName,
       updateProgress: async (id, progress, message) => {
-        await manager.updateProgress(jobId(id), progress, message);
+        const update = progressUpdate(progress, message);
+        await manager.updateProgress(jobId(id), update.progress, update.message);
       },
       // oxlint-disable-next-line typescript/require-await -- public callback contract is asynchronous
       log: async (id, message) => {

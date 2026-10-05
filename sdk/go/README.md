@@ -148,7 +148,16 @@ known IDs; the SDK does not fabricate the original snapshots.
 Workers use independent pull, command and heartbeat connections, so a long
 poll cannot delay ACK/FAIL or lock renewal. Set a positive
 `HeartbeatIntervalS` to enable automatic renewal; zero, negative, NaN and
-infinite values disable it.
+infinite values disable it. Positive intervals are clamped to the range from
+1 ms to the largest `time.Duration`, so no value can panic `time.NewTicker`.
+
+A negative `PollTimeoutMs` makes pulls non-blocking (values above 30000 are
+capped). After a pull that returns no jobs the worker waits before pulling
+again, exactly like the main client: 50 ms (its default `drainDelay`) after a
+non-blocking pull, 10 ms after a long poll, so neither re-polls an empty queue
+at round-trip speed. `Stop` interrupts these waits and the error backoff, so
+`Run` returns promptly. Zero or negative `LockTtlMs`, `Options.ConnectTimeout`
+and `Options.CommandTimeout` use their defaults (30000 ms, 10 s and 30 s).
 
 Connection telemetry is optional, synchronous and payload-free:
 

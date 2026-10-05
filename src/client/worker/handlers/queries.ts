@@ -3,6 +3,7 @@ import { jobId } from '../../../domain/types/job';
 import { getSharedManager } from '../../manager';
 import type { FlowJobData, Job, JobStateType } from '../../types';
 import type { TcpConnection } from '../types';
+import { assertProgressUpdated, progressUpdate } from '../../queue/commandArgs';
 
 export function createProgressHandler<T extends FlowJobData>(
   embedded: boolean,
@@ -11,11 +12,13 @@ export function createProgressHandler<T extends FlowJobData>(
   jobHolder: { current: Job<T> | null }
 ) {
   return async (id: string, progress: number, message?: string) => {
+    // Checked before sending: the TCP reply is not read, so NaN was dropped silently.
+    const update = progressUpdate(progress, message);
     if (embedded) {
       const manager = getSharedManager();
-      await manager.updateProgress(jobId(id), progress, message);
+      await manager.updateProgress(jobId(id), update.progress, update.message);
     } else if (tcp) {
-      await tcp.send({ cmd: 'Progress', id, progress, message });
+      assertProgressUpdated(await tcp.send({ cmd: 'Progress', id, ...update }));
     }
     emitter.emit('progress', jobHolder.current, progress);
   };

@@ -1,6 +1,7 @@
 /** Connection option and message types. */
 
 import type { Observability } from './observability.js';
+import type { SafeTimer } from './timing.js';
 
 export type TlsOption = boolean | { caFile?: string; rejectUnauthorized?: boolean } | undefined;
 
@@ -9,11 +10,14 @@ export interface ConnectionOptions extends Observability {
   port?: number;
   token?: string;
   tls?: TlsOption;
+  /** Connect timeout in ms (default 5000): finite, >= 1. */
   connectTimeoutMs?: number;
+  /** Per-command timeout in ms (default 10000): >= 1, or Infinity for no deadline. */
   commandTimeoutMs?: number;
   /**
    * Max in-flight commands before {@link Connection.call} applies backpressure
-   * (awaits a free slot). 0 / undefined = unbounded. Bounds memory under load.
+   * (awaits a free slot). 0 or below / Infinity / undefined = unbounded; NaN throws.
+   * Bounds memory under load.
    */
   maxInFlight?: number;
 }
@@ -39,5 +43,5 @@ export interface ConnectionLike {
 export interface Pending {
   resolve: (response: Response) => void;
   reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
+  timer: SafeTimer;
 }

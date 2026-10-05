@@ -33,11 +33,14 @@ describe('bug: backoff object form over TCP', () => {
     expect(validateJobOptions({ backoff: 500 })).toBeNull();
   });
 
-  it('rejects a malformed backoff object (bad type)', () => {
+  // 2.9.10 compatibility: embedded mode always admitted a custom type ('linear', BullMQ's
+  // 'custom') and ran it as exponential; refusing it only over TCP broke parity the other
+  // way. Only 'fixed' is fixed; any other type runs as exponential.
+  it('accepts a custom backoff type, which runs as exponential', () => {
     const err = validateJobOptions({
       backoff: { type: 'linear', delay: 200 },
     });
-    expect(err).not.toBeNull();
+    expect(err).toBeNull();
   });
 
   it('rejects a malformed backoff object (non-numeric delay)', () => {

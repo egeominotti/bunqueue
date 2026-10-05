@@ -1,6 +1,7 @@
 /**
- * Queue query surface: job lookup, state, results, counts, logs, children.
- * Methods are merged onto Queue.prototype by queue.ts.
+ * Queue query surface: job lookup, state, results, progress, children, waiting.
+ * Counts and logs live in queue-counts.ts. Methods are merged onto Queue.prototype
+ * by queue.ts.
  */
 
 import { CommandError, CommandTimeoutError } from './errors.js';
@@ -8,9 +9,7 @@ import { compact } from './frame.js';
 import { Job } from './job.js';
 import type { Queue } from './queue.js';
 import type {
-  CountResponse,
   DataResponse,
-  JobCountsResponse,
   JobResponse,
   JobsResponse,
   ProgressResponse,
@@ -18,7 +17,7 @@ import type {
   StateResponse,
   WaitJobResponse,
 } from './responses.js';
-import type { JobCounts } from './types.js';
+import { waitJobTtl } from './sdk-clamps.js';
 
 type Ctx = Queue<unknown>;
 type Raw = Record<string, unknown>;
@@ -147,12 +146,12 @@ export const queryMethods = {
    * non-completion we probe the state: a `failed` job throws CommandError (it
    * will not complete), everything else throws CommandTimeoutError.
    */
-  async waitForJob<R = unknown>(this: Ctx, id: string, ttlMs = 30_000): Promise<R> {
-    // The server validates 0 <= timeout <= 600000: clamp instead of erroring.
-    ttlMs = Math.min(Math.max(ttlMs, 0), 600_000);
+  async waitForJob<R = unknown>(this: Ctx, id: string, ttlMs?: number): Promise<R> {
+    // The server validates 0 <= timeout <= 600000: clamp instead of erroring (NaN: default).
+    const ttl = waitJobTtl(ttlMs);
     const response = await this.call<WaitJobResponse<R>>(
-      { cmd: 'WaitJob', id, timeout: ttlMs },
-      ttlMs + 5000
+      { cmd: 'WaitJob', id, timeout: ttl },
+      ttl + 5000
     );
     if (response.completed !== true) {
       let state: string | undefined;
@@ -162,7 +161,7 @@ export const queryMethods = {
         /* ignore probe failure; fall through to timeout */
       }
       if (state === 'failed') throw new CommandError(`job ${id} failed before completion`);
-      throw new CommandTimeoutError(`waitUntilFinished timed out after ${ttlMs}ms`);
+      throw new CommandTimeoutError(`waitUntilFinished timed out after ${ttl}ms`);
     }
     return response.result as R;
   },
@@ -180,82 +179,6 @@ export const queryMethods = {
   async getProgress(this: Ctx, id: string): Promise<{ progress: number; message: string | null }> {
     const response = await this.call<ProgressResponse>({ cmd: 'GetProgress', id });
     return { progress: response.progress ?? 0, message: response.message ?? null };
-  },
-
-  // ------------------------------------------------------------------- counts
-
-  async getJobCounts(this: Ctx): Promise<JobCounts> {
-    return (await this.call<JobCountsResponse>({ cmd: 'GetJobCounts', queue: this.name })).counts;
-  },
-
-  async getWaitingCount(this: Ctx): Promise<number> {
-    // 'waiting' only — prioritized jobs are counted by getPrioritizedCount,
-    // matching BullMQ and the Python SDK / reference client.
-    return (await this.getJobCounts()).waiting;
-  },
-
-  async getActiveCount(this: Ctx): Promise<number> {
-    return (await this.getJobCounts()).active;
-  },
-
-  async getCompletedCount(this: Ctx): Promise<number> {
-    return (await this.getJobCounts()).completed;
-  },
-
-  async getFailedCount(this: Ctx): Promise<number> {
-    return (await this.getJobCounts()).failed;
-  },
-
-  async getDelayedCount(this: Ctx): Promise<number> {
-    return (await this.getJobCounts()).delayed;
-  },
-
-  async getPrioritizedCount(this: Ctx): Promise<number> {
-    return (await this.getJobCounts()).prioritized;
-  },
-
-  async getWaitingChildrenCount(this: Ctx): Promise<number> {
-    return (await this.getJobCounts())['waiting-children'];
-  },
-
-  async count(this: Ctx): Promise<number> {
-    return (await this.call<CountResponse>({ cmd: 'Count', queue: this.name })).count ?? 0;
-  },
-
-  async getCountsPerPriority(this: Ctx): Promise<Record<string, number>> {
-    const response = await this.call({ cmd: 'GetCountsPerPriority', queue: this.name });
-    return (response.counts ?? response.data ?? {}) as Record<string, number>;
-  },
-
-  // --------------------------------------------------------------------- logs
-
-  async addJobLog(
-    this: Ctx,
-    id: string,
-    message: string,
-    level?: 'info' | 'warn' | 'error'
-  ): Promise<void> {
-    await this.call(compact({ cmd: 'AddLog', id, message, level }) as { cmd: string });
-  },
-
-  async getJobLogs(this: Ctx, id: string, start?: number, end?: number): Promise<string[]> {
-    const response = await this.call(
-      compact({ cmd: 'GetLogs', id, start, end }) as {
-        cmd: string;
-      }
-    );
-    const data = (response.data ?? {}) as Raw;
-    const logs = (data.logs ?? response.logs ?? []) as unknown[];
-    // Format as `[level] message` (reference client parity); never drop level.
-    return logs.map((row) => {
-      if (typeof row === 'string') return row;
-      const r = row as Raw;
-      return r.level ? `[${r.level}] ${r.message}` : String(r.message ?? row);
-    });
-  },
-
-  async clearJobLogs(this: Ctx, id: string, keepLogs?: number): Promise<void> {
-    await this.call(compact({ cmd: 'ClearLogs', id, keepLogs }) as { cmd: string });
   },
 };
 

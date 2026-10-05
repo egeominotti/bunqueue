@@ -19,6 +19,7 @@ import {
   retryWithTimeout,
   sha256,
 } from './s3BackupIo';
+import { isValidRetention } from './s3BackupConfig';
 import type { BackupItem, BackupMetadata, BackupResult, S3BackupConfig } from './s3BackupConfig';
 
 function timeoutFor(config: S3BackupConfig): number {
@@ -260,11 +261,20 @@ export async function restoreBackup(
   }
 }
 
-/** Delete backup pairs beyond the configured retention count. */
+/**
+ * Delete backup pairs beyond the configured retention count. An invalid retention
+ * deletes nothing: `slice(NaN)` is `slice(0)`, which would delete every backup.
+ */
 export async function cleanupOldBackups(config: S3BackupConfig, client: S3Client): Promise<void> {
+  if (!isValidRetention(config.retention)) {
+    backupLog.error('Backup cleanup skipped: retention must be a whole number >= 1', {
+      retention: String(config.retention),
+    });
+    return;
+  }
   try {
     const backups = await listBackups(config, client);
-    const toDelete = backups.slice(Math.max(config.retention, 1));
+    const toDelete = backups.slice(config.retention);
     const timeoutMs = timeoutFor(config);
 
     for (const backup of toDelete) {

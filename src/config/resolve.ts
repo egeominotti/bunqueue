@@ -1,14 +1,31 @@
 /**
  * bunqueue Config Resolver
- * Merges config file + env vars + defaults (config file wins)
+ * Merges config file + env vars + defaults (CLI flags are merged into the file
+ * config by `bunqueue start`; config file wins over env). Every value is validated:
+ * a setting the server cannot use stops startup with a `ConfigError` naming the env var
+ * or the config-file key, and every problem is reported at once. A value 2.9.10 ran
+ * with (an ignored word, a documented fallback, a setting of a feature that is off) is
+ * a warning in `configWarnings` instead, and keeps the value 2.9.10 used.
  */
 
-import { hostname } from 'os';
 import type { BunqueueConfig } from './types';
 import { normalizeCompletedRetentionMs } from '../application/types/config';
-import type { CloudConfig } from '../infrastructure/cloud/types';
-import type { S3BackupConfig } from '../infrastructure/backup/s3BackupConfig';
-import { DEFAULTS as S3_DEFAULTS } from '../infrastructure/backup/s3BackupConfig';
+import { parseTokenList } from './auth';
+import { backupSettings } from './backup';
+import { cloudIdentity, cloudNumbers, cloudSwitches } from './cloud';
+import { readMonitoringThresholds, readWebhookDelivery } from './componentEnv';
+import { envOptionalDuration } from './envSetting';
+import { resolveLogging } from './logging';
+import { ConfigIssues, type Env } from './numbers';
+import { normalizeConfigFile } from './schema';
+import { SETTINGS, envNumber, type NumericSetting } from './settings';
+import { selectStorage, type StorageDriver } from './storage';
+import { envBoolean, type LogFormat, type LogLevelWord } from './text';
+import { markConfigWarningsReported } from './warnings';
+
+export { resolveBackupConfig } from './backup';
+export { resolveCloudConfig } from './cloud';
+export { ConfigError } from './numbers';
 
 /** Fully resolved server configuration */
 export interface ResolvedConfig {
@@ -21,7 +38,7 @@ export interface ResolvedConfig {
   tlsKeyFile: string | undefined;
   authTokens: string[];
   dataPath: string | undefined;
-  storageDriver: 'memory' | 'sqlite' | 'postgres';
+  storageDriver: StorageDriver;
   postgresUrl: string | undefined;
   postgresNamespace: string;
   postgresBrokerId: string | undefined;
@@ -40,146 +57,154 @@ export interface ResolvedConfig {
   corsOrigins: string[];
   requireAuthForMetrics: boolean;
   maxPrometheusQueues: number;
+  /** S3_BACKUP_ENABLED / `backup.enabled`; an enabled backup that cannot run logs why. */
   s3BackupEnabled: boolean;
   shutdownTimeoutMs: number;
   statsIntervalMs: number;
+  /** WEBHOOK_MAX_RETRIES > 3 (first try included); the file's `webhooks.*` is ignored. */
+  webhookMaxRetries: number;
+  /** WEBHOOK_RETRY_DELAY_MS > 1000 ms; the file's `webhooks.*` is ignored. */
+  webhookRetryDelayMs: number;
+  /** WORKER_TIMEOUT_MS > 30000 ms; the file's `timeouts.worker` is ignored. */
+  workerTimeoutMs: number;
+  /** LOCK_TIMEOUT_MS > 5000 ms; the file's `timeouts.lock` is ignored. */
+  lockTimeoutMs: number;
+  /** `logging.level` > LOG_LEVEL > info; undefined keeps the logger's level (see `logging.ts`). */
+  logLevel: LogLevelWord | undefined;
+  /** `logging.format` > LOG_FORMAT > text; `json` turns JSON output on (see `logging.ts`). */
+  logFormat: LogFormat;
+  /** Non-fatal findings (unknown keys, tolerated values), logged by `bootServer`. */
+  configWarnings: string[];
 }
 
 /* eslint-disable complexity -- pure config mapping, no real branching logic */
 
-/** Resolve server config: config file > env vars > defaults */
-export function resolveServerConfig(fileConfig: BunqueueConfig | null): ResolvedConfig {
-  const fc = fileConfig;
-  const dataPath =
-    fc?.storage?.dataPath ??
-    Bun.env.BUNQUEUE_DATA_PATH ??
-    Bun.env.BQ_DATA_PATH ??
-    Bun.env.DATA_PATH ??
-    Bun.env.SQLITE_PATH;
-  const postgresUrl = fc?.storage?.url ?? Bun.env.BUNQUEUE_POSTGRES_URL;
-  const storageDriver = fc?.storage?.driver
-    ? resolveStorageDriver(fc.storage.driver, postgresUrl, dataPath)
-    : fc?.storage?.url
-      ? 'postgres'
-      : fc?.storage?.dataPath
-        ? 'sqlite'
-        : resolveStorageDriver(Bun.env.BUNQUEUE_STORAGE_DRIVER, postgresUrl, dataPath);
-  const configuredRetention = fc?.storage?.completedRetentionMs;
-  const retentionValue =
-    configuredRetention !== undefined
-      ? configuredRetention
-      : parseOptionalInteger(
-          Bun.env.BUNQUEUE_COMPLETED_RETENTION_MS ?? Bun.env.COMPLETED_RETENTION_MS
-        );
-  return {
-    tcpPort: fc?.server?.tcpPort ?? parseInt(Bun.env.TCP_PORT ?? '6789', 10),
-    httpPort: fc?.server?.httpPort ?? parseInt(Bun.env.HTTP_PORT ?? '6790', 10),
-    hostname: fc?.server?.host ?? Bun.env.HOST ?? '0.0.0.0',
-    tcpSocketPath: fc?.server?.tcpSocketPath ?? Bun.env.TCP_SOCKET_PATH,
-    httpSocketPath: fc?.server?.httpSocketPath ?? Bun.env.HTTP_SOCKET_PATH,
-    tlsCertFile: fc?.server?.tlsCertFile ?? Bun.env.TLS_CERT_FILE,
-    tlsKeyFile: fc?.server?.tlsKeyFile ?? Bun.env.TLS_KEY_FILE,
-    authTokens: fc?.auth?.tokens ?? Bun.env.AUTH_TOKENS?.split(',').filter(Boolean) ?? [],
+/**
+ * Resolve server config: config file > env vars > defaults. Throws a `ConfigError`
+ * when a setting the server would use is invalid, including the env-only settings of
+ * the webhook, monitoring, TCP and rate-limit components, so a bad value stops startup
+ * before anything binds. Settings of PostgreSQL, Cloud and S3 backup only stop it when
+ * that feature is in use; an enabled S3 backup that cannot run never does (the backup
+ * scheduler logs why, see `backup.ts`).
+ */
+export function resolveServerConfig(
+  fileConfig: BunqueueConfig | null,
+  env: Env = Bun.env
+): ResolvedConfig {
+  const issues = new ConfigIssues();
+  const fc = normalizeConfigFile(fileConfig, issues);
+  const num = (setting: NumericSetting & { readonly fallback: number }, fileValue?: number) =>
+    fileValue ??
+    envNumber(setting, env, setting.feature ? issues.forFeature(setting.feature) : issues);
+  const storage = fc?.storage;
+  const { storageDriver, dataPath, postgresUrl } = selectStorage(storage, env, issues);
+  const completedRetentionMs =
+    storage?.completedRetentionMs !== undefined
+      ? storage.completedRetentionMs
+      : envOptionalDuration(SETTINGS.completedRetentionMs, env, issues);
+  // Always parsed: the webhook manager reads these env vars on its own.
+  const webhookEnv = readWebhookDelivery(env, issues);
+  const logging = resolveLogging(fc?.logging, env, issues);
+  const backup = backupSettings(fc?.backup, env, issues);
+  // An enabled backup reports its problems itself (configErrors), at error level.
+  if (!backup.settings.enabled) {
+    for (const problem of backup.problems)
+      issues.warn(`${problem}; ignored: S3 backup is disabled`);
+  }
+
+  const resolved: ResolvedConfig = {
+    tcpPort: num(SETTINGS.tcpPort, fc?.server?.tcpPort),
+    httpPort: num(SETTINGS.httpPort, fc?.server?.httpPort),
+    hostname: fc?.server?.host ?? env.HOST ?? '0.0.0.0',
+    tcpSocketPath: fc?.server?.tcpSocketPath ?? env.TCP_SOCKET_PATH,
+    httpSocketPath: fc?.server?.httpSocketPath ?? env.HTTP_SOCKET_PATH,
+    tlsCertFile: fc?.server?.tlsCertFile ?? env.TLS_CERT_FILE,
+    tlsKeyFile: fc?.server?.tlsKeyFile ?? env.TLS_KEY_FILE,
+    // Trimmed, stray commas dropped; set but tokenless ("," or " ") is an error.
+    authTokens:
+      fc?.auth?.tokens ?? issues.check(() => parseTokenList('AUTH_TOKENS', env.AUTH_TOKENS), []),
     dataPath,
     storageDriver,
     postgresUrl,
-    postgresNamespace: fc?.storage?.namespace ?? Bun.env.BUNQUEUE_POSTGRES_NAMESPACE ?? 'default',
-    postgresBrokerId: fc?.storage?.brokerId ?? Bun.env.BUNQUEUE_BROKER_ID,
-    postgresPoolSize: positiveInteger(
-      fc?.storage?.poolSize ?? parseInt(Bun.env.BUNQUEUE_POSTGRES_POOL_SIZE ?? '4', 10),
-      4
+    postgresNamespace: storage?.namespace ?? env.BUNQUEUE_POSTGRES_NAMESPACE ?? 'default',
+    postgresBrokerId: storage?.brokerId ?? env.BUNQUEUE_BROKER_ID,
+    postgresPoolSize: num(SETTINGS.postgresPoolSize, storage?.poolSize),
+    postgresLeaseDurationMs: num(SETTINGS.postgresLeaseDurationMs, storage?.leaseDurationMs),
+    postgresPollIntervalMs: num(SETTINGS.postgresPollIntervalMs, storage?.pollIntervalMs),
+    postgresStatementTimeoutMs: num(
+      SETTINGS.postgresStatementTimeoutMs,
+      storage?.statementTimeoutMs
     ),
-    postgresLeaseDurationMs: positiveInteger(
-      fc?.storage?.leaseDurationMs ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_LEASE_DURATION_MS ?? '30000', 10),
-      30_000
+    postgresLockTimeoutMs: num(SETTINGS.postgresLockTimeoutMs, storage?.lockTimeoutMs),
+    postgresIdleTransactionTimeoutMs: num(
+      SETTINGS.postgresIdleTransactionTimeoutMs,
+      storage?.idleTransactionTimeoutMs
     ),
-    postgresPollIntervalMs: positiveInteger(
-      fc?.storage?.pollIntervalMs ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_POLL_INTERVAL_MS ?? '250', 10),
-      250
+    postgresMaxConcurrentOperations: num(
+      SETTINGS.postgresMaxConcurrentOperations,
+      storage?.maxConcurrentOperations
     ),
-    postgresStatementTimeoutMs: positiveInteger(
-      fc?.storage?.statementTimeoutMs ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_STATEMENT_TIMEOUT_MS ?? '30000', 10),
-      30_000
+    postgresMaxQueuedOperations: num(
+      SETTINGS.postgresMaxQueuedOperations,
+      storage?.maxQueuedOperations
     ),
-    postgresLockTimeoutMs: positiveInteger(
-      fc?.storage?.lockTimeoutMs ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_LOCK_TIMEOUT_MS ?? '5000', 10),
-      5_000
+    postgresMaxSnapshotJobs: num(SETTINGS.postgresMaxSnapshotJobs, storage?.maxSnapshotJobs),
+    postgresMaxSnapshotPayloadBytes: num(
+      SETTINGS.postgresMaxSnapshotPayloadBytes,
+      storage?.maxSnapshotPayloadBytes
     ),
-    postgresIdleTransactionTimeoutMs: positiveInteger(
-      fc?.storage?.idleTransactionTimeoutMs ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_IDLE_TRANSACTION_TIMEOUT_MS ?? '30000', 10),
-      30_000
-    ),
-    postgresMaxConcurrentOperations: positiveInteger(
-      fc?.storage?.maxConcurrentOperations ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_MAX_CONCURRENT_OPERATIONS ?? '16', 10),
-      16
-    ),
-    postgresMaxQueuedOperations: nonNegativeInteger(
-      fc?.storage?.maxQueuedOperations ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_MAX_QUEUED_OPERATIONS ?? '128', 10),
-      128
-    ),
-    postgresMaxSnapshotJobs: positiveInteger(
-      fc?.storage?.maxSnapshotJobs ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_MAX_SNAPSHOT_JOBS ?? '100000', 10),
-      100_000
-    ),
-    postgresMaxSnapshotPayloadBytes: positiveInteger(
-      fc?.storage?.maxSnapshotPayloadBytes ??
-        parseInt(Bun.env.BUNQUEUE_POSTGRES_MAX_SNAPSHOT_PAYLOAD_BYTES ?? '268435456', 10),
-      256 * 1024 * 1024
-    ),
-    maxCompletedJobs: positiveInteger(
-      fc?.storage?.maxCompletedJobs ??
-        parseInt(Bun.env.BUNQUEUE_MAX_COMPLETED_JOBS ?? Bun.env.MAX_COMPLETED_JOBS ?? '50000', 10),
-      50_000
-    ),
-    completedRetentionMs: normalizeCompletedRetentionMs(retentionValue),
-    corsOrigins: fc?.cors?.origins ?? Bun.env.CORS_ALLOW_ORIGIN?.split(',').filter(Boolean) ?? [],
-    requireAuthForMetrics: fc?.auth?.requireAuthForMetrics ?? Bun.env.METRICS_AUTH === 'true',
-    maxPrometheusQueues: nonNegativeInteger(
-      fc?.telemetry?.maxPrometheusQueues ?? parseInt(Bun.env.METRICS_MAX_QUEUES ?? '100', 10),
-      100
-    ),
-    s3BackupEnabled:
-      fc?.backup?.enabled ??
-      (Bun.env.S3_BACKUP_ENABLED === '1' || Bun.env.S3_BACKUP_ENABLED === 'true'),
-    shutdownTimeoutMs:
-      fc?.timeouts?.shutdown ?? parseInt(Bun.env.SHUTDOWN_TIMEOUT_MS ?? '30000', 10),
-    statsIntervalMs: fc?.timeouts?.stats ?? parseInt(Bun.env.STATS_INTERVAL_MS ?? '300000', 10),
+    maxCompletedJobs: num(SETTINGS.maxCompletedJobs, storage?.maxCompletedJobs),
+    completedRetentionMs: normalizeCompletedRetentionMs(completedRetentionMs),
+    corsOrigins: fc?.cors?.origins ?? env.CORS_ALLOW_ORIGIN?.split(',').filter(Boolean) ?? [],
+    requireAuthForMetrics:
+      fc?.auth?.requireAuthForMetrics ?? envBoolean('METRICS_AUTH', env, false, issues),
+    maxPrometheusQueues: num(SETTINGS.maxPrometheusQueues, fc?.telemetry?.maxPrometheusQueues),
+    s3BackupEnabled: backup.settings.enabled,
+    shutdownTimeoutMs: num(SETTINGS.shutdownTimeoutMs, fc?.timeouts?.shutdown),
+    statsIntervalMs: num(SETTINGS.statsIntervalMs, fc?.timeouts?.stats),
+    webhookMaxRetries: webhookEnv.maxRetries,
+    webhookRetryDelayMs: webhookEnv.retryDelayMs,
+    workerTimeoutMs: num(SETTINGS.workerTimeoutMs),
+    lockTimeoutMs: num(SETTINGS.lockTimeoutMs),
+    logLevel: logging.logLevel,
+    logFormat: logging.logFormat,
+    configWarnings: issues.warnings,
   };
-}
-
-function resolveStorageDriver(
-  configured: string | undefined,
-  postgresUrl: string | undefined,
-  dataPath: string | undefined
-): 'memory' | 'sqlite' | 'postgres' {
-  if (configured === 'memory' || configured === 'sqlite' || configured === 'postgres') {
-    return configured;
+  issues.settle('postgres', storageDriver === 'postgres', 'the server does not use PostgreSQL');
+  if (resolved.requireAuthForMetrics && resolved.authTokens.length === 0) {
+    const source =
+      fc?.auth?.requireAuthForMetrics === undefined ? 'METRICS_AUTH' : 'auth.requireAuthForMetrics';
+    issues.warn(
+      `${source} requires a token on /prometheus but no auth token is configured (AUTH_TOKENS or auth.tokens): /prometheus answers 503 until one is`
+    );
   }
-  if (configured) throw new Error(`Unsupported storage driver: ${configured}`);
-  if (postgresUrl) return 'postgres';
-  return dataPath ? 'sqlite' : 'memory';
+
+  // Settings other components read on their own: validated here so that a typo
+  // stops startup, before storage opens, instead of surfacing later (or never).
+  for (const setting of [
+    SETTINGS.workerCleanupIntervalMs,
+    SETTINGS.tcpIdleTimeoutMs,
+    SETTINGS.tcpMaxWriteQueueBytes,
+    SETTINGS.rateLimitWindowMs,
+    SETTINGS.rateLimitMaxRequests,
+    SETTINGS.rateLimitCleanupMs,
+  ]) {
+    envNumber(setting, env, issues);
+  }
+  readMonitoringThresholds(env, issues);
+  const cloud = cloudIdentity(fc?.cloud, env);
+  cloudNumbers(env, issues);
+  cloudSwitches(env, issues);
+  const cloudOn = Boolean(cloud.url && cloud.apiKey && cloud.instanceId);
+  issues.settle('cloud', cloudOn, 'bunqueue Cloud is not configured');
+  issues.settle('cloudInterval', false, 'the Cloud upload interval is adaptive, never this value');
+  // Components that read the same variables later must not print these twice.
+  markConfigWarningsReported(issues.warnings);
+  issues.throwIfAny();
+  return resolved;
 }
 
-function nonNegativeInteger(value: number, fallback: number): number {
-  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
-}
-
-function positiveInteger(value: number, fallback: number): number {
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
-}
-
-function parseOptionalInteger(value: string | undefined): number | null {
-  if (value === undefined || value.trim() === '') return null;
-  return parseInt(value, 10);
-}
+/* eslint-enable complexity */
 
 /**
  * Resolve server TLS options from resolved config. Returns null when TLS is
@@ -204,73 +229,3 @@ export function resolveTlsServerOptions(config: {
   }
   return { certFile: tlsCertFile, keyFile: tlsKeyFile };
 }
-
-/** Resolve cloud config: config file > env vars. Returns null if disabled. */
-export function resolveCloudConfig(
-  fileConfig: BunqueueConfig | null,
-  dataPath?: string
-): CloudConfig | null {
-  const fc = fileConfig?.cloud;
-  const url = fc?.url ?? Bun.env.BUNQUEUE_CLOUD_URL;
-  const apiKey = fc?.apiKey ?? Bun.env.BUNQUEUE_CLOUD_API_KEY;
-
-  if (!url || !apiKey) return null;
-
-  const instanceId = fc?.instanceId ?? Bun.env.BUNQUEUE_CLOUD_INSTANCE_ID;
-  if (!instanceId) {
-    console.error('[Cloud] BUNQUEUE_CLOUD_INSTANCE_ID is required for cloud mode.');
-    return null;
-  }
-
-  return {
-    url: url.replace(/\/+$/, ''),
-    apiKey,
-    instanceId,
-    signingSecret: Bun.env.BUNQUEUE_CLOUD_SIGNING_SECRET ?? null,
-    instanceName: Bun.env.BUNQUEUE_CLOUD_INSTANCE_NAME ?? hostname(),
-    intervalMs: parseInt(Bun.env.BUNQUEUE_CLOUD_INTERVAL_MS ?? '15000', 10),
-    includeJobData: Bun.env.BUNQUEUE_CLOUD_INCLUDE_JOB_DATA !== 'false',
-    redactFields: Bun.env.BUNQUEUE_CLOUD_REDACT_FIELDS?.split(',').filter(Boolean) ?? [],
-    eventFilter: Bun.env.BUNQUEUE_CLOUD_EVENTS?.split(',').filter(Boolean) ?? [],
-    bufferSize: parseInt(Bun.env.BUNQUEUE_CLOUD_BUFFER_SIZE ?? '720', 10),
-    circuitBreakerThreshold: parseInt(Bun.env.BUNQUEUE_CLOUD_CIRCUIT_BREAKER_THRESHOLD ?? '5', 10),
-    circuitBreakerResetMs: parseInt(Bun.env.BUNQUEUE_CLOUD_CIRCUIT_BREAKER_RESET_MS ?? '60000', 10),
-    useWebSocket: Bun.env.BUNQUEUE_CLOUD_USE_WEBSOCKET !== 'false',
-    useHttp: Bun.env.BUNQUEUE_CLOUD_USE_HTTP !== 'false',
-    dataPath: dataPath ?? null,
-    remoteCommands: Bun.env.BUNQUEUE_CLOUD_REMOTE_COMMANDS !== 'false',
-  };
-}
-
-/** Resolve S3 backup config: config file > env vars */
-export function resolveBackupConfig(
-  fileConfig: BunqueueConfig | null,
-  databasePath: string
-): S3BackupConfig {
-  const fc = fileConfig?.backup;
-  const virtualHostedStyle = Bun.env.S3_VIRTUAL_HOSTED_STYLE;
-  return {
-    enabled:
-      fc?.enabled ?? (Bun.env.S3_BACKUP_ENABLED === '1' || Bun.env.S3_BACKUP_ENABLED === 'true'),
-    accessKeyId: fc?.accessKeyId ?? Bun.env.S3_ACCESS_KEY_ID ?? Bun.env.AWS_ACCESS_KEY_ID ?? '',
-    secretAccessKey:
-      fc?.secretAccessKey ?? Bun.env.S3_SECRET_ACCESS_KEY ?? Bun.env.AWS_SECRET_ACCESS_KEY ?? '',
-    sessionToken: fc?.sessionToken ?? Bun.env.S3_SESSION_TOKEN ?? Bun.env.AWS_SESSION_TOKEN,
-    bucket: fc?.bucket ?? Bun.env.S3_BUCKET ?? Bun.env.AWS_BUCKET ?? '',
-    endpoint: fc?.endpoint ?? Bun.env.S3_ENDPOINT ?? Bun.env.AWS_ENDPOINT,
-    virtualHostedStyle:
-      fc?.virtualHostedStyle ??
-      (virtualHostedStyle === undefined
-        ? undefined
-        : virtualHostedStyle === '1' || virtualHostedStyle === 'true'),
-    region: fc?.region ?? Bun.env.S3_REGION ?? Bun.env.AWS_REGION ?? S3_DEFAULTS.region,
-    intervalMs:
-      fc?.interval ?? (parseInt(Bun.env.S3_BACKUP_INTERVAL ?? '', 10) || S3_DEFAULTS.intervalMs),
-    retention:
-      fc?.retention ?? (parseInt(Bun.env.S3_BACKUP_RETENTION ?? '', 10) || S3_DEFAULTS.retention),
-    prefix: fc?.prefix ?? Bun.env.S3_BACKUP_PREFIX ?? S3_DEFAULTS.prefix,
-    databasePath,
-  };
-}
-
-/* eslint-enable complexity */

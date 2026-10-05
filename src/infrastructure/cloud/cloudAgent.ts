@@ -28,8 +28,7 @@ export class CloudAgent {
   private readonly startedAt = Date.now();
   private readonly httpSender: HttpSender;
   private readonly wsSender: WsSender | null;
-  private snapshotTimer: ReturnType<typeof setInterval> | null = null;
-  private statsUpdateTimer: ReturnType<typeof setInterval> | null = null;
+  private snapshotTimer: ReturnType<typeof setTimeout> | null = null;
   private unsubscribeEvents: (() => void) | null = null;
   private sequenceId = 0;
   private started = false;
@@ -78,7 +77,8 @@ export class CloudAgent {
       url: this.config.url,
       instance: this.config.instanceName,
       id: this.instanceId,
-      intervalMs: this.config.intervalMs,
+      // BUNQUEUE_CLOUD_INTERVAL_MS is validated but not applied (see computeInterval).
+      cadence: 'adaptive 5-30s',
       ws: this.config.useWebSocket,
     });
 
@@ -133,11 +133,6 @@ export class CloudAgent {
       this.snapshotTimer = null;
     }
 
-    if (this.statsUpdateTimer) {
-      clearInterval(this.statsUpdateTimer);
-      this.statsUpdateTimer = null;
-    }
-
     if (this.unsubscribeEvents) {
       this.unsubscribeEvents();
       this.unsubscribeEvents = null;
@@ -167,7 +162,10 @@ export class CloudAgent {
     cloudLog.info('Disconnected from dashboard');
   }
 
-  /** Compute next interval from last compressed payload size */
+  /**
+   * Compute next interval from last compressed payload size. The cadence is adaptive by
+   * design (bigger snapshots are sent less often); `config.intervalMs` is not used.
+   */
   private computeInterval(): number {
     const kb = this.httpSender.lastCompressedKB;
     if (kb < 50) return 5_000;

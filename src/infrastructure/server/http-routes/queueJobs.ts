@@ -24,6 +24,9 @@ export async function routeQueueJobOperations(
       } catch {
         return jsonResponse({ ok: false, error: 'Invalid JSON body' }, 400, cors);
       }
+      // The fields this route has always forwarded; any other key is ignored, as on
+      // 2.9.10 (forwarding more changed the meaning of bodies that already worked, and
+      // failed some of them). The bulk route forwards whole PUSHB jobs.
       const command = {
         cmd: 'PUSH' as const,
         queue,
@@ -51,6 +54,7 @@ export async function routeQueueJobOperations(
     }
 
     if (method === 'GET') {
+      // Read as 2.9.10 read it (`parseInt`); the PULL handler reports an invalid wait.
       const timeout = parseInt(new URL(request.url).searchParams.get('timeout') ?? '0', 10);
       const result = await handleCommand({ cmd: 'PULL', queue, timeout }, context);
       return jsonResponse(result, 200, cors);
@@ -114,6 +118,7 @@ export async function routeQueueJobOperations(
         : stateValues.length === 1
           ? stateValues[0]
           : stateValues;
+    // `parseInt`, as on 2.9.10.
     const limitParam = url.searchParams.get('limit');
     const offsetParam = url.searchParams.get('offset');
     const limit = limitParam ? parseInt(limitParam, 10) : undefined;

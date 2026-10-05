@@ -1,6 +1,6 @@
-import { MAX_BACKOFF_DELAY } from '../../domain/job/constants';
+import { assertJobOptions, CALLER_OPTION_NAMES } from '../../domain/job/options';
 import type { AtomicFlowBatchInput } from '../../domain/types/flow';
-import { validateGroupId, validateGroupPriority } from '../../domain/types/group';
+import { validateGroupId } from '../../domain/types/group';
 import { isWellFormedJobId, normalizeJobPayload, type JobInput } from '../../domain/types/job';
 import { validateFlowTopology } from './flowTopologyValidation';
 
@@ -19,44 +19,19 @@ const BOOLEAN_OPTIONS = [
   'ignoreDependencyOnFailure',
 ] as const;
 
-function numeric(value: unknown, name: string, min: number, max: number, integer = false): void {
-  if (value === undefined || value === null) return;
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new Error(`${name} must be a finite number`);
-  }
-  if (integer && !Number.isInteger(value)) throw new Error(`${name} must be an integer`);
-  if (value < min || value > max) {
-    throw new Error(`${name} must be between ${min} and ${max}`);
-  }
-}
-
 function validateOptions(input: JobInput): void {
-  if (input.groupId === undefined) {
-    numeric(input.priority, 'priority', -1_000_000, 1_000_000, true);
-  } else {
-    const priorityError = validateGroupPriority(input.priority);
-    if (priorityError) throw new Error(priorityError);
+  if (input.repeat !== undefined) {
+    throw new Error('repeat is not supported inside an atomic flow');
   }
-  numeric(input.delay, 'delay', 0, 365 * 24 * 60 * 60 * 1_000);
-  numeric(input.timeout, 'timeout', 0, 24 * 60 * 60 * 1_000);
-  numeric(input.ttl, 'ttl', 0, 365 * 24 * 60 * 60 * 1_000);
-  numeric(input.maxAttempts, 'attempts', 1, 1_000, true);
-  numeric(input.stallTimeout, 'stallTimeout', 0, 24 * 60 * 60 * 1_000);
-  numeric(input.stackTraceLimit, 'stackTraceLimit', 0, 10_000, true);
-  numeric(input.keepLogs, 'keepLogs', 0, 1_000_000, true);
-  numeric(input.sizeLimit, 'sizeLimit', 0, MAX_JOB_DATA_BYTES, true);
-  numeric(input.timestamp, 'timestamp', 0, Number.MAX_SAFE_INTEGER);
-  numeric(input.groupMaxSize, 'group.maxSize', 1, Number.MAX_SAFE_INTEGER, true);
-
-  if (typeof input.backoff === 'object' && input.backoff !== null) {
-    if (input.backoff.type !== 'fixed' && input.backoff.type !== 'exponential') {
-      throw new Error("backoff.type must be 'fixed' or 'exponential'");
-    }
-    numeric(input.backoff.delay, 'backoff.delay', 0, MAX_BACKOFF_DELAY);
-    numeric(input.backoff.maxDelay, 'backoff.maxDelay', 0, MAX_BACKOFF_DELAY);
-  } else {
-    numeric(input.backoff, 'backoff', 0, MAX_BACKOFF_DELAY);
+  if (input.uniqueKey !== undefined || input.dedup !== undefined) {
+    throw new Error('deduplication is not supported inside an atomic flow');
   }
+  if (input.debounceId !== undefined || input.debounceTtl !== undefined) {
+    throw new Error('debounce is not supported inside an atomic flow');
+  }
+  // The same rules as PUSH/PUSHB and embedded adds, named as FlowProducer options
+  // (`attempts`, as flows always reported it).
+  assertJobOptions(input, '', CALLER_OPTION_NAMES);
 
   for (const name of BOOLEAN_OPTIONS) {
     const value = input[name];
@@ -72,16 +47,6 @@ function validateOptions(input: JobInput): void {
       input.tags.some((tag) => typeof tag !== 'string' || tag.length > 256))
   ) {
     throw new Error('tags must be an array of strings of at most 256 characters');
-  }
-
-  if (input.repeat !== undefined) {
-    throw new Error('repeat is not supported inside an atomic flow');
-  }
-  if (input.uniqueKey !== undefined || input.dedup !== undefined) {
-    throw new Error('deduplication is not supported inside an atomic flow');
-  }
-  if (input.debounceId !== undefined || input.debounceTtl !== undefined) {
-    throw new Error('debounce is not supported inside an atomic flow');
   }
 
   const policies = [

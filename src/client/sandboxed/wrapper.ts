@@ -61,18 +61,20 @@ export async function createWrapperScript(
   // Escape the path to prevent code injection via backticks or template expressions
   const escapedPath = escapeForTemplateLiteral(fullPath);
 
+  // The message handler is installed before the processor loads: a message that reaches
+  // a thread with none is lost. A job that arrives while the processor loads waits for
+  // it (the pool posts none before 'ready'). A processor that fails to load rejects the
+  // top-level await, so the thread dies with that error: the pool counts it a crash.
   const wrapperCode = `
 // Sandboxed Worker Wrapper
-const processor = (await import('${escapedPath}')).default;
-
-// Signal ready to parent
-self.postMessage({ type: 'ready' });
+const loaded = import('${escapedPath}').then((module) => module.default);
 
 self.onmessage = async (event) => {
   const { type, job } = event.data;
   if (type !== 'job') return;
 
   try {
+    const processor = await loaded;
     const result = await processor({
       id: job.id,
       name: job.name,
@@ -101,6 +103,10 @@ self.onmessage = async (event) => {
     });
   }
 };
+
+await loaded;
+// Signal ready to parent: the pool gives this thread jobs from now on.
+self.postMessage({ type: 'ready' });
 `;
 
   // path.join normalizes double slashes ($TMPDIR often ends in '/').

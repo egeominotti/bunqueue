@@ -20,11 +20,13 @@ from typing import Any, Callable, Dict, Optional
 
 from .ack_batcher import AckBatcher
 from .connection import Connection, TlsOption
-from .errors import CommandTimeoutError, ConnectionClosedError
 from .events import EventEmitter
 from .telemetry import TelemetryHandler
 from .job import Job
-from .worker_runtime import MAX_POLL_TIMEOUT_MS, RECONNECT_BACKOFF_S, WorkerRuntime
+from .sdk_clamps import clamp_batch_size
+from .worker_errors import report_pull_error
+from .worker_options import empty_pull_wait_s, resolve_worker_durations
+from .worker_runtime import WorkerRuntime
 
 logger = logging.getLogger("bunqueue")
 
@@ -64,11 +66,12 @@ class Worker(EventEmitter, WorkerRuntime):
         self.processor = processor
         self.concurrency = concurrency
         # The server rejects PULLB count > 1000 — an unclamped batch_size
-        # would wedge the poll loop in a permanent error cycle.
-        self.batch_size = max(1, min(batch_size, 1000))
-        self.poll_timeout_ms = min(poll_timeout_ms, MAX_POLL_TIMEOUT_MS)
-        self.lock_ttl_ms = lock_ttl_ms
-        self.heartbeat_interval_s = heartbeat_interval_s
+        # would wedge the poll loop in a permanent error cycle (rule 4 clamp).
+        self.batch_size = clamp_batch_size(batch_size)
+        # Validated before the connection exists; 0.0 heartbeat = disabled.
+        self.poll_timeout_ms, self.lock_ttl_ms, self.heartbeat_interval_s = (
+            resolve_worker_durations(poll_timeout_ms, lock_ttl_ms, heartbeat_interval_s)
+        )
         self.worker_id = f"py-{_socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self.name = name or self.worker_id
 
@@ -83,7 +86,7 @@ class Worker(EventEmitter, WorkerRuntime):
             self._ack_batcher = AckBatcher(
                 self.connection,
                 max_size=int(ack_batch.get("max_size", 50)),
-                max_delay_ms=float(ack_batch.get("max_delay_ms", 5)),
+                max_delay_ms=ack_batch.get("max_delay_ms", 5),
             )
 
         self._active: Dict[str, str] = {}  # job id -> lock token
@@ -141,27 +144,29 @@ class Worker(EventEmitter, WorkerRuntime):
         self._executor = ThreadPoolExecutor(
             max_workers=self.concurrency, thread_name_prefix="bunqueue-job"
         )
-        self._register()
-        self._ready.set()
-        self.emit("ready")
-        # 0 (or negative) disables heartbeats — Event.wait(0) returns
-        # immediately, so the loop would busy-spin flooding the server.
-        if self.heartbeat_interval_s > 0:
-            heartbeat = threading.Thread(target=self._heartbeat_loop, daemon=True)
-            heartbeat.start()
-        backoff_idx = 0
-        try:
+        failures = 0
+        try:  # every exit, including a failed setup step, goes through _shutdown
+            self._register()
+            self._ready.set()
+            self.emit("ready")
+            # 0 (or negative) disables heartbeats — Event.wait(0) returns
+            # immediately, so the loop would busy-spin flooding the server.
+            if self.heartbeat_interval_s > 0:
+                heartbeat = threading.Thread(target=self._heartbeat_loop, daemon=True)
+                heartbeat.start()
             while not self._stop.is_set():
                 if self._paused.is_set():
                     self._stop.wait(0.05)
                     continue
                 try:
-                    self._poll_once()
-                    backoff_idx = 0
-                except (ConnectionClosedError, CommandTimeoutError) as exc:
-                    self.emit("error", exc)
-                    delay = RECONNECT_BACKOFF_S[min(backoff_idx, len(RECONNECT_BACKOFF_S) - 1)]
-                    backoff_idx += 1
+                    if not self._poll_once():  # empty pull: never re-poll at once
+                        self._stop.wait(empty_pull_wait_s(self.poll_timeout_ms))
+                    failures = 0  # the broker answered: the streak is over
+                except Exception as exc:  # noqa: BLE001 - classified by worker_errors
+                    failures += 1
+                    delay = report_pull_error(self, exc, failures)
+                    if delay is None:
+                        raise  # permanent, no 'error' listener: run() raises (0.2.0)
                     self._stop.wait(delay)
         finally:
             self._shutdown()

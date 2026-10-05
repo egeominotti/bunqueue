@@ -59,6 +59,18 @@ the implementation map is in [CLAUDE.md](CLAUDE.md).
   that can exceed the lock TTL must call `Job::extendLock()` itself.
 - Heartbeat intervals that are zero, negative, NaN, or infinite are disabled;
   they must never create a busy loop.
+- The heartbeat interval, `batchSize`, `pollTimeoutMs` and the `waitForJob` ttl
+  follow sdk/CLAUDE.md rule 4 (`OptionGuard`) and never throw. Every value
+  0.2.0 accepted keeps the setting 0.2.0 derived from it;
+  `tests/e2e-compat.php` runs the 0.2.0 code as the oracle:
+  - `batchSize`: an int clamps to [1, 1000]; anything else, a float or a
+    string included, means 10;
+  - `pollTimeoutMs`: an int, float or numeric string clamps to [0, 30000]
+    before the int cast, so it never wraps, and NAN means 5000; anything else
+    means 0;
+  - the heartbeat interval converts with `(float)`: `'10'` is 10 s, while zero,
+    negative, non-finite or `false` disables;
+  - the ttl clamps to [0, 600000], null or NAN meaning 30000.
 - A completion or failure event and its counter are recorded only after the
   broker applies `ACK` or `FAIL`. A successful `applied: false` outcome means
   an exact timeout generation already finalized: release the held lease, emit

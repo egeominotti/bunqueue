@@ -3,8 +3,7 @@ import { throughputTracker } from '../../../application/throughputTracker';
 import type { CronJob } from '../../../domain/types/cron';
 import type { Worker } from '../../../domain/types/worker';
 import { isStorageDegraded } from '../../../shared/storageHealth';
-
-const WORKER_TIMEOUT_MS = parseInt(Bun.env.WORKER_TIMEOUT_MS ?? '30000', 10);
+import { workerTimeoutMs } from '../../../shared/workerTimeouts';
 
 type DurableSnapshotManager = QueueManager & {
   listWorkersDurable?: () => Promise<Worker[]>;
@@ -35,7 +34,8 @@ function statsSnapshot(
   const rates = throughputTracker.getRates();
   const perQueue = queueManager.getPerQueueStats();
   const now = Date.now();
-  const activeWorkers = workers.filter((worker) => now - worker.lastSeen < WORKER_TIMEOUT_MS);
+  const timeoutMs = workerTimeoutMs();
+  const activeWorkers = workers.filter((worker) => now - worker.lastSeen < timeoutMs);
   const queues: Record<string, object> = {};
   for (const [name, value] of perQueue) {
     queues[name] = {

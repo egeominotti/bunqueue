@@ -7,6 +7,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import type { HandlerContext } from '../src/infrastructure/server/types';
+import { jobId } from '../src/domain/types/job';
 
 // Core handlers
 import {
@@ -175,25 +176,29 @@ describe('Core Handlers', () => {
       expect(res.ok).toBe(false);
     });
 
-    test('should return error for negative delay', async () => {
+    test('should treat a negative delay as 0 (a waiting job, not an error)', async () => {
       const res = await handlePush(
         { cmd: 'PUSH', queue: 'emails', data: { msg: 'hi' }, delay: -1 },
         ctx
       );
-      expect(res.ok).toBe(false);
+      expect(res.ok).toBe(true);
+      const id = (res as { id: string }).id;
+      expect(await qm.getJobState(jobId(id))).toBe('waiting');
     });
 
-    test('should return error for non-integer priority when validation enforces integer', async () => {
+    // 2.9.10 compatibility: any finite priority and `maxAttempts: 0` (runs once) are
+    // admitted, as embedded 2.9.10 admitted them; what no job can run with still fails.
+    test('should return error for a non-numeric priority', async () => {
       const res = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: { msg: 'hi' }, priority: 1.5 },
+        { cmd: 'PUSH', queue: 'emails', data: { msg: 'hi' }, priority: 'high' as never },
         ctx
       );
       expect(res.ok).toBe(false);
     });
 
-    test('should return error for maxAttempts < 1', async () => {
+    test('should return error for a non-numeric maxAttempts', async () => {
       const res = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: { msg: 'hi' }, maxAttempts: 0 },
+        { cmd: 'PUSH', queue: 'emails', data: { msg: 'hi' }, maxAttempts: 'three' as never },
         ctx
       );
       expect(res.ok).toBe(false);

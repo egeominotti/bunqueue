@@ -3,6 +3,17 @@ import type { ChangePriorityOpts } from './types';
 import { getSharedManager } from './manager';
 import { getFlowDependencies } from './flowJobDependencies';
 import { assertFlowTcpOk, type FlowJobRuntime } from './flowJobTypes';
+import {
+  assertDelayChanged,
+  assertJobDelay,
+  assertLockExtension,
+  assertPriorityChanged,
+  assertProgressUpdated,
+  assertPromoted,
+  lockExtensionResult,
+  progressUpdate,
+  requireDataUpdated,
+} from './queue/commandArgs';
 
 /** Core state, mutation, and dependency methods exposed by a FlowProducer Job. */
 export function buildFlowJobCoreMethods(runtime: FlowJobRuntime) {
@@ -10,18 +21,16 @@ export function buildFlowJobCoreMethods(runtime: FlowJobRuntime) {
   return {
     updateProgress: async (progress: number | object) => {
       if (callbacks?.updateProgress) return callbacks.updateProgress(id, progress);
+      const update = progressUpdate(progress);
       if (embedded) {
-        const value = typeof progress === 'number' ? progress : 0;
-        const message = typeof progress === 'object' ? JSON.stringify(progress) : undefined;
-        return void (await getSharedManager().updateProgress(jobId(id), value, message));
+        return void (await getSharedManager().updateProgress(
+          jobId(id),
+          update.progress,
+          update.message
+        ));
       }
       if (!tcp) return;
-      const value = typeof progress === 'number' ? progress : 0;
-      const message = typeof progress === 'object' ? JSON.stringify(progress) : undefined;
-      assertFlowTcpOk(
-        await tcp.send({ cmd: 'Progress', id, progress: value, message }),
-        'Progress'
-      );
+      assertProgressUpdated(await tcp.send({ cmd: 'Progress', id, ...update }));
     },
     log: async (message: string) => {
       if (callbacks?.log) return callbacks.log(id, message);
@@ -78,7 +87,8 @@ export function buildFlowJobCoreMethods(runtime: FlowJobRuntime) {
     isWaitingChildren: async () => (await getState()) === 'waiting-children',
     updateData: async (data: unknown) => {
       if (callbacks?.updateData) return callbacks.updateData(id, data);
-      if (embedded) return void (await getSharedManager().updateJobData(jobId(id), data));
+      if (embedded)
+        return requireDataUpdated(await getSharedManager().updateJobData(jobId(id), data));
       if (!tcp) return;
       assertFlowTcpOk(await tcp.send({ cmd: 'Update', id, data }), 'Update');
     },
@@ -86,13 +96,16 @@ export function buildFlowJobCoreMethods(runtime: FlowJobRuntime) {
       if (callbacks?.promote) return callbacks.promote(id);
       if (embedded) return void (await getSharedManager().promote(jobId(id)));
       if (!tcp) return;
-      assertFlowTcpOk(await tcp.send({ cmd: 'Promote', id }), 'Promote');
+      // A job that is not delayed stays as it is, as in embedded mode.
+      assertPromoted(await tcp.send({ cmd: 'Promote', id }));
     },
     changeDelay: async (delay: number) => {
+      assertJobDelay(delay);
       if (callbacks?.changeDelay) return callbacks.changeDelay(id, delay);
+      // A job that cannot be changed is not changed (2.9.10 embedded); an invalid delay throws.
       if (embedded) return void (await getSharedManager().changeDelay(jobId(id), delay));
       if (!tcp) return;
-      assertFlowTcpOk(await tcp.send({ cmd: 'ChangeDelay', id, delay }), 'ChangeDelay');
+      assertDelayChanged(await tcp.send({ cmd: 'ChangeDelay', id, delay }));
     },
     changePriority: async (opts: ChangePriorityOpts) => {
       if (callbacks?.changePriority) {
@@ -102,19 +115,22 @@ export function buildFlowJobCoreMethods(runtime: FlowJobRuntime) {
         return void (await getSharedManager().changePriority(jobId(id), opts.priority, opts.lifo));
       }
       if (!tcp) return;
-      assertFlowTcpOk(
-        await tcp.send({ cmd: 'ChangePriority', id, priority: opts.priority, lifo: opts.lifo }),
-        'ChangePriority'
+      // A job that is not queued is not changed, as in embedded mode; anything else throws.
+      assertPriorityChanged(
+        await tcp.send({ cmd: 'ChangePriority', id, priority: opts.priority, lifo: opts.lifo })
       );
     },
     extendLock: async (token: string, duration: number) => {
+      assertLockExtension(duration);
       if (embedded) {
         return (await getSharedManager().extendLock(jobId(id), token, duration)) ? duration : 0;
       }
       if (!tcp) return 0;
-      const response = await tcp.send({ cmd: 'ExtendLock', id, token, duration });
-      assertFlowTcpOk(response, 'ExtendLock');
-      return duration;
+      // A missing lease is 0, as embedded; any other broker rejection throws.
+      return lockExtensionResult(
+        await tcp.send({ cmd: 'ExtendLock', id, token, duration }),
+        duration
+      );
     },
     clearLogs: async (keepLogs?: number) => {
       if (callbacks?.clearLogs) return callbacks.clearLogs(id, keepLogs);

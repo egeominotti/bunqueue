@@ -175,11 +175,11 @@ Dashboards and webhook alerting are covered in [Monitoring](/guide/monitoring/).
 `BUNQUEUE_POSTGRES_LEASE_DURATION_MS` defaults to 30 seconds. It controls the
 background coordination cadence as follows:
 
-| Operation                          | Formula                                        | Default |
-| ---------------------------------- | ---------------------------------------------- | ------: |
-| Broker heartbeat                   | `max(1s, floor(leaseDurationMs / 3))`          |    10 s |
-| Duplicate broker-ID stale takeover | `max(leaseDurationMs, 3 × heartbeat interval)` |    30 s |
-| Expired processing-lease scan      | `max(500ms, floor(leaseDurationMs / 2))`       |    15 s |
+| Operation                          | Formula                                            | Default |
+| ---------------------------------- | -------------------------------------------------- | ------: |
+| Broker heartbeat                   | `max(1s, floor(leaseDurationMs / 3))`              |    10 s |
+| Duplicate broker-ID stale takeover | `max(leaseDurationMs, 3 × heartbeat interval)`     |    30 s |
+| Expired processing-lease scan      | `min(15s, max(500ms, floor(leaseDurationMs / 2)))` |    15 s |
 
 The processing lease itself is still determined by the worker's
 `lockDuration` and renewed by heartbeats. After that lease expires, a surviving

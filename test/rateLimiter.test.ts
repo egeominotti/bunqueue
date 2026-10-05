@@ -123,4 +123,37 @@ describe('ProtocolRateLimiter', () => {
       cleaningLimiter.stop();
     });
   });
+
+  describe('maxRequests validation', () => {
+    const make = (maxRequests: unknown) => () =>
+      new ProtocolRateLimiter({ maxRequests: maxRequests as number, cleanupIntervalMs: 0 });
+    const message = (shown: string) =>
+      `ProtocolRateLimiter: maxRequests must be a whole number >= 1 (got ${shown})`;
+
+    test.each([
+      [0, '0'],
+      [1.5, '1.5'],
+      [NaN, 'NaN'],
+      [Infinity, 'Infinity'],
+      [2 ** 53, '9007199254740992, not a safe integer'],
+    ])('rejects %p with a RangeError', (value, shown) => {
+      expect(make(value)).toThrow(RangeError);
+      expect(make(value)).toThrow(message(shown));
+    });
+
+    test.each([
+      ['5', '"5"'],
+      [5n, '5n'],
+      [null, 'null'],
+    ])('rejects the non-number %p with a TypeError', (value, shown) => {
+      expect(make(value)).toThrow(TypeError);
+      expect(make(value)).toThrow(message(shown));
+    });
+
+    test('accepts a positive whole number', () => {
+      const valid = make(1)();
+      expect(valid.getRemaining('client')).toBe(1);
+      valid.stop();
+    });
+  });
 });

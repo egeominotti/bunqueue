@@ -7,11 +7,16 @@ import type { JobId } from '../domain/types/job';
 import { EventType, type JobEvent } from '../domain/types/queue';
 import type { WebhookManager } from './webhookManager';
 import type { WebhookEvent } from '../domain/types/webhook';
+import { assertDuration } from '../shared/durations';
 import { webhookLog } from '../shared/logger';
+import { safeTimeout } from '../shared/timers';
 
 /** Event subscriber callback */
 export type EventSubscriber = (event: JobEvent) => void;
 export type EventBatchSubscriber = (events: readonly JobEvent[]) => void;
+
+/** Accepted completion-wait timeouts: finite ms >= 0, any length (`safeTimeout`). */
+const WAIT_TIMEOUT_LIMITS = { min: 0 } as const;
 
 /** Waiter entry with cancellation flag for O(1) cleanup */
 interface CompletionWaiter {
@@ -66,16 +71,19 @@ export class EventsManager {
 
   /**
    * Wait for a specific job to complete - event-driven, no polling
-   * Returns true if job completed, false if timeout
+   * Returns true if job completed, false if timeout. `timeoutMs` must be a finite
+   * number >= 0 (0 times out on the next tick; longer than 2^31 - 1 ms is honoured);
+   * anything else throws a TypeError/RangeError synchronously, before a waiter exists.
    */
   waitForJobCompletion(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
+    assertDuration(timeoutMs, 'QueueManager.waitForJobCompletion: timeoutMs', WAIT_TIMEOUT_LIMITS);
     const jobKey = String(jobId);
     if (signal?.aborted) return Promise.resolve(false);
 
     return new Promise((resolve) => {
       let settled = false;
       const cleanup = () => {
-        clearTimeout(timer);
+        timer.clear();
         signal?.removeEventListener('abort', onAbort);
         const waiters = this.completionWaiters.get(jobKey);
         waiters?.delete(waiter);
@@ -102,7 +110,7 @@ export class EventsManager {
         this.completionWaiters.set(jobKey, waiters);
       }
       waiters.add(waiter);
-      const timer = setTimeout(() => finish(false), timeoutMs);
+      const timer = safeTimeout(() => finish(false), timeoutMs);
       signal?.addEventListener('abort', onAbort, { once: true });
       if (signal?.aborted) onAbort();
     });

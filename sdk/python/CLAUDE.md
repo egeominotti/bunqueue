@@ -37,12 +37,16 @@ serialization, Queue, Worker, FlowProducer, query, or admin code.
 | `queue_admin.py` | Admin mixin: DLQ, configs, rate limit, schedulers/cron, webhooks, monitoring |
 | `worker.py` | Worker lifecycle: start/run/pause/close, events |
 | `worker_runtime.py` | Worker runtime mixin: poll loop, job execution, heartbeats, registry |
+| `worker_errors.py` | Worker failure policy (mirror of `handlePullError`): transient pull failures retried 0.5→5 s; a permanent refusal or unexpected exception ends `run()` (0.2.0) unless an `error` listener is attached; swallowed RegisterWorker/heartbeat/ACK/FAIL reports |
+| `worker_options.py` / `durations.py` | Boundary handling of every duration (poll, lock TTL, heartbeat, ACK delay, connect/command timeouts) and runtime-safe waits; 0.2.0 values keep their 0.2.0 result |
+| `sdk_clamps.py` | The four `sdk/CLAUDE.md` rule-4 clamps (heartbeat, batch size, poll timeout, `wait_for_job` ttl), mirror of `sdk/typescript/src/sdk-clamps.ts` |
 | `ack_outcome.py` / `ack_batcher.py` | Authoritative ACK/FAIL parsing and positional ACKB settlement |
 | `flow.py` | FlowProducer public creation/read API |
 | `flow_plan.py` / `flow_plan_legacy.py` | Pure ID allocation and closed tree/chain/fan-in planning |
 | `flow_commit.py` | One `PUSHF` call plus exact snapshot ID/queue validation |
 | `simple/app.py` + `simple/app_api.py` | `Bunqueue` Simple Mode: constructor + processing pipeline, API mixin |
 | `simple/{retry,circuit_breaker,batch,triggers,aging,cancellation,ttl,dedup_debounce}.py` | Simple Mode subsystems, 1:1 with `src/client/bunqueue/` |
+| `simple/validation.py` | Simple Mode 0.2.0 option reading (`x or default`) and the rejection, before the Queue/Worker exist, of values 0.2.0 could not handle |
 
 ## Wire protocol (VITAL gotchas)
 
@@ -88,7 +92,10 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[test,mutation]'
   --hypothesis-seed=20260730
 .venv/bin/mutmut run                       # final gate; Python 3.10+
 .venv/bin/python tests/test_integration.py   # smoke (8) — also pytest-compatible
-.venv/bin/python tests/run_e2e.py            # full e2e (112)
+.venv/bin/python -m pytest tests/test_worker_pull_errors.py \
+  tests/test_worker_wire_errors.py \
+  tests/test_compat_options.py tests/test_compat_simple.py  # no broker
+.venv/bin/python tests/run_e2e.py            # full e2e (172)
 BUNQUEUE_SDK_SOAK_SECONDS=3600 .venv/bin/python tests/soak.py
 ```
 

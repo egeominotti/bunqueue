@@ -59,8 +59,17 @@ commands are summarized in [CLAUDE.md](CLAUDE.md).
 - Every active job is paired with its delivery token. ACK/FAIL and batched
   heartbeat calls use the same ID/token pair exactly once; completed jobs leave
   the held set before future renewal.
-- Positive finite heartbeat intervals create one ticker. Zero, negative, NaN,
+- Positive finite heartbeat intervals create one ticker, with a period clamped
+  to [1 ms, max `time.Duration`] so it can never panic. Zero, negative, NaN,
   infinity, or `DisableHeartbeat` create none.
+- A pull that returns no jobs is followed by a pause, as in the main client's
+  `polling.ts`: 50 ms after a non-blocking pull (poll timeout 0), 10 ms after
+  a long poll. The pull loop never re-polls an empty queue with zero delay.
+  Lock TTL and connection timeouts at or below zero fall back to their
+  defaults, never to a past deadline.
+- Every wait in the pull loop is interruptible: the empty-pull pause, the
+  error backoff and the busy-slot wait select on the per-`Run` stop channel,
+  which `Stop` and `Close` close once. `Stop` never waits out a pending pause.
 - Processor panics become failures with the real stack and do not kill the
   worker. “completed” is emitted only after successful ACK; unrecoverable
   errors skip retries.

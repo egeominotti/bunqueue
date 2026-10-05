@@ -23,6 +23,7 @@ from .rate_gate import RateGate
 from .retry import execute_with_retry
 from .triggers import TriggerManager
 from .ttl import TtlChecker
+from .validation import validate_bunqueue_options
 
 Processor = Callable[[Job], Any]
 
@@ -45,6 +46,8 @@ class Bunqueue(BunqueueApi):
             raise ValueError('Bunqueue requires "processor", "routes", or "batch"')
         if len(modes) > 1:
             raise ValueError('Bunqueue: use only one of "processor", "routes", or "batch"')
+        # Before the Queue and Worker exist: a rejected option leaks nothing.
+        validate_bunqueue_options(opts)
 
         self.name = name
         self._middlewares: List[Callable[[Job, Callable[[], Any]], Any]] = []

@@ -15,7 +15,9 @@ import { EventsManager } from '../eventsManager';
 import { createMonitoringState, type MonitoringState } from '../monitoringChecks';
 import type { OperationalMetrics } from '../metricsExporter';
 import { DEFAULT_CONFIG, type QueueManagerConfig } from '../types';
-import { normalizeCompletedRetentionMs } from '../types/config';
+import { resolveQueueManagerConfig } from '../types/config';
+import { lockTimeoutMs } from '../../shared/lockTimeout';
+import { workerCleanupIntervalMs, workerTimeoutMs } from '../../shared/workerTimeouts';
 import * as bgTasks from '../backgroundTasks';
 import { ContextFactory } from '../contextFactory';
 import { DependencyResultTracker } from '../dependencyResultTracker';
@@ -103,11 +105,12 @@ export abstract class QueueManagerState {
   }
 
   constructor(config: QueueManagerConfig = {}) {
-    this.config = {
-      ...DEFAULT_CONFIG,
-      ...config,
-      completedRetentionMs: normalizeCompletedRetentionMs(config.completedRetentionMs),
-    };
+    this.config = resolveQueueManagerConfig(config);
+    // Parse the runtime env vars now, before storage opens: a malformed value fails
+    // construction (server startup, first embedded Queue/Worker) with the name shown.
+    lockTimeoutMs();
+    workerTimeoutMs();
+    workerCleanupIntervalMs();
     this.storage = config.dataPath ? new SqliteStorage({ path: config.dataPath }) : null;
     const cleanupFailedInitialization: Array<() => void> = [() => this.storage?.close()];
     try {

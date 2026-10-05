@@ -157,5 +157,22 @@ for (const mode of MODES) {
         completed: 2,
       });
     }, 30_000);
+
+    // Documented: `ms` must be finite and >= 0, `0` does nothing, invalid values throw.
+    test('worker.rateLimit(ms) ignores values that are not a positive finite number', async () => {
+      harness = await startHarness('rate-limiting', mode);
+      const queue = harness.queue('worker-override');
+      const worker = harness.worker(queue.name, async () => true, { autorun: false });
+
+      for (const ms of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, null]) {
+        worker.rateLimit(ms as number);
+        expect(worker.isRateLimited()).toBe(false);
+      }
+      expect(() => worker.rateLimit('soon' as unknown as number)).toThrow(TypeError);
+      expect(worker.isRateLimited()).toBe(false);
+
+      worker.rateLimit('5000' as unknown as number);
+      expect(worker.isRateLimited()).toBe(true);
+    });
   });
 }

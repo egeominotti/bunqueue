@@ -1,4 +1,10 @@
 import type { JobId } from '../../domain/types/job';
+import { assertLockDuration, delayArgument } from '../../domain/job/options';
+import {
+  normalizeProgress,
+  priorityChange,
+  validateUpdatedJobData,
+} from '../../domain/job/mutations';
 import * as lockMgr from '../lockManager';
 import * as jobMgmt from '../operations/jobManagement';
 import * as jobPromotion from '../operations/jobPromotion';
@@ -15,24 +21,32 @@ export class QueueManagerJobManagement extends QueueManagerConfiguration {
   }
 
   async updateProgress(jobId: JobId, progress: number, message?: string): Promise<boolean> {
+    // 2.9.10's stored value for any progress (never NaN, never a throw).
+    const update = normalizeProgress(progress, message);
     return jobMgmt.updateJobProgress(
       jobId,
-      progress,
+      update.progress,
       this.contextFactory.getJobMgmtContext(),
-      message
+      update.message
     );
   }
 
   async updateJobData(jobId: JobId, data: unknown): Promise<boolean> {
+    // Serializable, with no size limit: 2.9.10 accepted any update size.
+    const dataError = validateUpdatedJobData(data);
+    if (dataError) throw new Error(dataError);
     return jobMgmt.updateJobData(jobId, data, this.contextFactory.getJobMgmtContext());
   }
 
   async changePriority(jobId: JobId, priority: number, lifo?: boolean): Promise<boolean> {
+    // Any finite priority (missing = 0), grouped jobs included, and a boolean lifo, as
+    // 2.9.10 applied them.
+    const change = priorityChange(priority, lifo);
     return jobMgmt.changeJobPriority(
       jobId,
-      priority,
+      change.priority,
       this.contextFactory.getJobMgmtContext(),
-      lifo
+      change.lifo
     );
   }
 
@@ -48,7 +62,9 @@ export class QueueManagerJobManagement extends QueueManagerConfiguration {
     return this.changeDelay(jobId, delay, token);
   }
 
-  async changeDelay(jobId: JobId, delay: number, token?: string): Promise<boolean> {
+  async changeDelay(jobId: JobId, rawDelay: number, token?: string): Promise<boolean> {
+    // A NaN delay would never come due; a past run time (negative) is "now".
+    const delay = delayArgument(rawDelay);
     try {
       const lockContext = this.contextFactory.getLockContext();
       this.assertLeaseToken(jobId, token, lockContext);
@@ -83,7 +99,11 @@ export class QueueManagerJobManagement extends QueueManagerConfiguration {
   }
 
   async changeWaitingDelay(jobId: JobId, delay: number): Promise<boolean> {
-    return jobTransitions.changeWaitingDelay(jobId, delay, this.contextFactory.getJobMgmtContext());
+    return jobTransitions.changeWaitingDelay(
+      jobId,
+      delayArgument(delay),
+      this.contextFactory.getJobMgmtContext()
+    );
   }
 
   async moveToWaitingChildren(jobId: JobId, token?: string): Promise<boolean> {
@@ -106,6 +126,7 @@ export class QueueManagerJobManagement extends QueueManagerConfiguration {
     token: string | null,
     duration: number
   ): Promise<boolean> {
+    assertLockDuration(duration, 'duration');
     const targetId = typeof jobId === 'string' ? (jobId as JobId) : jobId;
     const context = this.contextFactory.getLockContext();
     if (token) return lockMgr.renewJobLock(targetId, token, context, duration);

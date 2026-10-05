@@ -8,7 +8,9 @@ import threading
 import time
 from typing import Any, Dict, Optional
 
+from ..durations import wait_seconds
 from ..queue import Queue
+from .validation import option
 
 logger = logging.getLogger("bunqueue")
 
@@ -26,8 +28,11 @@ class PriorityAger:
     def _schedule(self) -> None:
         if self._stopped:
             return
-        interval = float(self._config.get("interval") or 60000)
-        self._timer = threading.Timer(interval / 1000.0, self._tick)
+        # 0 means 60000 ms, as in 0.2.0. Bunqueue rejects a NaN or negative
+        # interval (it fired at once and re-armed itself, a hot loop of aging
+        # queries) and an infinite one (it crashed the Timer thread).
+        interval = float(option(self._config, "interval", None, 60000))
+        self._timer = threading.Timer(wait_seconds(interval), self._tick)
         self._timer.daemon = True
         self._timer.start()
 
@@ -40,12 +45,10 @@ class PriorityAger:
             self._schedule()
 
     def _boost_old_jobs(self) -> None:
-        min_age = float(self._config.get("min_age") or self._config.get("minAge") or 60000)
-        boost = int(self._config.get("boost") or 1)
-        max_priority = int(
-            self._config.get("max_priority") or self._config.get("maxPriority") or 100
-        )
-        max_scan = int(self._config.get("max_scan") or self._config.get("maxScan") or 100)
+        min_age = float(option(self._config, "min_age", "minAge", 60000))
+        boost = int(option(self._config, "boost", None, 1))
+        max_priority = int(option(self._config, "max_priority", "maxPriority", 100))
+        max_scan = int(option(self._config, "max_scan", "maxScan", 100))
 
         jobs = self._queue.get_waiting(0, max_scan) + self._queue.get_jobs(
             "prioritized", 0, max_scan

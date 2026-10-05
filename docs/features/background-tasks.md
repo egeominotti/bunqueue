@@ -6,7 +6,7 @@
 
 This module orchestrates all server-side maintenance work that keeps a
 `QueueManager` healthy without a client request driving it. It owns a
-next-deadline scheduler for processing timeouts plus the `setInterval` timers
+next-deadline scheduler for processing timeouts plus the periodic `safeInterval` timers
 for stall detection, expired-lock recovery, DLQ auto-retry/expiry, dependency
 resolution, memory-bound garbage collection, and dashboard monitoring. It also
 owns startup `recover()`, the one-shot pass that rebuilds in-memory shard state
@@ -49,7 +49,7 @@ Internal:
 
 External/runtime:
 
-- Bun/Node timers (`setInterval`/`clearInterval`).
+- Bun/Node timers through `safeInterval` (`src/shared/timers.ts`, see [Shared Timers & Durations](./shared-timers.md)): a period that fits is one native `setInterval`; a longer one is re-armed per period instead of being shortened to a 1 ms spin. Each handle is a `SafeTimer`, stopped with `clear()`.
 - `process.memoryUsage()` for memory-pressure monitoring (`monitoringChecks.ts:166`).
 - No third-party runtime dependencies.
 
@@ -59,12 +59,12 @@ Exported from `backgroundTasks.ts`:
 
 ```typescript
 export interface BackgroundTaskHandles {
-  cleanupInterval: ReturnType<typeof setInterval>;
+  cleanupInterval: SafeTimer;
   timeoutScheduler: JobTimeoutScheduler;
-  depCheckInterval: ReturnType<typeof setInterval>;
-  stallCheckInterval: ReturnType<typeof setInterval>;
-  dlqMaintenanceInterval: ReturnType<typeof setInterval>;
-  lockCheckInterval: ReturnType<typeof setInterval>;
+  depCheckInterval: SafeTimer;
+  stallCheckInterval: SafeTimer;
+  dlqMaintenanceInterval: SafeTimer;
+  lockCheckInterval: SafeTimer;
   cronScheduler: CronScheduler;
 }
 
@@ -109,13 +109,15 @@ Exported from `monitoringChecks.ts`:
 
 ```typescript
 export interface MonitoringState {
+  readonly thresholds: MonitoringThresholds; // read once, when the state is created
   queueIdleSince: Map<string, number>;
   queueThresholdEmitted: Set<string>;
   workerOverloadedSince: Map<string, number>;
   storageWarningEmitted: boolean;
   memoryWarningEmitted: boolean;
 }
-export function createMonitoringState(): MonitoringState;
+// Default: readMonitoringThresholds() (src/config/componentEnv.ts); throws on an invalid env var.
+export function createMonitoringState(thresholds?: MonitoringThresholds): MonitoringState;
 export function runMonitoringChecks(ctx: MonitoringContext): void;
 ```
 
@@ -206,8 +208,8 @@ therefore fail fast before listener bind even when the database is corrupt.
 
 ### `startBackgroundTasks` (`background/lifecycle.ts`)
 
-Registers five maintenance intervals, starts the timeout deadline scheduler,
-and calls `cronScheduler.start()`:
+Registers five maintenance intervals (`safeInterval`), starts the timeout
+deadline scheduler, and calls `cronScheduler.start()`:
 
 | Interval handle          | Config key                              | Default        | Body                                                                                                                   |
 | ------------------------ | --------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -223,10 +225,25 @@ Note: monitoring runs on the cleanup tick (10s), not its own timer — it is inv
 ### `JobTimeoutScheduler` (`background/timeouts.ts`)
 
 Active jobs with a processing timeout are registered in a min-heap keyed by
-`startedAt + timeout`. One `setTimeout` is armed for the earliest live entry;
-earlier arrivals re-arm it, and every processing exit cancels or re-synchronizes
-the job's generation. Delays above the runtime's signed 32-bit timer ceiling
-are chunked at `2_147_483_647` ms without changing the absolute deadline.
+`processingDeadline(job)` = `Math.ceil(startedAt + timeout)`: a fractional timeout is
+rounded up to the next whole millisecond (honoured, never early), a `0`/`NaN`/unset
+timeout means no timeout, and a deadline that is still not a safe integer (an
+infinite or absurdly large timeout) is `NEVER_DEADLINE` (`Number.MAX_SAFE_INTEGER`)
+(`test/repro-job-timeout-fractional.test.ts`). The rule lives in
+`src/domain/job/timeoutRule.ts`, shared with the Worker: the Worker aborts its
+processor after `processingTimeoutDelay(job)`, the distance from `startedAt` to the
+same deadline (none for `NEVER_DEADLINE`), then leaves the job to this scheduler, so
+the two can never disagree about which deadlines exist
+(`test/worker-job-timeout-rule.test.ts`, [Client SDK: Worker](./client-worker-sdk.md)).
+One `setTimeout` is armed for the
+earliest live entry; earlier arrivals re-arm it, and every processing exit cancels
+or re-synchronizes the job's generation. Delays above the runtime's signed 32-bit
+timer ceiling are chunked at `2_147_483_647` ms (`timeoutTimerDelay` = at least
+1 ms, then `clampTimerDelay` from [Shared Timers](./shared-timers.md)) without
+changing the absolute deadline: a chunk that fires with nothing due re-arms for
+what remains.
+`timeoutTimerDelay` maps a NaN distance to 1 ms instead of throwing out of
+`schedule()` on the pull path (only a NaN `jobTimeoutCheckMs` retry could make one).
 Cancelled generations are rejected by entry identity and `startedAt`, so a
 recycled custom ID cannot inherit an old timeout.
 
@@ -402,7 +419,16 @@ Stall detection uses two-phase confirmation (a job must be flagged in two consec
 
 ## Configuration
 
-Interval timings come from `DEFAULT_CONFIG` (`src/application/types/config.ts`), overridable via the `QueueManagerConfig` passed to `QueueManager`:
+Interval timings come from `DEFAULT_CONFIG` (`src/application/types/config.ts`), overridable via the `QueueManagerConfig` passed to `QueueManager`.
+`resolveQueueManagerConfig` validates the five periods when the QueueManager is
+constructed: each must be a finite number of milliseconds >= 1 (`undefined` keeps
+the default). NaN, `0`, negatives, `Infinity`, `null` and non-numbers throw a
+`RangeError`/`TypeError` naming the option, for example
+`QueueManager: stallCheckMs must be a finite number of milliseconds >= 1 (got NaN)`.
+Before, they reached `setInterval` raw and ticked about every millisecond (an
+explicit `undefined` did too), and a NaN `jobTimeoutCheckMs` reached the timeout
+scheduler's retry deadline. A period above 2^31 - 1 ms is honoured
+(`test/repro-server-runtime-config.test.ts`):
 
 | Option                 | Default  | Effect                                                                                                                                                                  |
 | ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -414,11 +440,15 @@ Interval timings come from `DEFAULT_CONFIG` (`src/application/types/config.ts`),
 | `maxCompletedJobs`     | `50_000` | Hot completed cache and Phase 3 recovery cap; not disk retention                                                                                                        |
 | `completedRetentionMs` | `null`   | Optional completed-row age; finite non-negative values are floored to milliseconds, invalid values disable retention, and each tick deletes at most 1,000 eligible rows |
 
-Monitoring thresholds are read from env vars at module load (`monitoringChecks.ts:36`), and a value of `0` disables that check:
+Monitoring thresholds are read from env vars when a `QueueManager` creates its
+`MonitoringState` (`createMonitoringState` → `readMonitoringThresholds`), not at
+module load. Each must be a whole number >= 0 and `0` disables that check;
+anything else (`abc`, `-1`, `1e12`) throws an error naming the variable, and a
+server reports it at startup from `resolveServerConfig`:
 
 | Env var                        | Default        | Effect                                                                      |
 | ------------------------------ | -------------- | --------------------------------------------------------------------------- |
-| `QUEUE_IDLE_THRESHOLD_MS`      | `30000`        | Emit `queue:idle` after this idle duration (`<=0` disables)                 |
+| `QUEUE_IDLE_THRESHOLD_MS`      | `30000`        | Emit `queue:idle` after this idle duration (`0` disables)                   |
 | `QUEUE_SIZE_THRESHOLD`         | `0` (disabled) | Emit `queue:threshold` when waiting count reaches it                        |
 | `WORKER_OVERLOAD_THRESHOLD_MS` | `30000`        | Emit `worker:overloaded` after sustained at-capacity duration               |
 | `MEMORY_WARNING_MB`            | `0` (disabled) | Emit `server:memory-warning` when heap reaches it (re-arms below 90%)       |

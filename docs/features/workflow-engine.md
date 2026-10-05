@@ -213,7 +213,10 @@ child on re-entry; a durable running child whose first queue publication was
 lost is republished. Poll interval and timeout come from the node definition.
 The deadline is based on the child's original `createdAt`, so restart does not
 reset it. Completion returns the child's completed result map; failure,
-`compensation-stuck`, or deadline expiry settles the parent record as failed.
+`compensation-stuck`, or deadline expiry settles the parent record as failed. A
+child whose `createdAt` is not a number fails the node with
+`Sub-workflow "<name>" (<id>) has an invalid start time (NaN)` instead of polling
+without a deadline (`test/repro-workflow-subworkflow-nan-start.test.ts`).
 
 **Loops/map** (`loops.ts`, `mapRunner.ts`): loop conditions and `forEach`
 item snapshots are journaled; completed indexed occurrences are memoised.
@@ -235,7 +238,12 @@ published by the signaller is dropped by admission as a duplicate) or `moved`
 (another driver already advanced or finished the run; the worker stands down).
 Only after `expired` does it emit `signal:timeout`, compensate, emit
 `workflow:failed` and throw `WaitForSignalError`; a signal that wins never sees a
-timeout event. The sentinel is caught by `processStep`, so normal parking acks
+timeout event. A persisted start time that is not a finite number (a corrupted
+row) leaves the budget unmeasurable: the gate expires through the same claim with
+the reason `Signal "<event>" wait has an invalid start time (<value>); ...`
+instead of parking behind a `NaN` timer, recovery re-runs such a node rather than
+arming it, and `scheduleTimeoutCheck` treats a `NaN` delay as "re-check now"
+(`test/repro-workflow-waitfor-nan-start.test.ts`). The sentinel is caught by `processStep`, so normal parking acks
 the node job without treating the pause as a workflow failure.
 
 **signal** (`executorLifecycle.ts` → `SignalCoordinator.record`): delivery,
@@ -369,7 +377,11 @@ closing the worker and queue.
 - **The `signals` column is owned by `storeSignals.ts` alone.** `store.update()` never writes it. A worker holds one in-memory `Execution` for a whole node, so rewriting `signals` from that stale snapshot destroyed payloads delivered mid-step and parked runs forever. `recordSignal`/`parkForSignal` read-modify-write it inside a transaction, and the resume is claimed with a conditional state UPDATE so duplicate signals collapse to exactly one resume. The third transition that pairs with a signal, the expiry of a timed gate (`expireWait`, `storeWaitExpiry.ts`), only reads the column inside its IMMEDIATE transaction and never writes it.
 - **`waitFor` timer handles are chunked** at `2**31-1` ms while the original
   persisted deadline remains unchanged; without chunking, larger timer values
-  wrap and fire immediately.
+  wrap and fire immediately. `waitFor.ts`, `runnerTiming.ts` (step timeouts) and
+  `subWorkflowRunner.ts` (child polling) pass each delay through
+  `clampTimerDelay` ([Shared Timers](./shared-timers.md)) to the engine clock's
+  `setTimeout`, so a simulated clock still drives them, and re-check what remains
+  when the timer fires.
 - **List pages are bounded.** The default is 100 and the maximum is 1000;
   callers retrieve later deterministic pages with `offset`. Offset pages do not
   promise snapshot stability under concurrent insertion. `archive` moves at

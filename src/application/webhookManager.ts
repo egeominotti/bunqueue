@@ -12,12 +12,11 @@ import {
 } from '../domain/types/webhook';
 import { validateWebhookUrl } from '../shared/webhookValidation';
 import { webhookLog } from '../shared/logger';
+import { readWebhookDelivery, type WebhookDelivery } from '../config/componentEnv';
+import { assertWhole } from '../config/numbers';
+import { SETTINGS } from '../config/settings';
 
-/** Maximum webhook delivery retries (configurable via WEBHOOK_MAX_RETRIES env var) */
-const WEBHOOK_MAX_RETRIES = parseInt(Bun.env.WEBHOOK_MAX_RETRIES ?? '3', 10);
-
-/** Delay between webhook retries in ms (configurable via WEBHOOK_RETRY_DELAY_MS env var) */
-const WEBHOOK_RETRY_DELAY_MS = parseInt(Bun.env.WEBHOOK_RETRY_DELAY_MS ?? '1000', 10);
+export type { WebhookDelivery } from '../config/componentEnv';
 
 /** HMAC-SHA256 signature using Bun native CryptoHasher (2-3x faster than WebCrypto) */
 function signPayload(payload: string, secret: string): string {
@@ -31,16 +30,43 @@ function signPayload(payload: string, secret: string): string {
  */
 export class WebhookManager {
   private readonly webhooks = new Map<WebhookId, Webhook>();
-  private readonly maxRetries = WEBHOOK_MAX_RETRIES;
-  private readonly retryDelay = WEBHOOK_RETRY_DELAY_MS;
+  /** Retry policy: WEBHOOK_MAX_RETRIES / WEBHOOK_RETRY_DELAY_MS, or the server's config. */
+  private delivery: WebhookDelivery;
   private readonly validateUrls: boolean;
   private dashboardEmit: ((event: string, data: Record<string, unknown>) => void) | null = null;
 
   /** Running counter for enabled webhooks - avoids O(n) filter in getStats */
   private enabledCount = 0;
 
+  /**
+   * Reads WEBHOOK_MAX_RETRIES and WEBHOOK_RETRY_DELAY_MS now (not at module load) and
+   * throws an error naming the variable when one is invalid: a NaN delay would make
+   * `Bun.sleep` resolve at once and burst every retry.
+   */
   constructor(options?: { validateUrls?: boolean }) {
     this.validateUrls = options?.validateUrls !== false;
+    this.delivery = readWebhookDelivery();
+  }
+
+  /** Replace the retry policy (the server applies `webhooks.*` from its config file). */
+  setDeliveryPolicy(policy: WebhookDelivery): void {
+    this.delivery = {
+      maxRetries: assertWhole(
+        policy.maxRetries,
+        'WebhookManager: maxRetries',
+        SETTINGS.webhookMaxRetries.rule
+      ),
+      retryDelayMs: assertWhole(
+        policy.retryDelayMs,
+        'WebhookManager: retryDelayMs',
+        SETTINGS.webhookRetryDelayMs.rule
+      ),
+    };
+  }
+
+  /** The retry policy in effect. */
+  getDeliveryPolicy(): WebhookDelivery {
+    return this.delivery;
   }
 
   /** Set the dashboard event emitter callback */
@@ -138,8 +164,10 @@ export class WebhookManager {
       headers['X-Webhook-Signature'] = signPayload(body, webhook.secret);
     }
 
+    // One policy per delivery, even if the policy is replaced meanwhile.
+    const { maxRetries, retryDelayMs } = this.delivery;
     let lastError: Error | null = null;
-    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const response = await fetch(webhook.url, {
           method: 'POST',
@@ -164,9 +192,10 @@ export class WebhookManager {
         lastError = err instanceof Error ? err : new Error(String(err));
       }
 
-      // Wait before retry
-      if (attempt < this.maxRetries - 1) {
-        await Bun.sleep(this.retryDelay * (attempt + 1));
+      // Wait before retry (linear backoff). The delay is a validated whole number of
+      // ms; Bun.sleep honours delays above the native timer limit.
+      if (attempt < maxRetries - 1) {
+        await Bun.sleep(retryDelayMs * (attempt + 1));
       }
     }
 

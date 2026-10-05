@@ -27,6 +27,8 @@ import { resolveToolSettings } from './toolSetup';
 import { transportConfigFromEnv } from './transportConfig';
 import { mcpTracker } from './tools/mcpTracker';
 import { CloudAgent } from '../infrastructure/cloud/cloudAgent';
+import { loadCloudConfig } from '../infrastructure/cloud/config';
+import type { CloudConfig } from '../infrastructure/cloud/types';
 import { getSharedManager } from '../client/manager';
 
 export async function run(): Promise<void> {
@@ -37,11 +39,15 @@ export async function run(): Promise<void> {
 
   // In TCP mode HTTP handlers process jobs on the remote broker, never in a local database
   const handlerRegistry = new HttpHandlerRegistry(handlerConnectionFromEnv());
+  // The Cloud agent's settings are validated before any transport starts: an invalid
+  // value must stop the process before it binds a port, not after.
+  let cloudConfig: CloudConfig | null = null;
   // The opt-in tool settings are validated before binding. In http mode the first
   // server is never connected: every session builds its own from the same settings.
   let server: McpServer;
   let http: HttpTransportHandle | null = null;
   try {
+    if (mode === 'embedded' && process.env.BUNQUEUE_CLOUD_URL) cloudConfig = loadCloudConfig();
     const settings = resolveToolSettings(backend);
     const createServer = () => createMcpServer(backend, handlerRegistry, { settings });
     server = createServer();
@@ -56,22 +62,19 @@ export async function run(): Promise<void> {
 
   // Start Cloud agent for MCP telemetry (embedded mode only)
   let cloudAgent: CloudAgent | null = null;
-  if (mode === 'embedded' && process.env.BUNQUEUE_CLOUD_URL) {
-    const manager = getSharedManager();
-    cloudAgent = CloudAgent.create(manager);
-    if (cloudAgent) {
-      cloudAgent.setServerHandles({
-        getConnectionCount: () => 0,
-        getWsClientCount: () => 0,
-        getSseClientCount: () => 0,
-        getMcpOperations: () => {
-          // IMPORTANT: getSummary() MUST be called before drain() — drain empties the buffer
-          const summary = mcpTracker.getSummary();
-          const operations = mcpTracker.drain();
-          return { operations, summary };
-        },
-      });
-    }
+  if (cloudConfig) {
+    cloudAgent = CloudAgent.createFromConfig(getSharedManager(), cloudConfig);
+    cloudAgent.setServerHandles({
+      getConnectionCount: () => 0,
+      getWsClientCount: () => 0,
+      getSseClientCount: () => 0,
+      getMcpOperations: () => {
+        // IMPORTANT: getSummary() MUST be called before drain() — drain empties the buffer
+        const summary = mcpTracker.getSummary();
+        const operations = mcpTracker.drain();
+        return { operations, summary };
+      },
+    });
   }
 
   // Graceful shutdown — close HTTP sessions and stop the HTTP server (awaiting

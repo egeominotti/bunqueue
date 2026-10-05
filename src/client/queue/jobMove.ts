@@ -7,6 +7,7 @@ import { getSharedManager } from '../manager';
 import type { TcpConnectionPool } from '../tcpPool';
 import { jobId } from '../../domain/types/job';
 import { buildFailCommand, failEmbeddedArgs } from './failWire';
+import { delayUntil } from './commandArgs';
 
 interface JobMoveContext {
   name: string;
@@ -131,8 +132,9 @@ export async function moveJobToDelayed(
   timestamp: number,
   token?: string
 ): Promise<void> {
+  // A NaN timestamp used to become a NaN delay: a job that never came due.
+  const delay = delayUntil(timestamp);
   if (ctx.embedded) {
-    const delay = Math.max(0, timestamp - Date.now());
     const manager = getSharedManager();
     const state = await ctx.getJobState(id);
 
@@ -157,8 +159,7 @@ export async function moveJobToDelayed(
     // handleMoveToDelayed read the wire field `delay`. Sending `timestamp` left
     // `delay` undefined server-side → runAt = now + undefined = NaN (an active job
     // was re-queued as `waiting` with the delay dropped) or a silent no-op (a
-    // waiting job). Convert to relative delay here so the wire field matches.
-    const delay = Math.max(0, timestamp - Date.now());
+    // waiting job). The relative delay computed above is the wire field.
     const response = await ctx.tcp!.send({
       cmd: 'MoveToDelayed',
       id,

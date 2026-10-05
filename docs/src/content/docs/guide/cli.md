@@ -1,6 +1,6 @@
 ---
-title: "CLI: Run and Manage bunqueue from the Terminal"
-description: "The bunqueue CLI starts the server and talks to a running one: push and process jobs, manage the DLQ and cron, and script everything with JSON output."
+title: 'CLI: Run and Manage bunqueue from the Terminal'
+description: 'The bunqueue CLI starts the server and talks to a running one: push and process jobs, manage the DLQ and cron, and script everything with JSON output.'
 head:
   - tag: meta
     attrs:
@@ -33,6 +33,27 @@ On startup the server prints its ports, data path, and enabled features (TLS, au
 50,000). `--completed-retention-ms` separately opts SQLite into durable
 age-based cleanup; without it, completed rows remain until an explicit clean or
 obliterate operation.
+
+The global `--port` / `-p` option takes a whole number from 1 to 65535 for client
+commands (0 to 65535 with `start`); an invalid or missing value stops the command
+instead of falling back to 6789. `--port=` (empty) means "not given": the port then
+comes from `TCP_PORT`, `BUNQUEUE_TCP_PORT` or `BQ_TCP_PORT`, and an env value that is
+not a port (such as the `tcp://10.96.0.12:6789` Kubernetes sets for a Service named
+`bunqueue-tcp`) prints a warning and uses 6789.
+
+Port flags follow the rules of their environment variables: ports `0`-`65535`
+(`0` lets the OS pick a free port; `6789.5` and `+6789` are read as 6789). As in
+earlier releases, a value that is not a port (`abc`, `70000`, `-5`) prints a warning
+and starts on the default port (6789 for `--tcp-port`, 6790 for `--http-port`), and
+`-p abc` with `start` is ignored with a warning. A value earlier releases misread,
+such as `1e4` (read as port 1), stops the server with an error that names the flag:
+`Fatal error: Invalid --tcp-port: "1e4" (expected a whole number between 0 and 65535)`.
+`--max-completed-jobs` (at least `1`) and `--completed-retention-ms` (at least `0`)
+read their value like a JavaScript number (`1e5` is 100000); an invalid one is
+ignored with a warning, `Warning: Invalid completed-job retention "-1" (...). Ignoring it.`,
+and the config file or environment value applies. An empty value (`--tcp-port=`,
+`--http-port=`, `--host=`, `--config=`) means "not given"; `--data-path`,
+`--auth-tokens`, `--tls-cert` and `--tls-key` must not be empty.
 
 :::tip[Configuration File]
 Instead of CLI flags and env vars, you can centralize all settings in a typed `bunqueue.config.ts`. See [Configuration File](/guide/configuration/).
@@ -74,22 +95,22 @@ bunqueue push notifications '{"userId":"1"}' -u user-1-notify          # unique 
 bunqueue push aggregate '{"type":"sum"}' --depends-on job-1,job-2      # wait for other jobs
 ```
 
-| Option | Short | Default | Description |
-|--------|-------|---------|-------------|
-| `--priority` | `-P` | `0` | Higher = processed first |
-| `--delay` | `-d` | `0` | Delay in ms before processing |
-| `--job-id` | - | - | Custom ID for deduplication |
-| `--max-attempts` | - | `3` | Max retry attempts |
-| `--backoff` | - | `1000` | Delay between retries (ms) |
-| `--ttl` | - | - | Time-to-live in ms |
-| `--timeout` | - | - | Processing timeout in ms |
-| `--unique-key` | `-u` | - | Deduplication key |
-| `--depends-on` | - | - | Comma-separated job IDs to wait for |
-| `--tags` | - | - | Comma-separated tags |
-| `--group-id` | `-g` | - | Group identifier |
-| `--lifo` | - | `false` | Last in, first out ordering |
-| `--remove-on-complete` | - | `false` | Auto-delete on completion |
-| `--remove-on-fail` | - | `false` | Auto-delete on failure |
+| Option                 | Short | Default | Description                         |
+| ---------------------- | ----- | ------- | ----------------------------------- |
+| `--priority`           | `-P`  | `0`     | Higher = processed first            |
+| `--delay`              | `-d`  | `0`     | Delay in ms before processing       |
+| `--job-id`             | -     | -       | Custom ID for deduplication         |
+| `--max-attempts`       | -     | `3`     | Max retry attempts                  |
+| `--backoff`            | -     | `1000`  | Delay between retries (ms)          |
+| `--ttl`                | -     | -       | Time-to-live in ms                  |
+| `--timeout`            | -     | -       | Processing timeout in ms            |
+| `--unique-key`         | `-u`  | -       | Deduplication key                   |
+| `--depends-on`         | -     | -       | Comma-separated job IDs to wait for |
+| `--tags`               | -     | -       | Comma-separated tags                |
+| `--group-id`           | `-g`  | -       | Group identifier                    |
+| `--lifo`               | -     | `false` | Last in, first out ordering         |
+| `--remove-on-complete` | -     | `false` | Auto-delete on completion           |
+| `--remove-on-fail`     | -     | `false` | Auto-delete on failure              |
 
 Pull the next job (typically a worker's job, but handy for debugging):
 
@@ -221,16 +242,20 @@ bunqueue webhook remove <id>
 
 ## Backups
 
-Backup commands run **locally**, not through the TCP server: they require a
-persistent database path from `BUNQUEUE_DATA_PATH` (or its aliases) and read
-credentials from the `S3_*` environment variables, including temporary
-`S3_SESSION_TOKEN` credentials when used (see [S3 Backup](/guide/backup/)).
+Backup commands run **locally**, not through the TCP server, and read the same
+configuration as the server: the config file (`bunqueue.config.ts` in the working
+directory, or `--config <file>` / `-c <file>`), then the environment. They need a
+persistent SQLite path (`storage.dataPath`, else `BUNQUEUE_DATA_PATH` or its
+aliases) and S3 credentials from the `backup` section or the `S3_*` variables,
+including temporary `S3_SESSION_TOKEN` credentials when used (see
+[S3 Backup](/guide/backup/)).
 
 ```bash
 bunqueue backup now              # create a backup, prints key/size/duration
 bunqueue backup list             # list backups in the bucket
 bunqueue backup status           # show configuration
 bunqueue backup restore <key> -f # restore; requires --force, stop the server first
+bunqueue backup status -c ./config/production.config.ts  # use a specific config file
 ```
 
 Stopping is mandatory for restore. The command validates a temporary candidate
@@ -239,17 +264,17 @@ database handle held by a running server.
 
 ## Global Options
 
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--host` | `-H` | Server hostname | `localhost` |
-| `--port` | `-p` | TCP port | `6789` |
-| `--token` | `-t` | Authentication token (env: `BQ_TOKEN`, `BUNQUEUE_TOKEN`) | - |
-| `--tls` | - | Connect with TLS (verify with system CAs) | `false` |
-| `--tls-ca <file>` | - | Trust a custom CA cert (implies `--tls`) | - |
-| `--tls-no-verify` | - | TLS without cert verification (self-signed, dev only) | `false` |
-| `--json` | - | Output as JSON | `false` |
-| `--help` | - | Show help | - |
-| `--version` | - | Show version | - |
+| Option            | Short | Description                                              | Default     |
+| ----------------- | ----- | -------------------------------------------------------- | ----------- |
+| `--host`          | `-H`  | Server hostname                                          | `localhost` |
+| `--port`          | `-p`  | TCP port                                                 | `6789`      |
+| `--token`         | `-t`  | Authentication token (env: `BQ_TOKEN`, `BUNQUEUE_TOKEN`) | -           |
+| `--tls`           | -     | Connect with TLS (verify with system CAs)                | `false`     |
+| `--tls-ca <file>` | -     | Trust a custom CA cert (implies `--tls`)                 | -           |
+| `--tls-no-verify` | -     | TLS without cert verification (self-signed, dev only)    | `false`     |
+| `--json`          | -     | Output as JSON                                           | `false`     |
+| `--help`          | -     | Show help                                                | -           |
+| `--version`       | -     | Show version                                             | -           |
 
 :::note
 Two subcommands define their own short `-t` (`--timeout`): `pull` and `job wait`. There, use the long `--token` form.

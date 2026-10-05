@@ -7,9 +7,9 @@ import { withSemaphore } from '../../shared/semaphore';
 import { handleCommand } from './handler';
 import { sanitizeServerError } from './errors';
 import { FrameSizeError } from './protocol';
-import { getRateLimiter } from './rateLimiter';
+import { getRateLimiter, rateLimiterEnvConfig } from './rateLimiter';
 import { TcpConnectionRegistry } from './tcp/connections';
-import { MAX_WRITE_QUEUE_BYTES, TCP_IDLE_TIMEOUT_MS } from './tcp/constants';
+import { resolveIdleTimeoutMs, resolveMaxWriteQueueBytes } from './tcp/constants';
 import { handleEventSubscription } from './tcp/eventSubscriptions';
 import { serializeTcpResponse, tcpErrorResponse } from './tcp/responses';
 import { loadTlsOptions } from './tls';
@@ -17,14 +17,21 @@ import type { TcpConnectionData, TcpServerConfig } from './types/tcpServer';
 
 export type { TcpServerConfig } from './types/tcpServer';
 
-/** Create and start the MessagePack TCP server. */
+/**
+ * Create and start the MessagePack TCP server. The transport and rate-limiter settings
+ * are validated before anything binds: a malformed TCP_* or RATE_LIMIT_* env var, or a
+ * bad `idleTimeoutMs`/`maxWriteQueueBytes`, throws here and fails server startup.
+ */
 export function createTcpServer(queueManager: QueueManager, config: TcpServerConfig) {
+  const idleTimeoutMs = resolveIdleTimeoutMs(config.idleTimeoutMs);
+  const maxWriteQueueBytes = resolveMaxWriteQueueBytes(config.maxWriteQueueBytes);
+  rateLimiterEnvConfig();
   const authTokens = new Set(config.authTokens ?? []);
   const registry = new TcpConnectionRegistry(
     queueManager,
     authTokens,
-    config.idleTimeoutMs ?? TCP_IDLE_TIMEOUT_MS,
-    config.maxWriteQueueBytes ?? MAX_WRITE_QUEUE_BYTES
+    idleTimeoutMs,
+    maxWriteQueueBytes
   );
 
   const socketHandlers = {

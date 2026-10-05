@@ -7,9 +7,12 @@
 import type { WorkerManager } from './workerManager';
 import type { Shard } from '../domain/queue/shard';
 import { shardIndex } from '../shared/hash';
+import { readMonitoringThresholds, type MonitoringThresholds } from '../config/componentEnv';
 
 /** Monitoring state — tracked across intervals */
 export interface MonitoringState {
+  /** QUEUE_IDLE_THRESHOLD_MS & co., read when the state is created; 0 disables a check. */
+  readonly thresholds: MonitoringThresholds;
   /** queue → timestamp when it became idle */
   queueIdleSince: Map<string, number>;
   /** queues that already emitted threshold warning */
@@ -22,8 +25,16 @@ export interface MonitoringState {
   memoryWarningEmitted: boolean;
 }
 
-export function createMonitoringState(): MonitoringState {
+/**
+ * Create the monitoring state. Reads the threshold env vars now (not at module load)
+ * and throws an error naming the variable when one is invalid: NaN silently disabled
+ * a check, and `parseInt('1e12')` (1 ms) fired it on the next pass.
+ */
+export function createMonitoringState(
+  thresholds: MonitoringThresholds = readMonitoringThresholds()
+): MonitoringState {
   return {
+    thresholds,
     queueIdleSince: new Map(),
     queueThresholdEmitted: new Set(),
     workerOverloadedSince: new Map(),
@@ -31,16 +42,6 @@ export function createMonitoringState(): MonitoringState {
     memoryWarningEmitted: false,
   };
 }
-
-/** Config from env vars */
-const QUEUE_IDLE_THRESHOLD_MS = parseInt(process.env.QUEUE_IDLE_THRESHOLD_MS ?? '30000', 10);
-const QUEUE_SIZE_THRESHOLD = parseInt(process.env.QUEUE_SIZE_THRESHOLD ?? '0', 10); // 0 = disabled
-const MEMORY_WARNING_MB = parseInt(process.env.MEMORY_WARNING_MB ?? '0', 10); // 0 = disabled
-const STORAGE_WARNING_MB = parseInt(process.env.STORAGE_WARNING_MB ?? '0', 10); // 0 = disabled
-const WORKER_OVERLOAD_THRESHOLD_MS = parseInt(
-  process.env.WORKER_OVERLOAD_THRESHOLD_MS ?? '30000',
-  10
-);
 
 export interface MonitoringContext {
   queueNamesCache: Set<string>;
@@ -87,7 +88,8 @@ function getQueueActive(queue: string, procShards: Map<unknown, { queue: string 
 }
 
 function checkQueueIdle(ctx: MonitoringContext, now: number): void {
-  if (QUEUE_IDLE_THRESHOLD_MS <= 0) return;
+  const idleMs = ctx.state.thresholds.queueIdleMs;
+  if (idleMs <= 0) return;
 
   for (const queue of ctx.queueNamesCache) {
     const waiting = getQueueWaiting(queue, ctx.shards, now);
@@ -98,7 +100,7 @@ function checkQueueIdle(ctx: MonitoringContext, now: number): void {
         ctx.state.queueIdleSince.set(queue, now);
       } else {
         const since = ctx.state.queueIdleSince.get(queue) ?? now;
-        if (now - since >= QUEUE_IDLE_THRESHOLD_MS) {
+        if (now - since >= idleMs) {
           ctx.dashboardEmit?.('queue:idle', {
             queue,
             idleSeconds: Math.floor((now - since) / 1000),
@@ -113,18 +115,19 @@ function checkQueueIdle(ctx: MonitoringContext, now: number): void {
 }
 
 function checkQueueThreshold(ctx: MonitoringContext): void {
-  if (QUEUE_SIZE_THRESHOLD <= 0) return;
+  const threshold = ctx.state.thresholds.queueSize;
+  if (threshold <= 0) return;
   const now = Date.now();
 
   for (const queue of ctx.queueNamesCache) {
     const waiting = getQueueWaiting(queue, ctx.shards, now);
 
-    if (waiting >= QUEUE_SIZE_THRESHOLD) {
+    if (waiting >= threshold) {
       if (!ctx.state.queueThresholdEmitted.has(queue)) {
         ctx.dashboardEmit?.('queue:threshold', {
           queue,
           size: waiting,
-          threshold: QUEUE_SIZE_THRESHOLD,
+          threshold,
         });
         ctx.state.queueThresholdEmitted.add(queue);
       }
@@ -135,7 +138,8 @@ function checkQueueThreshold(ctx: MonitoringContext): void {
 }
 
 function checkWorkerOverload(ctx: MonitoringContext, now: number): void {
-  if (WORKER_OVERLOAD_THRESHOLD_MS <= 0) return;
+  const overloadMs = ctx.state.thresholds.workerOverloadMs;
+  if (overloadMs <= 0) return;
 
   for (const worker of ctx.workerManager.list()) {
     const atCapacity = worker.concurrency > 0 && worker.activeJobs >= worker.concurrency;
@@ -144,7 +148,7 @@ function checkWorkerOverload(ctx: MonitoringContext, now: number): void {
         ctx.state.workerOverloadedSince.set(worker.id, now);
       } else {
         const since = ctx.state.workerOverloadedSince.get(worker.id) ?? now;
-        if (now - since >= WORKER_OVERLOAD_THRESHOLD_MS) {
+        if (now - since >= overloadMs) {
           ctx.dashboardEmit?.('worker:overloaded', {
             workerId: worker.id,
             name: worker.name,
@@ -162,35 +166,37 @@ function checkWorkerOverload(ctx: MonitoringContext, now: number): void {
 }
 
 function checkMemoryPressure(ctx: MonitoringContext): void {
-  if (MEMORY_WARNING_MB <= 0) return;
+  const thresholdMB = ctx.state.thresholds.memoryWarningMb;
+  if (thresholdMB <= 0) return;
   const mem = process.memoryUsage();
   const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
 
-  if (heapMB >= MEMORY_WARNING_MB) {
+  if (heapMB >= thresholdMB) {
     if (!ctx.state.memoryWarningEmitted) {
       ctx.dashboardEmit?.('server:memory-warning', {
         heapUsedMB: heapMB,
-        thresholdMB: MEMORY_WARNING_MB,
+        thresholdMB,
         rssMB: Math.round(mem.rss / 1024 / 1024),
       });
       ctx.state.memoryWarningEmitted = true;
     }
-  } else if (heapMB < MEMORY_WARNING_MB * 0.9) {
+  } else if (heapMB < thresholdMB * 0.9) {
     ctx.state.memoryWarningEmitted = false;
   }
 }
 
 function checkStorageSize(ctx: MonitoringContext): void {
-  if (STORAGE_WARNING_MB <= 0 || !ctx.storage) return;
+  const thresholdMB = ctx.state.thresholds.storageWarningMb;
+  if (thresholdMB <= 0 || !ctx.storage) return;
   const sizeBytes = ctx.storage.getSize();
   const sizeMB = Math.round(sizeBytes / 1024 / 1024);
 
-  if (sizeMB >= STORAGE_WARNING_MB) {
+  if (sizeMB >= thresholdMB) {
     if (!ctx.state.storageWarningEmitted) {
-      ctx.dashboardEmit?.('storage:size-warning', { sizeMB, thresholdMB: STORAGE_WARNING_MB });
+      ctx.dashboardEmit?.('storage:size-warning', { sizeMB, thresholdMB });
       ctx.state.storageWarningEmitted = true;
     }
-  } else if (sizeMB < STORAGE_WARNING_MB * 0.9) {
+  } else if (sizeMB < thresholdMB * 0.9) {
     ctx.state.storageWarningEmitted = false;
   }
 }

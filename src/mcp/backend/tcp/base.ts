@@ -2,7 +2,9 @@ import { FlowProducer } from '../../../client/flow';
 import { TcpConnectionPool } from '../../../client/tcpPool';
 import { normalizeLegacyJobPayload } from '../../../domain/types/job';
 import type { SerializedJob } from '../../types/adapter';
+import { isoTime } from '../../workflow/jsonSafe';
 import { serializeJobOptions } from '../jobOptionsView';
+import { poolSizeFromEnv } from './env';
 import { assertOk, isNegativeOutcome, isNotFound, type WireReply } from './wire';
 
 export interface TcpBackendOptions {
@@ -29,7 +31,7 @@ export class TcpBackendBase {
       host: options.host ?? 'localhost',
       port: options.port ?? 6789,
       token: options.token,
-      poolSize: Number(process.env.BUNQUEUE_POOL_SIZE) || 2,
+      poolSize: poolSizeFromEnv(),
       commandTimeout: MCP_TCP_COMMAND_TIMEOUT_MS,
     });
   }
@@ -96,10 +98,8 @@ export class TcpBackendBase {
       progress: (job.progress as number) ?? 0,
       attempts: (job.attempts as number) ?? 0,
       maxAttempts: (job.maxAttempts as number) ?? 3,
-      createdAt: job.createdAt
-        ? new Date(job.createdAt as number).toISOString()
-        : new Date().toISOString(),
-      startedAt: job.startedAt ? new Date(job.startedAt as number).toISOString() : undefined,
+      createdAt: job.createdAt ? isoTime(job.createdAt) : new Date().toISOString(),
+      startedAt: job.startedAt ? (isoTime(job.startedAt) ?? undefined) : undefined,
       ...serializeJobOptions(job),
     };
   }

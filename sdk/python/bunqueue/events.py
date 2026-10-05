@@ -45,6 +45,11 @@ class EventEmitter:
                 self._listeners.pop(event, None)
                 self._once.pop(event, None)
 
+    def _has_listeners(self, event: str) -> bool:
+        """True while an ``on`` or ``once`` listener is attached for ``event``."""
+        with self._lock:
+            return bool(self._listeners.get(event)) or bool(self._once.get(event))
+
     def emit(self, event: str, *args: Any) -> None:
         with self._lock:
             listeners = list(self._listeners.get(event, ()))

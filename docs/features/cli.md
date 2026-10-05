@@ -1,11 +1,15 @@
 # CLI
 
 `healthcheck [url]` is the shell-free production container probe. It defaults to
-`http://127.0.0.1:${HTTP_PORT ?? 6790}/health`, accepts HTTP/HTTPS only, rejects
+`http://127.0.0.1:<HTTP_PORT>/health`, with `HTTP_PORT` read through the server's own
+setting (`SETTINGS.httpPort`: the server's env grammar, default 6790), so a value the
+server accepts, such as `" 6790"`, is never a broken probe URL; it must be 1-65535,
+since 0 (OS-assigned) cannot be probed. It accepts HTTP/HTTPS only, rejects
 redirects, enforces a five-second deadline, and requires both a successful HTTP
 status and a JSON object with `status: "healthy"`. It exits 0 and prints `healthy`
 on success; otherwise it exits 1 with a generic message that omits response data
-and credentials. It never opens a database or starts a broker. The command
+and credentials (an invalid `HTTP_PORT` is named: `Health check failed: Invalid
+HTTP_PORT: "abc" (...)`). It never opens a database or starts a broker. The command
 does not resolve server config files or start flags; pass an explicit URL when
 those override the listener. TLS certificate verification remains enabled.
 See [Docker images](./docker-images.md) for the packaging and publication gates.
@@ -13,10 +17,13 @@ See [Docker images](./docker-images.md) for the packaging and publication gates.
 > **Category:** Interface · **Source:** `src/cli/index.ts`, `src/cli/globalOptions.ts`, `src/cli/localOutput.ts`, `src/cli/client.ts`, `src/cli/commandRegistry.ts`, `src/cli/commandRouter.ts`, `src/cli/output.ts`, `src/cli/help.ts`, `src/cli/commands/*.ts`
 
 ## Purpose
+
 The CLI is the `bunqueue` executable: a single binary that boots the server **or** acts as a thin TCP client against a running server. It parses global options and a command line, builds a msgpack command object, sends it over the TCP wire protocol, and renders the response for the terminal (human-readable or `--json`). It exists so operators can push/pull jobs, inspect/control queues, manage DLQ/cron/webhooks/workers/rate-limits, run diagnostics, and trigger S3 backups without writing code.
 
 ## Responsibilities & Scope
+
 Owns:
+
 - **argv parsing** — `globalOptions.ts` owns global flags; command builders own subcommand flags; `index.ts` only dispatches.
 - **Command building** — translating CLI verbs into protocol command objects (`{ cmd, ... }`) under `src/cli/commands/`.
 - **Surface registry and routing** — `CLI_COMMAND_SURFACE` is the canonical list
@@ -28,13 +35,16 @@ Owns:
   `One queue. Any language.` shared with the startup banner.
 
 Does NOT own:
+
 - Actual queue logic — delegated to the server. The CLI never touches a Shard or SQLite directly (except `backup`, which uses `S3BackupManager`).
 - Server bootstrap internals — `runServer` delegates to `bootServer` / `resolveServerConfig` (see [Configuration & Entrypoint](./configuration.md)).
 - The wire framing/encoding algorithm — it reuses `FrameParser` and msgpackr from the [TCP Wire Protocol & Framing](./tcp-protocol.md).
 - The persistent connection pool / reconnection / auto-batching used by the SDK — the CLI opens its own single short-lived socket (see [Client Transport](./client-transport.md)).
 
 ## Dependencies
+
 Internal:
+
 - [TCP Wire Protocol & Framing](./tcp-protocol.md) — `FrameParser`, `FrameParser.frame()`, `FrameSizeError` from `src/infrastructure/server/protocol`.
 - [Client Transport](./client-transport.md) — `buildClientTls` from `src/client/tcp/connection` and `ClientTlsOptions` type.
 - [Configuration & Entrypoint](./configuration.md) — `loadConfigFile`, `resolveServerConfig`, `bootServer`, and `resolveToken` (`src/client/resolveToken.ts`).
@@ -43,6 +53,7 @@ Internal:
 - [TCP Server Command Handlers](./tcp-server-handlers.md) — the actual handlers for every `cmd` the CLI emits.
 
 External / runtime:
+
 - Bun APIs: `Bun.connect` (TCP+optional TLS), `Bun.env`, `Bun.stringWidth` (ANSI-aware column padding), `fetch` + `AbortSignal.timeout` (doctor/version health probe), `process.argv`/`process.exit`/`process.stdout.isTTY`.
 - `msgpackr` through the canonical `src/shared/msgpack.ts` codec.
 - `node:util` `parseArgs` for per-subcommand flag parsing.
@@ -50,10 +61,11 @@ External / runtime:
 ## Public Interface
 
 ### Exported functions
+
 - `main(): Promise<void>` — entry point; runs only under `import.meta.main` (`src/cli/index.ts:95`, `:149`).
 - `parseGlobalOptions(): { options: GlobalOptions; commandArgs: string[] }` (`src/cli/globalOptions.ts`, re-exported by `index.ts`).
 - `executeCommand(command: string, args: string[], options: ClientOptions): Promise<void>` (`src/cli/client.ts:181`).
-- `clientTimeoutFor(cmd: Record<string, unknown>): number` (`src/cli/client.ts:44`).
+- `clientTimeoutFor(cmd: Record<string, unknown>): number` (`src/cli/client.ts:47`).
 - `formatOutput(response, command, asJson, subcommand?): string` and `formatError(message, asJson): string` (`src/cli/output.ts:6`, `:17`).
 - Pure `renderHelp`/`renderServerHelp`/`renderPushHelp`/`renderCronAddHelp`/`renderVersion` plus compatible `print*` wrappers (`src/cli/help.ts`).
 - Command builders: `buildCoreCommand`, `buildJobCommand`, `buildQueueCommand`, `buildDlqCommand`, `buildCronCommand`, `buildWorkerCommand`, `buildWebhookCommand`, `buildRateLimitCommand`, `buildMonitorCommand`, and the backup runners `isBackupCommand` / `executeBackupCommand` / `runDoctor` / `runServer`.
@@ -63,35 +75,38 @@ External / runtime:
   `src/cli/commandRouter.ts`).
 
 ### CLI commands → TCP `cmd`
+
 The CLI itself emits no HTTP; it maps verbs to TCP commands (`src/cli/commandRouter.ts:8-52`):
 
-| CLI command | TCP `cmd` |
-| --- | --- |
-| `push` / `pull` / `ack` / `fail` | `PUSH` / `PULL` / `ACK` / `FAIL` |
-| `job get`/`state`/`result`/`cancel` | `GetJob` / `GetState` / `GetResult` / `Cancel` |
-| `job progress`/`update`/`priority` | `Progress` / `Update` / `ChangePriority` |
-| `job promote`/`delay`/`discard` | `Promote` / `MoveToDelayed` / `Discard` |
-| `job logs`/`log`/`wait` | `GetLogs` / `AddLog` / `WaitJob` |
-| `queue list`/`pause`/`resume`/`drain` | `ListQueues` / `Pause` / `Resume` / `Drain` |
-| `queue obliterate`/`clean`/`count` | `Obliterate` / `Clean` / `Count` |
-| `queue jobs`/`paused` | `GetJobs` / `IsPaused` |
-| `dlq list`/`retry`/`purge` | `Dlq` / `RetryDlq` / `PurgeDlq` |
-| `cron list`/`add`/`delete` | `CronList` / `Cron` / `CronDelete` |
-| `worker list`/`register`/`unregister` | `ListWorkers` / `RegisterWorker` / `UnregisterWorker` |
-| `webhook list`/`add`/`remove` | `ListWebhooks` / `AddWebhook` / `RemoveWebhook` |
-| `rate-limit set`/`clear` | `RateLimit` / `RateLimitClear` |
-| `concurrency set`/`clear` | `SetConcurrency` / `ClearConcurrency` |
-| `stats` / `metrics` / `health` / `ping` | `Stats` / `Prometheus` / `Stats` / `Ping` |
+| CLI command                             | TCP `cmd`                                             |
+| --------------------------------------- | ----------------------------------------------------- |
+| `push` / `pull` / `ack` / `fail`        | `PUSH` / `PULL` / `ACK` / `FAIL`                      |
+| `job get`/`state`/`result`/`cancel`     | `GetJob` / `GetState` / `GetResult` / `Cancel`        |
+| `job progress`/`update`/`priority`      | `Progress` / `Update` / `ChangePriority`              |
+| `job promote`/`delay`/`discard`         | `Promote` / `MoveToDelayed` / `Discard`               |
+| `job logs`/`log`/`wait`                 | `GetLogs` / `AddLog` / `WaitJob`                      |
+| `queue list`/`pause`/`resume`/`drain`   | `ListQueues` / `Pause` / `Resume` / `Drain`           |
+| `queue obliterate`/`clean`/`count`      | `Obliterate` / `Clean` / `Count`                      |
+| `queue jobs`/`paused`                   | `GetJobs` / `IsPaused`                                |
+| `dlq list`/`retry`/`purge`              | `Dlq` / `RetryDlq` / `PurgeDlq`                       |
+| `cron list`/`add`/`delete`              | `CronList` / `Cron` / `CronDelete`                    |
+| `worker list`/`register`/`unregister`   | `ListWorkers` / `RegisterWorker` / `UnregisterWorker` |
+| `webhook list`/`add`/`remove`           | `ListWebhooks` / `AddWebhook` / `RemoveWebhook`       |
+| `rate-limit set`/`clear`                | `RateLimit` / `RateLimitClear`                        |
+| `concurrency set`/`clear`               | `SetConcurrency` / `ClearConcurrency`                 |
+| `stats` / `metrics` / `health` / `ping` | `Stats` / `Prometheus` / `Stats` / `Ping`             |
 
 `health` reuses `Stats` and lets the formatter render it (`src/cli/commands/monitor.ts:13`). When a `--token` is set, an `Auth` command is sent first on the same socket (`src/cli/client.ts:199`).
 
 ### Commands handled locally (no TCP `cmd`)
+
 - `version` → client version + HTTP `/health` probe at TCP-port + 1 (`src/cli/index.ts:44-53`).
 - `doctor` → HTTP `/health` diagnostics (`src/cli/index.ts:56-65` → `runDoctor`).
 - `backup now|create|list|restore|status` → `S3BackupManager` directly (`src/cli/index.ts:68-91`).
 - bare `bunqueue` / `start` / a leading `-flag` → server mode via `runServer` (`src/cli/index.ts:122-125`).
 
 ## Data Models
+
 The CLI is schemaless on the wire: every command is a plain `Record<string, unknown>` carrying a `cmd` discriminator, and every response is a `Record<string, unknown>` with an `ok: boolean`. See [data-model](../data-model.md) for the canonical Job shape.
 
 - `GlobalOptions` (`src/cli/globalOptions.ts`): `{ host: string; port: number; token?: string; tls?: boolean | { rejectUnauthorized?: boolean; caFile?: string }; json: boolean; help: boolean; version: boolean }`.
@@ -104,16 +119,20 @@ Job fields the formatter reads (`src/cli/output/jobs.ts`): `id`, `queue`, `state
 ## Business Logic / Control Flow
 
 ### 1. Global parse (`parseGlobalOptions`, `src/cli/globalOptions.ts`)
+
 Done by hand (not `parseArgs`) so unknown/subcommand flags survive into `commandArgs`. Notable rules:
+
 - `--` ends global parsing; everything after is opaque (`:227`).
 - `-t`/`--token` is global **except** after `pull` and `job wait`, where `-t` is that subcommand's `--timeout` and is passed through (`commandOwnsShortT`, `:120`, `:136`).
 - TLS flags: `--tls`, `--tls-no-verify`, `--tls-ca <file>` / `--tls-ca=<file>`; `--tls-cert`/`--tls-key` are server flags and pass through (`applyTlsFlag`, `:65`). `--tls-no-verify` or `--tls-ca` imply TLS (`buildTlsOption`, `:104`).
 - Attached short flags that shadow a global letter (e.g. `-p10`, `-Hfoo`) are warned about because `strict:false` downstream would silently mis-parse them (`warnAmbiguousAttachedShort`, `:195`).
-- Flag-consumers refuse to swallow a following `-flag` as their value (host/port/token/ca), warning instead.
-- Port/host fall back to env when not explicit: port via `TCP_PORT`→`BUNQUEUE_TCP_PORT`→`BQ_TCP_PORT` (`resolveEnvPort`, `:34`), host via `HOST`→`BUNQUEUE_HOST`→`BQ_HOST` (`:49`). Token via `resolveToken` (`--token`→`BQ_TOKEN`→`BUNQUEUE_TOKEN`).
-- **Server mode** is detected when the first positional is `start`, absent, or starts with `-` (`:277`). In that case explicit `--host`/`--port` are re-injected into `commandArgs` as `--host`/`--tcp-port` so they reach `parseServerArgs` (`:283`).
+- Flag-consumers refuse to swallow a following `-flag` as their value (host/token/ca warn instead; `-p`/`--port` reports a missing value, see below).
+- **Port:** `-p`/`--port <n>` and `--port=<n>` are parsed after the loop with the rule of the mode: a client command needs 1-65535, server mode follows `--tcp-port` (0-65535, 0 = OS-assigned) because the value is re-injected as `--tcp-port`. The env grammar applies (`6789.5` and `+6789` are 6789). On a client command `1e4`, `-1`, `abc`, `99999` and a missing value (`--port` at the end, `-p --json`) throw a `ConfigError` naming the flag as typed (`Invalid -p: "abc" (expected a whole number between 1 and 65535)`), printed as one `Fatal error:` line; before, each warned and connected to 6789, which may be a different server. On `start`, a value that is not a port (`abc`, `70000`, missing) is dropped with a warning, as in 2.9.10, and the server port (TCP_PORT or 6789) applies; a misread (`1e4`) is an error. An empty value (`--port=`, `-p ''`) means "not given", as in 2.9.10: the env or default port applies; `--host=` likewise.
+- Port/host fall back to env when not explicit: a client command's port comes from `TCP_PORT ?? BUNQUEUE_TCP_PORT ?? BQ_TCP_PORT` (`resolveEnvPort`; an empty `TCP_PORT` means 6789 and hides the aliases). A value that is not a port warns and uses 6789, as in 2.9.10 (`Warning: Invalid env port "tcp://10.96.0.12:6789" (BUNQUEUE_TCP_PORT: expected a whole number between 1 and 65535). Using 6789.`): Kubernetes injects `BUNQUEUE_TCP_PORT=tcp://<ip>:<port>` for a Service named `bunqueue-tcp`, which must not break every client command. In server mode the env port is the server's and is validated by `resolveServerConfig` instead. Host via `HOST`→`BUNQUEUE_HOST`→`BQ_HOST`. Token via `resolveToken` (`--token`→`BQ_TOKEN`→`BUNQUEUE_TOKEN`).
+- **Server mode** is detected when the first positional is `start`, absent, or starts with `-`. In that case explicit `--host`/`--port` are re-injected into `commandArgs` as `--host`/`--tcp-port` so they reach `parseServerArgs`.
 
 ### 2. Dispatch (`main`, `src/cli/index.ts`)
+
 `--version`/`--help` short-circuit first. Then: server mode → `runServer`; `version`/`doctor`/`backup` → local handlers; otherwise → `executeCommand`. Command-specific help is printed for `push`/`cron` when `--help` follows the verb (`:351`). Top-level `try/catch` prints `Error: <msg>` and exits 1.
 
 With `--json`, global/command help, both version forms, doctor, backup, and
@@ -121,27 +140,32 @@ fatal local errors all pass through `emitLocalOutput`: one ANSI-free JSON
 document on exactly one stream, with the historical exit code preserved.
 
 ### 3. Client execution (`executeCommand`, `src/cli/client.ts:181`)
+
 1. **Build first, connect second** — `buildCommand` runs before any socket is opened, so unknown commands and parse errors are reported without a reachable server (`:190`). Unknown command → exit 1.
 2. `connect()` opens `Bun.connect` (TLS wrapped if `buildClientTls` returns a value), with a 5s connection timeout (`:171`).
 3. If a token is present, send `{ cmd:'Auth', token }`; non-`ok` → "Authentication failed" exit 1 (`:199`).
-4. Send the command with a deadline from `clientTimeoutFor` (base 30s; only `PULL`/`WaitJob` add the server-side `timeout` + 10s network buffer, `:43`). One in-flight request per socket: `socket.data.resolve/reject` is set, the framed msgpack is written, the `data` handler unpacks the first frame and resolves.
+4. Send the command with a deadline from `clientTimeoutFor` (base 30s; only `PULL`/`WaitJob` add the server-side `timeout` + 10s network buffer, `:47`). The deadline is armed with `safeTimeout` (`:54`), so a long-poll `--timeout` above 2^31 - 1 ms reaches the server and the CLI prints the server's own range error (for example `timeout must be at most 60000`); a native timer used to overflow and report `Command timeout` after about 1 ms (`test/repro-server-runtime-cli-timeout.test.ts`). One in-flight request per socket: `socket.data.resolve/reject` is set, the framed msgpack is written, the `data` handler unpacks the first frame and resolves.
 5. Response handling: `!ok` → `formatOutput` to stderr, exit 1. Two false-success guards: `WaitJob` + `completed:false` → "Job not completed within timeout" exit 1 (`:228`); `GetState` + `state:'unknown'` → "Job not found" exit 1 (`:234`). Otherwise print formatted output to stdout.
 6. `RegisterWorker` prints a stderr warning that the registration is transient and dies with the CLI process (`:245`).
 7. `finally` closes the socket.
 
 ### 4. Output (`formatOutput` → `formatSuccess`, `src/cli/output.ts:6`, `src/cli/output/success.ts:65`)
+
 `--json` returns `JSON.stringify(response, null, 2)` of the raw response (pretty-printed, no unwrapping). Otherwise `unwrap` flattens a `{ data: {...} }` envelope (`src/cli/output/success.ts:14-24`), then `formatSuccess` checks `id`→"Job created" (only for `push`) and `ids`→verb chosen by command+subcommand first, then a collection cascade picks a renderer: job / jobs-table (DLQ-aware) / workers / webhooks / crons / dlqJobs / logs / stats / counts / queues, then the remaining scalar shapes (`workerId`, `webhookId`, `cron`, `state`, `result`, `progress`, `paused`, `count`, `metrics`), falling back to `OK` (`src/cli/output/success.ts:65-120`). The subcommand (first positional) is forwarded so batch responses read "Drained"/"Cleaned"/"Retried"/"Purged" correctly (`src/cli/client.ts:216-220`).
 
-### 5. Server mode (`runServer`, `src/cli/commands/server.ts:118`)
-Parse CLI flags (`parseCliFlags`, `:37`) → `loadConfigFile(configPath)` → `applyCliFlags` (CLI wins over file config, `:83`) → `resolveServerConfig` → `bootServer`. Invalid ports warn and fall back to defaults (6789/6790).
+### 5. Server mode (`runServer`, `src/cli/commands/server.ts:138`)
+
+Parse CLI flags (`parseCliFlags`) → `loadConfigFile(configPath)` → `applyCliFlags` (CLI wins over file config) → `resolveServerConfig` → `bootServer`. Port flags are parsed by `parsePortFlagLeniently` (`src/config/cliFlags.ts`) with the rule of their env var and config key (`SETTINGS`, `src/config/settings.ts`). As in 2.9.10, a value that is not a port (`abc`, `70000`, `-5`, no value) prints `Warning: Invalid TCP port "abc" (--tcp-port: expected a whole number between 0 and 65535). Using default 6789.` and uses 6789 / 6790 (over the env and the file); a misread (`1e4`, which `parseInt` read as port 1; `6789abc`) stops startup naming the flag. String flags go through `requireFlagValue`, and `--auth-tokens` then through `parseTokenList` (`src/config/auth.ts`, the `AUTH_TOKENS` rule); a string flag given without a value (`parseArgs` yields `true`) stops startup. Before, `--completed-retention-ms` without a value became a 1 ms retention (`Number(true)`). `--max-completed-jobs` and `--completed-retention-ms` keep their 2.9.10 reading (`storageFlag`): `Number()` (`1e5` is 100000), and an invalid value (`0`, `-1`, `abc`) prints `Warning: Invalid completed-job retention "-1" (--completed-retention-ms: expected a whole number >= 0). Ignoring it.` and the file or env value applies. An empty value (`--tcp-port=`, `--http-port=`, `--host=`, `--config=`, `--max-completed-jobs=`, `--completed-retention-ms=`) means "not given", as in 2.9.10; `--data-path=`, `--auth-tokens=`, `--tls-cert=` and `--tls-key=` stay errors (an empty value would silently open other data or weaken security).
 
 ### 6. Doctor (`src/cli/commands/doctor.ts`)
+
 `fetchDoctorHealth` owns HTTP I/O, `evaluateDoctor` is pure deterministic
 business logic, and `formatDoctorText` owns the ANSI view. The report covers
 reachability, version mismatch, status, uptime, connections, DLQ, and RSS; the
 dispatcher chooses text or JSON and applies its exit code.
 
 ### 7. Backup (`executeBackupCommand`, `src/cli/commands/backup.ts:21`)
+
 Requires a data path from
 `BUNQUEUE_DATA_PATH`→`BQ_DATA_PATH`→`DATA_PATH`→`SQLITE_PATH`; otherwise
 fails. It accepts temporary S3 credentials (`S3_SESSION_TOKEN` /
@@ -156,18 +180,18 @@ can continue using the replaced file.
 CLI invariants are IDs 60–69 in the production coverage register. They are
 owned by focused suites rather than the queue lifecycle `fc.commands` model:
 
-| ID | Invariant | Executable owner |
-| --- | --- | --- |
-| 60 | Any generated argv produces a deterministic command, `null`, or deterministic error; it never hangs | generated parser suites plus real-process deadlines |
-| 61 | `--json` emits exactly one parseable, ANSI-free JSON document on network and local success/error paths | 5,000-case formatter property plus runtime/local executable suites |
-| 62 | CLI parsing and MessagePack round-trip preserve exact protocol meaning for arbitrary JSON, Unicode, negative primitives, and dangerous-looking keys | exact fixtures, 2,000 generated payloads, and restart regression |
-| 63 | Equivalent global spellings (`--port`, `-p`, `--port=`; token/CA forms) are equivalent | `test/cli-invariants-core.test.ts` |
-| 64 | Permuting independent global or command flags does not change meaning | generated permutations in `test/cli-invariants-core.test.ts` |
-| 65 | Argument/parse failures do not mutate memory counters or SQLite, including 32 concurrent failures | real process/broker/SQLite snapshot and concurrency tests |
-| 66 | Every read-only CLI command preserves broker counters and every durable table | complete read-only E2E matrix |
-| 67 | Direct API and CLI lifecycles converge to the same observable state, result, options, and counts | dual-queue API/CLI parity test |
-| 68 | Timeout or transport interruption cancels connection-scoped `PULL`/`PULLB`; no hidden waiter, lease, rate/concurrency token, lock, counter increment, or restart divergence remains | CLI kill/storm regressions, shard-lock abort, waiter, owner/batch, and durable recovery tests |
-| 69 | Registry, router, help, and exact builder fixtures expose the same complete command surface | bidirectional surface/fixture/help checks |
+| ID  | Invariant                                                                                                                                                                           | Executable owner                                                                              |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 60  | Any generated argv produces a deterministic command, `null`, or deterministic error; it never hangs                                                                                 | generated parser suites plus real-process deadlines                                           |
+| 61  | `--json` emits exactly one parseable, ANSI-free JSON document on network and local success/error paths                                                                              | 5,000-case formatter property plus runtime/local executable suites                            |
+| 62  | CLI parsing and MessagePack round-trip preserve exact protocol meaning for arbitrary JSON, Unicode, negative primitives, and dangerous-looking keys                                 | exact fixtures, 2,000 generated payloads, and restart regression                              |
+| 63  | Equivalent global spellings (`--port`, `-p`, `--port=`; token/CA forms) are equivalent                                                                                              | `test/cli-invariants-core.test.ts`                                                            |
+| 64  | Permuting independent global or command flags does not change meaning                                                                                                               | generated permutations in `test/cli-invariants-core.test.ts`                                  |
+| 65  | Argument/parse failures do not mutate memory counters or SQLite, including 32 concurrent failures                                                                                   | real process/broker/SQLite snapshot and concurrency tests                                     |
+| 66  | Every read-only CLI command preserves broker counters and every durable table                                                                                                       | complete read-only E2E matrix                                                                 |
+| 67  | Direct API and CLI lifecycles converge to the same observable state, result, options, and counts                                                                                    | dual-queue API/CLI parity test                                                                |
+| 68  | Timeout or transport interruption cancels connection-scoped `PULL`/`PULLB`; no hidden waiter, lease, rate/concurrency token, lock, counter increment, or restart divergence remains | CLI kill/storm regressions, shard-lock abort, waiter, owner/batch, and durable recovery tests |
+| 69  | Registry, router, help, and exact builder fixtures expose the same complete command surface                                                                                         | bidirectional surface/fixture/help checks                                                     |
 
 ### Complete E2E command matrix
 
@@ -204,6 +228,7 @@ MessagePack round-trip. Adding a command requires updating the canonical
 registry, help, fixture matrix, E2E behavior, and this document in one change.
 
 ## Concurrency & Locking
+
 No server-side locks are taken by the CLI process — it is a client. The only
 client-side concurrency invariant is **one outstanding request per socket**:
 `SocketData.resolve/reject` is a single slot, set before `write` and cleared on
@@ -216,6 +241,7 @@ final post-lock guard requeues if cancellation lands at the handoff boundary.
 handoff so a later one-shot CLI invocation can `ack`/`fail` that delivered job.
 
 ## Edge Cases & Failure Modes
+
 - **Exit codes**: `0` success; `1` generic failure (unknown command, `!ok`, auth fail, timeout, `WaitJob` not completed, `GetState` unknown); `2` when a `CommandError` (bad arguments/JSON) escapes (`src/cli/client.ts:254`). Doctor/backup compute their own codes.
 - **TLS mismatch hint**: a plaintext client reading a TLS handshake parses garbage as an absurd frame size; `FrameSizeError` is caught and rephrased to suggest `--tls`/`--tls-ca`/`--tls-no-verify` (`src/cli/client.ts:96`).
 - **Connect rejection path**: `Bun.connect` may reject directly (TLS handshake refused) instead of firing `connectError`; that promise rejection is surfaced rather than waiting out the 5s timeout (`:163`).
@@ -227,30 +253,47 @@ handoff so a later one-shot CLI invocation can `ack`/`fail` that delivered job.
 - **Job IDs are passed as strings** (`parseBigIntArg`) so UUIDs, numeric, and custom IDs all work; the server parses them (`src/cli/commands/types.ts:46-52`).
 - **Transient worker registration**: `worker register` over the CLI is gone the instant the process exits (TCP close auto-unregisters); a stderr warning points users to the SDK `Worker` or `bunqueue start --processor` (`src/cli/client.ts:241-250`).
 - **Invalid server response**: a frame that fails `unpack` rejects with "Invalid response from server" (`:121`).
-- **Color suppression**: ANSI is emitted only when `process.stdout.isTTY` and `NO_COLOR !== '1'` (`src/cli/output/style.ts:13-16`).
+- **Color policy** (`colorEnabled`, `src/shared/colorSupport.ts`), shared by CLI results (`style.ts`), `--help`, `doctor` and the server startup banner: a non-empty `FORCE_COLOR` wins (`0`/`false` force color off, anything else on, even on a pipe and over `NO_COLOR`, as Node.js resolves the two); otherwise any non-empty `NO_COLOR` (https://no-color.org) or `TERM=dumb` disables color; otherwise color only on a TTY. Before, CLI results honoured only `NO_COLOR=1`, and help, doctor and the banner always wrote ANSI, into pipes and log files too. `--json` output never contains color.
 - **No retry/reconnect**: unlike the SDK pool, the one-shot CLI does not retry a failed connection or resend on a dropped socket.
 
 ## Configuration
+
 Client-affecting env vars / flags (defaults in parentheses):
+
 - `--host`/`-H` (`localhost`) ← `HOST` / `BUNQUEUE_HOST` / `BQ_HOST`.
 - `--port`/`-p` (`6789`, TCP) ← `TCP_PORT` / `BUNQUEUE_TCP_PORT` / `BQ_TCP_PORT`. HTTP probes use port + 1.
 - `--token`/`-t` ← `BQ_TOKEN` / `BUNQUEUE_TOKEN` (empty string = unset).
 - `--tls` / `--tls-ca <file>` / `--tls-no-verify` (plaintext by default).
 - `--json` (off), `--help`/`-h`, `--version`/`-v`.
-- `NO_COLOR=1` disables ANSI output.
+- `NO_COLOR` (any non-empty value) disables ANSI output; `FORCE_COLOR` forces it (`0`/`false` force it off); `TERM=dumb` disables it.
 - Connection timeout 5000 ms (`src/cli/client.ts:171-176`); command timeout has a 30000 ms base (`src/cli/client.ts:44-48`).
-- `backup` data path ← `BUNQUEUE_DATA_PATH` / `BQ_DATA_PATH` / `DATA_PATH` / `SQLITE_PATH` plus S3 vars consumed by `S3BackupManager.fromEnv`.
+- `backup` reads the server's config file (`--config`/`-c <file>`, else `bunqueue.config.{ts,js,mjs}` in the working directory) with the server's precedence: data path ← `storage.dataPath` > `BUNQUEUE_DATA_PATH` > `BQ_DATA_PATH` > `DATA_PATH` > `SQLITE_PATH`, backup settings ← the `backup` section > `S3_*`/`AWS_*` > defaults (`resolveBackupCommandConfig`). A configuration that selects PostgreSQL or memory is refused.
 
 Server-start flags (`bunqueue start`, merged over `bunqueue.config.ts`, CLI
-wins): `--tcp-port` (6789), `--http-port` (6790), `--host` (0.0.0.0),
-`--data-path`, `--max-completed-jobs` (positive hot-cache bound),
-`--completed-retention-ms` (non-negative, opt-in durable SQLite retention),
-`--auth-tokens`, `--tls-cert`, `--tls-key`, `--config`/`-c`. Env fallbacks are
-resolved in `resolveServerConfig`. See
+wins): `--tcp-port` (6789; 0-65535, 0 lets the OS pick), `--http-port` (6790;
+same rule), `--host` (0.0.0.0), `--data-path`, `--max-completed-jobs` (whole
+number >= 1, hot-cache bound), `--completed-retention-ms` (whole ms >= 0, opt-in
+durable SQLite retention), `--auth-tokens`, `--tls-cert`, `--tls-key`,
+`--config`/`-c`. Port values follow the env grammar (`6789.5`, `+6789`); a value
+that is not a port warns and uses the default port, as in 2.9.10, and a misread
+(`1e12`, `5s`) stops startup with an error naming the flag; the two storage flags
+warn and ignore an invalid value, as in 2.9.10, and an empty value means "not given"
+(see above). `--auth-tokens` follows the `AUTH_TOKENS` rule (`parseTokenList`,
+`src/config/auth.ts`): split on commas, each entry trimmed, empty entries dropped
+(`'a, b'` means `a` and `b`). A value with no token at all stops startup,
+`Invalid --auth-tokens: "," (expected a comma-separated list of non-empty tokens)`;
+it used to yield an empty list that replaced `AUTH_TOKENS` and disabled auth. The
+flag's tokens replace `auth.tokens` from the file, which replaces `AUTH_TOKENS`. Env fallbacks are resolved in `resolveServerConfig`. The global `-p`/`--port`
+is validated with the `--tcp-port` rule in server mode and re-injected as
+`--tcp-port`. Every entry point prints a configuration error as one
+`Fatal error: <message>` line and exits 1 (`src/cli/index.ts` for the npm bin,
+`exitOnConfigError` in `src/main.ts` for `bun src/main.ts` and the Docker binary).
+See
 [Configuration & Entrypoint](./configuration.md) and
 [Security: TLS, Auth, CORS](./security-tls-auth.md).
 
 ## Related Docs
+
 - [TCP Wire Protocol & Framing](./tcp-protocol.md), [TCP Server Command Handlers](./tcp-server-handlers.md)
 - [Client Transport](./client-transport.md), [Client SDK: Queue](./client-queue-sdk.md), [Client SDK: Worker](./client-worker-sdk.md)
 - [HTTP / REST / SSE / WebSocket API](./http-api.md), [Stats, Metrics & Monitoring](./stats-and-monitoring.md)

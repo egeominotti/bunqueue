@@ -4,6 +4,7 @@
  */
 
 import type { EventEmitter } from 'events';
+import { safeInterval, type SafeTimer } from '../../shared/timers';
 import type { TcpConnection } from './types';
 
 export interface HeartbeatDeps {
@@ -14,11 +15,13 @@ export interface HeartbeatDeps {
   readonly emitter: EventEmitter;
 }
 
-export function startHeartbeat(
-  deps: HeartbeatDeps,
-  intervalMs: number
-): ReturnType<typeof setInterval> {
-  return setInterval(() => void sendHeartbeat(deps), intervalMs);
+/**
+ * Renew every pulled job's lease each `intervalMs` (> 0, validated as the Worker's
+ * `heartbeatInterval`). `safeInterval` honours an interval above the native timer limit
+ * instead of letting the runtime fire it every millisecond.
+ */
+export function startHeartbeat(deps: HeartbeatDeps, intervalMs: number): SafeTimer {
+  return safeInterval(() => void sendHeartbeat(deps), intervalMs);
 }
 
 export async function sendHeartbeat(deps: HeartbeatDeps): Promise<void> {

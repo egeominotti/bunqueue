@@ -1,13 +1,16 @@
 /**
  * Maps MCP job options to the engine's job input. Both backends use these functions,
  * so an option means the same thing in embedded and TCP mode:
- * - embedded: `toJobInput` feeds QueueManager.push / pushBatch directly;
+ * - embedded: `admittedJobInput`/`admittedBulkInputs` (`toJobInput` plus the PUSH/PUSHB
+ *   data and option checks) feed QueueManager.push / pushBatch directly;
  * - TCP PUSH: `toPushFields` (the custom id travels as `jobId`, as the PUSH handler expects);
  * - TCP PUSHB: `toJobInput` per job (PUSHB jobs are engine inputs, so it travels as `customId`).
  * Fields left undefined are omitted, never sent as null.
  */
 
+import { validateJobOptions } from '../../domain/job/options';
 import type { JobInput } from '../../domain/types/job';
+import { validateJobData } from '../../infrastructure/server/protocol/validation';
 import type { McpBulkJob, McpJobOptions } from '../types/adapter';
 
 /** Copy of `fields` without its undefined entries. */
@@ -55,6 +58,34 @@ export function toJobInput(name: string, data: unknown, opts: McpJobOptions = {}
 /** Engine input for one bulk item. */
 export function toBulkJobInput(job: McpBulkJob): JobInput {
   return toJobInput(job.name, job.data, job);
+}
+
+/**
+ * The checks a TCP PUSH applies before admission (job data size, then the shared
+ * job-option validator), for the embedded backend, which calls the engine directly.
+ * The zod schemas already bound every option they expose; this keeps the two backends
+ * on one definition and one message.
+ */
+function admissionError(input: JobInput): string | null {
+  return validateJobData(input.data) ?? validateJobOptions(input);
+}
+
+/** Engine input for one job, or the error a TCP PUSH would return for it. */
+export function admittedJobInput(name: string, data: unknown, opts: McpJobOptions = {}): JobInput {
+  const input = toJobInput(name, data, opts);
+  const error = admissionError(input);
+  if (error) throw new Error(error);
+  return input;
+}
+
+/** Engine inputs for a bulk add, or the `jobs[i]: ...` error a TCP PUSHB would return. */
+export function admittedBulkInputs(jobs: McpBulkJob[]): JobInput[] {
+  const inputs = jobs.map(toBulkJobInput);
+  for (let index = 0; index < inputs.length; index++) {
+    const error = admissionError(inputs[index]);
+    if (error) throw new Error(`jobs[${index}]: ${error}`);
+  }
+  return inputs;
 }
 
 /** Option fields of a TCP PUSH command. */

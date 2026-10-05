@@ -3,10 +3,10 @@
  * Method surface mirrors the official TS client (TCP mode).
  *
  * The class is composed from area modules kept under 250 lines each:
- * queue-query.ts (query/counts/logs), queue-control.ts (state control,
- * job mutations) and queue-admin.ts (DLQ, configs, schedulers, webhooks,
- * monitoring). Methods are merged onto the prototype; declaration merging
- * exposes them on the type.
+ * queue-query.ts (lookup/state/results/wait), queue-counts.ts (counts/logs),
+ * queue-control.ts (state control, job mutations) and queue-admin.ts (DLQ,
+ * configs, schedulers, webhooks, monitoring). Methods are merged onto the
+ * prototype; declaration merging exposes them on the type.
  */
 
 import { Connection, type Response, type TlsOption } from './connection.js';
@@ -16,8 +16,10 @@ import { Job } from './job.js';
 import type { Observability } from './observability.js';
 import { adminMethods, type QueueAdminApi } from './queue-admin.js';
 import { controlMethods, type QueueControlApi } from './queue-control.js';
+import { countMethods, type QueueCountsApi } from './queue-counts.js';
 import { type QueueQueryApi, queryMethods } from './queue-query.js';
 import { type JobOptions, jobPayload, wireJobOptions } from './types.js';
+import { resolveConnectionTimings, resolvePoolSize } from './validation.js';
 
 export interface QueueOptions extends Observability {
   host?: string;
@@ -25,12 +27,14 @@ export interface QueueOptions extends Observability {
   token?: string;
   tls?: TlsOption;
   connection?: Connection;
+  /** Per-command timeout in ms (default 10000): >= 1, or Infinity for no deadline. */
   commandTimeoutMs?: number;
-  /** Max in-flight commands before backpressure kicks in (0 = unbounded). */
+  /** Max in-flight commands before backpressure kicks in (0 or below = unbounded). */
   maxInFlight?: number;
   /**
    * Fan producer commands across N connections (round-robin) for throughput.
-   * >1 builds a ConnectionPool; default 1 = a single connection.
+   * Above 1 builds a ConnectionPool of `Math.floor(poolSize)` connections, at most 65535;
+   * default 1 = a single connection.
    */
   poolSize?: number;
 }
@@ -49,22 +53,33 @@ export class Queue<T = unknown> {
 
   constructor(name: string, opts: QueueOptions = {}) {
     this.name = name;
+    this.connection = opts.connection ?? Queue.ownConnection(opts);
+    this.ownsConnection = opts.connection === undefined;
+  }
+
+  /**
+   * The connection a Queue builds when none is given. Only the options it forwards are
+   * validated, naming this Queue, before anything is built: with `connection`, 0.2.2
+   * read none of them. As in 0.2.2, only a truthy `poolSize` above 1 builds a pool
+   * (NaN, 0 and a non-numeric string mean one connection), and its size is floored.
+   */
+  private static ownConnection(opts: QueueOptions): ConnectionLike {
+    const { commandTimeoutMs, maxInFlight } = opts;
+    resolveConnectionTimings('Queue', { commandTimeoutMs, maxInFlight });
+    const requested: unknown = opts.poolSize;
+    const pooled = Boolean(requested) && (requested as number) > 1;
+    const poolSize = pooled ? resolvePoolSize('Queue: poolSize', requested) : 1;
     const connOptions = {
       host: opts.host,
       port: opts.port,
       token: opts.token,
       tls: opts.tls,
-      commandTimeoutMs: opts.commandTimeoutMs,
-      maxInFlight: opts.maxInFlight,
+      commandTimeoutMs,
+      maxInFlight,
       logger: opts.logger,
       onTelemetry: opts.onTelemetry,
     };
-    this.connection =
-      opts.connection ??
-      (opts.poolSize && opts.poolSize > 1
-        ? new ConnectionPool(opts.poolSize, connOptions)
-        : new Connection(connOptions));
-    this.ownsConnection = opts.connection === undefined;
+    return pooled ? new ConnectionPool(poolSize, connOptions) : new Connection(connOptions);
   }
 
   /** Send a raw command on this queue's connection (used by area modules). */
@@ -139,5 +154,6 @@ export class Queue<T = unknown> {
  * installs exactly the methods the interface declares. The unused type
  * parameter is required — merged interfaces must repeat the class generics. */
 // oxlint-disable-next-line no-unused-vars -- generic must match the class declaration
-export interface Queue<T = unknown> extends QueueQueryApi, QueueControlApi, QueueAdminApi {}
-Object.assign(Queue.prototype, queryMethods, controlMethods, adminMethods);
+export interface Queue<T = unknown>
+  extends QueueQueryApi, QueueCountsApi, QueueControlApi, QueueAdminApi {}
+Object.assign(Queue.prototype, queryMethods, countMethods, controlMethods, adminMethods);

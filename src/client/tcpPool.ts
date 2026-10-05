@@ -5,6 +5,7 @@
 
 import { TcpClient, type ConnectionOptions, type ConnectionHealth } from './tcpClient';
 import { LongPollRouter, type LongPollLease } from './tcp/longPollRouter';
+import { assertPoolOptions, resolveConnectionOptions, resolvePoolSize } from './tcp/options';
 import { getPoolKey } from './tcp/poolKey';
 import type { SendOptions } from './tcp/types';
 
@@ -30,45 +31,17 @@ export class TcpConnectionPool {
   private readonly longPolls = new LongPollRouter();
 
   constructor(options: PoolOptions = {}) {
-    const poolSize = Math.max(1, options.poolSize ?? 4); // Validate: at least 1
-    this.options = {
-      host: options.host ?? 'localhost',
-      port: options.port ?? 6789,
-      token: options.token ?? '',
-      tls: options.tls ?? false,
-      poolSize,
-      maxReconnectAttempts: options.maxReconnectAttempts ?? Infinity,
-      reconnectDelay: options.reconnectDelay ?? 100,
-      maxReconnectDelay: options.maxReconnectDelay ?? 30000,
-      connectTimeout: options.connectTimeout ?? 5000,
-      commandTimeout: options.commandTimeout ?? 30000,
-      autoReconnect: options.autoReconnect ?? true,
-      pingInterval: options.pingInterval ?? 30000,
-      maxPingFailures: options.maxPingFailures ?? 3,
-      maxCommandTimeouts: options.maxCommandTimeouts ?? 3,
-      pipelining: options.pipelining ?? true,
-      maxInFlight: options.maxInFlight ?? 100,
-    };
+    // Throws before anything is built: a TypeError or RangeError naming the option.
+    assertPoolOptions('TcpConnectionPool', options);
+    // Every connection option comes from the one defaults table (DEFAULT_CONNECTION), so
+    // none can be dropped on its way to the clients (#111). poolSize below 1 means one
+    // and a fraction rounds up, as 2.9.10 built `i < poolSize` connections.
+    const connection = resolveConnectionOptions('TcpConnectionPool', options);
+    this.options = { ...connection, poolSize: resolvePoolSize(options) };
 
     // Create pool of connections
     for (let i = 0; i < this.options.poolSize; i++) {
-      const client = new TcpClient({
-        host: this.options.host,
-        port: this.options.port,
-        token: this.options.token,
-        tls: this.options.tls,
-        maxReconnectAttempts: this.options.maxReconnectAttempts,
-        reconnectDelay: this.options.reconnectDelay,
-        maxReconnectDelay: this.options.maxReconnectDelay,
-        connectTimeout: this.options.connectTimeout,
-        commandTimeout: this.options.commandTimeout,
-        autoReconnect: this.options.autoReconnect,
-        pingInterval: this.options.pingInterval,
-        maxPingFailures: this.options.maxPingFailures,
-        maxCommandTimeouts: this.options.maxCommandTimeouts,
-        pipelining: this.options.pipelining,
-        maxInFlight: this.options.maxInFlight,
-      });
+      const client = new TcpClient(connection);
       // Socket-level errors (e.g. TLS handshake failures, protocol garbage) are
       // emitted as 'error' events; without a listener EventEmitter would throw
       // and crash the process. Commands are still settled via the close/timeout

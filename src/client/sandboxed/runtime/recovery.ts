@@ -1,4 +1,5 @@
 import { jobId, type Job as DomainJob } from '../../../domain/types/job';
+import { safeInterval } from '../../../shared/timers';
 import { getSharedManager } from '../../manager';
 import { createPublicJob } from '../../jobConversion';
 import { buildFailCommand, failEmbeddedArgs } from '../../queue/failWire';
@@ -34,46 +35,86 @@ import { SandboxedDispatch } from './dispatch';
 import { log } from './log';
 
 export class SandboxedRecovery<T = unknown> extends SandboxedDispatch<T> {
-  protected handleCrash(worker: WorkerProcess, index: number, reportError = true): void {
-    if (worker.currentJob) {
-      const token = worker.currentToken ?? undefined;
-      this.ops.fail(worker.currentJob.id, 'Worker crashed', token).catch((error: unknown) => {
-        log('error', 'Failed to mark crashed job as failed', {
-          jobId: String(worker.currentJob?.id),
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
-    }
-
+  /**
+   * A thread died: an uncaught error, an exit, a processor module that failed to load,
+   * or a job timeout that terminated it. Handled once per thread. Its job is failed at
+   * once (retried per its attempts), never left holding its lease. Within the restart
+   * budget (`autoRestart`, and the counter, incremented first, below `maxRestarts`) the
+   * slot gets a new thread, given jobs only once its processor has loaded; otherwise it
+   * is retired: never respawned, never given a job. The pull loop stops the worker when
+   * every slot is retired (`stopExhausted`).
+   */
+  protected handleCrash(worker: WorkerProcess, reason: string, reportError = true): void {
+    const index = this.workers.indexOf(worker);
+    if (index === -1 || worker.crashed) return;
+    worker.crashed = true;
+    worker.terminated = true;
+    // A thread that raised an error may still run: nothing more of it is wanted.
+    worker.worker.terminate();
+    const message = `Worker crashed: ${reason}`;
+    if (worker.currentJob) void this.fail(worker, message);
+    else this.resetWorkerState(worker);
     if (reportError) {
       this.safeEmitError(
-        Object.assign(new Error('Worker crashed'), {
-          workerIndex: index,
-          context: 'crash' as const,
-        })
+        Object.assign(new Error(message), { workerIndex: index, context: 'crash' as const })
       );
     }
-    this.resetWorkerState(worker);
     worker.restarts++;
-
-    if (this.options.autoRestart && worker.restarts < this.options.maxRestarts && this.running) {
+    if (!this.running) return;
+    if (this.options.autoRestart && worker.restarts < this.options.maxRestarts) {
       this.spawnWorker(index).catch((error: unknown) => {
+        // A new thread that dies while loading is handled as its own crash; one that a
+        // stop() terminated while it loaded is no failure to report.
+        if (!this.running) return;
         log('error', 'Failed to restart worker', {
           workerIndex: index,
           error: error instanceof Error ? error.message : String(error),
         });
       });
-    } else if (worker.restarts >= this.options.maxRestarts) {
-      log('error', 'Worker exceeded max restarts', {
-        workerIndex: index,
-        maxRestarts: this.options.maxRestarts,
-      });
+      return;
     }
+    worker.retired = true;
+    log('error', 'Sandbox thread retired', {
+      workerIndex: index,
+      restarts: worker.restarts,
+      maxRestarts: this.options.maxRestarts,
+      autoRestart: this.options.autoRestart,
+    });
+    // A pull loop waiting for a free thread re-checks now, so it never pulls for none.
+    this.wakePullLoop();
+  }
+
+  /**
+   * Every thread crashed and none may restart: report it (`error`, context
+   * 'exhausted') and stop as stop() would, `autoStart` included, since an automatic
+   * restart would crash again. A later start() begins with a fresh restart budget.
+   */
+  protected stopExhausted(): void {
+    const cause = this.options.autoRestart
+      ? `maxRestarts (${this.options.maxRestarts}) is used up`
+      : 'autoRestart is off';
+    const error = Object.assign(
+      new Error(
+        `SandboxedWorker: all ${this.workers.length} threads crashed and ${cause}; the worker stopped`
+      ),
+      { queue: this.queueName, context: 'exhausted' as const }
+    );
+    log('error', error.message, { queue: this.queueName });
+    this.safeEmitError(error);
+    this.idleStop().catch((failure: unknown) => {
+      log('error', 'Exhausted-pool stop failed', {
+        queue: this.queueName,
+        error: failure instanceof Error ? failure.message : String(failure),
+      });
+    });
   }
 
   protected startHeartbeat(): void {
+    // 0 = disabled; otherwise a finite period >= 1 ms by construction. safeInterval
+    // honours one above the 2^31 - 1 ms native limit instead of spinning.
     if (this.heartbeatInterval <= 0) return;
-    this.heartbeatTimer = setInterval(() => void this.sendHeartbeat(), this.heartbeatInterval);
+    this.heartbeatTimer?.clear();
+    this.heartbeatTimer = safeInterval(() => void this.sendHeartbeat(), this.heartbeatInterval);
   }
 
   protected async sendHeartbeat(): Promise<void> {

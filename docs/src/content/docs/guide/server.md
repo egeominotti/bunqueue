@@ -42,6 +42,16 @@ For bounded completed-job history on SQLite, add
 setting). `--max-completed-jobs` only sizes the in-memory hot window and does
 not reclaim disk space.
 
+The server validates every setting before it opens a port. A flag, config-file
+key or environment variable with a value the server cannot use, such as
+`--tcp-port 1e4`, `timeouts.stats: 0` or `STATS_INTERVAL_MS=1e12` (which earlier
+releases misread as port 1 and 1 ms), stops startup with an error that names it.
+Values that earlier releases accepted keep working: forms such as `6789.5` or
+`5000ms` are read as they were, and a value they replaced with a default (for
+example `--tcp-port abc`, which starts on 6789) is logged as a warning and keeps
+that default. See [Configuration File](/guide/configuration/#validation) and
+[Environment Variables](/guide/env-vars/).
+
 ## Connect from your app
 
 Drop the `embedded` option and clients connect to `localhost:6789` automatically:
@@ -122,7 +132,7 @@ tag when the server and client must move together:
 ```bash
 docker run -d -p 6789:6789 -p 6790:6790 \
   -v bunqueue-data:/app/data \
-  ghcr.io/egeominotti/bunqueue:2.9.10
+  ghcr.io/egeominotti/bunqueue:2.9.11
 ```
 
 PostgreSQL storage needs a 2.9 image or newer: a 2.8.x image ignores the

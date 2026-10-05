@@ -53,6 +53,11 @@ Update the progress of an active job.
 }
 ```
 
+`progress` is stored as in 2.9.10 and never refused: a number is clamped to 0-100 (NaN
+is 0); a numeric string, a boolean or null is its `Number(...)` (`"50"` is 50, `true` is
+1); other text is 0 with the text as the `message` when none is given. Clients send
+object progress as `0` with its JSON as the `message`.
+
 **Response:**
 
 ```typescript
@@ -76,6 +81,9 @@ Update the data payload of an existing job.
   data: any              // New job data
 }
 ```
+
+`data` must be JSON serializable (`Job data must be JSON serializable`). Unlike `PUSH`,
+an update has no size limit, as in 2.9.10.
 
 **Response:**
 
@@ -101,6 +109,14 @@ Change the priority of a queued job.
   lifo?: boolean         // Tie-break ordering among same-priority jobs
 }
 ```
+
+`priority` can be any finite number, for grouped jobs too (as in 2.9.10; a numeric
+string counts as its number); a missing `priority` is 0 (BullMQ's
+`changePriority({ lifo: true })`). `lifo`, when given, is made a boolean exactly as on
+`PUSH` (`1` is `true`, `0` is `false`). NaN, an infinity or a non-number fails
+(`priority must be a finite number`, `priority must be a number`) and leaves the job
+unchanged; a job that is not queued fails with `Job not found or not in queue`,
+which the client SDKs treat as "not changed", like embedded mode.
 
 **Response:**
 
@@ -142,10 +158,16 @@ Move an active job back to the delayed state.
 {
   cmd: 'MoveToDelayed',
   id: string,
-  delay: number,         // Delay in ms from now
+  delay: number,         // Delay in ms from now (required, finite; negative = past run time)
   token?: string         // Required when the active job has a lock
 }
 ```
+
+A missing or non-finite `delay` fails the command (`delay is required`,
+`delay must be a finite number`, ...) and leaves the job unchanged. As in 2.9.10, a
+negative `delay` makes the job ready at once with a past run time (ahead of later ready
+jobs; a PostgreSQL broker uses "now", as on 2.9.10) and a very large one is applied (clamped at
+about 136,900 years).
 
 **Response:**
 

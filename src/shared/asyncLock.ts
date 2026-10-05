@@ -1,13 +1,14 @@
 /** FIFO asynchronous mutex with direct ownership handoff. */
 
 import { LockTimeoutError } from './lockError';
-import { DEFAULT_LOCK_TIMEOUT_MS } from './lockTimeout';
+import { lockTimeoutMs } from './lockTimeout';
+import { safeTimeout, type SafeTimer } from './timers';
 import type { LockGuard } from './types/lock';
 
 interface AsyncWaiter {
   resolve: (guard: LockGuard) => void;
   reject: (error: LockTimeoutError) => void;
-  timer?: ReturnType<typeof setTimeout>;
+  timer?: SafeTimer;
   settled: boolean;
 }
 
@@ -15,20 +16,28 @@ export class AsyncLock {
   private locked = false;
   private readonly queue: AsyncWaiter[] = [];
 
-  acquire(timeoutMs: number = DEFAULT_LOCK_TIMEOUT_MS): Promise<LockGuard> {
+  /**
+   * Acquire the lock. `timeoutMs` defaults to LOCK_TIMEOUT_MS; a value <= 0 rejects at
+   * once when the lock is contended, and any longer value is honoured (`safeTimeout`).
+   */
+  acquire(timeoutMs?: number): Promise<LockGuard> {
     if (!this.locked && this.queue.length === 0) {
       this.locked = true;
       return Promise.resolve(this.createGuard());
     }
-    if (timeoutMs <= 0) return Promise.reject(new LockTimeoutError());
 
     return new Promise<LockGuard>((resolve, reject) => {
+      const waitMs = timeoutMs ?? lockTimeoutMs();
+      if (waitMs <= 0) {
+        reject(new LockTimeoutError());
+        return;
+      }
       const waiter: AsyncWaiter = {
         resolve,
         reject,
         settled: false,
       };
-      waiter.timer = setTimeout(() => this.timeout(waiter), timeoutMs);
+      waiter.timer = safeTimeout(() => this.timeout(waiter), waitMs);
       this.queue.push(waiter);
       this.drain();
     });
@@ -57,7 +66,7 @@ export class AsyncLock {
     if (!waiter) return;
 
     waiter.settled = true;
-    if (waiter.timer) clearTimeout(waiter.timer);
+    waiter.timer?.clear();
     this.locked = true;
     waiter.resolve(this.createGuard());
   }

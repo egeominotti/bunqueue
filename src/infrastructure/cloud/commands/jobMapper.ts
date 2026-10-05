@@ -1,4 +1,5 @@
 import type { Job } from '../../../domain/types/job';
+import { cloudTimestamp, optionalCloudTimestamp } from '../timestamps';
 
 /** Derive the dashboard state from persisted job timestamps. */
 function deriveState(job: {
@@ -27,10 +28,10 @@ export function mapCloudCommandJob(job: Job) {
     _status: state,
     data: data !== undefined ? JSON.stringify(data) : undefined,
     priority: job.priority,
-    timestamp: job.createdAt,
-    processedOn: job.startedAt ?? undefined,
-    finishedOn: job.completedAt ?? undefined,
-    runAt: job.runAt,
+    timestamp: cloudTimestamp(job.createdAt),
+    processedOn: optionalCloudTimestamp(job.startedAt),
+    finishedOn: optionalCloudTimestamp(job.completedAt),
+    runAt: cloudTimestamp(job.runAt, cloudTimestamp(job.createdAt)),
     failedReason:
       state === 'active' && job.attempts > 0
         ? `Retry ${job.attempts}/${job.maxAttempts}`
@@ -53,7 +54,7 @@ export function mapCloudCommandJob(job: Job) {
     childrenIds: job.childrenIds.length > 0 ? job.childrenIds.map(String) : undefined,
     dependsOn: job.dependsOn.length > 0 ? job.dependsOn.map(String) : undefined,
     childrenCompleted: job.childrenCompleted > 0 ? job.childrenCompleted : undefined,
-    lastHeartbeat: job.lastHeartbeat > 0 ? job.lastHeartbeat : undefined,
+    lastHeartbeat: job.lastHeartbeat > 0 ? cloudTimestamp(job.lastHeartbeat) : undefined,
     stallCount: job.stallCount > 0 ? job.stallCount : undefined,
     stallTimeout: job.stallTimeout ?? undefined,
     removeOnComplete: job.removeOnComplete || undefined,

@@ -1,5 +1,6 @@
 import type { TransactionSQL } from 'bun';
 import { databaseNow, type PostgresContext } from './context';
+import { postgresBrokerHeartbeatMs } from './maintenanceSchedule';
 
 interface BrokerRow {
   readonly broker_id: string;
@@ -22,8 +23,7 @@ export class PostgresBrokerSessionFencedError extends Error {
 }
 
 export function postgresBrokerStaleMs(ctx: PostgresContext): number {
-  const heartbeatMs = Math.max(1000, Math.floor(ctx.config.leaseDurationMs / 3));
-  return Math.max(ctx.config.leaseDurationMs, heartbeatMs * 3);
+  return Math.max(ctx.config.leaseDurationMs, postgresBrokerHeartbeatMs(ctx.config) * 3);
 }
 
 export async function registerPostgresBroker(ctx: PostgresContext): Promise<void> {

@@ -120,15 +120,35 @@ Scheduler `limit` and `tz` map to the wire fields `maxLimit` and `timezone`.
 
 ## Worker semantics
 
-- `batch_size` is clamped to `1..1000`, and each pull is additionally bounded
-  by the worker concurrency so no lease waits outside the heartbeat lifecycle.
+- `batch_size` (default: the concurrency) is clamped to `1..1000`; `nil`, a
+  float or a non-number is a batch of 1. Each pull is additionally bounded by
+  the worker concurrency so no lease waits outside the heartbeat lifecycle.
+- `Queue.wait_for_job/3` clamps its timeout to `0..600_000` ms; `nil` or a
+  non-number is a 0 ms hold that returns an unfinished job's timeout at once.
+  `wait_for_job/2` waits up to 30,000 ms.
 - The worker registers before every pull, so a lazily reconnected socket is
   registered before scheduler checks.
 - Active leases are renewed through an independent connection. Polling is
-  capped at 30 seconds. Set `heartbeat_interval: 0` to disable job heartbeats.
+  capped at 30 seconds (default 1,000 ms); `poll_timeout: 0` (also a negative
+  value, `nil` or a non-number) is a non-blocking poll, and `run/1` then waits
+  50 ms after an empty pull instead of re-polling at once; after an empty long
+  poll it waits 10 ms, as the main client does. Set `heartbeat_interval: 0`
+  (any non-positive number, `nil` or `false`) to disable job heartbeats; a
+  positive interval (default 10,000 ms) is rounded to at least 1 ms and capped
+  at 4,294,967,295 ms, the BEAM timer limit. `true` or a string raises
+  `ArgumentError` rather than silently disabling them.
+- `lock_ttl` (default 30,000 ms, also for `nil`) must be a positive number of
+  milliseconds: a float is rounded up to whole milliseconds and a value above
+  9,007,199,254,740,991 is capped; zero, negative and non-number values raise
+  `ArgumentError` before the worker starts its processes. The connection
+  `timeout` (default 30,000 ms) falls back to the default below 1 ms and is
+  capped at 4,294,965,295 ms; an explicit `Connection.call/3` timeout below
+  1 ms uses the connection's timeout.
 - `stop/1` is idempotent and safe while `run/1` is active: it rejects new
   runs, waits for every active handler and its ACK/FAIL, then unregisters,
-  closes, and releases its lifecycle process.
+  closes, and releases its lifecycle process. It always returns: a run whose
+  process died (for example from a handler's linked crash) no longer counts as
+  active.
 - Raise `Bunqueue.UnrecoverableError` to skip remaining retries and
   dead-letter a job. ACK/FAIL failures are surfaced and never counted as
   completed processing.

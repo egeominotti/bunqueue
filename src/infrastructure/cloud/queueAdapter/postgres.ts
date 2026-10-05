@@ -5,6 +5,7 @@ import type { JobId } from '../../../domain/types/job';
 import { DEFAULT_STALL_CONFIG } from '../../../domain/types/stall';
 import type { PostgresCounts, PostgresQueueState } from '../../persistence/postgres';
 import type { PostgresCloudReadModel } from '../../persistence/postgres/cloudReadModel';
+import { workerTimeoutMs } from '../../../shared/workerTimeouts';
 import type { CloudQueueAdapter, CloudQueueCounts, CloudSnapshotSource } from './types';
 
 const EMPTY_COUNTS: PostgresCounts = {
@@ -170,7 +171,9 @@ export class PostgresCloudQueueAdapter implements CloudQueueAdapter {
     );
     const localStats = this.manager.getCloudProcessStats();
     const now = Date.now();
-    const activeWorkers = model.workers.filter((worker) => now - worker.lastSeen < 30_000);
+    // The same freshness window as every other worker view (timeouts.worker / WORKER_TIMEOUT_MS).
+    const freshMs = workerTimeoutMs();
+    const activeWorkers = model.workers.filter((worker) => now - worker.lastSeen < freshMs);
     const workerStats = {
       total: model.workers.length,
       active: activeWorkers.length,

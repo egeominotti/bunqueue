@@ -23,6 +23,7 @@ import { executeWithRetry } from './retry.js';
 import { TriggerManager } from './triggers.js';
 import { TtlChecker } from './ttl.js';
 import type { BunqueueMiddleware, BunqueueOptions } from './types.js';
+import { validateBunqueueOptions } from './validation.js';
 
 type Raw = Record<string, unknown>;
 
@@ -54,8 +55,11 @@ export class Bunqueue<T = unknown, R = unknown> {
     const modes = [opts.processor, opts.routes, opts.batch].filter(Boolean).length;
     if (modes === 0) throw new Error('Bunqueue requires "processor", "routes", or "batch"');
     if (modes > 1) throw new Error('Bunqueue: use only one of "processor", "routes", or "batch"');
+    // Before the Queue and Worker exist: a rejected option must leave nothing running.
+    validateBunqueueOptions(opts);
 
     this.name = (opts.prefixKey ?? '') + name;
+    // The caller's object, read at each job as in 0.2.2; executeWithRetry normalizes it.
     this.retryConfig = opts.retry ?? null;
     this.ttlChecker = opts.ttl ? new TtlChecker(opts.ttl) : null;
     this.merger = new DedupDebounceMerger(opts.deduplication ?? null, opts.debounce ?? null);
@@ -82,6 +86,8 @@ export class Bunqueue<T = unknown, R = unknown> {
       ...conn,
       concurrency: opts.concurrency,
       autorun: opts.autorun,
+      // As in 0.2.2: null / 1000 is 0, which disables heartbeats, and a numeric string
+      // is its number; 0, negative, non-finite and NaN disable (sdk-clamps.ts).
       heartbeatIntervalS:
         opts.heartbeatInterval !== undefined ? opts.heartbeatInterval / 1000 : undefined,
       batchSize: opts.batchSize,
@@ -146,18 +152,35 @@ export class Bunqueue<T = unknown, R = unknown> {
     // Register cancellation
     const ac = this.cancellation.register(job.id);
     const runChain = () => this.runMiddlewareChain(job, ac);
-    const execute = this.retryConfig ? executeWithRetry(runChain, this.retryConfig) : runChain();
+    // A processor or middleware that throws before returning a Promise becomes a
+    // rejection, so the breaker counts it and the registration below is released. The
+    // signal ends a pending retry wait on cancel() or close() ('Job cancelled').
+    let execute: Promise<R>;
+    try {
+      execute = this.retryConfig
+        ? executeWithRetry(runChain, this.retryConfig, ac.signal)
+        : runChain();
+    } catch (error) {
+      execute = Promise.reject(error);
+    }
 
+    // finally: a throwing breaker hook (onOpen, onClose) cannot skip the release.
     return execute.then(
       (result) => {
-        this.cb?.onSuccess();
-        this.cancellation.unregister(job.id);
-        return result;
+        try {
+          this.cb?.onSuccess();
+          return result;
+        } finally {
+          this.cancellation.unregister(job.id, ac);
+        }
       },
       (err: unknown) => {
-        this.cb?.onFailure();
-        this.cancellation.unregister(job.id);
-        throw err;
+        try {
+          this.cb?.onFailure();
+          throw err;
+        } finally {
+          this.cancellation.unregister(job.id, ac);
+        }
       }
     );
   }

@@ -11,6 +11,7 @@ import {
   reflectionMeta,
   resolveGroupId,
 } from './payload';
+import { assertBulkOptions } from './validation';
 
 export async function addBulk<T>(
   context: AddContext,
@@ -22,6 +23,8 @@ export async function addBulk<T>(
     ...context.opts.defaultJobOptions,
     ...opts,
   }));
+  // Reject the whole bulk before anything is sent or admitted, as PUSHB does.
+  assertBulkOptions(merged);
 
   if (context.embedded) {
     const manager = getSharedManager(context.opts.dataPath);

@@ -11,7 +11,9 @@ import {
   validateGroupId,
   validateJobData,
   validateJobOptions,
+  validateLockDuration,
   validateNumericField,
+  validatePullTimeout,
 } from '../protocol';
 import { validatePushBatchJobs, validatePushDependencies } from './pushBatchValidation';
 
@@ -28,15 +30,8 @@ export async function handlePush(
   const groupError = validateGroupId(cmd.groupId);
   if (groupError) return resp.error(groupError, reqId);
 
-  const optionsError = validateJobOptions({
-    groupId: cmd.groupId,
-    priority: cmd.priority,
-    delay: cmd.delay,
-    timeout: cmd.timeout,
-    maxAttempts: cmd.maxAttempts,
-    backoff: cmd.backoff,
-    ttl: cmd.ttl,
-  });
+  // Every bounded option of the command, stallTimeout and timestamp included.
+  const optionsError = validateJobOptions(cmd);
   if (optionsError) return resp.error(optionsError, reqId);
 
   try {
@@ -119,17 +114,18 @@ export async function handlePull(
   const queueError = validateQueueName(cmd.queue);
   if (queueError) return resp.error(queueError, reqId);
 
-  const timeoutError = validateNumericField(cmd.timeout, 'timeout', { min: 0, max: 60000 });
+  const timeoutError = validatePullTimeout(cmd.timeout);
   if (timeoutError) return resp.error(timeoutError, reqId);
-  const groupError = validateGroupPullOptions(cmd.group);
-  if (groupError) return resp.error(groupError, reqId);
+  const pullError =
+    validateGroupPullOptions(cmd.group) ?? validateLockDuration(cmd.lockTtl, 'lockTtl');
+  if (pullError) return resp.error(pullError, reqId);
 
   if (cmd.owner) {
     const { job, token } = await ctx.queueManager.pullWithLock(
       cmd.queue,
       cmd.owner,
       cmd.timeout,
-      cmd.lockTtl,
+      cmd.lockTtl ?? undefined,
       ctx.signal,
       cmd.group
     );
@@ -158,10 +154,11 @@ export async function handlePullBatch(
   const countError = validateNumericField(cmd.count, 'count', { min: 1, max: 1000 });
   if (countError) return resp.error(countError, reqId);
 
-  const timeoutError = validateNumericField(cmd.timeout, 'timeout', { min: 0, max: 60000 });
+  const timeoutError = validatePullTimeout(cmd.timeout);
   if (timeoutError) return resp.error(timeoutError, reqId);
-  const groupError = validateGroupPullOptions(cmd.group);
-  if (groupError) return resp.error(groupError, reqId);
+  const pullError =
+    validateGroupPullOptions(cmd.group) ?? validateLockDuration(cmd.lockTtl, 'lockTtl');
+  if (pullError) return resp.error(pullError, reqId);
 
   if (cmd.owner) {
     const { jobs, tokens } = await ctx.queueManager.pullBatchWithLock(
@@ -169,7 +166,7 @@ export async function handlePullBatch(
       cmd.count,
       cmd.owner,
       cmd.timeout ?? 0,
-      cmd.lockTtl,
+      cmd.lockTtl ?? undefined,
       ctx.signal,
       cmd.group
     );

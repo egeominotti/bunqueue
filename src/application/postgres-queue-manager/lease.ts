@@ -1,3 +1,4 @@
+import { assertLockDuration } from '../../domain/job/options';
 import {
   DEFAULT_LOCK_TTL,
   jobId,
@@ -27,6 +28,8 @@ export class PostgresQueueManagerLease extends PostgresQueueManagerDelivery {
     token: string | null,
     duration: number
   ): Promise<boolean> {
+    // The base engine's argument rule: this override does not call super.
+    assertLockDuration(duration, 'duration');
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
       const target = jobId(String(id));
@@ -95,6 +98,7 @@ export class PostgresQueueManagerLease extends PostgresQueueManagerDelivery {
   }
 
   override renewJobLock(id: JobId, token: string, ttl = DEFAULT_LOCK_TTL): boolean {
+    assertLockDuration(ttl, 'duration');
     return this.operations.runSync(() => {
       if (!this.verifyLock(id, token)) return false;
       this.enqueueWrite(() =>

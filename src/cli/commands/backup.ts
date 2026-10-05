@@ -1,9 +1,14 @@
 /**
  * Backup Command Builders
- * S3 backup operations (executed locally, not via TCP)
+ * S3 backup operations (executed locally, not via TCP). The command reads the same
+ * config file as the server (`--config`/`-c`, else bunqueue.config.{ts,js,mjs} in the
+ * working directory) with the same precedence: file > env vars > defaults.
  */
 
 import { parseArgs } from 'node:util';
+import { loadConfigFile } from '../../config';
+import { resolveBackupCommandConfig } from '../../config/backup';
+import { requireFlagValue } from '../../config/cliFlags';
 import { S3BackupManager } from '../../infrastructure/backup';
 import { CommandError, requireArg } from './types';
 
@@ -19,23 +24,31 @@ export interface BackupCommandResult {
  * Returns result instead of building a command
  */
 export async function executeBackupCommand(args: string[]): Promise<BackupCommandResult> {
-  const subcommand = args[0];
-  const subArgs = args.slice(1);
+  const { configPath, rest } = takeConfigFlag(args);
+  const subcommand = rest[0];
+  const subArgs = rest.slice(1);
 
-  // Get database path from env — canonical priority (see config/resolve.ts)
-  const dataPath =
-    Bun.env.BUNQUEUE_DATA_PATH ?? Bun.env.BQ_DATA_PATH ?? Bun.env.DATA_PATH ?? Bun.env.SQLITE_PATH;
+  // The server's own resolution: storage.dataPath > BUNQUEUE_DATA_PATH > BQ_DATA_PATH >
+  // DATA_PATH > SQLITE_PATH, and the backup section > S3_* env > defaults.
+  const fileConfig = await loadConfigFile(configPath);
+  const { selection, settings } = resolveBackupCommandConfig(fileConfig);
 
-  if (!dataPath) {
+  if (!selection.dataPath) {
     return {
       success: false,
-      message: 'BUNQUEUE_DATA_PATH not set. Backup requires persistent storage.',
+      message:
+        'BUNQUEUE_DATA_PATH not set and no storage.dataPath in the config file. ' +
+        'Backup requires persistent SQLite storage.',
+    };
+  }
+  if (selection.storageDriver !== 'sqlite') {
+    return {
+      success: false,
+      message: `Backup requires SQLite storage, but the configured driver is ${selection.storageDriver}.`,
     };
   }
 
-  // Create backup manager
-  const config = S3BackupManager.fromEnv(dataPath);
-  const manager = new S3BackupManager(config);
+  const manager = new S3BackupManager({ ...settings, databasePath: selection.dataPath });
 
   // Validate configuration
   const validation = manager.validate();
@@ -168,6 +181,25 @@ function executeBackupStatus(manager: S3BackupManager): Promise<BackupCommandRes
       retention: `${status.retention} backups`,
     },
   });
+}
+
+/** Remove `--config <path>`, `--config=<path>` or `-c <path>` from the arguments. */
+function takeConfigFlag(args: string[]): { configPath: string | undefined; rest: string[] } {
+  const rest: string[] = [];
+  let configPath: string | undefined;
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === '--config' || arg === '-c') {
+      const value = args[index + 1];
+      configPath = requireFlagValue(arg, value?.startsWith('-') ? true : (value ?? true));
+      index++;
+    } else if (arg.startsWith('--config=')) {
+      configPath = requireFlagValue('--config', arg.slice('--config='.length));
+    } else {
+      rest.push(arg);
+    }
+  }
+  return { configPath, rest };
 }
 
 /**

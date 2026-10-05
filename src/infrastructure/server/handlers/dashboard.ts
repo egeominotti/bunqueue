@@ -14,8 +14,7 @@ import type { CronJob } from '../../../domain/types/cron';
 import type { Worker } from '../../../domain/types/worker';
 import { pausedView } from '../../../shared/pausedView';
 import { clientStorageStatus } from '../../../shared/storageHealth';
-
-const WORKER_TIMEOUT_MS = parseInt(Bun.env.WORKER_TIMEOUT_MS ?? '30000', 10);
+import { workerTimeoutMs } from '../../../shared/workerTimeouts';
 
 type DurableDashboardManager = HandlerContext['queueManager'] & {
   listWorkersDurable?: () => Promise<Worker[]>;
@@ -57,7 +56,8 @@ function dashboardOverviewResponse(
   const avgLatencies = latencyTracker.getAverages();
   const memStats = queueManager.getMemoryStats();
   const now = Date.now();
-  const activeWorkers = workers.filter((worker) => now - worker.lastSeen < WORKER_TIMEOUT_MS);
+  const timeoutMs = workerTimeoutMs();
+  const activeWorkers = workers.filter((worker) => now - worker.lastSeen < timeoutMs);
   const storage = clientStorageStatus(queueManager.getStorageStatus());
   const mem = process.memoryUsage();
 

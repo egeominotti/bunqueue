@@ -5,6 +5,7 @@
  */
 
 import type { Job } from '../job.js';
+import { legacyDelay } from '../legacy-coercion.js';
 import type { JobOptions } from '../types.js';
 import type { Bunqueue } from './bunqueue.js';
 import type { DlqFilter, DlqStats } from './dlq-rate-limit.js';
@@ -56,8 +57,15 @@ export const bunqueueApi = {
 
   // ------------------------------------------------------------- cancellation
 
-  cancel(this: Ctx, jobId: string, gracePeriodMs = 0): void {
-    this.cancellation.cancel(jobId, gracePeriodMs);
+  /**
+   * Cancel a running job: at once (the default, `0`, `null`, a negative or NaN grace,
+   * as in 0.2.2), or after `gracePeriodMs` (a numeric string is its number). Any finite
+   * grace is honoured, even beyond 24.8 days; Infinity throws a RangeError and a
+   * non-number a TypeError.
+   */
+  cancel(this: Ctx, jobId: string, gracePeriodMs?: number): void {
+    const grace = legacyDelay(gracePeriodMs ?? 0, 'Bunqueue: cancel() gracePeriodMs');
+    this.cancellation.cancel(jobId, grace);
   },
   isCancelled(this: Ctx, jobId: string): boolean {
     return this.cancellation.isCancelled(jobId);

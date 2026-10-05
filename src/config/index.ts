@@ -11,5 +11,6 @@ export {
   resolveCloudConfig,
   resolveBackupConfig,
   resolveTlsServerOptions,
+  ConfigError,
 } from './resolve';
 export type { ResolvedConfig } from './resolve';

@@ -129,9 +129,9 @@ names shown in the table.
 | Option             | Type                        | Default | Description                                                          |
 | ------------------ | --------------------------- | ------- | -------------------------------------------------------------------- |
 | `priority`         | `number`                    | `0`     | Higher = processed first                                             |
-| `delay`            | `number`                    | `0`     | Delay in ms before processing                                        |
+| `delay`            | `number`                    | `0`     | Delay in ms before processing; a negative delay makes the job ready at once |
 | `attempts`         | `number`                    | `3`     | Max total executions, first run included (`3` = 1 run + 2 retries)   |
-| `backoff`          | `number \| { type, delay, maxDelay? }` | `1000`  | Backoff base in ms, or `{ type: 'fixed' \| 'exponential', delay, maxDelay? }`; `maxDelay` caps each retry delay (default: 1 hour, max: 1 day) |
+| `backoff`          | `number \| { type, delay, maxDelay? }` | `1000`  | Backoff base in ms, or `{ type, delay, maxDelay? }` (`'fixed'` is fixed; `'exponential'` or any other type is exponential); `maxDelay` caps each retry delay (default: 1 hour, max: 1 day) |
 | `timeout`          | `number`                    | -       | Processing timeout in ms                                             |
 | `jobId`            | `string`                    | -       | Custom ID for idempotent adds                                        |
 | `deduplication`    | `object`                    | -       | TTL-based dedup (`id`, `ttl`, `extend`, `replace`)                   |
@@ -152,6 +152,32 @@ names shown in the table.
 | `removeDependencyOnFailure` | `boolean`          | `false` | Flow: remove this child from the parent's dependencies on failure    |
 | `sizeLimit`        | `number`                    | -       | BullMQ-compat metadata: stored on the job, not enforced by the broker |
 | `debounce`         | `{ id, ttl }`               | -       | Legacy BullMQ alias: stored on the job, not enforced — use `deduplication` |
+
+Numeric options are validated before the job is admitted, with the same rules in
+embedded and TCP mode. Only a value no job can run with is rejected: a value that is
+not a number, `NaN` or an infinity, a negative `timeout`, `ttl` or `backoff.delay`, a
+`backoff.maxDelay` above one day, and a
+`timestamp` outside the JavaScript date range. A numeric string such as `'3'` is read
+as its number. Everything else is accepted, as in 2.9.10:
+
+- `priority` can be any finite number (fractions and BullMQ's `2,097,152` included);
+- `attempts` of `0` or less runs the job once, like `1`; a fraction rounds up;
+  `Infinity` or a value above 2,147,483,647 retries up to 2,147,483,647 times;
+- `timeout`, `stallTimeout`, `backoff`, `delay`, `ttl`, `deduplication.ttl`,
+  `debounce.ttl` and `repeat.every` have no practical upper limit (a duration above
+  about 136,900 years is clamped to it);
+- `stackTraceLimit`, `keepLogs` and `sizeLimit` are stored as given.
+
+An invalid option makes `add()` throw, for example `timeout must be at least 0`;
+`addBulk()` throws `jobs[i]: ...` and admits nothing. Messages name the option you
+passed (`attempts`, `deduplication.ttl`, `debounce.ttl`).
+
+A negative `delay` makes the job ready at once, in every mode and entry point, as in
+2.9.10: its run time is in the past (`now + delay`), so among jobs of the same priority
+it runs ahead of ready jobs added before it with a later run time. So
+`{ delay: runAt - Date.now() }` is safe when `runAt` has already passed. The same holds
+for the `delay` argument of `changeDelay()` (a PostgreSQL broker applies a negative one
+as "now", as in 2.9.10); a past `moveToDelayed()` timestamp means "now". `ttl` cannot be negative.
 
 At the same priority, LIFO jobs run newest-first ahead of FIFO jobs. Priority
 always remains authoritative, so a lower-priority LIFO job cannot overtake a

@@ -43,7 +43,7 @@ export interface Job {
   readonly lifo: boolean; // tie-break among equal priority
 
   // Scheduling
-  runAt: number; // createdAt + delay; <=now means ready
+  runAt: number; // createdAt + delay (a negative delay counts as 0); <=now means ready
   startedAt: number | null; // set when pulled (active)
   completedAt: number | null; // set when completed
 
@@ -152,23 +152,26 @@ Notable supporting types:
   attempt, and a zero wait would re-pull the job in a tight loop. `PULL`/`PULLB` already serialize the whole `Job`,
   so `backoffConfig` (or `null`) reaches TCP workers, which parse it in
   `client/worker/jobParser.ts`.
-  `maxDelay` accepts `0..MAX_BACKOFF_DELAY` (`86_400_000`, 24h, the same bound as
-  `backoff.delay`); `0` makes every retry immediate (not a `DelayedError`
-  postponement, see above). `PUSH`, `PUSHB`, HTTP push
-  (`validateBackoffField`) and atomic flows (`validateAtomicFlowBatch`) reject a
-  non-numeric, non-finite or out-of-range value; `null` counts as absent.
-  `createJob` keeps only a finite in-range value and silently drops anything
-  else, because embedded and cron admission skip the server validator. SQLite
+  `maxDelay` accepts `0..MAX_BACKOFF_DELAY` (`86_400_000`, 24h; `backoff.delay` only
+  needs to be finite and `>= 0`, since the cap applies); `0` makes every retry immediate (not a `DelayedError`
+  postponement, see above). Every admission path (`PUSH`, `PUSHB`, HTTP push,
+  atomic flows, embedded `add`/`addBulk`, cron templates) validates it with the
+  shared `validateBackoffField` and rejects a non-numeric, non-finite or
+  out-of-range value; `null` counts as absent. A missing object-form `delay` is the
+  1000 ms default base (createJob's fallback), as on every path including job
+  scheduler templates.
+  `createJob` still keeps only a finite in-range value and silently drops anything
+  else, for internal callers and stored rows that bypass validation. SQLite
   persists it in `jobs.extended_options`; PostgreSQL keeps it in the MessagePack
   job payload.
 - `JobTimelineEntry` (`src/domain/types/jobs/model.ts:33-39`) — `{ state, timestamp, worker?, error?, attempt? }`,
   capped at `MAX_TIMELINE_ENTRIES = 20` (`src/domain/job/constants.ts:2`).
 - `JobLock` (`src/domain/types/jobs/model.ts:139-148`) — `{ jobId, token, owner, createdAt, expiresAt,
 lastRenewalAt, renewalCount, ttl }`. `DEFAULT_LOCK_TTL = 30_000`. A lease belongs to an earlier
-processing generation when `job.startedAt > lock.createdAt` (`isLeaseFromEarlierGeneration`,
-`src/domain/job/locks.ts`); a same-millisecond lease is current. Such a stale lease is replaced
-by `createLock`, rejected by lease-token checks, never counts as liveness for cleanup, and its
-expiry never reclaims the current delivery (the lock-expiry sweep only deletes it).
+  processing generation when `job.startedAt > lock.createdAt` (`isLeaseFromEarlierGeneration`,
+  `src/domain/job/locks.ts`); a same-millisecond lease is current. Such a stale lease is replaced
+  by `createLock`, rejected by lease-token checks, never counts as liveness for cleanup, and its
+  expiry never reclaims the current delivery (the lock-expiry sweep only deletes it).
 
 ### Job State Machine
 
@@ -225,7 +228,14 @@ Allowed transitions (enforced across `pull`/`ack`/`fail` operations and
 
 > `ChangeDelay` and `MoveToDelayed` both carry a **relative** `delay` (ms) and an
 > optional lease `token` on the wire; the client converts the public absolute
-> `moveToDelayed(id, timestamp)` to `delay = max(0, timestamp - now)`. In-queue
+> `moveToDelayed(id, timestamp)` to `delay = max(0, timestamp - now)`. `delay` is
+> required and must be a finite number in both modes (TCP/HTTP handlers,
+> `QueueManager.changeDelay`/`changeWaitingDelay`, and the client job methods before
+> sending); a negative delay keeps its past run time (`runAt = now + delay`: the job is
+> ready at once, ahead of later ready jobs; the PostgreSQL engine applies `now +
+> max(0, delay)`, as on 2.9.10) and one beyond ±`MAX_JOB_DURATION_MS` is clamped, as
+> 2.9.10 applied them (`delayArgument`); a
+> non-finite `timestamp` is rejected. In-queue
 > jobs route through `changeWaitingDelay`, active jobs through the two-phase
 > `moveJobToDelayed` — both share `QueueManager.moveToDelayed`/`changeDelay`
 > (`application/queue-manager/job-management.ts`), so `MoveToDelayed` works over TCP/HTTP/MCP for
@@ -237,14 +247,53 @@ Allowed transitions (enforced across `pull`/`ack`/`fail` operations and
 > before its processing generation is released.
 
 Helper predicates: `isDelayed`, `isReady`, `isExpired`, `isTimedOut`,
-`canRetry` (`src/domain/job/state.ts:19-84`).
+`canRetry` (`src/domain/job/state.ts`). `isReady` is `!(runAt > now)`, the exact
+complement of `isDelayed`, so a NaN `runAt` is ready rather than stuck. `isTimedOut`
+is `now >= processingDeadline(job)` (`src/domain/job/timeoutRule.ts`, the rule the
+timeout scheduler and the Worker share): an absent, `0` or NaN `timeout` never times
+out, and a fractional deadline is rounded up.
+`calculateBackoff` always returns a finite delay >= 0 (see
+[Job Options Validation](./features/job-options-validation.md#engine-guards)).
 
 ---
 
 ## JobOptions
 
 `JobInput` (`src/domain/types/jobs/model.ts:92-137`) is the creation-time shape. Defaults are applied
-by `createJob` (`src/domain/job/create.ts:93-134`) using `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`).
+by `createJob` (`src/domain/job/create.ts`) using `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`).
+`createJob` never stores NaN or a non-number in the `NOT NULL` columns: a NaN
+`timestamp`, `delay`, `backoff` (or object `backoff.delay`), `priority` or
+`maxAttempts` falls back to now, no delay or the default. A negative `delay` is kept as
+in 2.9.10 (`run_at = created_at + delay`, bounded to ±`MAX_JOB_DURATION_MS`): the job is
+never `delayed` and sorts ahead of ready jobs with a later `run_at`.
+
+`lifo` is stored as a boolean whatever the input (`1` is `true`), as the heap
+comparator requires; `ChangePriority` normalizes its `lifo` the same way.
+`ChangePriority` (any finite priority, a missing one is 0), `Progress`
+(`normalizeProgress`, never refused), `Update` (serializable, no size limit) and
+`ClearLogs` (`keepLogsArgument`) apply `src/domain/job/mutations.ts`.
+
+Every public path validates the bounded options with `validateJobOptions`
+(`src/domain/job/options.ts`) before admission, with the same rule in embedded and
+TCP mode (wire field names over TCP/HTTP, SDK names such as `attempts` in the client;
+`PUSHB`/`addBulk` prefix `jobs[i]: `). Only what cannot run is refused; every value
+2.9.10 ran is admitted and stored by `normalizeJobInput`. A numeric string counts as
+its number; "clamped" values above the maximum are stored as the maximum
+(`MAX_JOB_DURATION_MS` = 4,320,000,000,000,000 ms):
+
+| Option                                     | Bound                                                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `priority`                                 | finite (grouped: integer 0..2,097,151)                                                          |
+| `delay`                                    | finite; negative = a past run time (ready, sorts first); clamped to ±MAX                        |
+| `ttl`, `timeout`                           | finite, >= 0; clamped                                                                           |
+| `stallTimeout`                             | finite                                                                                          |
+| `maxAttempts`                              | any number, ±Infinity allowed; stored 1 or less → 1, fraction rounded up, at most 2,147,483,647 |
+| `backoff`                                  | finite >= 0; object form: free `type`, `delay` 1000 when missing, `maxDelay` 0..86,400,000      |
+| `timestamp`                                | finite, within ±4,320,000,000,000,000                                                           |
+| `stackTraceLimit`, `keepLogs`, `sizeLimit` | finite                                                                                          |
+| `groupMaxSize`                             | positive safe integer                                                                           |
+| `dedup.ttl`, `debounceTtl`                 | finite; clamped                                                                                 |
+| `repeat.every`                             | positive finite; clamped                                                                        |
 
 | Option                      | Type                                                                | Default      |
 | --------------------------- | ------------------------------------------------------------------- | ------------ |
@@ -280,7 +329,7 @@ by `createJob` (`src/domain/job/create.ts:93-134`) using `JOB_DEFAULTS` (`src/do
 | `debounceTtl`               | `number \| null`                                                    | `null`       |
 | `timestamp`                 | `number` (overrides `createdAt`)                                    | `Date.now()` |
 
-`dedup` maps onto job fields via `parseBullMQV5Options` (`src/domain/job/create.ts:76-91`):
+`dedup` maps onto job fields via `parseBullMQV5Options` (`src/domain/job/create.ts:91-106`):
 `deduplicationTtl = dedup.ttl ?? null`, `deduplicationExtend = dedup.extend ??
 false`, `deduplicationReplace = dedup.replace ?? false`.
 
@@ -476,8 +525,13 @@ valid, `schedule` takes precedence for compatibility.
 `CronJobOptions` (`cron.ts:20-28`) is the per-spawn subset of `JobInput`:
 `maxAttempts`, `backoff`, `timeout`, `delay`, `stallTimeout`,
 `removeOnComplete`, `removeOnFail`. `backoff` has the `number | BackoffConfig`
-shape, so a spawned job inherits `maxDelay`. Cron job options do not pass
-through the server option validator; `createJob` drops an unusable `maxDelay`.
+shape, so a spawned job inherits `maxDelay`. `assertValidCronInput` validates
+these template fields (messages prefixed `jobOptions.`), the spawned `priority`
+and `dedup.ttl` with the PUSH rules (refusing only what a job cannot run with, so every
+template 2.9.10 stored is accepted), and caps `repeatEvery` at `MAX_JOB_DURATION_MS`,
+in every backend. Spawned jobs are normalized like added ones (`normalizeJobInput`). Persisted definitions are not re-validated on load (that would block
+startup): each invalid one logs a single warning naming the cron and the problem,
+and `createJob` and `calculateBackoff` keep a legacy template's values safe.
 
 Predicates: `isAtLimit` (`cron.ts:135-138`), `isDue` (`cron.ts:141-143`).
 The SQLite engine persists this in `cron_jobs`; `dedup` and `jobOptions` are
@@ -518,6 +572,10 @@ export interface Worker {
 
 `createWorker` (`worker.ts:38-60`) defaults `concurrency:1`,
 `hostname:'unknown'`, `pid:0`, and generates `id` via `uuid()` if not given.
+A worker is live while `now - lastSeen < WORKER_TIMEOUT_MS` (default 30000) and is
+removed after three times that window by a sweep every `WORKER_CLEANUP_INTERVAL_MS`
+(default 60000). Both are whole milliseconds >= 1, read once per process through
+`workerTimeoutMs()` / `workerCleanupIntervalMs()` (`src/shared/workerTimeouts.ts`).
 
 ```typescript
 export interface JobLogEntry {
@@ -635,6 +693,84 @@ export interface UniqueKeyEntry {
 
 ---
 
+## Server Configuration Types
+
+The server's settings come from CLI flags, the config file (`BunqueueConfig`,
+`src/config/types.ts`), env vars and defaults, in that order of precedence, and
+resolve into `ResolvedConfig` (`src/config/resolve.ts`). Every numeric setting is
+declared once in `SETTINGS` (`src/config/settings.ts`): env names (aliases in
+priority order), config-file key, CLI flag, accepted range and default.
+
+```typescript
+interface ResolvedConfig {
+  // ...ports, host, sockets, TLS, auth, storage, PostgreSQL, telemetry, backup flag...
+  shutdownTimeoutMs: number; // >= 0
+  statsIntervalMs: number; // >= 1
+  webhookMaxRetries: number; // WEBHOOK_MAX_RETRIES > 3 (file webhooks.* ignored)
+  webhookRetryDelayMs: number; // WEBHOOK_RETRY_DELAY_MS > 1000
+  workerTimeoutMs: number; // WORKER_TIMEOUT_MS > 30000 (file timeouts.worker ignored)
+  lockTimeoutMs: number; // LOCK_TIMEOUT_MS > 5000 (file timeouts.lock ignored)
+  logLevel: 'debug' | 'info' | 'warn' | 'error' | undefined; // logging.level > LOG_LEVEL > info
+  logFormat: 'text' | 'json'; // logging.format > LOG_FORMAT > text
+  configWarnings: string[]; // unknown config-file keys, tolerated values
+}
+
+// src/infrastructure/backup/s3BackupConfig.ts
+interface S3BackupConfig {
+  // ...credentials, bucket, endpoint, region, interval, retention, prefix, path...
+  configErrors?: readonly string[]; // problems naming the setting: the backup never runs
+}
+
+// src/config/componentEnv.ts — read when the component is created
+interface WebhookDelivery {
+  readonly maxRetries: number; // attempts per event, first try included (>= 1)
+  readonly retryDelayMs: number; // attempt n + 1 waits retryDelayMs * n (>= 0)
+}
+interface MonitoringThresholds {
+  readonly queueIdleMs: number; // QUEUE_IDLE_THRESHOLD_MS, 0 = off
+  readonly queueSize: number; // QUEUE_SIZE_THRESHOLD, 0 = off
+  readonly workerOverloadMs: number; // WORKER_OVERLOAD_THRESHOLD_MS, 0 = off
+  readonly memoryWarningMb: number; // MEMORY_WARNING_MB, 0 = off
+  readonly storageWarningMb: number; // STORAGE_WARNING_MB, 0 = off
+}
+```
+
+Validation rules (all sources):
+
+- Env vars and CLI flags must read as a whole number within range. The forms
+  `parseInt` read as meant are accepted (`+6789`, `1500.5` read as 1500, `5000ms`,
+  `512MB`, `60000 # comment`); the forms it misread are errors (`1e12`, `5s`, `1.5e3`); an
+  empty env var means unset. One parser does this for every whole-number env var:
+  `parseIntegerEnv` (`src/shared/durations.ts`). A setting 2.9.10 replaced when
+  invalid (`SETTINGS[...].legacy`: a `-1` threshold means 0, an invalid count means
+  the default, an invalid retention means off) keeps that value, with a warning.
+- Boolean env vars honour `1`/`0`, `true`/`false`, `yes`/`no`, `on`/`off` in any
+  case; another word keeps 2.9.10's value, with a warning. `LOG_LEVEL` /
+  `LOG_FORMAT` (and `logging.*` in the file) accept their values in any case and
+  the aliases `warning`, `trace`, `verbose`, `fatal`, `critical`; another word is a
+  warning.
+- Config-file numbers must be finite and within range; a fraction is rounded
+  down; ports, `timeouts.shutdown` / `stats` and the backup interval/retention also
+  take a numeric string. `null` means unset; `storage.completedRetentionMs: null` is
+  "disabled". A boolean given as another type keeps its 2.9.10 truthiness (`'false'`
+  is true), with a warning; `cors.origins` takes a comma-separated
+  string. `timeouts.worker`, `timeouts.lock` and `webhooks.*` are ignored, with a
+  warning. Other keys must have their declared type.
+- Unknown keys and tolerated values are warnings in `configWarnings`.
+- Settings of a feature that is off (PostgreSQL on another driver, Cloud without
+  Cloud, S3 backup disabled, the never-applied `BUNQUEUE_CLOUD_INTERVAL_MS`) are
+  warnings. An enabled S3 backup that cannot run (missing bucket or credentials,
+  an invalid interval or retention) never stops the server: `configErrors` names
+  each problem and the scheduler logs them and runs no backup.
+- Any other error throws a `ConfigError` (`problems: string[]`) that names each
+  env var, config key or flag, and the server does not start.
+
+`MonitoringState` (`src/application/monitoringChecks.ts`) carries the
+`MonitoringThresholds` it was created with. See
+[Configuration & Entrypoint](./features/configuration.md) for the full table.
+
+---
+
 ## Wire Protocol Types
 
 TCP frames are msgpack-encoded `Command` (request) and `Response` (reply)
@@ -673,9 +809,9 @@ export interface PullCommand extends BaseCommand {
   // src/domain/types/commands/core.ts:65-72
   readonly cmd: 'PULL';
   readonly queue: string;
-  readonly timeout?: number; // long-poll ms
+  readonly timeout?: number; // long-poll ms, finite 0..60000 (QueueManager.pull* clamps)
   readonly owner?: string; // lock owner id
-  readonly lockTtl?: number; // default 30000
+  readonly lockTtl?: number; // default 30000; any finite number (2.9.10), not NaN/Infinity
   readonly detach?: boolean; // don't auto-release on disconnect
 }
 
@@ -721,7 +857,12 @@ Command families (each is a `cmd`-tagged interface under `src/domain/types/comma
 `StorageStatus`, `CompactMemory`), **Dashboard** (`DashboardOverview/Queues/Queue`),
 **Auth/Negotiation** (`Auth`, `Hello`), and **Events** (`SubscribeEvents`,
 `UnsubscribeEvents`). `SubscribeEvents` carries a validated queue key;
-`UnsubscribeEvents` has no payload. `HelloCommand` negotiates
+`UnsubscribeEvents` has no payload. Lease durations (`PULL`/`PULLB` `lockTtl`,
+`ExtendLock` `duration`, `ExtendLocks` `durations[i]`, a non-zero `JobHeartbeat`
+`duration`) must be finite numbers (any sign, passed through as on 2.9.10, so a 2.9.10
+Worker with `lockDuration: 0` keeps working); NaN, an infinity or a string is refused;
+omitted means the default/current TTL, and an invalid `ExtendLocks` entry rejects the whole batch
+(`durations[i]: ...`) before any lease changes. `HelloCommand` negotiates
 `protocolVersion` and `ProtocolCapability[]`. Protocol revision 3 advertises
 `pipelining` and `separate-job-name`: job envelopes expose top-level `name`
 while preserving `data` as the original user value. Only the inbound legacy
@@ -1314,8 +1455,12 @@ Primary key: `(namespace, id)`. One row is the authoritative job generation.
 `state` is constrained to `waiting`, `prioritized`, `delayed`,
 `waiting-children`, `active`, `completed`, or `failed`. Paused is a queue view,
 not a stored job state. `lease_token` is the opaque fencing credential;
-`lease_until` is compared against the PostgreSQL clock, and `lease_renewals`
-distinguishes an initial client-owned lease from one transferred by a heartbeat.
+`lease_until` is compared against the PostgreSQL clock and is always a whole
+millisecond in `[0, 8640000000000000]`; the upper value, the latest instant a
+JavaScript `Date` represents, is a lease that never expires (`leaseDeadline.ts`,
+see [Lease deadlines](./features/postgres-multibroker.md#lease-deadlines)).
+`lease_renewals` distinguishes an initial client-owned lease from one transferred
+by a heartbeat.
 `group_order` is allocated from `bunqueue_group_order_seq` only for grouped
 admissions. The sequence is `BIGINT INCREMENT 1 CACHE 1`; batch admission
 allocates all grouped positions in input order before splitting inserts into
@@ -1567,24 +1712,27 @@ the dedicated PostgreSQL validation suite.
 Defined on `QueueManagerState` (`src/application/queue-manager/state.ts`), with
 its context interfaces in `src/application/types/contexts.ts`, and sized by
 `DEFAULT_CONFIG` (`src/application/types/config.ts`). Cleanup runs every `cleanupIntervalMs`
-(default 10 s).
+(default 10 s). Like the other background periods (`stallCheckMs`,
+`dependencyCheckMs`, `dlqMaintenanceMs`, `jobTimeoutCheckMs`), it must be a finite
+number of milliseconds >= 1; `resolveQueueManagerConfig` checks this when the
+QueueManager is constructed (see [Background Tasks](./features/background-tasks.md#configuration)).
 
-| Collection                  | Type                                           | Max                       | Eviction                                     |
-| --------------------------- | ---------------------------------------------- | ------------------------- | -------------------------------------------- |
-| `jobIndex`                  | `Map<JobId, JobLocation>`                      | unbounded*                | follows job lifecycle (no cap)               |
-| `completedJobs`             | `BoundedSet<JobId>`                            | 50,000                    | FIFO, **10% batch**                          |
-| `depCompletions`            | `DependencyCompletionTracker`                  | 50,000 recent + live pins | exact FIFO; pins released with reverse edges |
-| `jobResults`                | `LRUMap<JobId, unknown>`                       | 10,000                    | LRU (1 entry on overflow)                    |
-| `jobLogs`                   | `LRUMap<JobId, JobLogEntry[]>`                 | 10,000                    | LRU                                          |
-| `customIdMap`               | `LRUMap<string, JobId>`                        | 50,000                    | LRU                                          |
-| `timedOutJobs`              | `BoundedMap<JobId, RetiredTimeoutGeneration>`  | 50,000                    | FIFO batch                                   |
-| `retiredTimeoutLeaseTokens` | `BoundedMap<string, RetiredTimeoutGeneration>` | 50,000                    | FIFO batch                                   |
-| `waitingDeps`               | per-shard map                                  | unbounded*                | follows live dependency waiters              |
-| `pendingQueueAdmissions`    | `Map<string, number>`                          | transient*                | reference-counted `finally` release          |
+| Collection                  | Type                                           | Max                       | Eviction                                      |
+| --------------------------- | ---------------------------------------------- | ------------------------- | --------------------------------------------- |
+| `jobIndex`                  | `Map<JobId, JobLocation>`                      | unbounded*                | follows job lifecycle (no cap)                |
+| `completedJobs`             | `BoundedSet<JobId>`                            | 50,000                    | FIFO, **10% batch**                           |
+| `depCompletions`            | `DependencyCompletionTracker`                  | 50,000 recent + live pins | exact FIFO; pins released with reverse edges  |
+| `jobResults`                | `LRUMap<JobId, unknown>`                       | 10,000                    | LRU (1 entry on overflow)                     |
+| `jobLogs`                   | `LRUMap<JobId, JobLogEntry[]>`                 | 10,000                    | LRU                                           |
+| `customIdMap`               | `LRUMap<string, JobId>`                        | 50,000                    | LRU                                           |
+| `timedOutJobs`              | `BoundedMap<JobId, RetiredTimeoutGeneration>`  | 50,000                    | FIFO batch                                    |
+| `retiredTimeoutLeaseTokens` | `BoundedMap<string, RetiredTimeoutGeneration>` | 50,000                    | FIFO batch                                    |
+| `waitingDeps`               | per-shard map                                  | unbounded*                | follows live dependency waiters               |
+| `pendingQueueAdmissions`    | `Map<string, number>`                          | transient*                | reference-counted `finally` release           |
 | `clientJobs`                | `Map<clientId, Set<JobId>>`                    | live deliveries*          | detach on delivery end; dropped on disconnect |
-| `clientJobOwners`           | `Map<JobId, ClientJobOwner>`                   | live deliveries*          | same records as `clientJobs`; cleanup prune  |
-| `telemetryJournal.events`   | per-queue arrays                               | 10,000 each               | oldest event first                           |
-| terminal metric buckets     | per queue/type map or SQLite rows              | 20,160 each               | minutes older than newest window             |
+| `clientJobOwners`           | `Map<JobId, ClientJobOwner>`                   | live deliveries*          | same records as `clientJobs`; cleanup prune   |
+| `telemetryJournal.events`   | per-queue arrays                               | 10,000 each               | oldest event first                            |
+| terminal metric buckets     | per queue/type map or SQLite rows              | 20,160 each               | minutes older than newest window              |
 
 \* `jobIndex` and `waitingDeps` are keyed by live jobs; entries are removed with
 their lifecycle or dependency edges rather than capped by size.
@@ -1780,7 +1928,7 @@ backends share one projection per shape, so both modes emit identical JSON
 `types/inspection.ts`):
 
 - `SerializedJob` — `{ id, name, queue, data, priority, state?, progress,
-  attempts, maxAttempts, createdAt, startedAt? }` (string id, ISO times) plus
+attempts, maxAttempts, createdAt, startedAt? }` (string id, ISO times) plus
   `SerializedJobOptions` from `backend/jobOptionsView.ts`: `backoff` always
   (a number, or `{ type, delay, maxDelay? }` from `backoffConfig`), and
   `timeout`, `stallTimeout`, `lifo`, `removeOnComplete`, `removeOnFail`, `tags`,
@@ -1796,7 +1944,7 @@ backends share one projection per shape, so both modes emit identical JSON
 - `QueueLimits` (`backend/limitsView.ts`) — the engine/broker limit status
   (`rateLimit { max, duration }`, `rateLimitTtl`, `concurrencyLimit`, `maxed`)
   as `{ rateLimit: { max, durationMs } | null, rateLimitTtlMs (null for the -2
-  sentinel), rateLimited, concurrencyLimit, concurrencyMaxed }` plus `queue`,
+sentinel), rateLimited, concurrencyLimit, concurrencyMaxed }` plus `queue`,
   `paused` and the active count.
 - Workflow executions (`src/mcp/workflow/views.ts`, `jsonSafe.ts`) — the
   decoded `Execution` with BigInt as strings, Date as ISO strings, Map/Set/bytes/

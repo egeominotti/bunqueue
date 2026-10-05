@@ -15,11 +15,18 @@ import {
   type JobId,
   type JobInput,
 } from '../../domain/types/job';
+import {
+  assertLockDuration,
+  normalizeJobInput,
+  pullTimeoutArgument,
+} from '../../domain/job/options';
 import { validateRepeatJobInput } from '../repeatJobs';
 import { PostgresQueueManagerTerminalDelivery } from './terminalDelivery';
 
 export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDelivery {
-  override async push(queue: string, input: JobInput): Promise<Job> {
+  override async push(queue: string, rawInput: JobInput): Promise<Job> {
+    // The base engine's stored option form (normalizeJobInput), before the group checks.
+    const input = normalizeJobInput(rawInput);
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
       assertOptionalGroupId(input.groupId);
@@ -38,7 +45,8 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     });
   }
 
-  override async pushBatch(queue: string, inputs: JobInput[]): Promise<JobId[]> {
+  override async pushBatch(queue: string, rawInputs: JobInput[]): Promise<JobId[]> {
+    const inputs = rawInputs.map(normalizeJobInput);
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
       for (const input of inputs) {
@@ -85,11 +93,12 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     signal?: AbortSignal,
     groupOptions?: GroupPullOptions
   ): Promise<Job | null> {
+    // The base engine's argument rules (a clamped wait): this override does not call super.
     const claims = await this.claimUntil(
       queue,
       1,
       this.postgresStore.config.brokerId,
-      timeoutMs,
+      pullTimeoutArgument(timeoutMs),
       undefined,
       signal,
       groupOptions
@@ -106,7 +115,9 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     signal?: AbortSignal,
     groupOptions?: GroupPullOptions
   ): Promise<{ job: Job | null; token: string | null }> {
-    const claims = await this.claimUntil(queue, 1, owner, timeoutMs, lockTtl, signal, groupOptions);
+    assertLockDuration(lockTtl, 'lockTtl');
+    const wait = pullTimeoutArgument(timeoutMs);
+    const claims = await this.claimUntil(queue, 1, owner, wait, lockTtl, signal, groupOptions);
     const claim = claims[0];
     return claim ? { job: claim.job, token: claim.token } : { job: null, token: null };
   }
@@ -122,7 +133,7 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
       queue,
       count,
       this.postgresStore.config.brokerId,
-      timeoutMs,
+      pullTimeoutArgument(timeoutMs),
       undefined,
       signal,
       groupOptions
@@ -140,11 +151,12 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     signal?: AbortSignal,
     groupOptions?: GroupPullOptions
   ): Promise<{ jobs: Job[]; tokens: string[] }> {
+    assertLockDuration(lockTtl, 'lockTtl');
     const claims = await this.claimUntil(
       queue,
       count,
       owner,
-      timeoutMs,
+      pullTimeoutArgument(timeoutMs),
       lockTtl,
       signal,
       groupOptions
@@ -168,7 +180,9 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     assertGroupPullOptions(groupOptions);
     await this.postgresReady;
     await this.flushPostgresWrites();
-    const deadline = Date.now() + Math.max(0, timeoutMs);
+    // As in the core engine, a NaN or non-positive timeout is a single attempt.
+    const waitMs = timeoutMs > 0 ? timeoutMs : 0;
+    const deadline = Date.now() + waitMs;
     do {
       const claims = await this.runPostgresOperation(async () => {
         const admitted = await this.postgresStore.claim(
@@ -183,7 +197,7 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
         }
         return admitted;
       });
-      if (claims.length > 0 || timeoutMs <= 0 || signal?.aborted) return claims;
+      if (claims.length > 0 || waitMs === 0 || signal?.aborted) return claims;
       const remaining = deadline - Date.now();
       if (remaining <= 0) return [];
       await this.postgresStore.waitForWork(

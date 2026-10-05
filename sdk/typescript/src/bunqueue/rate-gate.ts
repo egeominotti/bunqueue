@@ -8,9 +8,9 @@
  * full waits (holding its concurrency slot) until the window frees.
  */
 
+import { numericString } from '../legacy-coercion.js';
+import { safeSleep } from '../timing.js';
 import type { RateLimiterOptions } from './types.js';
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class RateGate {
   private readonly max: number;
@@ -18,9 +18,18 @@ export class RateGate {
   private readonly groupKey: string | undefined;
   private readonly windows = new Map<string, number[]>();
 
+  /**
+   * `max` (> 0) and `duration` (not Infinity) are validated by the Bunqueue constructor;
+   * a zero `max` or an infinite window used to wait forever on a ~1 ms poll. As in
+   * 0.2.2, `max` is compared as given (1.5 admits two starts) and a 0, negative, NaN or
+   * omitted `duration` means no limit. A numeric string `duration` is its number: 0.2.2
+   * concatenated it into the wait and then polled every millisecond. The wait is armed
+   * with `safeSleep`, so a window beyond the runtime's timer limit sleeps until it frees
+   * instead of polling every millisecond.
+   */
   constructor(options: RateLimiterOptions) {
     this.max = options.max;
-    this.duration = options.duration;
+    this.duration = numericString(options.duration) as number;
     this.groupKey = options.groupKey;
   }
 
@@ -47,7 +56,7 @@ export class RateGate {
       }
       this.windows.set(group, fresh);
       const oldest = fresh[0];
-      await sleep(Math.max(oldest + this.duration - now, 10));
+      await safeSleep(Math.max(oldest + this.duration - now, 10));
     }
   }
 

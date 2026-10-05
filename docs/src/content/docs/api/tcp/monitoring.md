@@ -255,6 +255,9 @@ Send a heartbeat for an active job (prevents stall detection from marking it as 
 }
 ```
 
+A `duration` other than `0` (no TTL change) must be a finite number of at least
+1 ms; otherwise the command fails with `duration must be ...`.
+
 **Response:**
 
 ```typescript

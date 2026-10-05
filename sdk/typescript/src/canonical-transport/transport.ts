@@ -8,6 +8,7 @@ import {
 } from '../../../../src/infrastructure/server/protocol/frameParser.js';
 import type { ClientTlsOptions } from '../../../../src/client/tcp/types/tls.js';
 import type { SocketWrapper } from '../../../../src/client/tcp/types/socket.js';
+import { safeTimeout, type SafeTimer } from '../../../../src/shared/timers.js';
 import type {
   ConnectionEvents,
   ConnectionResult,
@@ -54,9 +55,9 @@ export function createConnection(
     // The attempt resolved and the client owns the socket.
     let opened = false;
     let socket: Socket;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: SafeTimer | undefined;
     const cleanup = () => {
-      if (timer !== undefined) clearTimeout(timer);
+      timer?.clear();
       timer = undefined;
     };
     const fail = (error: Error) => {
@@ -65,6 +66,15 @@ export function createConnection(
       cleanup();
       reject(error);
     };
+
+    // Armed before the socket, so a delay safeTimeout refuses (NaN) throws before
+    // anything opens; it honours a connectTimeout above 2^31 - 1 ms, which a raw
+    // setTimeout ran after about 1 ms (every attempt failed with a timeout). It cannot
+    // fire before `socket` is assigned below: a throwing connect clears it in `fail`.
+    timer = safeTimeout(() => {
+      fail(new Error(`Connection timeout to ${description}`));
+      socket.destroy();
+    }, connectTimeout);
 
     try {
       socket =
@@ -145,9 +155,5 @@ export function createConnection(
       // of running its lost-connection path.
       if (tcpOpened) events.onClose();
     });
-    timer = setTimeout(() => {
-      fail(new Error(`Connection timeout to ${description}`));
-      socket.destroy();
-    }, connectTimeout);
   });
 }

@@ -1127,11 +1127,22 @@ describe('issue #118 SQLite completed retention', () => {
     expect(configured.maxCompletedJobs).toBe(321);
     expect(configured.completedRetentionMs).toBe(86_400_000);
 
-    const disabled = resolveServerConfig({
-      storage: { maxCompletedJobs: 0, completedRetentionMs: -1 },
-    });
+    const disabled = resolveServerConfig({ storage: { completedRetentionMs: null } });
     expect(disabled.maxCompletedJobs).toBe(50_000);
     expect(disabled.completedRetentionMs).toBeNull();
+    // Invalid server values keep the 2.9.10 fallback (cap 50_000, retention off), now
+    // with a warning naming the key. Direct QueueManager construction normalizes the
+    // same way, as the next test pins.
+    const invalidCap = resolveServerConfig({ storage: { maxCompletedJobs: 0 } });
+    expect(invalidCap.maxCompletedJobs).toBe(50_000);
+    expect(invalidCap.configWarnings).toEqual([
+      expect.stringContaining('storage.maxCompletedJobs'),
+    ]);
+    const invalidRetention = resolveServerConfig({ storage: { completedRetentionMs: -1 } });
+    expect(invalidRetention.completedRetentionMs).toBeNull();
+    expect(invalidRetention.configWarnings).toEqual([
+      expect.stringContaining('storage.completedRetentionMs'),
+    ]);
     expect(normalizeCompletedRetentionMs(12.9)).toBe(12);
     expect(normalizeCompletedRetentionMs(0)).toBe(0);
     expect(normalizeCompletedRetentionMs(Number.MAX_SAFE_INTEGER + 1)).toBeNull();

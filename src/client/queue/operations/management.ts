@@ -6,7 +6,18 @@ import { getSharedManager } from '../../manager';
 import type { TcpConnectionPool } from '../../tcpPool';
 import { jobId } from '../../../domain/types/job';
 import { assertFlowTcpOk } from '../../flowJobTypes';
-interface ManagementContext {
+import {
+  assertLogsCleared,
+  assertProgressUpdated,
+  assertPromoted,
+  progressUpdate,
+  requireDataUpdated,
+} from '../commandArgs';
+import { runInBackground, sendInBackground, type BackgroundReporting } from '../backgroundCommand';
+
+export { changeJobDelay, changeJobPriority, extendJobLock } from './jobSetters';
+
+interface ManagementContext extends BackgroundReporting {
   name: string;
   embedded: boolean;
   tcp: TcpConnectionPool | null;
@@ -14,11 +25,13 @@ interface ManagementContext {
 
 // ============ Remove Operations ============
 
-/** Remove a job (sync, fire-and-forget; use removeAsync to await the removal) */
+/**
+ * Remove a job (sync, fire-and-forget; use removeAsync to await the removal). The
+ * cancellation is not awaited here; its failure is reported (backgroundCommand.ts).
+ */
 export function remove(ctx: ManagementContext, id: string): void {
-  // `void`: the cancellation is intentionally not awaited here (sync API).
-  if (ctx.embedded) void getSharedManager().cancel(jobId(id));
-  else void ctx.tcp!.send({ cmd: 'Cancel', id });
+  if (ctx.embedded) runInBackground(ctx, 'Cancel', getSharedManager().cancel(jobId(id)));
+  else sendInBackground(ctx, { cmd: 'Cancel', id });
 }
 
 /** Remove a job (async) */
@@ -164,11 +177,12 @@ export async function promoteJobs(
 
 /** Promote a single job */
 export async function promoteJob(ctx: ManagementContext, id: string): Promise<void> {
+  // A job that is not delayed stays as it is in both modes; other rejections throw.
   if (ctx.embedded) {
     await getSharedManager().promote(jobId(id));
     return;
   }
-  await ctx.tcp!.send({ cmd: 'Promote', id });
+  assertPromoted(await ctx.tcp!.send({ cmd: 'Promote', id }));
 }
 
 // ============ Progress Operations ============
@@ -179,15 +193,13 @@ export async function updateJobProgress(
   id: string,
   progress: number | object
 ): Promise<void> {
-  const progressValue = typeof progress === 'number' ? progress : 0;
-  const message = typeof progress === 'object' ? JSON.stringify(progress) : undefined;
-
+  // The job-object mapping: an object is 0 plus its JSON; NaN or a non-number throws.
+  const update = progressUpdate(progress);
   if (ctx.embedded) {
-    await getSharedManager().updateProgress(jobId(id), progressValue, message);
+    await getSharedManager().updateProgress(jobId(id), update.progress, update.message);
     return;
   }
-
-  await ctx.tcp!.send({ cmd: 'Progress', id, progress: progressValue, message });
+  assertProgressUpdated(await ctx.tcp!.send({ cmd: 'Progress', id, ...update }));
 }
 
 // ============ Log Operations ============
@@ -240,7 +252,7 @@ export async function clearJobLogs(
     getSharedManager().clearLogs(jobId(id), keepLogs);
     return;
   }
-  await ctx.tcp!.send({ cmd: 'ClearLogs', id, keepLogs });
+  assertLogsCleared(await ctx.tcp!.send({ cmd: 'ClearLogs', id, keepLogs }));
 }
 
 // ============ Data Update Operations ============
@@ -252,49 +264,8 @@ export async function updateJobData(
   data: unknown
 ): Promise<void> {
   if (ctx.embedded) {
-    await getSharedManager().updateJobData(jobId(id), data);
+    requireDataUpdated(await getSharedManager().updateJobData(jobId(id), data));
     return;
   }
   assertFlowTcpOk(await ctx.tcp!.send({ cmd: 'Update', id, data }), 'Update');
-}
-
-/** Change job delay */
-export async function changeJobDelay(
-  ctx: ManagementContext,
-  id: string,
-  delay: number
-): Promise<void> {
-  if (ctx.embedded) {
-    await getSharedManager().changeDelay(jobId(id), delay);
-    return;
-  }
-  await ctx.tcp!.send({ cmd: 'ChangeDelay', id, delay });
-}
-
-/** Change job priority */
-export async function changeJobPriority(
-  ctx: ManagementContext,
-  id: string,
-  opts: { priority: number; lifo?: boolean }
-): Promise<void> {
-  if (ctx.embedded) {
-    await getSharedManager().changePriority(jobId(id), opts.priority, opts.lifo);
-    return;
-  }
-  await ctx.tcp!.send({ cmd: 'ChangePriority', id, priority: opts.priority, lifo: opts.lifo });
-}
-
-/** Extend job lock */
-export async function extendJobLock(
-  ctx: ManagementContext,
-  id: string,
-  token: string,
-  duration: number
-): Promise<number> {
-  if (ctx.embedded) {
-    const success = await getSharedManager().extendLock(jobId(id), token, duration);
-    return success ? duration : 0;
-  }
-  const response = await ctx.tcp!.send({ cmd: 'ExtendLock', id, token, duration });
-  return response.ok ? duration : 0;
 }

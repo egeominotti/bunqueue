@@ -51,8 +51,11 @@ defmodule Bunqueue.QueueQuery do
 
   def count(queue), do: field(queue, %{"cmd" => "Count", "queue" => queue.name}, "count", 0)
 
-  def wait_for_job(queue, id, timeout_ms) do
-    timeout = timeout_ms |> normalize_timeout() |> max(0) |> min(600_000)
+  # sdk/CLAUDE.md rule 4: one WaitJob hold clamped to the broker's 0..600_000 ms.
+  # As in 0.1.1, `nil` or a non-number is a 0 ms hold, a poll that returns an
+  # unfinished job's timeout at once. An omitted timeout waits up to 30_000 ms.
+  def wait_for_job(queue, id, timeout_ms \\ 30_000) do
+    timeout = wait_timeout_ms(timeout_ms)
     command = %{"cmd" => "WaitJob", "id" => id, "timeout" => timeout}
 
     with {:ok, response} <- Queue.call(queue, command, timeout + 5_000) do
@@ -97,6 +100,9 @@ defmodule Bunqueue.QueueQuery do
   end
 
   defp compact(map), do: Map.reject(map, fn {_key, value} -> is_nil(value) end)
-  defp normalize_timeout(value) when is_number(value), do: trunc(value)
-  defp normalize_timeout(_value), do: 0
+
+  defp wait_timeout_ms(value) when is_number(value),
+    do: value |> max(0) |> min(600_000) |> trunc()
+
+  defp wait_timeout_ms(_value), do: 0
 end

@@ -7,6 +7,7 @@ import type { Response } from '../../../../domain/types/response';
 import * as response from '../../../../domain/types/response';
 import type { HandlerContext } from '../../types';
 import type { CreateWorkerOptions, Worker } from '../../../../domain/types/worker';
+import { workerTimeoutMs } from '../../../../shared/workerTimeouts';
 
 type DurableWorkerManager = HandlerContext['queueManager'] & {
   registerWorkerDurable?: (
@@ -19,10 +20,8 @@ type DurableWorkerManager = HandlerContext['queueManager'] & {
   listWorkersDurable?: () => Promise<Worker[]>;
 };
 
-const WORKER_TIMEOUT_MS = parseInt(Bun.env.WORKER_TIMEOUT_MS ?? '30000', 10);
-
 function computeWorkerStatus(lastSeen: number, now: number): 'active' | 'stale' {
-  return now - lastSeen < WORKER_TIMEOUT_MS ? 'active' : 'stale';
+  return now - lastSeen < workerTimeoutMs() ? 'active' : 'stale';
 }
 
 export function handleRegisterWorker(

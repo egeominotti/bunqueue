@@ -23,9 +23,9 @@ type WorkerOptions struct {
 	TLS                *TLSOptions
 	Concurrency        int     // default 4
 	BatchSize          int     // default 10, clamped to [1, 1000] (server PULLB cap)
-	PollTimeoutMs      int     // default 5000, capped at 30000
-	LockTtlMs          int     // default 30000
-	HeartbeatIntervalS float64 // positive seconds enable heartbeats; zero/negative/non-finite disables
+	PollTimeoutMs      int     // default 5000, capped at 30000; negative = non-blocking pulls (see emptyPullDelay)
+	LockTtlMs          int     // default 30000; zero or negative uses the default
+	HeartbeatIntervalS float64 // positive seconds enable heartbeats (clamped to [1ms, max time.Duration]); zero/negative/non-finite disables
 	DisableHeartbeat   bool    // explicit off, even when HeartbeatIntervalS is positive
 	Name               string
 	OnEvent            TelemetryCallback
@@ -52,6 +52,7 @@ type Worker struct {
 	active               map[string]string // job id -> lock token
 	listeners            map[string][]func(...any)
 	stopped              bool
+	stopCh               chan struct{} // closed by Stop/Close; wakes waitOrStop
 	wasBusy              bool
 	registeredGeneration int
 	processed            int
@@ -67,6 +68,18 @@ type Worker struct {
 const workerMaxStackLines = 10 // server persists the FIRST stackTraceLimit lines (default 10)
 
 var workerBackoff = []time.Duration{500 * time.Millisecond, time.Second, 2 * time.Second, 5 * time.Second}
+
+// Pauses after a pull that returned no jobs, mirroring the main client's
+// rule in src/client/worker/runtime/polling.ts
+// (`pollTimeout > 0 ? 10 : drainDelay`, drainDelay default 50):
+//   - emptyPollDelay after a non-blocking pull (poll timeout 0), which the
+//     broker answers at once, so the loop would otherwise re-poll with zero delay;
+//   - emptyLongPollDelay after a long poll, so a 1 ms poll timeout cannot
+//     re-poll an empty queue hundreds of times per second.
+const (
+	emptyPollDelay     = 50 * time.Millisecond
+	emptyLongPollDelay = 10 * time.Millisecond
+)
 
 // NewWorker builds a worker; call Run() to start the blocking pull loop.
 func NewWorker(queue string, processor Processor, opts WorkerOptions) *Worker {
@@ -88,12 +101,14 @@ func NewWorker(queue string, processor Processor, opts WorkerOptions) *Worker {
 	}
 	pollTimeout = min(pollTimeout, 30_000)
 	lockTtl := opts.LockTtlMs
-	if lockTtl == 0 {
-		lockTtl = 30_000
+	if lockTtl <= 0 {
+		lockTtl = 30_000 // the broker rejects lockTtl < 1 on every PULLB
 	}
 	heartbeat := opts.HeartbeatIntervalS
 	if heartbeat <= 0 || math.IsNaN(heartbeat) || math.IsInf(heartbeat, 0) || opts.DisableHeartbeat {
 		heartbeat = 0 // disabled: no ticker at all (never a 0-interval storm)
+	} else {
+		heartbeat = heartbeatPeriod(heartbeat).Seconds() // the effective, ticker-safe interval
 	}
 	hostname, _ := os.Hostname()
 	workerID := fmt.Sprintf("go-%s-%d-%08x", hostname, os.Getpid(), rand.Uint32())
@@ -144,6 +159,7 @@ func (w *Worker) On(event string, fn func(...any)) *Worker {
 func (w *Worker) Run() {
 	w.mu.Lock()
 	w.stopped = false
+	w.stopCh = make(chan struct{})
 	w.mu.Unlock()
 	if err := w.safeRegister(); err != nil {
 		w.emit("error", err)
@@ -154,7 +170,7 @@ func (w *Worker) Run() {
 	for !w.isStopped() {
 		if err := w.pollOnce(); err != nil {
 			w.emit("error", err)
-			time.Sleep(workerBackoff[min(backoffIdx, len(workerBackoff)-1)])
+			w.waitOrStop(workerBackoff[min(backoffIdx, len(workerBackoff)-1)])
 			backoffIdx++
 			continue
 		}
@@ -167,14 +183,14 @@ func (w *Worker) Run() {
 // Stop asks the pull loop to exit after the in-flight jobs settle.
 func (w *Worker) Stop() {
 	w.mu.Lock()
-	w.stopped = true
+	w.signalStopLocked()
 	w.mu.Unlock()
 }
 
 // Close unregisters (when registered), stops heartbeats and drops the socket.
 func (w *Worker) Close() {
 	w.mu.Lock()
-	w.stopped = true
+	w.signalStopLocked()
 	if w.hbStarted {
 		close(w.stopHb)
 		w.hbStarted = false
@@ -211,7 +227,7 @@ func (w *Worker) pollOnce() error {
 	}
 	free := w.freeSlots()
 	if free <= 0 {
-		time.Sleep(20 * time.Millisecond)
+		w.waitOrStop(20 * time.Millisecond)
 		return nil
 	}
 	response, err := w.Connection.CallTimeout(map[string]any{
@@ -237,6 +253,7 @@ func (w *Worker) pollOnce() error {
 		if drained {
 			w.emit("drained")
 		}
+		w.waitOrStop(emptyPullDelay(w.pollTimeoutMs))
 		return nil
 	}
 	w.mu.Lock()

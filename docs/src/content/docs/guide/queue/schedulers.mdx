@@ -141,6 +141,14 @@ queue.remove_job_scheduler("daily-report")?;
 </TabItem>
 </Tabs>
 
+The template options are validated like a regular add (`attempts`, `backoff`,
+`timeout`, `delay`, `stallTimeout`, plus `priority` and the deduplication `ttl`): only
+a value no job can run with is refused (for example a `NaN` timeout), so every template
+that worked in 2.9.10 is still accepted at boot. A `backoff` object without `delay` uses
+the 1000 ms default base. An invalid scheduler is not stored, and is reported as in
+2.9.10: embedded mode throws the reason (for example `timeout must be a finite number`
+or `Invalid cron expression: ...`), TCP mode resolves `null`.
+
 Both TypeScript packages order schedulers by their next execution time. Pagination uses
 zero-based inclusive `start` and `end` offsets, so `(0, 99)` returns at most 100
 entries; `end: -1` means the rest of the list. `asc` defaults to `false`.

@@ -1,5 +1,10 @@
 import type { Job } from '../types/jobs/model';
 import { DEFAULT_MAX_BACKOFF, JOB_DEFAULTS } from './constants';
+import { parseMaxDelay } from './create';
+import { processingDeadline } from './timeoutRule';
+
+/** 2^1023 is the largest finite power of two: a higher exponent would give 0 * Infinity. */
+const MAX_BACKOFF_EXPONENT = 1023;
 
 export function normalizeStacktrace(
   lines: readonly unknown[] | undefined,
@@ -20,8 +25,13 @@ export function isDelayed(job: Job, now: number = Date.now()): boolean {
   return job.runAt > now;
 }
 
+/**
+ * Ready means "not delayed": the complement of `isDelayed`, as every state view
+ * classifies jobs. A NaN run time (never valid) is therefore ready, not a job that is
+ * reported waiting but can never be pulled.
+ */
 export function isReady(job: Job, now: number = Date.now()): boolean {
-  return job.runAt <= now;
+  return !(job.runAt > now);
 }
 
 export function isExpired(job: Job, now: number = Date.now()): boolean {
@@ -29,28 +39,38 @@ export function isExpired(job: Job, now: number = Date.now()): boolean {
   return now > job.createdAt + job.ttl;
 }
 
+/**
+ * Whether a started job is past its processing deadline, by the rule the broker's
+ * timeout scheduler and the Worker share (`timeoutRule.ts`): no timeout for an absent,
+ * 0 or NaN `timeout`, a fractional deadline rounded up, and due at the deadline itself.
+ */
 export function isTimedOut(job: Job, now: number = Date.now()): boolean {
-  if (job.timeout === null || job.startedAt === null) return false;
-  return now > job.startedAt + job.timeout;
+  const deadline = processingDeadline(job);
+  return deadline !== null && now >= deadline;
 }
 
+/** A usable retry base: >= 0 (Infinity is capped later); anything else is the default. */
+function retryBase(value: unknown): number {
+  return typeof value === 'number' && value >= 0 ? value : JOB_DEFAULTS.backoff;
+}
+
+/**
+ * Retry delay after a failure: always a finite number of milliseconds >= 0, whatever
+ * the attempt count or a legacy job's stored values. `fixed` is the base with ±20%
+ * jitter; otherwise `base * 2^attempts` with -50%..+50% jitter. Both are capped at
+ * `backoff.maxDelay` (default 1 hour). A zero base retries at once for any attempt
+ * count (no `0 * 2^1024 = NaN`), and a NaN or missing base uses the 1000 ms default.
+ */
 export function calculateBackoff(job: Job): number {
-  const maxDelay = job.backoffConfig?.maxDelay ?? DEFAULT_MAX_BACKOFF;
-
-  if (job.backoffConfig) {
-    if (job.backoffConfig.type === 'fixed') {
-      const base = job.backoffConfig.delay;
-      const jittered = base * (0.8 + Math.random() * 0.4);
-      return Math.min(jittered, maxDelay);
-    }
-    const base = job.backoffConfig.delay * Math.pow(2, job.attempts);
-    const jittered = base * (0.5 + Math.random());
-    return Math.min(jittered, maxDelay);
+  const config = job.backoffConfig;
+  const maxDelay = parseMaxDelay(config?.maxDelay) ?? DEFAULT_MAX_BACKOFF;
+  const base = retryBase(config ? config.delay : job.backoff);
+  if (config?.type === 'fixed') {
+    return Math.min(base * (0.8 + Math.random() * 0.4), maxDelay);
   }
-
-  const base = job.backoff * Math.pow(2, job.attempts);
-  const jittered = base * (0.5 + Math.random());
-  return Math.min(jittered, maxDelay);
+  if (base === 0) return 0;
+  const exponent = job.attempts > 0 ? Math.min(job.attempts, MAX_BACKOFF_EXPONENT) : 0;
+  return Math.min(base * Math.pow(2, exponent) * (0.5 + Math.random()), maxDelay);
 }
 
 /**

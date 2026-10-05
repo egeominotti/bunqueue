@@ -17,7 +17,13 @@ observability behavior must agree with `docs/protocol.md`.
 
 The TypeScript SDK (`bunqueue-client` 0.2.0) ships the canonical
 `bunqueue/client` API as its default entry, a breaking change from 0.1.x; the
-0.1.x API stays unchanged at `bunqueue-client/legacy`, and
+0.1.x API stays at `bunqueue-client/legacy` (same surface; since 0.2.3 it
+arms option-driven timers through `src/shared/timers.ts`, via
+`sdk/typescript/src/timing.ts`, applies the SDK clamps of `sdk/CLAUDE.md` rule 4
+to the heartbeat, `batchSize`, poll timeout and `waitForJob` ttl, and rejects
+only values 0.2.2 turned into a hot loop, a hang, a crash or a ~1 ms timer;
+every other value keeps its 0.2.2 result (`sdk/typescript/src/legacy-coercion.ts`;
+see `sdk/typescript/LEGACY.md#option-validation`), and
 `sdk/typescript/README.md#migrating-from-01x` is the migration guide. The
 package is ESM-only (`require()` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`), has
 one runtime dependency (`msgpackr`), no top-level `await` (CommonJS bundlers such
@@ -33,6 +39,9 @@ Protocol v3 (`separate-job-name`) clients were released with server 2.9.7 on
 the `egeominotti/bunqueue-php` mirror) and Go `sdk/go/v0.2.0` (a git tag; the Go
 proxy serves it). TypeScript 0.2.2 followed on 2026-10-03 with the canonical
 client's job-wait fix (`src/client/jobWait.ts`) and the rewritten README.
+TypeScript 0.2.3 followed on 2026-10-05 with server 2.9.11: duration and
+count validation, shared timers in both entries, and pool keys that cover
+every connection option and the full token hash.
 Python 0.2.0 and Rust 0.2.0 are versioned and built in the
 same release and are published by hand to PyPI and crates.io by the maintainer,
 who holds those credentials. The previous registry releases (Python 0.1.5, PHP
@@ -143,7 +152,9 @@ Every SDK must:
    preserving lists), and normalize ext type 0 to the language's null value;
 5. preserve every advertised job, scheduler, rate-limit, and flow option
    instead of silently dropping fields;
-6. clamp batch and long-poll values to protocol limits;
+6. clamp batch and long-poll values to protocol limits, and validate or
+   normalize every duration before it reaches a timer, sleep, socket deadline
+   or backoff (see [Duration validation](#duration-validation));
 7. keep active job leases alive, bound pulls by available concurrency, and
    surface ACK/FAIL errors;
 8. plan every flow completely before I/O and submit it with one atomic `PUSHF`,
@@ -207,6 +218,224 @@ PHP's sampled profile was dominated by socket polling and exposed no
 application self-time hotspot. These clients therefore retain their existing
 lifecycle behavior until a separately measured optimization clears the same
 bar.
+
+## Duration validation
+
+A duration from options or job data must never reach a timer, a sleep, a
+socket deadline or a backoff as NaN, a negative number, a zero that becomes a
+spin or an instant timeout, or a value above the runtime's limit. A NaN or
+negative one-shot delay that the previous release ran at once still runs at
+once.
+
+Each SDK keeps every value its previous release handled as intended. It
+rejects or normalizes only values that release turned into a hot loop, a
+~1 ms timer or lease, a hang, a crash, a request the broker always refused,
+or an integer wrap. The previous releases differ, so the per-SDK results for
+`null`/`None`/`nil`, non-numbers and fractions differ on purpose.
+
+### The four SDK clamps
+
+Four options follow `sdk/CLAUDE.md` rule 4 (`docs/protocol.md` sections 6.3
+and 9) in every SDK. No SDK raises for a number in these options, and each
+clamps a number as below; the per-SDK notes give the exceptions:
+
+| Option | Rule |
+| --- | --- |
+| Heartbeat interval | `<= 0`, NaN or ±Infinity disables heartbeats. A positive value is kept, capped only at the runtime timer limit. |
+| Batch size | Clamped to [1, 1000]. |
+| Poll timeout | Clamped to [0, 30000]. NaN means 5000. |
+| `waitForJob` ttl | Clamped to [0, 600000]. An omitted ttl means 30000. |
+
+Per SDK:
+
+- Python (`bunqueue/sdk_clamps.py`) keeps every working 0.2.0 result:
+  - `None` means the default: a 10 s heartbeat, a batch of 10, a 5000 ms
+    poll and a 30000 ms wait.
+  - `batch_size` and the wait keep 0.2.0's `max(low, min(value, high))`. A
+    NaN batch size is 1, a NaN wait is 0, and a bool counts as 0 or 1.
+  - `heartbeat_interval_s=False` disables heartbeats, and `True` beats every
+    second.
+  - A bool poll timeout raises `TypeError`; 0.2.0 sent it and the broker
+    refused it. Any other non-number raises `TypeError` naming the option.
+- PHP (`src/OptionGuard.php`) keeps every working 0.2.0 setting. None of the
+  four throws, and an omitted or `null` key means the default:
+  - `batchSize`: an int is clamped. Any other value, a float or a string
+    included, means 10.
+  - `pollTimeoutMs`: an int, a float or a numeric string such as `'5000'` is
+    clamped before the int cast, and `NAN` means 5000. Any other value means
+    0, a non-blocking pull.
+  - `heartbeatIntervalS` is converted with `(float)`: `'10'` is 10 s, and
+    `false` disables heartbeats.
+  - `waitForJob()` takes `int|float|null`: `null` or `NAN` means 30000, and
+    `INF` holds for 600000.
+  - The poll timeout and the wait truncate a fraction after clamping.
+- Elixir (`Worker.new/3`, `Queue.wait_for_job/2,3`) is compatible with
+  0.1.1. BEAM floats cannot be NaN or Infinity.
+  - `nil` and non-numbers mean `batch_size` 1, `poll_timeout` 0, a
+    `wait_for_job` 0 ms hold, and disabled heartbeats for `nil`, `false` or
+    another atom.
+  - Only `heartbeat_interval: true` or another non-atom non-number raises
+    `ArgumentError`.
+  - Fractions of the heartbeat interval, poll timeout and wait are truncated,
+    but a non-integer `batch_size` is 1, as in 0.1.1. A positive heartbeat
+    interval is at least 1 ms.
+  - An omitted `batch_size` follows `concurrency`, and an omitted wait
+    (`wait_for_job/2`) is 30000.
+- The legacy TypeScript entry (`sdk/typescript/src/sdk-clamps.ts`) keeps
+  every working 0.2.2 result:
+  - An omitted or `null` value means the default, except a `null` ttl, which
+    is a 0 ms hold.
+  - A non-number heartbeat interval disables heartbeats. A non-finite or
+    non-number `batchSize` means 10, and a fraction is kept.
+  - A numeric string poll timeout or ttl is its number, and NaN means the
+    default. Any other non-number raises `TypeError`.
+- Go and Rust: their static types exclude non-numbers. Only Go's
+  `HeartbeatIntervalS` is a float, so NaN and ±Inf disable it; the other
+  clamps apply to integer fields.
+  - Go's zero value means "omitted": `BatchSize: 0` means 10 and
+    `PollTimeoutMs: 0` means 5000. A negative poll timeout clamps to 0, a
+    non-blocking pull. `WaitForJob(id, 0)` is a 0 ms hold.
+  - Rust's `heartbeat_interval: None`, or a zero `Duration`, disables
+    heartbeats. `batch_size: 0` clamps to 1.
+
+The runtime caps on a positive heartbeat interval are:
+
+- Go: [1 ms, maximum `time.Duration`];
+- Elixir: [1, 2^32 - 1] ms;
+- Python: `threading.TIMEOUT_MAX`.
+
+Without these caps the value would panic, crash a timer process, or become a
+zero-delay loop.
+
+### Other durations
+
+No protocol rule pins the following options. Each SDK checks them at its
+boundary in its own idiom, under the same compatibility rule, so it can
+accept a value the main client (`src/shared/durations.ts`) rejects.
+
+- After a pull that returned no jobs, the worker loop waits exactly as the
+  main client does (`src/client/worker/runtime/polling.ts`:
+  `pollTimeout > 0 ? 10 : drainDelay`):
+  - 10 ms after an empty long poll;
+  - 50 ms, the default `drainDelay`, after an empty non-blocking pull
+    (timeout 0).
+
+  One-shot APIs (`run_once`, `runOnce`) return at once.
+- The lock TTL is at least 1 ms, because a lease of 0 or less is already
+  expired when it is granted:
+  - Python takes a finite number >= 1, capped at 2^53 - 1, or `None`. `None`
+    sends `lockTtl: null`, and the broker leases for its 30000 ms default.
+    NaN, infinity, a value below 1, a bool or a string raises at construction.
+  - PHP takes an int >= 1 and throws `\InvalidArgumentException` for any
+    other value. An omitted or `null` key means 30000.
+  - Elixir: `nil` means 30000, a positive float is rounded up, and a value
+    above 2^53 - 1 is capped. Zero, negative and non-number values raise
+    `ArgumentError` before any worker process starts.
+  - Go and Rust, whose constructors are infallible and already default zero
+    values, use 30000 for zero or less.
+- Connect and command timeouts are positive:
+  - Python raises on construction for a zero, negative or NaN timeout and
+    for an infinite `connect_timeout` (`ValueError`; `TypeError` for a
+    non-number). `True` still means 1 s. `command_timeout=None` or
+    `math.inf` means no client deadline, and `connect_timeout=None` keeps
+    0.2.0's blocking connect, with no client deadline.
+  - PHP throws `\InvalidArgumentException` on construction for a zero,
+    negative, non-finite or non-number timeout. An omitted or `null` one
+    means the default.
+  - Go treats a value of zero or less as the default.
+  - Rust returns `Error::Connection` before any socket opens.
+  - Elixir: a configured timeout below 1 ms, or a non-number, falls back to
+    the 30 s default. A per-call timeout of at least 0 but below 1 ms, `nil`
+    or `false` uses the connection's timeout, and a negative or non-number
+    one the 30 s default. Both cap at 2^32 - 1 - 2000 ms.
+  - PHP caps at 2,147,482 s (about 24.85 days). Above that, `php_tvtoto()`
+    turns a stream timeout into an infinite poll, and beyond `PHP_INT_MAX` the
+    `(int)` cast wraps.
+- Elixir's `Worker.stop/1` always returns. The lifecycle barrier monitors every
+  admitted run and every stopper. A run whose process dies without leaving
+  (a linked crash) is released by its `:DOWN`, while a live run is still
+  waited for. If the stop owner dies, a waiting stopper takes over.
+- Go's `Stop` interrupts every pull-loop wait: the empty-pull pause, the error
+  backoff and the busy-slot wait each select on a per-`Run` stop channel.
+  `Run` used to wait them out, measured at 47 ms in an empty-pull pause and
+  480 ms in a backoff; it now returns in under 1 ms.
+- Python's reconnect backoff stays within 0.5–5 s for any failure count. The
+  Worker pull loop classifies a failure as the main client does
+  (`sdk/python/bunqueue/worker_errors.py`):
+  - A transient failure (a lost connection, a command timeout, the rate
+    limit, a lock acquisition timeout, `Internal server error`) emits `error`
+    and is retried after 0.5, 1, 2, then 5 s, the 0.2.0 schedule. A pull the
+    broker answers resets it.
+  - A permanent refusal (a bad token, a validation error) or an unexpected
+    exception ends the loop and is raised from `run()`, as in 0.2.0. With an
+    `error` listener attached, it is emitted and retried on the same schedule.
+
+  `ack_batch.max_delay_ms` is still read with `float()`; only an infinite
+  delay newly raises. Simple Mode rejects, before the Queue and Worker exist,
+  only the `retry`, `circuit_breaker`, `batch`, `priority_aging` and
+  `rate_limit` values 0.2.0 could not handle (`bunqueue/simple/validation.py`).
+  Every other value there keeps 0.2.0's `snake or camel or default` reading,
+  so 0 means the default. Computed retry backoffs saturate at 2^53 - 1 ms.
+- The legacy TypeScript entry rejects only values 0.2.2 turned into a hot
+  loop, a hang, a crash or a ~1 ms timer. `src/legacy-coercion.ts` keeps the
+  other 0.2.2 results: a numeric string is its number, and a NaN or negative
+  one-shot delay runs at once. `LEGACY.md` ("Option validation") lists each
+  option.
+
+The regressions that motivated these rules were measured before the fix:
+
+- At poll timeout 0, Python, Go, Rust and PHP sent about 10,000 PULLB per
+  second until the broker's anti-abuse rate limit cut them off; the legacy
+  TypeScript entry sent 8,244 and Elixir 5,000. Each fixed SDK now sends
+  about 20.
+- At a 1 ms poll timeout, the SDKs sent 324 to 734 PULLB per second. They
+  now send 65 to 77, within the 10 ms rule's bound of about 90.
+- The four rule-4 options:
+  - Python sent a NaN or negative poll timeout to the broker, which rejected
+    the PULLB and shut the worker down. A `None` batch size or wait raised,
+    and a `None` heartbeat killed the loop with `TypeError`.
+  - PHP's int cast turned a `NAN` or `INF` poll timeout into 0 and wrapped a
+    float beyond the int range (`1e19` became 0, `2^64 + 8192` became 8192).
+    A `null` or non-finite `waitForJob` ttl threw PHP's own `TypeError`.
+  - Elixir silently disabled heartbeats the caller asked for (`true`, a
+    string); it now raises `ArgumentError`. Its other `nil` and non-number
+    mappings are kept for 0.1.1 compatibility: 0, 1, disabled heartbeats,
+    and a 0 ms wait.
+- Elixir turned `nil`, every float, and zero, negative or non-number
+  `lock_ttl` values into a 1 ms lease that expired mid-job. Python, PHP, Go
+  and Rust sent a lock TTL below 1 to the broker as given.
+- A Python priority-aging interval of NaN ran about 27,000 aging ticks per
+  second.
+- Python raised `OverflowError` after about 1,025 failed reconnects, and a
+  transient broker refusal (the rate limit, a lock timeout,
+  `Internal server error`) ended its Worker loop for good.
+- Go panicked on sub-nanosecond heartbeat intervals.
+- Elixir truncated a heartbeat interval below 1 ms to 0, a `JobHeartbeatB`
+  loop per job, and raised `:timeout_value` for heartbeat intervals and
+  timeouts above 2^32 - 1 ms.
+- A NaN or infinite `commandTimeout` made PHP busy-spin socket reads. A finite
+  one above `PHP_INT_MAX` seconds wrapped in the `(int)` cast: `1e300`
+  busy-spun, `1e19` never timed out, and `2^64 + 8192` timed out after 8192 s.
+- A linked crash in a handler could leave Elixir's `stop/1` waiting forever.
+
+Each SDK covers these cases in its native suite:
+
+- Python: `sdk/python/tests/e2e_durations*.py`,
+  `sdk/python/tests/e2e_sdk_clamps.py`, `sdk/python/tests/e2e_compat.py`,
+  `sdk/python/tests/e2e_worker_refusals.py` and
+  `sdk/python/tests/test_compat_*.py`
+- Go: `sdk/go/duration_validation_test.go` and `sdk/go/stop_latency_test.go`
+- Rust: `sdk/rust/tests/duration_validation.rs`
+- PHP: `sdk/php/tests/e2e-durations.php`, `sdk/php/tests/e2e-clamps.php` and
+  `sdk/php/tests/e2e-compat.php`
+- Elixir: `sdk/elixir/test/duration_validation_test.exs`,
+  `sdk/elixir/test/option_clamps_test.exs`,
+  `sdk/elixir/test/option_compat_test.exs` and
+  `sdk/elixir/test/worker_stop_test.exs`
+- TypeScript legacy entry: `sdk/typescript/tests/legacy-*-durations.test.ts`,
+  `sdk/typescript/tests/legacy-compat-*.test.ts`,
+  `sdk/typescript/tests/e2e-durations.ts` and
+  `sdk/typescript/tests/e2e-legacy-compat.ts`
 
 ## Test layers
 

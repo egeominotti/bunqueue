@@ -35,9 +35,12 @@ export interface WorkerEventMap<T = unknown, R = unknown> {
 export interface AckBatchOptions {
   /** Batch ACKs into ACKB round-trips (default false; opt-in for throughput). */
   enabled?: boolean;
-  /** Max ACKs per batch (default 50). */
+  /** Max ACKs per batch (default 50); 0 or below sends every ACK at once. */
   maxSize?: number;
-  /** Max ms to hold a partial batch before flushing (default 5). */
+  /**
+   * Max ms to hold a partial batch before flushing (default 5): finite; NaN or negative
+   * flushes on the next timer tick.
+   */
   maxDelayMs?: number;
 }
 
@@ -51,15 +54,25 @@ export interface WorkerOptions extends Observability {
    * load. Opt-in: the default (individual ACK per job) is unchanged.
    */
   ackBatch?: AckBatchOptions;
-  /** Max jobs processed in parallel (default 4). */
+  /** Max jobs processed in parallel (default 4): a whole number >= 1. */
   concurrency?: number;
-  /** Max jobs fetched per PULLB (default 10, capped by free slots and the server max 1000). */
+  /**
+   * Max jobs fetched per PULLB (default 10, capped by free slots): clamped to [1, 1000]
+   * (the server max); a non-finite or non-number value means the default.
+   */
   batchSize?: number;
-  /** Server-side long-poll timeout in ms (default 5000, max 30000). */
+  /**
+   * Server-side long-poll timeout in ms (default 5000): clamped to [0, 30000]; NaN means
+   * the default. After an empty pull the worker pauses 50 ms with 0, 10 ms after a long poll.
+   */
   pollTimeoutMs?: number;
-  /** Job lock TTL in ms (default 30000). */
+  /** Job lock TTL in ms (default 30000): finite, >= 1. */
   lockTtlMs?: number;
-  /** Worker + job heartbeat interval in seconds (default 10, 0 = disabled). */
+  /**
+   * Worker + job heartbeat interval in seconds (default 10). 0, negative, non-finite or
+   * a non-number disables heartbeats (SDK rule); periods beyond the runtime timer limit
+   * (about 24.8 days) are honoured.
+   */
   heartbeatIntervalS?: number;
   /** Start the loop at construction (default true, mirrors the TS client). */
   autorun?: boolean;
@@ -67,6 +80,12 @@ export interface WorkerOptions extends Observability {
 }
 
 export const MAX_POLL_TIMEOUT_MS = 30_000;
+/**
+ * Pause after an empty pull, as the main client's polling loop: its `drainDelay`
+ * default without a long poll (pollTimeoutMs 0), 10 ms after a long poll.
+ */
+export const EMPTY_PULL_DELAY_MS = 50;
+export const LONG_POLL_REPOLL_MS = 10;
 export const MAX_STACK_LINES = 20;
 export const RECONNECT_BACKOFF_MS = [500, 1000, 2000, 5000];
 

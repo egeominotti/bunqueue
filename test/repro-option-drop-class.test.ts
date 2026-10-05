@@ -246,8 +246,9 @@ describe('CLAIM B — PUSHB must enforce the same validation as PUSH (handlers/c
   it('an out-of-bounds option rejected by PUSH is also rejected by PUSHB', async () => {
     const c = await connect();
     const QUEUE = 'optdrop-b1';
-    // priority bound is ±1_000_000 (protocol.ts:128). 2_000_000 is invalid.
-    const BAD_PRIORITY = 2_000_000;
+    // A priority must be a finite number. (2_000_000 was the original probe; any finite
+    // priority is admitted since the 2.9.10-compatibility rules, as embedded 2.9.10 did.)
+    const BAD_PRIORITY = 'high';
 
     // Baseline (GREEN today and after the fix): PUSH rejects it.
     const single = await c.send({

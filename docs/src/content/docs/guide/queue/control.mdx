@@ -128,7 +128,7 @@ queue.close();             // Close the TCP connection
 </TabItem>
 </Tabs>
 
-Gotcha: in TCP mode the fire-and-forget forms return before the server has processed them. If you drain or obliterate and immediately add new jobs, the wipe can land after the add and delete the new job. Use the `Async` variants when the next step depends on the command being done.
+Gotcha: in TCP mode the fire-and-forget forms return before the server has processed them. If you drain or obliterate and immediately add new jobs, the wipe can land after the add and delete the new job. Use the `Async` variants when the next step depends on the command being done. A fire-and-forget command that fails (for example, the broker is unreachable) is logged as one line naming the command and the queue and never crashes the process; the `Async` variants reject to the caller instead.
 
 ## Maintenance
 

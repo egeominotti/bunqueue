@@ -70,6 +70,54 @@ for (const mode of MODES) {
       expect(opts.pollTimeout).toBe(30_000);
     });
 
+    // Documented under "Duration validation": bad durations throw at construction,
+    // naming the option; the documented minimums and the pollTimeout clamp hold.
+    test('duration options are validated at construction, as documented', async () => {
+      harness = await startHarness('worker-options', mode);
+      const queue = harness.queue('durations');
+      const build = (extra: Record<string, unknown>) => () =>
+        harness?.worker(queue.name, async () => true, { autorun: false, ...extra });
+
+      expect(build({ drainDelay: 0 })).toThrow(
+        'Worker: drainDelay must be a finite number of milliseconds >= 1 (got 0)'
+      );
+      expect(build({ heartbeatInterval: 0.5 })).toThrow(RangeError);
+      expect(build({ lockDuration: 0 })).toThrow(RangeError);
+      expect(build({ heartbeatInterval: 'often' })).toThrow(TypeError);
+
+      // Documented: -1 means no long-poll, drainDelay is checked only without one, NaN
+      // disables heartbeats and a numeric string is a number.
+      expect(build({ pollTimeout: -1, drainDelay: 0, heartbeatInterval: 0 })).toThrow(RangeError);
+      expect(build({ drainDelay: 0, pollTimeout: 5000 })).not.toThrow();
+      const accepted = options(
+        harness.worker(queue.name, async () => true, {
+          autorun: false,
+          heartbeatInterval: Number.NaN,
+          pollTimeout: Number.POSITIVE_INFINITY,
+          drainDelay: '1',
+          lockDuration: 1,
+        })
+      );
+      expect([
+        accepted.heartbeatInterval,
+        accepted.pollTimeout,
+        accepted.drainDelay,
+        accepted.lockDuration,
+      ]).toEqual([0, 30_000, 1, 1]);
+
+      // Counts: numbers > 0, fractions rounded up; batchSize above 1000 (Infinity
+      // included) becomes 1000.
+      expect(build({ concurrency: 0 })).toThrow(RangeError);
+      expect(build({ batchSize: 0 })).toThrow(RangeError);
+      const counts = options(
+        harness.worker(queue.name, async () => true, {
+          autorun: false,
+          batchSize: Number.POSITIVE_INFINITY,
+        })
+      );
+      expect(counts.batchSize).toBe(1_000);
+    });
+
     test('a non-boolean removeOnComplete keeps the job, as documented', async () => {
       harness = await startHarness('worker-options', mode);
       const queue = harness.queue('remove-on-complete-count');

@@ -7,6 +7,7 @@
 
 import { S3Client } from 'bun';
 import { backupLog } from '../../shared/logger';
+import { safeInterval, type SafeTimer } from '../../shared/timers';
 import {
   type S3BackupConfig,
   type BackupResult,
@@ -31,7 +32,7 @@ export class S3BackupManager {
   private readonly client: S3Client;
   private readonly flushBeforeBackup?: () => void | Promise<void>;
   private readonly telemetry: BackupTelemetry;
-  private backupInterval: ReturnType<typeof setInterval> | null = null;
+  private backupInterval: SafeTimer | null = null;
   private initialBackupTimeout: ReturnType<typeof setTimeout> | null = null;
   private schedulerGeneration = 0;
   private dashboardEmit: ((event: string, data: Record<string, unknown>) => void) | null = null;
@@ -61,6 +62,7 @@ export class S3BackupManager {
       prefix: config.prefix ?? DEFAULTS.prefix,
       databasePath: config.databasePath,
       timeoutMs: config.timeoutMs,
+      ...(config.configErrors !== undefined && { configErrors: config.configErrors }),
     };
 
     this.flushBeforeBackup = config.flushBeforeBackup;
@@ -83,7 +85,9 @@ export class S3BackupManager {
   }
 
   /**
-   * Create configuration from environment variables
+   * Create configuration from environment variables. Same validated parser as the
+   * server: an invalid value is carried in `configErrors` (naming the variable), so
+   * `validate()` fails and neither `start()` nor `backup()` runs with it.
    */
   static fromEnv(databasePath: string): S3BackupConfig {
     return configFromEnv(databasePath);
@@ -127,8 +131,10 @@ export class S3BackupManager {
     }, 60 * 1000);
     this.initialBackupTimeout = initialBackupTimeout;
 
-    // Schedule periodic backups
-    const backupInterval = setInterval(() => {
+    // Schedule periodic backups. `validate()` guarantees a whole interval >= 60 s, and
+    // safeInterval honours one above the native limit (a 30-day interval would
+    // otherwise be rewritten to 1 ms and upload back-to-back).
+    const backupInterval = safeInterval(() => {
       if (generation !== this.schedulerGeneration || this.backupInterval !== backupInterval) {
         return;
       }
@@ -150,7 +156,7 @@ export class S3BackupManager {
       this.initialBackupTimeout = null;
     }
     if (this.backupInterval) {
-      clearInterval(this.backupInterval);
+      this.backupInterval.clear();
       this.backupInterval = null;
     }
     this.telemetry.setSchedulerRunning(false);
@@ -160,6 +166,15 @@ export class S3BackupManager {
    * Perform a backup
    */
   async backup(): Promise<BackupResult> {
+    // A configuration the server reported as unusable never uploads or prunes (its
+    // interval and retention are placeholders, not the operator's values).
+    const { configErrors } = this.config;
+    if (configErrors !== undefined && configErrors.length > 0) {
+      return {
+        success: false,
+        error: `S3 backup configuration invalid: ${configErrors.join('; ')}`,
+      };
+    }
     if (!this.telemetry.tryStart()) {
       return { success: false, error: 'Backup already in progress' };
     }

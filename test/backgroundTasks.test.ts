@@ -17,6 +17,7 @@ import type { BackgroundContext } from '../src/application/types';
 import type { Job } from '../src/domain/types/job';
 import { processingShardIndex, SHARD_COUNT } from '../src/shared/hash';
 import { JobTimeoutScheduler } from '../src/application/background/timeouts';
+import { safeInterval } from '../src/shared/timers';
 
 // ============ Helpers ============
 
@@ -154,15 +155,15 @@ describe('backgroundTasks', () => {
 
   describe('edge cases', () => {
     test('stopping before starting should not throw', () => {
-      // Construct a fake handles object with dummy interval IDs
+      // Construct a fake handles object with dummy intervals (the handles are SafeTimers)
       const cron = new CronScheduler();
       const fakeHandles: BackgroundTaskHandles = {
-        cleanupInterval: setInterval(() => undefined, 999999),
+        cleanupInterval: safeInterval(() => undefined, 999999),
         timeoutScheduler: new JobTimeoutScheduler(),
-        depCheckInterval: setInterval(() => undefined, 999999),
-        stallCheckInterval: setInterval(() => undefined, 999999),
-        dlqMaintenanceInterval: setInterval(() => undefined, 999999),
-        lockCheckInterval: setInterval(() => undefined, 999999),
+        depCheckInterval: safeInterval(() => undefined, 999999),
+        stallCheckInterval: safeInterval(() => undefined, 999999),
+        dlqMaintenanceInterval: safeInterval(() => undefined, 999999),
+        lockCheckInterval: safeInterval(() => undefined, 999999),
         cronScheduler: cron,
       };
 

@@ -2,6 +2,7 @@
 
 import { EmbeddedBackend } from './backend/embedded';
 import { TcpBackend } from './backend/tcp';
+import { brokerConnectionFromEnv } from './backend/tcp/env';
 import type { McpBackend } from './types/adapter';
 
 export { EmbeddedBackend } from './backend/embedded';
@@ -38,11 +39,8 @@ export type {
 
 export async function createBackend(): Promise<McpBackend> {
   if ((process.env.BUNQUEUE_MODE ?? 'embedded') === 'tcp') {
-    const backend = new TcpBackend({
-      host: process.env.BUNQUEUE_HOST,
-      port: process.env.BUNQUEUE_PORT ? parseInt(process.env.BUNQUEUE_PORT, 10) : undefined,
-      token: process.env.BUNQUEUE_TOKEN,
-    });
+    // Throws on an invalid BUNQUEUE_PORT / BUNQUEUE_POOL_SIZE: startup stops, naming it.
+    const backend = new TcpBackend(brokerConnectionFromEnv());
     await backend.connect();
     return backend;
   }

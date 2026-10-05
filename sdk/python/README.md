@@ -103,7 +103,30 @@ older processor cannot discard a newer active generation.
   survive), `UnrecoverableError` to skip retries, opt-in ACK batching
   (`ack_batch={"max_size": 50, "max_delay_ms": 5}`: successful ACKs flush as
   one `ACKB` on size/delay/close; a job stays active until its batch settles;
-  broker-ignored positions do not emit completion events)
+  broker-ignored positions do not emit completion events). A failed pull
+  is classified as in the main client:
+  - a transient failure (lost connection, timeout, rate limit, lock-wait
+    timeout, `Internal server error`) emits `error` and is retried after
+    0.5, 1, 2, then 5 s, with or without a listener;
+  - a permanent refusal (auth, validation) or an unexpected exception ends
+    the loop and is raised from `run()` when no `error` listener is attached.
+    With a listener it is emitted and retried on the same schedule, so a
+    fixed token or broker setting recovers the worker without a restart.
+
+  The SDK clamps of `sdk/CLAUDE.md` rule 4 never raise for a number. `None`
+  means the default, and any other non-number raises `TypeError`:
+  - a zero, negative or non-finite `heartbeat_interval_s` disables
+    heartbeats, `False` disables them and `True` beats every second;
+  - `batch_size` is `max(1, min(value, 1000))`: NaN gives 1, infinity 1000;
+  - `poll_timeout_ms` is clamped to [0, 30000], and NaN means 5000. 0 is a
+    non-blocking pull. An empty pull is followed by a 10 ms wait, or 50 ms
+    at 0, as in the main client;
+  - the `wait_for_job` ttl is `max(0, min(value, 600000))`: NaN waits 0,
+    and `None` means 30000.
+
+  `lock_ttl_ms` must be a finite number >= 1, or `None` for the broker's
+  30000 ms default. `ack_batch.max_delay_ms` is read with `float()`: a
+  negative or NaN delay flushes at once, and infinity raises `ValueError`.
 - **FlowProducer**: `add` (parent/child trees), `add_bulk`, `add_chain`
   (sequential), `add_bulk_then` (fan-in), `get_flow`, atomic broker commit
 - **Simple Mode** (`Bunqueue`): Queue + Worker in one object — routes,
@@ -111,9 +134,17 @@ older processor cannot discard a newer active generation.
   custom + `retry_if`), circuit breaker, batch accumulation, event triggers,
   job TTL, priority aging, cooperative cancellation (`get_signal`),
   dedup/debounce defaults, cron shorthands — 1:1 with the official client
-  (TCP mode; `embedded` raises)
+  (TCP mode; `embedded` raises). Options read as `x or default`, so 0
+  means the default. The constructor rejects, before the Queue and Worker
+  exist, only values that would fail later: a NaN, negative or infinite
+  aging interval or retry delay, an infinite batch timeout or rate window, a
+  rate `max` below 1, a value `int()`/`float()` cannot read, or a callback
+  that is not callable
 - **Connection**: auth token, TLS (`tls=True`, `{"ca_file": ...}`,
-  `{"verify": False}`), pipelining, lazy reconnect, structured telemetry
+  `{"verify": False}`), pipelining, lazy reconnect (0.5–5 s backoff),
+  structured telemetry; `connect_timeout`/`command_timeout` are seconds
+  > 0. `connect_timeout=None` connects without a client deadline, and
+  `command_timeout=None` or `math.inf` disables the command deadline
 
 Not applicable outside Bun (by design): embedded mode, sandboxed workers,
 `QueueEvents` (in-process subscription; use webhooks or SSE/WS on the HTTP
@@ -202,7 +233,18 @@ from bunqueue import (
 
 The SDK logs its otherwise-silent failure points (swallowed command errors,
 raising listeners, failed registrations) at warning level on the `bunqueue`
-logger; attach a handler to see them.
+logger; attach a handler to see them. A Worker logs each failed pull it
+retries by kind:
+
+- a transient failure (lost connection, timeout, rate limit, lock-wait
+  timeout, `Internal server error`) at debug level;
+- a permanent refusal (auth, validation), retried because an `error`
+  listener is attached, as a warning every time;
+- any other exception, retried the same way, as an error with its traceback.
+
+Each one is also emitted as the Worker's `error` event. Without an `error`
+listener, a permanent refusal or an unexpected exception is not retried:
+`run()` raises it and the Worker closes.
 
 ### Structured telemetry
 

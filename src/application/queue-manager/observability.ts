@@ -1,4 +1,5 @@
 import type { JobId } from '../../domain/types/job';
+import { keepLogsArgument } from '../../domain/job/mutations';
 import type { JobLogEntry } from '../../domain/types/worker';
 import * as logsOps from '../jobLogsManager';
 import { generatePrometheusMetrics, type OperationalMetrics } from '../metricsExporter';
@@ -26,7 +27,9 @@ export class QueueManagerObservability extends QueueManagerStats {
   }
 
   clearLogs(jobId: JobId, keepLogs?: number): void {
-    logsOps.clearJobLogs(jobId, this.contextFactory.getLogsContext(), keepLogs);
+    // 2.9.10's result on every path: <= 0 clears all, a fraction keeps its whole part,
+    // a numeric string is its number; NaN is refused (it used to keep every entry).
+    logsOps.clearJobLogs(jobId, this.contextFactory.getLogsContext(), keepLogsArgument(keepLogs));
   }
 
   getPerQueueStats() {

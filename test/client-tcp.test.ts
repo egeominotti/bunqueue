@@ -10,6 +10,7 @@ import { CommandQueue } from '../src/client/tcp/connection';
 import { TcpClient } from '../src/client/tcp/client';
 import { TcpConnectionPool, getSharedPool, closeAllSharedPools } from '../src/client/tcpPool';
 import { Queue, shutdownManager } from '../src/client';
+import { safeTimeout, type SafeTimer } from '../src/shared/timers';
 
 // ---------------------------------------------------------------------------
 // HealthTracker (health.ts) - pure unit tests
@@ -831,7 +832,9 @@ describe('TcpClient', () => {
     it('should reject pending commands on close', async () => {
       const client = new TcpClient({
         host: 'localhost',
-        port: 99999, // invalid port
+        // Nothing listens on port 1. Out-of-range ports (99999) are now rejected at
+        // construction (test/repro-tcp-client-target-options.test.ts).
+        port: 1,
         autoReconnect: false,
         connectTimeout: 100,
         commandTimeout: 200,
@@ -1161,7 +1164,7 @@ function makePendingCommand(
   command: Record<string, unknown>;
   resolve: (value: Record<string, unknown>) => void;
   reject: (error: Error) => void;
-  timeout: ReturnType<typeof setTimeout>;
+  timeout: SafeTimer;
 } {
   return {
     id,
@@ -1169,6 +1172,7 @@ function makePendingCommand(
     command: { cmd: 'test', reqId },
     resolve: () => {},
     reject: () => {},
-    timeout: setTimeout(() => {}, 60000),
+    // PendingCommand.timeout is the SafeTimer the client arms with safeTimeout.
+    timeout: safeTimeout(() => {}, 60000),
   };
 }

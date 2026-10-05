@@ -17,6 +17,10 @@ impl Connection {
         timeout: Duration,
         events: &mut Vec<TelemetryEvent>,
     ) -> Result<Map> {
+        if let Err(error) = require_positive(timeout, "command_timeout") {
+            record_failure(events, "command", Duration::ZERO, &error);
+            return Err(error);
+        }
         self.connect_locked(inner, events)?;
         inner.request_counter = inner.request_counter.wrapping_add(1) & 0x7fff_ffff;
         let request_id = format!("rust-{}", inner.request_counter);
@@ -72,6 +76,14 @@ impl Connection {
         }
         if inner.closed {
             return Err(Error::Closed);
+        }
+        // A zero Duration is rejected by the socket layer only after the
+        // socket opened, so every call would open and drop a connection.
+        if let Err(error) = require_positive(self.options.connect_timeout, "connect_timeout")
+            .and_then(|()| require_positive(self.options.command_timeout, "command_timeout"))
+        {
+            record_failure(events, "connect", Duration::ZERO, &error);
+            return Err(error);
         }
         if inner.generation >= 0 {
             events.push(TelemetryEvent::Reconnecting {
@@ -199,6 +211,18 @@ impl Connection {
 
     pub(crate) fn teardown_locked(&self, inner: &mut Inner) {
         inner.socket.take();
+    }
+}
+
+/// Reject a zero timeout before it reaches a socket: std refuses it with
+/// InvalidInput, which a round trip treats as a broken stream.
+fn require_positive(timeout: Duration, name: &str) -> Result<()> {
+    if timeout.is_zero() {
+        Err(Error::Connection(format!(
+            "{name} must be greater than zero"
+        )))
+    } else {
+        Ok(())
     }
 }
 

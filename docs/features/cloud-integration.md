@@ -132,7 +132,7 @@ The wire payload is `CloudSnapshot` (`types/snapshot.ts:41-88`) — a large flat
 
 ### Adaptive interval (`cloudAgent.ts:167-186`)
 
-`computeInterval()` chooses the next delay purely from `lastCompressedKB`: `<50KB → 5s`, `<200KB → 10s`, `<500KB → 20s`, else `30s`. `scheduleNext()` re-arms one identity-checked `setTimeout` after each push. A cleared or superseded callback is a no-op and cannot detach the active handle. The configured `intervalMs` is logged at startup but is **not** used for scheduling.
+`computeInterval()` chooses the next delay purely from `lastCompressedKB`: `<50KB → 5s`, `<200KB → 10s`, `<500KB → 20s`, else `30s`. `scheduleNext()` re-arms one identity-checked `setTimeout` after each push. A cleared or superseded callback is a no-op and cannot detach the active handle. The configured `intervalMs` (`BUNQUEUE_CLOUD_INTERVAL_MS`) is validated but **not** used for scheduling; the startup log reports `cadence: 'adaptive 5-30s'`.
 
 ### Remote command path (`wsSender.ts:115-171` → `commandHandler.ts:44-100`)
 
@@ -142,9 +142,27 @@ The wire payload is `CloudSnapshot` (`types/snapshot.ts:41-88`) — a large flat
    `success:false` with `Unknown command:`. The handler receives the resolved
    `CloudQueueAdapter` and `CommandContext`, the raw result is
    `camelKeys`-normalized (PascalCase→camelCase, skipping user-data keys), and
-   wrapped in a `command_result`. `job:list` normalizes `offset` and `limit` to
-   finite non-negative integers and uses a half-open `[start, end)` page on both
-   adapters, matching the unchanged local `QueueManager.getJobs` contract.
+   wrapped in a `command_result`. `job:list` and `job:listAll` normalize `offset`
+   and `limit` to finite non-negative integers (a NaN limit used to return an
+   empty page in `job:listAll`); `job:list` uses a half-open `[start, end)` page on
+   both adapters, matching the unchanged local `QueueManager.getJobs` contract.
+   `job:push` applies the checks TCP PUSH applies to the same fields, in the same
+   order and with the same messages — `validateQueueName`, `validateJobData`
+   (10 MB), then `validateJobOptions({ priority, delay })` — before it touches the
+   adapter, so a remote command cannot create a job the TCP server would reject (a
+   NaN or non-numeric delay or priority). Every value TCP PUSH accepts is accepted
+   (a 2,000,000 or fractional priority, a 400-day delay, a numeric string), and a
+   negative `delay` makes the job ready at once with a past run time, as over TCP. The rejection is
+   returned as `success:false` with that message. `job:delay` requires `delay` and
+   applies TCP ChangeDelay's rule (`assertDelayArgument`: finite, same messages; the
+   engine keeps a negative delay as a past run time); it used to default a missing delay to 0,
+   which made a delayed job ready at once. `job:priority` applies TCP
+   ChangePriority's rule: any finite priority, and a missing one is 0, as on 2.9.10.
+   `job:clearLogs` checks `keepLogs` (`validateKeepLogs`: only NaN or text is refused)
+   before either adapter runs, because the PostgreSQL adapter calls
+   `clearLogsDurable` rather than `QueueManager.clearLogs`: NaN used to keep every
+   log. Both engines then apply `keepLogsArgument` (0 or less clears all, a fraction
+   keeps its whole part), as 2.9.10 did.
    Infrastructure failures from both regular handlers and `snapshot:get` are
    sanitized in the response; their raw detail remains available only in the
    local Cloud error log.
@@ -197,6 +215,16 @@ Coordination in the agent itself is single-threaded JS event-loop based:
 - **Command safety:** only whitelisted actions execute; arguments are taken from optional fields with `?? ''`/defaults, so a missing `queue`/`jobId` becomes an empty-string call rather than a crash (`commands.ts`). Command handler errors are caught and returned as `success:false` rather than tearing down the socket.
 - **WS best-effort send:** `sendRaw` no-ops if not connected and swallows send errors — a command result can be silently dropped if the socket flaps between receipt and reply (`wsSender.ts:93`).
 - **Big-int safety:** lifetime counters are sent as strings in `CloudSnapshot.stats` to survive msgpack/JSON without precision loss (`snapshotCollector.ts:124-138`).
+- **Timestamps are always valid dates:** job timestamps (`runAt`, `createdAt` /
+  `timestamp`, `startedAt` / `processedOn`, `completedAt` / `finishedOn`,
+  `lastHeartbeat`) in snapshots and command results pass through `cloudTimestamp`
+  (`timestamps.ts`). A legacy row's ±Infinity run time is clamped to the last
+  representable instant (±8.64e15 ms, `MAX_DATE_MS`), which keeps its ordering;
+  NaN falls back to the job's creation time. msgpack preserves ±Infinity, and the
+  dashboard's `new Date(Infinity).toISOString()` throws a RangeError.
+- **Worker freshness:** the PostgreSQL adapter's `workerStats.active` uses
+  `workerTimeoutMs()` (`WORKER_TIMEOUT_MS`), like every other
+  worker view; it used to hardcode 30 s.
 - **Metric authority:** PostgreSQL `totalCompleted`/`totalFailed` are durable
   namespace totals. `totalPushed`/`totalPulled`, latency, throughput, memory,
   connections, webhooks, and task/MCP values remain broker/process-local.
@@ -204,33 +232,50 @@ Coordination in the agent itself is single-threaded JS event-loop based:
 ### Known stale / unwired code (verify before relying on)
 
 - `CollectSnapshotParams.includeHeavy` is declared and always passed `true`, but `collectSnapshot` never reads it — the "light every 15s / heavy every 90s" file-header comment is aspirational; **every snapshot is full** (`snapshotCollector.ts:2-6`, `types/collector.ts:38-49`, callers `cloudAgent.ts:145-155`, `cloudAgent.ts:191-201`, `cloudAgent.ts:259-269`).
-- `statsUpdateTimer` is declared and cleared in `stop()` but **never assigned** — there is no live 15s `stats_update` WS push (`cloudAgent.ts:32,128`).
+- There is no live 15s `stats_update` WS push: the agent only sends HTTP snapshots and WS command results (the unused `statsUpdateTimer` field was removed).
 - `buildStatsRefresh` (`statsRefresh.ts`) and `buildStatsUpdate` (`statsUpdate.ts`) are exported but not referenced anywhere in `src`; the `stats:refresh` command uses the selected adapter source. Treat both files as legacy/unwired.
 - Post-command immediate-snapshot trigger is commented out — the dashboard is expected to refresh via WS command results, not via an HTTP re-push (`cloudAgent.ts:100-103`).
 
 ## Configuration
 
-All via `Bun.env`, parsed once in `loadCloudConfig` (`config.ts`). **Defaults below are the actual code defaults.**
+All via `Bun.env` (plus `cloud.url`, `cloud.apiKey` and `cloud.instanceId` in the
+config file), parsed and validated by `resolveCloudConfig` (`src/config/cloud.ts`).
+That is the single parser: the server calls it in `bootServer` before anything
+binds, and `loadCloudConfig` (`config.ts`, used by `CloudAgent.create` in the MCP
+server) is `resolveCloudConfig(null, dataPath)`. The numeric variables must be
+whole numbers in range or the call throws a `ConfigError` naming the variable;
+`resolveServerConfig` also checks them whenever they are set, even with Cloud
+mode off, and `bunqueue-mcp` resolves them before it starts any transport. The
+four switches are booleans (`1/0`, `true/false`, `yes/no`, `on/off`, any case):
+only the exact word `false` used to turn one off, so `BUNQUEUE_CLOUD_REMOTE_COMMANDS=0`
+left remote control enabled. **Defaults below are the actual code defaults.**
 
-| Env var                                    | Default                | Notes                                                                             |
-| ------------------------------------------ | ---------------------- | --------------------------------------------------------------------------------- |
-| `BUNQUEUE_CLOUD_URL`                       | — (required)           | Trailing slashes stripped; `http→ws` for the command socket.                      |
-| `BUNQUEUE_CLOUD_API_KEY`                   | — (required)           | Sent as `Authorization: Bearer …` on both channels.                               |
-| `BUNQUEUE_CLOUD_INSTANCE_ID`               | — (required)           | Missing → error + disabled.                                                       |
-| `BUNQUEUE_CLOUD_SIGNING_SECRET`            | `null`                 | Enables `X-Signature` HMAC-SHA256 over the compressed body.                       |
-| `BUNQUEUE_CLOUD_INSTANCE_NAME`             | `os.hostname()`        | Human-readable label.                                                             |
-| `BUNQUEUE_CLOUD_INTERVAL_MS`               | `15000`                | **Parsed but unused** — actual cadence is adaptive (5–30s) via `computeInterval`. |
-| `BUNQUEUE_CLOUD_INCLUDE_JOB_DATA`          | `true` (`!== 'false'`) | Set to `false` to omit job data.                                                  |
-| `BUNQUEUE_CLOUD_REDACT_FIELDS`             | `[]`                   | Comma-separated top-level keys → `'[REDACTED]'`.                                  |
-| `BUNQUEUE_CLOUD_EVENTS`                    | `[]` (all)             | Comma-separated `eventType` allowlist.                                            |
-| `BUNQUEUE_CLOUD_BUFFER_SIZE`               | `720`                  | Offline snapshot ring-buffer cap.                                                 |
-| `BUNQUEUE_CLOUD_CIRCUIT_BREAKER_THRESHOLD` | `5`                    | Consecutive failures to OPEN.                                                     |
-| `BUNQUEUE_CLOUD_CIRCUIT_BREAKER_RESET_MS`  | `60000`                | OPEN→HALF_OPEN delay.                                                             |
-| `BUNQUEUE_CLOUD_USE_WEBSOCKET`             | `true` (`!== 'false'`) | Command channel.                                                                  |
-| `BUNQUEUE_CLOUD_USE_HTTP`                  | `true` (`!== 'false'`) | Snapshot upload channel.                                                          |
-| `BUNQUEUE_CLOUD_REMOTE_COMMANDS`           | `true` (`!== 'false'`) | Allows the dashboard to mutate this instance; set `false` for read-only.          |
+| Env var                                    | Default          | Notes                                                                                                 |
+| ------------------------------------------ | ---------------- | ----------------------------------------------------------------------------------------------------- |
+| `BUNQUEUE_CLOUD_URL`                       | — (required)     | Trailing slashes stripped; `http→ws` for the command socket.                                          |
+| `BUNQUEUE_CLOUD_API_KEY`                   | — (required)     | Sent as `Authorization: Bearer …` on both channels.                                                   |
+| `BUNQUEUE_CLOUD_INSTANCE_ID`               | — (required)     | Missing → error + disabled.                                                                           |
+| `BUNQUEUE_CLOUD_SIGNING_SECRET`            | `null`           | Enables `X-Signature` HMAC-SHA256 over the compressed body.                                           |
+| `BUNQUEUE_CLOUD_INSTANCE_NAME`             | `os.hostname()`  | Human-readable label.                                                                                 |
+| `BUNQUEUE_CLOUD_INTERVAL_MS`               | `15000`          | Whole ms >= 1. **Validated but not applied**: the cadence is adaptive (5–30 s) via `computeInterval`. |
+| `BUNQUEUE_CLOUD_INCLUDE_JOB_DATA`          | `true` (boolean) | Set to `false` to omit job data.                                                                      |
+| `BUNQUEUE_CLOUD_REDACT_FIELDS`             | `[]`             | Comma-separated top-level keys → `'[REDACTED]'`.                                                      |
+| `BUNQUEUE_CLOUD_EVENTS`                    | `[]` (all)       | Comma-separated `eventType` allowlist.                                                                |
+| `BUNQUEUE_CLOUD_BUFFER_SIZE`               | `720`            | Offline snapshot ring-buffer cap; whole number >= 1 (NaN made it unbounded).                          |
+| `BUNQUEUE_CLOUD_CIRCUIT_BREAKER_THRESHOLD` | `5`              | Consecutive failures to OPEN; whole number >= 1 (NaN never opened it).                                |
+| `BUNQUEUE_CLOUD_CIRCUIT_BREAKER_RESET_MS`  | `60000`          | OPEN→HALF_OPEN delay; whole ms >= 1 (NaN never reset it).                                             |
+| `BUNQUEUE_CLOUD_USE_WEBSOCKET`             | `true` (boolean) | Command channel.                                                                                      |
+| `BUNQUEUE_CLOUD_USE_HTTP`                  | `true` (boolean) | Snapshot upload channel.                                                                              |
+| `BUNQUEUE_CLOUD_REMOTE_COMMANDS`           | `true` (boolean) | Allows the dashboard to mutate this instance; set `false` for read-only.                              |
 
 `dataPath` is not an env var here — it is threaded in from the caller (`CloudAgent.create(qm, dataPath)`).
+
+**Why `BUNQUEUE_CLOUD_INTERVAL_MS` is not wired.** `computeInterval` picks 5, 10, 20
+or 30 s from the last compressed snapshot size, so large instances upload less
+often. A single configured interval would either replace that adaptation or need
+new semantics (a floor or a ceiling) that the variable never documented, so it
+stays reserved: it is validated, kept in `CloudConfig.intervalMs`, and the
+startup log reports `cadence: 'adaptive 5-30s'` instead of the unused value.
 
 ## Related Docs
 

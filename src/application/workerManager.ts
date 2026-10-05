@@ -9,19 +9,17 @@ import {
   type CreateWorkerOptions,
   createWorker,
 } from '../domain/types/worker';
-
-/** Worker timeout - consider dead after this many ms without heartbeat */
-const WORKER_TIMEOUT_MS = parseInt(Bun.env.WORKER_TIMEOUT_MS ?? '30000', 10);
-
-/** Cleanup interval for stale workers */
-const WORKER_CLEANUP_INTERVAL_MS = parseInt(Bun.env.WORKER_CLEANUP_INTERVAL_MS ?? '60000', 10);
+import { safeInterval, type SafeTimer } from '../shared/timers';
+import { workerCleanupIntervalMs, workerTimeoutMs } from '../shared/workerTimeouts';
 
 /**
- * Worker Manager
+ * Worker Manager. Liveness uses WORKER_TIMEOUT_MS and the stale sweep runs every
+ * WORKER_CLEANUP_INTERVAL_MS (`shared/workerTimeouts.ts`); the constructor reads both,
+ * so a malformed value fails QueueManager construction instead of spinning the sweep.
  */
 export class WorkerManager {
   private readonly workers = new Map<WorkerId, Worker>();
-  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private cleanupInterval: SafeTimer | null = null;
   private dashboardEmit: ((event: string, data: Record<string, unknown>) => void) | null = null;
 
   /** Running counters for O(1) stats - avoids O(n) reduce operations */
@@ -30,6 +28,7 @@ export class WorkerManager {
   private totalActiveJobsCounter = 0;
 
   constructor() {
+    workerTimeoutMs();
     this.startCleanup();
   }
 
@@ -194,28 +193,30 @@ export class WorkerManager {
   /** List active workers (seen recently) */
   listActive(): Worker[] {
     const now = Date.now();
-    return Array.from(this.workers.values()).filter((w) => now - w.lastSeen < WORKER_TIMEOUT_MS);
+    const timeoutMs = workerTimeoutMs();
+    return Array.from(this.workers.values()).filter((w) => now - w.lastSeen < timeoutMs);
   }
 
   /** Get workers for a specific queue (only active workers with recent heartbeat) */
   getForQueue(queue: string): Worker[] {
     const now = Date.now();
+    const timeoutMs = workerTimeoutMs();
     return Array.from(this.workers.values()).filter(
-      (w) => w.queues?.includes(queue) && now - w.lastSeen < WORKER_TIMEOUT_MS
+      (w) => w.queues?.includes(queue) && now - w.lastSeen < timeoutMs
     );
   }
 
   /** Start cleanup interval */
   private startCleanup(): void {
-    this.cleanupInterval = setInterval(() => {
+    this.cleanupInterval = safeInterval(() => {
       this.cleanupStale();
-    }, WORKER_CLEANUP_INTERVAL_MS);
+    }, workerCleanupIntervalMs());
   }
 
   /** Remove stale workers */
   private cleanupStale(): void {
     const now = Date.now();
-    const staleTimeout = WORKER_TIMEOUT_MS * 3; // Give extra time before removal
+    const staleTimeout = workerTimeoutMs() * 3; // Give extra time before removal
 
     for (const [id, worker] of this.workers) {
       if (now - worker.lastSeen > staleTimeout) {
@@ -230,7 +231,7 @@ export class WorkerManager {
   /** Stop cleanup */
   stop(): void {
     if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
+      this.cleanupInterval.clear();
       this.cleanupInterval = null;
     }
   }
@@ -238,12 +239,13 @@ export class WorkerManager {
   /** Get stats - O(n) only for active count, O(1) for other metrics */
   getStats() {
     const now = Date.now();
+    const timeoutMs = workerTimeoutMs();
     let activeWorkers = 0;
     let concurrencySlots = 0;
 
     // Only iterate once for time-based active count and configured capacity.
     for (const worker of this.workers.values()) {
-      if (now - worker.lastSeen < WORKER_TIMEOUT_MS) {
+      if (now - worker.lastSeen < timeoutMs) {
         activeWorkers++;
         concurrencySlots += worker.concurrency;
       }

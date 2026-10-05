@@ -30,12 +30,12 @@ Add a single job to a queue.
   queue: string,          // Queue name (required, max 256 chars, alphanumeric/underscore/dash/dot/colon)
   name: string,           // Job name metadata (required for protocol v3 clients)
   data: any,              // Untouched user payload (required, max 10 MB)
-  priority?: number,      // Ungrouped: higher first. With groupId: 0 first, then ascending (0..2097151)
-  delay?: number,         // Delay in ms before processing (default: 0, max: 1 year)
-  maxAttempts?: number,   // Max retry attempts (default: 3, range: 1-1000)
-  backoff?: number,       // Retry backoff delay in ms (default: 1000, max: 1 day)
-  ttl?: number,           // Time-to-live in ms (max: 1 year)
-  timeout?: number,       // Processing timeout in ms (max: 1 day)
+  priority?: number,      // Ungrouped: any finite number, higher first. With groupId: 0 first, then ascending (0..2097151)
+  delay?: number,         // Delay in ms before processing (default: 0; negative = ready, past run time)
+  maxAttempts?: number,   // Max attempts (default: 3; 1 or less runs once, fraction rounds up, max 2147483647)
+  backoff?: number,       // Retry backoff delay in ms (default: 1000; each retry capped at 1 h or maxDelay)
+  ttl?: number,           // Time-to-live in ms (>= 0)
+  timeout?: number,       // Processing timeout in ms (>= 0; 0 = none)
   uniqueKey?: string,     // Deduplication key
   jobId?: string,         // Custom job ID (idempotent)
   dependsOn?: string[],   // Job IDs this job depends on
@@ -64,18 +64,30 @@ Add a single job to a queue.
   ignoreDependencyOnFailure?: boolean,
   continueParentOnFailure?: boolean,
   // Advanced options:
-  stallTimeout?: number,  // Stall detection timeout in ms (max: 1 day)
-  stackTraceLimit?: number, // Cap on stored stack trace lines
-  keepLogs?: number,      // Cap on stored log entries
-  sizeLimit?: number,     // Max serialized data size for this job
-  dedup?: { ttl?: number, extend?: boolean, replace?: boolean }, // Dedup options (uniqueKey carries the id)
+  stallTimeout?: number,  // Stall detection timeout in ms (finite)
+  stackTraceLimit?: number, // Cap on stored stack trace lines (finite)
+  keepLogs?: number,      // BullMQ metadata, stored as given (finite)
+  sizeLimit?: number,     // BullMQ metadata, stored as given (finite)
+  dedup?: { ttl?: number, extend?: boolean, replace?: boolean }, // Dedup options (uniqueKey carries the id); ttl finite
   debounceId?: string,    // Debounce identifier
-  debounceTtl?: number,   // Debounce window in ms
-  timestamp?: number      // Explicit creation timestamp
+  debounceTtl?: number,   // Debounce window in ms (finite)
+  timestamp?: number      // Explicit creation timestamp (within ±4,320,000,000,000,000)
 }
 ```
 
-The `backoff` field also accepts an object form: `{ type: 'fixed' | 'exponential', delay: number, maxDelay?: number }`. `maxDelay` caps each computed retry delay for that job (default: 1 hour when omitted). `delay` and `maxDelay` must be finite numbers between 0 and 86,400,000 ms (1 day); `maxDelay: null` is treated as omitted, and any other invalid value fails the command. The same rule applies to every job in `PUSHB` and `PUSHF`.
+Every numeric option must be a finite number (a numeric string such as `"3"` counts as
+its number; `repeat.every` must also be positive); `timeout` and `ttl`
+cannot be negative; `maxAttempts` of 1 or less runs the job once and `Infinity` is
+stored as 2,147,483,647. A
+violation fails the command with `{ ok: false, error }` naming the field, for example
+`timeout must be at least 0` or `delay must be a finite number`. Every value 2.9.10
+accepted in either mode is accepted with its 2.9.10 result; durations above about
+136,900 years (4.32e15 ms) are clamped. Durations may be fractional. A negative `delay`
+keeps its past run time, as in 2.9.10: the job is ready at once (never `delayed`) and
+runs ahead of ready jobs with a later run time. Embedded `Queue.add`, `addBulk`, flows and job schedulers apply the same
+rules (their messages name the SDK option, such as `attempts`).
+
+The `backoff` field also accepts an object form: `{ type: 'fixed' | 'exponential', delay?: number, maxDelay?: number }` (any other `type` runs as exponential, as in 2.9.10). `maxDelay` caps each computed retry delay for that job (default: 1 hour when omitted). A missing `delay` is the 1000 ms default base; a given one must be a finite number of at least 0; `maxDelay` must be a finite number between 0 and 86,400,000 ms (1 day); `maxDelay: null` is treated as omitted, and any other invalid value fails the command. The same rule applies to every job in `PUSHB` and `PUSHF`.
 
 **Response:**
 
@@ -113,7 +125,8 @@ Batch push multiple jobs to a queue.
     lifo?: boolean,
     removeOnComplete?: boolean,
     removeOnFail?: boolean,
-    durable?: boolean
+    durable?: boolean,
+    // ...and every other PUSH option (stallTimeout, timestamp, dedup, ...)
   }>
 }
 ```
@@ -199,7 +212,7 @@ Pull the next available job from a queue. Supports optional long polling and loc
   queue: string,
   timeout?: number,    // Long poll timeout in ms (0-60000, default: 0)
   owner?: string,      // Client identifier for lock-based pull
-  lockTtl?: number,    // Lock TTL in ms (default: 30000)
+  lockTtl?: number,    // Lock TTL in ms (default: 30000; any finite number, as in 2.9.10)
   detach?: boolean,    // Don't auto-release the job when this connection closes (CLI usage; ignored with owner)
   group?: { concurrency?: number, limit?: { max: number, duration: number } }
 }
@@ -234,10 +247,15 @@ Batch pull multiple jobs from a queue.
   count: number,       // Number of jobs to pull (1-1000)
   timeout?: number,    // Long poll timeout in ms (0-60000, default: 0), with or without owner
   owner?: string,      // Client identifier for lock-based pull
-  lockTtl?: number,    // Lock TTL in ms (default: 30000)
+  lockTtl?: number,    // Lock TTL in ms (default: 30000; any finite number, as in 2.9.10)
   group?: { concurrency?: number, limit?: { max: number, duration: number } }
 }
 ```
+
+A `lockTtl` that is not a finite number (`lockTtl must be a number`, `lockTtl must be a
+finite number`) fails the command before any job is claimed; NaN or an infinity would be
+a lease that never expires. Every finite value is granted as given, as in 2.9.10 (a
+2.9.10 Worker with `lockDuration: 0` sends `lockTtl: 0`).
 
 **Response (without owner):**
 
@@ -425,6 +443,11 @@ Extend the lock TTL on an active job (lock-based processing).
 { cmd: 'ExtendLock', id: string, duration: number, token?: string }
 ```
 
+`duration` is the new lease length from now: any finite number, applied as given (as in
+2.9.10; 0 or less ends the lease now). An omitted `duration` keeps the lease's current
+TTL; NaN, an infinity or a non-number fails with `duration must be ...` and leaves the
+lease unchanged.
+
 **Response:** `{ ok: true }` or `{ ok: false, error: 'Lock not found or invalid token' }`
 
 ---
@@ -438,6 +461,9 @@ Batch variant of `ExtendLock` (positional arrays, same order).
 ```typescript
 { cmd: 'ExtendLocks', ids: string[], tokens: string[], durations: number[] }
 ```
+
+Each duration follows the `ExtendLock` rule. One invalid entry fails the whole
+command with `durations[i]: duration must be ...` before any lease is extended.
 
 **Response:**
 
@@ -454,6 +480,11 @@ Batch variant of `ExtendLock` (positional arrays, same order).
 Change the delay of a delayed job (recomputes `runAt`).
 
 **Request:** `{ cmd: 'ChangeDelay', id: string, delay: number, token?: string }`
+
+`delay` (ms from now) is required and must be a finite number (a numeric string counts
+as its number). As with the `PUSH` `delay` and as in 2.9.10, a negative value makes the
+job ready at once with a past run time (ahead of later ready jobs); a PostgreSQL broker
+applies it as "now", as it did on 2.9.10. NaN or an infinity fails the command (`delay must be a finite number`).
 
 `token` is required when the job is active and currently leased. Worker
 processor Job objects forward their current delivery token automatically;
@@ -491,6 +522,11 @@ Promote all (or up to `count`) delayed jobs in a queue to waiting.
 Clear a job's log entries, optionally keeping the most recent N.
 
 **Request:** `{ cmd: 'ClearLogs', id: string, keepLogs?: number }`
+
+`keepLogs` is the number of most recent entries to keep, applied as in 2.9.10: omitted,
+`0` or a negative value clears every entry, a fraction keeps its whole part (`2.5` keeps
+2), a numeric string counts as its number and a value above the entry count keeps them
+all. NaN or text fails with `keepLogs must be a number` and leaves the logs unchanged.
 
 **Response:** `{ ok: true }`
 

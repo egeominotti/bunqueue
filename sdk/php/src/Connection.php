@@ -40,15 +40,19 @@ final class Connection
     /** @var (callable(array<string, mixed>): void)|null */
     private $onEvent;
 
-    /** @param array{host?: string, port?: int, token?: string, tls?: bool|array, connectTimeout?: float, commandTimeout?: float, onEvent?: callable} $options */
+    /**
+     * Timeouts: finite seconds > 0, capped at OptionGuard::MAX_TIMEOUT_S; else \InvalidArgumentException.
+     *
+     * @param array{host?: string, port?: int, token?: string, tls?: bool|array, connectTimeout?: int|float, commandTimeout?: int|float, onEvent?: callable} $options
+     */
     public function __construct(array $options = [])
     {
         $this->host = $options['host'] ?? 'localhost';
         $this->port = $options['port'] ?? 6789;
         $this->token = $options['token'] ?? null;
         $this->tls = $options['tls'] ?? false;
-        $this->connectTimeout = $options['connectTimeout'] ?? 10.0;
-        $this->commandTimeout = $options['commandTimeout'] ?? 30.0;
+        $this->connectTimeout = OptionGuard::seconds($options['connectTimeout'] ?? 10.0, 'connectTimeout');
+        $this->commandTimeout = OptionGuard::seconds($options['commandTimeout'] ?? 30.0, 'commandTimeout');
         $callback = $options['onEvent'] ?? null;
         if ($callback !== null && !\is_callable($callback)) {
             throw new \InvalidArgumentException('onEvent must be callable');
@@ -79,6 +83,7 @@ final class Connection
     /** Send a command and return the decoded response. Throws on `ok: false`. */
     public function call(array $command, ?float $timeout = null): array
     {
+        $timeout = $timeout === null ? $this->commandTimeout : OptionGuard::seconds($timeout, 'timeout');
         $started = microtime(true);
         $name = (string) ($command['cmd'] ?? '');
         try {
@@ -86,7 +91,7 @@ final class Connection
                 $this->connect();
             }
             $command['reqId'] = 'php-' . (++$this->reqCounter);
-            $response = $this->roundTrip($command, $timeout ?? $this->commandTimeout);
+            $response = $this->roundTrip($command, $timeout);
             if (($response['ok'] ?? false) !== true) {
                 throw new CommandException((string) ($response['error'] ?? 'unknown server error'));
             }

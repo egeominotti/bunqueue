@@ -16,18 +16,32 @@ if (import.meta.main) {
   // boots the same full server (shared bootstrap). Every other first argument
   // is a CLI command: known ones execute, unknown ones print
   // "Unknown command: X" and exit 1 — a typo must never silently boot a server.
-  if (!firstArg) {
-    void startServer();
-  } else {
-    void import('./cli/index').then(({ main }) => main());
-  }
+  const run = firstArg ? import('./cli/index').then(({ main }) => main()) : startServer();
+  void run.catch(exitOnConfigError);
 }
 
-import { Logger, type LogLevel } from './shared/logger';
-import { loadConfigFile, resolveServerConfig } from './config';
+import { Logger } from './shared/logger';
+import { ConfigError, loadConfigFile, resolveServerConfig } from './config';
+import { logFormatWord, logLevelWord } from './config/text';
 import { bootServer } from './infrastructure/server/bootstrap';
 export { defineConfig } from './config';
 export type { BunqueueConfig } from './config';
+
+/**
+ * A configuration error is the operator's input, not a bug: print one
+ * `Fatal error: <message>` line (or `{ ok: false, error }` with --json) and exit 1, as
+ * the `bunqueue` CLI entry does. Any other error is re-thrown, so a real crash keeps
+ * its stack trace.
+ */
+function exitOnConfigError(error: unknown): never {
+  if (!(error instanceof ConfigError)) throw error;
+  if (process.argv.includes('--json')) {
+    console.error(JSON.stringify({ ok: false, error: error.message }, null, 2));
+  } else {
+    console.error(`Fatal error: ${error.message}`);
+  }
+  process.exit(1);
+}
 
 /** Start the server (direct mode) */
 async function startServer(): Promise<void> {
@@ -40,16 +54,11 @@ async function startServer(): Promise<void> {
 // Logger env-var bootstrap only applies when this file is the entry point.
 // Imported consumers (e.g. user config files using `defineConfig`) must not
 // have their process Logger state mutated as a side effect — see Issue #85.
+// LOG_FORMAT / LOG_LEVEL apply from the first line (any case, aliases such as
+// `warning` / `trace`). An unknown word is ignored here: a server reports it as a warning
+// (see src/config/logging.ts, which also explains why JSON set here stays on).
 if (import.meta.main) {
-  if (Bun.env.LOG_FORMAT === 'json') {
-    Logger.enableJsonMode();
-  }
-
-  if (Bun.env.LOG_LEVEL) {
-    const validLevels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
-    const level = Bun.env.LOG_LEVEL.toLowerCase();
-    if (validLevels.includes(level as LogLevel)) {
-      Logger.setLevel(level as LogLevel);
-    }
-  }
+  if (logFormatWord(Bun.env.LOG_FORMAT) === 'json') Logger.enableJsonMode();
+  const level = logLevelWord(Bun.env.LOG_LEVEL);
+  if (level !== undefined) Logger.setLevel(level);
 }

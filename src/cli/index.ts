@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { stdoutColorEnabled } from '../shared/colorSupport';
 import { executeCommand } from './client';
 import { executeBackupCommand, isBackupCommand } from './commands/backup';
 import { formatDoctorText, runDoctor } from './commands/doctor';
@@ -113,7 +114,7 @@ export async function main(): Promise<void> {
   }
 
   if (options.help) {
-    const help = helpFor(command, !options.json);
+    const help = helpFor(command, !options.json && stdoutColorEnabled());
     finish(
       {
         exitCode: 0,

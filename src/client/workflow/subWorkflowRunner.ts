@@ -1,8 +1,7 @@
+import { clampTimerDelay } from '../../shared/timers';
 import { clock } from './clock';
 import { assertWorkflowActive } from './executionFence';
 import type { Execution } from './types';
-
-const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export interface SubWorkflowRunOptions {
   pollIntervalMs?: number;
@@ -57,13 +56,21 @@ export async function executeSubWorkflow(
       );
     }
     const remaining = maxWaitMs - (clock().now() - startedAt);
+    if (Number.isNaN(remaining)) {
+      // A corrupted start time: the budget cannot be measured, so fail the node.
+      throw new Error(
+        `Sub-workflow "${workflowName}" (${handle.id}) has an invalid start time ` +
+          `(${String(startedAt)})`
+      );
+    }
     if (remaining <= 0) {
       throw new Error(
         `Sub-workflow "${workflowName}" (${handle.id}) timed out after ${maxWaitMs}ms`
       );
     }
+    // A poll longer than one native timer wakes early; the loop re-checks `remaining`.
     await new Promise<void>((resolve) =>
-      clock().setTimeout(() => resolve(), Math.min(pollIntervalMs, remaining, MAX_TIMER_DELAY_MS))
+      clock().setTimeout(() => resolve(), clampTimerDelay(Math.min(pollIntervalMs, remaining)))
     );
     assertActive();
   }

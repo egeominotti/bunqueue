@@ -16,6 +16,7 @@ import {
 import type { Response } from '../../../../domain/types/response';
 import * as response from '../../../../domain/types/response';
 import { VERSION } from '../../../../shared/version';
+import { validateLockDuration } from '../../protocol';
 import type { HandlerContext } from '../../types';
 
 export { PROTOCOL_VERSION };
@@ -101,6 +102,10 @@ export function handleJobHeartbeat(
   context: HandlerContext,
   requestId?: string
 ): Response | Promise<Response> {
+  // A lease duration, when given: 0 keeps meaning "heartbeat without renewing the TTL".
+  const durationError =
+    command.duration === 0 ? null : validateLockDuration(command.duration, 'duration');
+  if (durationError) return response.error(durationError, requestId);
   const id = jobId(command.id);
   const manager = context.queueManager as typeof context.queueManager & {
     heartbeatDurable?: (id: JobId, token?: string, duration?: number) => Promise<boolean>;

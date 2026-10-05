@@ -5,6 +5,191 @@ All notable changes to `bunqueue-client` (TypeScript SDK) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-10-05
+
+Bun and Node.js run a timer whose delay is `NaN`, negative or above 2^31 - 1 ms
+(about 24.8 days) after about 1 ms. Durations reached timers from options
+without validation, so a typo became a hot loop, a spurious timeout or a stuck
+job. Both entries now validate durations and counts where they enter, and arm
+every timer through the shared helpers, which honour any delay.
+
+### Security
+
+- Default entry: shared TCP pools and clients are keyed by every connection
+  option and the full 64-bit hash of the token (never the token itself). The
+  previous key used a 16-bit token fingerprint (about 1,900 distinct values),
+  so two callers with different auth tokens could share a pool, and the second
+  caller's commands ran authenticated as the first. Callers with equal options
+  still share a pool; callers with different timeouts or ping and reconnect
+  settings now get separate pools, so they open more connections.
+
+### Fixed
+
+Default entry (`bunqueue-client`, compiled from the bunqueue client):
+
+- The portable `sleep` and the Node.js connect timeout honour durations above
+  about 24.8 days. Before, they fired after about 1 ms.
+- `job.waitUntilFinished()` and `Queue.waitJobUntilFinished()` TTLs above
+  about 24.8 days hold for the whole TTL. Before, the wait rejected with
+  `timed out after <ttl>ms` within milliseconds. This is the bunqueue 2.9.10
+  fix, which 0.2.2 did not include.
+- Durations and counts are checked at construction, keeping every 0.2.2
+  result that was not broken: a plain-digit string is its number
+  (`port: process.env.PORT`), a fraction rounds as 0.2.2's comparisons did
+  (`concurrency: 2.5` runs 3), a negative or `NaN` interval that 0.2.2 guarded
+  with `> 0` means disabled, an option the active mode does not use is not
+  checked, and `undefined` and `null` mean the default. Values 0.2.2 could not
+  run with (a hot loop, a ~1 ms timer, a lease that is already expired, a pull
+  loop that never processes) throw a `TypeError` or `RangeError` naming the
+  owner and the option, for example
+  `Worker: heartbeatInterval must be a finite number of milliseconds >= 1 (got 0.5)`.
+  The rules cover `ConnectionOptions` and pool options (`poolSize` up to
+  65535), `Worker`, `SandboxedWorker`, `Queue` `autoBatch` and the `Bunqueue`
+  Simple Mode options.
+- In TCP mode a synchronous Queue method (`pause()`, `remove()`,
+  `setDlqConfig()`, the rate-limit setters and the others) no longer ends the
+  process when the broker is unreachable: the failure is logged as one line
+  naming the command and the queue, or emitted on Simple Mode's `error` event
+  while a listener is attached.
+- A Worker whose pull is refused backs off (100 ms to 30 s) and retries,
+  instead of idling as if the queue were empty. A permanent refusal (a bad
+  token) goes to the `error` listener, or else to one `console.error` line a
+  minute, and never ends the process.
+- Connection races: `close()` during `connect()` wins, and the attempt closes
+  its socket. A socket that hits the connect timeout is closed, and events
+  from a stale socket no longer reach the current connection. `close()` inside
+  a `'reconnecting'` listener no longer reconnects.
+
+Legacy entry (`bunqueue-client/legacy`). Every timer that takes an option
+value now honours delays beyond 24.8 days. Where an option accepts `Infinity`,
+no timer is armed.
+
+- A `heartbeatIntervalS` above about 24.8 days (2147484 s or more) sent a
+  `Heartbeat` about every millisecond.
+- A `commandTimeoutMs` or per-call `timeoutMs` beyond the limit timed out
+  every command at once. After three timeouts this also forced a reconnect.
+  `commandTimeoutMs: Infinity` now means no client-side deadline.
+- A `connectTimeoutMs`, `ackBatch.maxDelayMs`, Simple Mode retry delay,
+  `circuitBreaker.resetTimeout`, `batch.timeout`, `cancel()` grace period,
+  `priorityAging.interval` or rate-limit window beyond the limit fired after
+  about 1 ms. `circuitBreaker.resetTimeout: Infinity` now stays open until
+  `resetCircuit()`.
+- A Worker with `pollTimeoutMs: 0` re-polled an empty queue at once: 8,244
+  `PULLB` per second against a local broker, until the broker's rate limiter
+  cut it off. After an empty pull the Worker now pauses as the default entry
+  does: 50 ms with `pollTimeoutMs: 0` (19 `PULLB`/s), 10 ms after a long poll.
+- `maxInFlight: NaN` parked every command forever. `new ConnectionPool(NaN)`
+  built a pool with no connection, and `new ConnectionPool(Infinity)` threw
+  `Invalid array length`.
+- A Worker `pollTimeoutMs` or `lockTtlMs` of `NaN` made every `PULLB` fail
+  serialization. The Worker emitted `error` every 200 ms and never pulled a job.
+  A negative `pollTimeoutMs` was sent to the broker, which rejected every pull.
+  `queue.waitForJob(id, NaN)` failed with a generic `SerializationError`.
+- Simple Mode retry backoffs saturate at `Number.MAX_SAFE_INTEGER` ms. Before,
+  `exponential`, `jitter` and `fibonacci` overflowed to `Infinity` (a retry
+  after about 1 ms), or to `NaN` with a zero base delay.
+- Simple Mode: when `retry.customBackoff` returns `Infinity` or a value that
+  is neither a number nor a numeric string, the job fails with a `RangeError`
+  or `TypeError` whose `cause` is the processor error. Before, the job retried
+  after about 1 ms. `NaN`, a negative number, `undefined` and `null` still
+  retry at once, as in 0.2.2.
+- `cancel()` and `close()` end a pending Simple Mode retry wait with
+  `Job cancelled`.
+- Simple Mode: a processor or middleware that throws synchronously, with or
+  without `retry`, is handled like a rejection. Before, the circuit breaker did
+  not count it, `retry` skipped the remaining attempts, and the job's
+  cancellation registration was never released (one leaked entry per job). A
+  throwing circuit-breaker hook (`onOpen`, `onClose`) no longer skips that
+  release either. This mirrors the bunqueue client fix.
+- Priority aging runs at most one tick at a time. A failed job scan is skipped
+  instead of raising an unhandled rejection, which ends a Node.js process by
+  default.
+- The SDK clamps of `sdk/CLAUDE.md` rule 4 and the protocol spec hold
+  for every number, and never throw for one.
+  - `heartbeatIntervalS`: `0`, negative, `NaN`, `±Infinity` or a non-number
+    disables heartbeats; any positive period is honoured.
+  - `batchSize`: clamped to [1, 1000]; `NaN`, `±Infinity` or a non-number
+    means 10.
+  - `pollTimeoutMs`: clamped to [0, 30000]; `NaN` means 5000.
+  - `waitForJob()` ttl: clamped to [0, 600000]; `NaN` means 30000.
+  - `Bunqueue` `heartbeatInterval` and `pollTimeout` are forwarded under the
+    same rules.
+  The default entry has its own rules for these options; `LEGACY.md` lists
+  the differences.
+- Option values that 0.2.2 turned into a hot loop, a hang, a crash or a timer
+  firing after about 1 ms now throw in the constructor, with a `TypeError` or
+  `RangeError` that names the option, for example
+  `Queue: commandTimeoutMs must be a finite number of milliseconds >= 1 or Infinity (got 0)`.
+  Every other value keeps its 0.2.2 result. `LEGACY.md` ("Option validation")
+  lists each option.
+  - `Connection`, `Queue`, `ConnectionPool`: a `connectTimeoutMs` or
+    `commandTimeoutMs` of 0, negative or `NaN` (every attempt or command timed
+    out after about 1 ms), `connectTimeoutMs: Infinity`, `maxInFlight: NaN`,
+    and a pool size of `NaN`, `Infinity` or above 65535.
+  - `Worker`: a `concurrency` that is `NaN` or fractional (the pull loop sent
+    invalid counts and emitted `error` every 200 ms) or `Infinity` (worker
+    registration failed serialization), and a `lockTtlMs` that is `NaN`,
+    below 1 or `Infinity`.
+  - `Bunqueue`: a `priorityAging.interval` that is `NaN`, below 1 ms or
+    `Infinity` (a 1 ms spin), `priorityAging.maxScan: Infinity`, a string
+    `priorityAging.boost`, a rate limit `max` that is 0, negative, `NaN` or
+    omitted (it waited forever on a 1 ms poll), and `duration: Infinity`.
+  - `Infinity` where it does not mean "never": `ackBatch.maxDelayMs`,
+    `retry.delay`, `batch.timeout` and the `cancel()` grace period.
+
+### Changed
+
+Behavior changes to check when upgrading the legacy entry. Every option value
+that worked in 0.2.2 keeps its 0.2.2 result: a numeric string is read as its
+number, a negative `maxInFlight` is unbounded, a fractional pool size is
+floored, a `retry.maxAttempts` of 0 is one attempt, an unknown
+`retry.strategy` is a fixed delay, and a `NaN` or negative one-shot delay runs
+at once. Only the following change:
+
+- The values listed under "Fixed" throw at construction instead of failing
+  later.
+- `concurrency` below 1 throws a `RangeError` (still an `Error`) whose message
+  contains 0.2.2's `concurrency must be >= 1`, now prefixed with `Worker: ` and
+  followed by the received value.
+- A negative `pollTimeoutMs` clamps to 0, and a `NaN` one means 5000. Both used
+  to fail every pull.
+- A numeric string `lockTtlMs` or rate limit `duration` is read as its number.
+  0.2.2 sent the string to the broker, or appended it to the wait and then
+  polled every millisecond.
+- A string that is not a number throws a `TypeError` where 0.2.2 fed it to a
+  timer, for example `cancel(id, 'soon')`.
+- Long durations are honoured. For example, a 30-day `resetTimeout` no longer
+  half-opens after about 1 ms.
+
+### Tests
+
+- Seven deterministic `bun:test` files now run in `bun run test:property`.
+  Five pin the fixes: `tests/legacy-connection-durations.test.ts`,
+  `tests/legacy-worker-durations.test.ts`,
+  `tests/legacy-simple-mode-durations.test.ts`,
+  `tests/legacy-simple-mode-validation.test.ts` and
+  `tests/legacy-simple-mode-sync-throw.test.ts`; 50 of their 59 cases fail
+  against 0.2.2. Two pin 0.2.2 compatibility:
+  `tests/legacy-compat-options.test.ts` and
+  `tests/legacy-compat-simple-mode.test.ts`; all 39 cases pass against 0.2.2.
+- `tests/e2e-durations.ts` and `tests/e2e-legacy-compat.ts`, registered in
+  `tests/e2e.ts`, run the built package against a real broker on Bun, Node.js
+  and Deno. All five `e2e-durations` cases failed before the fix (336
+  heartbeats in about 600 ms on Bun, 333 on Node.js; 8,244 `PULLB`/s). All five
+  `e2e-legacy-compat` cases pass against the 0.2.2 package and broker.
+
+### Development
+
+- `bun run typecheck`, part of `bun run check` (and so of CI), checks every
+  source with the compiler options of the build's declaration emit
+  (`tsconfig.json`). It also checks the legacy entry with NodeNext and only
+  Node.js types (`tsconfig.legacy.json`), which enforces explicit `.js`
+  imports and no `Bun` globals. Before, `tsc -p tsconfig.json` failed with 43
+  `rootDir` and resolution errors.
+- `connection.ts` and `queue-query.ts` are split (`connection-base.ts`,
+  `queue-counts.ts`) to keep every source file within 250 lines. The public API
+  is unchanged.
+
 ## [0.2.2] - 2026-10-03
 
 ### Added

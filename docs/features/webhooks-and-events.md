@@ -57,7 +57,9 @@ External / runtime (Bun):
 ```ts
 // webhookManager.ts
 class WebhookManager {
-  constructor(options?: { validateUrls?: boolean });           // default: validate ON
+  constructor(options?: { validateUrls?: boolean });           // default: validate ON; reads WEBHOOK_* (throws if invalid)
+  setDeliveryPolicy(policy: WebhookDelivery): void;            // { maxRetries, retryDelayMs }, validated
+  getDeliveryPolicy(): WebhookDelivery;
   setDashboardEmit(cb: (event: string, data: Record<string, unknown>) => void): void;
   add(url: string, events: string[], queue?: string, secret?: string): Webhook; // throws on bad URL
   remove(id: WebhookId): boolean;
@@ -80,7 +82,7 @@ class EventsManager {
   subscribe(callback: EventSubscriber,
             batchCallback?: EventBatchSubscriber): () => void; // returns unsubscribe fn
   clear(): void;                                               // shutdown: resolves all waiters
-  waitForJobCompletion(jobId: JobId, timeoutMs: number): Promise<boolean>; // true=done, false=timeout
+  waitForJobCompletion(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<boolean>; // true=done, false=timeout/abort
   needsBroadcast(): boolean;                                   // batch fast-path check
   broadcast(event: Partial<JobEvent> & { eventType; queue; jobId; timestamp; error? }): void;
   broadcastBatch(events: readonly JobEvent[]): void;
@@ -228,7 +230,7 @@ for the moves without a job event (see [Client SDK: Queue](./client-queue-sdk.md
 
 1. `trigger` builds the `WebhookPayload`, filters webhooks by `enabled && events.includes(event) && (queue === null || queue === eventQueue)`, then fires each `sendWebhook` fire-and-forget (`webhookManager.ts:115`).
 2. `sendWebhook` POSTs JSON with headers `Content-Type: application/json`, `X-Webhook-Event`, `X-Webhook-Timestamp`, and — if a secret is set — `X-Webhook-Signature` = hex HMAC-SHA256 of the body (`webhookManager.ts:128`).
-3. Up to `maxRetries` attempts. A 2xx response sets `lastTriggered`, increments `successCount`, emits `webhook:fired`, and returns. Non-2xx or thrown errors record `lastError`; between attempts it sleeps `retryDelay * (attempt + 1)` (linear backoff). After exhausting retries it increments `failureCount`, emits `webhook:failed`, and throws (the throw is caught by the fire-and-forget caller) (`webhookManager.ts:142`).
+3. Up to `maxRetries` attempts (the count includes the first try), taken from the delivery policy in effect when the delivery starts. A 2xx response sets `lastTriggered`, increments `successCount`, emits `webhook:fired`, and returns. Non-2xx or thrown errors record `lastError`; between attempts it sleeps `retryDelayMs * (attempt + 1)` (linear backoff; `Bun.sleep` honours any validated delay). After exhausting retries it increments `failureCount`, emits `webhook:failed`, and throws (the throw is caught by the fire-and-forget caller).
 
 ### Job logs
 
@@ -273,7 +275,8 @@ its remaining untransferred leases; expired protected cron leases are discarded.
   they are lost on broker restart.
 - **Fixed 10 s per-request timeout** via `AbortSignal.timeout(10000)`; linear (not exponential) inter-attempt backoff.
 - **`hasEnabledWebhooks` / `getStats` are O(1)** thanks to the `enabledCount` running counter maintained in `add`/`remove`/`setEnabled` (`webhookManager.ts:39`).
-- **Completion-waiter memory safety:** `waitForJobCompletion` registers a timer that, on timeout, marks the waiter `cancelled`, splices it out, and deletes empty arrays — preventing a leak when `WaitJob` times out without completion (`eventsManager.ts:78`). `clear()` resolves all outstanding non-cancelled waiters on shutdown.
+- **Completion-waiter memory safety:** `waitForJobCompletion` registers a timer that, on timeout, marks the waiter `cancelled`, splices it out, and deletes empty arrays — preventing a leak when `WaitJob` times out without completion (`eventsManager.ts:78-117`). `clear()` resolves all outstanding non-cancelled waiters on shutdown.
+- **Wait timeout validation:** this is the public `QueueManager.waitForJobCompletion` path (TCP/HTTP `WaitJob` validate 0..600000 and MCP 100..30000 before calling it). `timeoutMs` must be a finite number >= 0: `0` resolves `false` on the next tick, and a timeout above 2^31 - 1 ms is honoured through `safeTimeout`. NaN, a negative value, `Infinity` (a waiter that could outlive any job) or a non-number throws a `RangeError`/`TypeError` synchronously, before a waiter is registered: `QueueManager.waitForJobCompletion: timeoutMs must be a finite number of milliseconds >= 0 (got NaN)`. Before, each of these resolved `false` after about 1 ms while the job was still running (`test/repro-server-runtime-wait.test.ts`). The check is a few comparisons on a path that already allocates a promise, closures and a timer.
 - **Subscriber isolation:** exceptions thrown by scalar or batch subscribers
   are caught and ignored; a failed telemetry batch performs isolated scalar
   retries before returning.
@@ -282,10 +285,27 @@ its remaining untransferred leases; expired protected cron leases are discarded.
 
 ## Configuration
 
-| Env var                  | Default | Effect                                                                                 |
-| ------------------------ | ------- | -------------------------------------------------------------------------------------- |
-| `WEBHOOK_MAX_RETRIES`    | `3`     | Max delivery attempts per webhook (`webhookManager.ts:17`)                             |
-| `WEBHOOK_RETRY_DELAY_MS` | `1000`  | Base inter-attempt delay; actual wait = `delay * (attempt+1)` (`webhookManager.ts:20`) |
+| Env var / config-file key | Default | Accepts       | Effect                                                                                                  |
+| ------------------------- | ------- | ------------- | ------------------------------------------------------------------------------------------------------- |
+| `WEBHOOK_MAX_RETRIES`     | `3`     | whole >= 1    | Delivery attempts per event, the first try included                                                     |
+| `WEBHOOK_RETRY_DELAY_MS`  | `1000`  | whole ms >= 0 | Base inter-attempt delay; the wait before attempt n + 1 is `delay * n`; `abc` or `-1` means 0 (warning) |
+
+The policy is a `WebhookDelivery` (`{ maxRetries, retryDelayMs }`,
+`src/config/componentEnv.ts`). The constructor reads the env vars when the
+manager is created (not at module load) through `readWebhookDelivery`, which
+throws an error naming the variable for anything that is not a whole number in
+range: `WEBHOOK_MAX_RETRIES=abc` or `0` meant no attempt was ever made, and a
+misread delay (`1e3`, read as 1) changed the backoff. `WEBHOOK_RETRY_DELAY_MS=abc` or
+`-1` made `Bun.sleep` resolve at once (every retry in an immediate burst); that is what
+2.9.10 ran with, so it is kept as a 0 ms delay with a warning naming the variable
+(upgrade compatibility). In embedded mode the error surfaces from the
+`QueueManager` constructor; the server checks the same variables in
+`resolveServerConfig`, so it never gets that far. `setDeliveryPolicy(policy)`
+replaces the policy (validated with the same rules) and `getDeliveryPolicy()`
+returns it; `bootServer` applies the resolved server values (env > default). The
+config-file keys `webhooks.maxRetries` and `webhooks.retryDelay` are ignored, as
+they always were, with a startup warning naming the env var to use. A delivery in
+flight keeps the policy it started with.
 
 Options (not env): `WebhookManager({ validateUrls })` — defaults ON; wired from `config.validateWebhookUrls` in `queue-manager/state.ts`. Job-log bounds: `maxLogsPerJob = 100`, `maxJobLogs = 10_000` (config default). Webhook fetch timeout is a hardcoded 10 000 ms.
 

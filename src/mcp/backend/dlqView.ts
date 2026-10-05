@@ -5,6 +5,7 @@
  * bounded: only the most recent attempts are listed and error texts are truncated.
  */
 
+import { isoTime } from '../workflow/jsonSafe';
 import type {
   SerializedDlqAttempt,
   SerializedDlqEntry,
@@ -28,8 +29,7 @@ function finite(value: unknown): number | null {
 }
 
 function isoOrNull(value: unknown): string | null {
-  const ms = finite(value);
-  return ms === null ? null : new Date(ms).toISOString();
+  return isoTime(value);
 }
 
 function errorText(value: unknown): string | null {

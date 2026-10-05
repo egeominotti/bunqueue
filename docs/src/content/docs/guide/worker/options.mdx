@@ -127,20 +127,20 @@ The table below documents the shared TypeScript Worker options for Bun, Node.js,
 | Option              | Type                                           | Default          | Description                                                                                                                                                                                                                         |
 | ------------------- | ---------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `embedded`          | `boolean`                                      | `false`          | Use in-process mode                                                                                                                                                                                                                 |
-| `concurrency`       | `number`                                       | `1`              | Parallel job processing                                                                                                                                                                                                             |
+| `concurrency`       | `number`                                       | `1`              | Parallel job processing. A number > 0 (a fraction rounds up) or `Infinity`                                                                                                                                                          |
 | `autorun`           | `boolean`                                      | `true`           | Start polling automatically                                                                                                                                                                                                         |
-| `heartbeatInterval` | `number`                                       | `10000`          | Heartbeat interval in ms (0 = disabled)                                                                                                                                                                                             |
-| `batchSize`         | `number`                                       | `10`             | Jobs to pull per batch (max: 1000)                                                                                                                                                                                                  |
+| `heartbeatInterval` | `number`                                       | `10000`          | Heartbeat interval in ms (0, a negative value or NaN = disabled). Any other value must be a finite number >= 1                                                                                                                      |
+| `batchSize`         | `number`                                       | `10`             | Jobs to pull per batch (max: 1000). A number > 0 (a fraction rounds up); larger values, `Infinity` included, are clamped to 1000                                                                                                   |
 | `batch`             | `{ size, minSize?, timeout?, groupAffinity? }` | -                | Native batch processor. `job.getBatch()` exposes members and `member.setAsFailed(error)` selectively fails one job. `minSize` waits indefinitely without `timeout`; grouped batches require `groupAffinity` to wait.                |
-| `pollTimeout`       | `number`                                       | `0`              | Long-poll timeout in ms (max: 30000)                                                                                                                                                                                                |
+| `pollTimeout`       | `number`                                       | `0`              | Long-poll timeout in ms (max: 30000). A negative value or NaN means 0; larger values, `Infinity` included, are clamped to 30000                                                                                                    |
 | `useLocks`          | `boolean`                                      | `true`           | Enable BullMQ-style job locks                                                                                                                                                                                                       |
 | `limiter`           | `{ max, duration, groupKey? }`                 | -                | Without `groupKey`: max job starts per rolling window, acquired atomically even with concurrent or manual processing. With `groupKey`: per-group concurrency cap of `max` (jobs grouped by `job.data[groupKey]`, `duration` unused) |
 | `group`             | `{ concurrency?, limit?: { max, duration } }`  | unlimited / none | Broker-authoritative per-job-group concurrency and fixed-window rate defaults. See [Job Groups](/guide/queue/job-groups/)                                                                                                           |
-| `lockDuration`      | `number`                                       | `30000`          | Job lock TTL in ms                                                                                                                                                                                                                  |
+| `lockDuration`      | `number`                                       | `30000`          | Job lock TTL in ms. With `useLocks`, a finite number from 1 to `Number.MAX_SAFE_INTEGER` (the broker's lease bound)                                                                                                                 |
 | `maxStalledCount`   | `number`                                       | `1`              | Accepted for BullMQ compatibility, but not applied by the Worker. Configure the broker's per-queue `maxStalls` policy with `Queue.setStallConfig()` or the HTTP API instead                                                         |
 | `skipStalledCheck`  | `boolean`                                      | `false`          | In embedded or TCP mode, skip only this Worker's subscription to `stalled` notifications. It does not disable broker-side stall detection or recovery                                                                               |
 | `skipLockRenewal`   | `boolean`                                      | `false`          | Suppress the per-job heartbeat timer entirely (no `JobHeartbeat` sent), so both lock renewal and broker-side stall freshness stop; only the worker-registration heartbeat keeps running                                              |
-| `drainDelay`        | `number`                                       | `50`             | Delay between polls when the queue is empty (ms)                                                                                                                                                                                    |
+| `drainDelay`        | `number`                                       | `50`             | Delay between polls when the queue is empty (ms). Without a long-poll, a finite number >= 1                                                                                                                                         |
 | `removeOnComplete`  | `boolean \| number \| KeepJobs`                | `false`          | Auto-remove completed jobs. Only `true` is honored; `number` / `{ age?, count? }` are accepted for BullMQ type compatibility but ignored — the job's own `removeOnComplete` option still applies                                     |
 | `removeOnFail`      | `boolean \| number \| KeepJobs`                | `false`          | Same behavior as `removeOnComplete`: only `true` is honored, other values are ignored and the job-level `removeOnFail` option still applies                                                                                                                                                                                  |
 | `connection`        | `ConnectionOptions`                            | -                | TCP connection (`host`, `port`, `token`, `poolSize`)                                                                                                                                                                                |
@@ -155,6 +155,66 @@ The table below documents the shared TypeScript Worker options for Bun, Node.js,
 If `dataPath` is omitted, the Worker uses the existing embedded manager or the
 configured data-path environment variables. With neither a path nor a configured
 manager, embedded storage is memory-only. See [Persistence](/guide/quickstart/#turn-on-persistence).
+
+### Duration validation
+
+The constructor checks every duration before it starts a timer or contacts the
+broker. Leaving an option out (or passing `null`) keeps its default. A numeric
+string such as `process.env.POLL_TIMEOUT` (`'1000'`) is read as that number; any
+other value that is not a number throws a `TypeError`. A value the worker could not
+use, such as NaN where a timer would run, `Infinity` (except for `pollTimeout`) or a
+value below the minimum, throws a `RangeError` that names the option:
+
+```text
+RangeError: Worker: drainDelay must be a finite number of milliseconds >= 1 (got 0)
+```
+
+Long values are honoured exactly. For example, a `heartbeatInterval` of 30 days
+sends its first heartbeat after 30 days, not after 1 ms.
+
+| Option              | Accepts                                    |
+| ------------------- | ------------------------------------------ |
+| `heartbeatInterval` | `0` (disabled; a negative value or NaN also disables) or a finite number of at least `1`. A positive value below `1` would send a heartbeat about every millisecond |
+| `pollTimeout`       | `0` or more, `Infinity` included; values above `30000` become `30000`, and a negative value or NaN means `0` |
+| `drainDelay`        | a finite number of at least `1`, checked only when `pollTimeout` is `0` (the only mode that uses it). `0` would re-poll an empty queue without pause |
+| `lockDuration`      | a finite number from `1` to `Number.MAX_SAFE_INTEGER`, checked only with `useLocks` (the default). A smaller value gives a lock that expires when it is granted; a larger one is refused by the broker |
+
+`concurrency` and `batchSize` are counts. Each accepts a number greater than `0`;
+a fraction rounds up (`concurrency: 2.5` runs up to 3 jobs at once), and
+`Infinity` is accepted (`concurrency: Infinity` removes the limit; `batchSize`
+above `1000` becomes `1000`). `0`, a negative value and NaN throw a `RangeError`,
+because a worker with them never processed a job. Under a native `batch`, whose
+`size` is the pull size, `batchSize` is not read. Assigning `worker.concurrency`
+later follows the same rule, except that a value below `1` becomes `1`.
+
+`worker.delay(ms, abortController?)` resolves at once for `0` or a negative `ms`
+and waits for any longer finite `ms`; NaN and `Infinity` reject its promise.
+`worker.rateLimit(ms)` does nothing unless `ms` is a positive finite number (`0`, a
+negative value, NaN, `Infinity` and `null` are no-ops). `worker.extendJobLocks(ids,
+tokens, duration)` needs a finite `duration >= 1`; an omitted or `null` duration
+renews each lock with its own TTL. A numeric string is read as its number in all
+three.
+
+Some values only the broker can check: an invalid queue name, an option an older
+broker rejects, or a missing or wrong auth token. When the broker refuses a pull for
+such a reason, the worker retries with a backoff from 100 ms up to 30 s and reports
+the refusal: as an `error` event with `context: 'pull'` when the worker has an
+`error` listener, otherwise as one console line naming the queue and the reason
+(at most once a minute). It never ends the process, and the worker resumes as soon
+as the cause is fixed. A temporary refusal, such as the broker's rate limit or a
+lock timeout under heavy broker load, counts as an empty queue, as in earlier
+releases: the worker polls again after `drainDelay` (10 ms with `pollTimeout`), with no
+growing backoff, and reports nothing. An `error` listener that throws is logged, never rethrown.
+`worker.getNextJob()` resolves `undefined` on a refusal and reports a permanent one the
+same way.
+
+A job's own `timeout` is enforced by the broker. The worker aborts the
+processor's `signal` only when the broker enforces the timeout too. A `timeout`
+of `0` means no timeout, so the job runs to completion. Producers accept any
+finite timeout of 0 or more (one above about 136,900 years is clamped), as 2.9.10
+did. A job that an older release or a direct broker call stored with another value
+follows the same rule: `NaN` and `Infinity` mean no timeout, and a long timeout is
+honoured exactly.
 
 ### Native batch option details
 

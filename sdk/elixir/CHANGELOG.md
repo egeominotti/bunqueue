@@ -2,6 +2,55 @@
 
 ## Unreleased
 
+- Add `Queue.wait_for_job/2`, which omits the timeout and waits up to
+  30_000 ms. The `wait_for_job/3` timeout keeps its 0.1.1 meaning: a number is
+  clamped to the broker's `0..600_000` ms (`sdk/CLAUDE.md` rule 4), and `nil`
+  or a non-number is a 0 ms hold, a poll that returns an unfinished job's
+  timeout at once.
+- Raise `ArgumentError` for `heartbeat_interval: true` or a non-atom
+  non-number such as an unparsed `"10000"`: 0.1.1 silently disabled the
+  heartbeats they asked for, so a job that outlived its lease was delivered
+  again while still running. Every other worker option value keeps its 0.1.1
+  meaning: a heartbeat interval of 0 or less, `nil`, `false` or another atom
+  disables heartbeats; `batch_size` is 1 for `nil`, a float or a non-number, an
+  integer is clamped to `1..1000` and an omitted one follows `concurrency`;
+  `poll_timeout` is a non-blocking 0 for `nil` or a non-number and a number is
+  clamped to `0..30_000`.
+- Stop the non-blocking poll from spinning: `poll_timeout: 0` (also a negative
+  value, `nil` or a non-number, which map to 0) made `run/1` re-poll at
+  round-trip speed on an empty queue, measured at 5,000 PULLB commands per
+  second. `run/1` now waits 50 ms after an empty pull, mirroring the main
+  client's default `drainDelay`.
+- Wait 10 ms after an empty pull when `poll_timeout` is above 0, as the main
+  client does (`pollTimeout > 0 ? 10 : drainDelay` in
+  `src/client/worker/runtime/polling.ts`). A 1 ms long poll re-polled after
+  every broker wait: 324 PULLB per second before, 65 after.
+- Make `Worker.stop/1` always return. The stop barrier did not monitor the
+  runs it admitted, so a run whose process died without leaving it (a handler's
+  linked crash kills the `run_once/1` caller, which skips its `after`) held
+  `stop/1` forever. Admitted runs are now monitored and a `:DOWN` releases them
+  like a `leave`. A live handler is still waited for. A stopper that dies
+  before finishing is replaced by the next waiting stopper.
+- Keep job heartbeats bounded: a `heartbeat_interval` between 0 and 1 ms was
+  truncated to 0, a `JobHeartbeatB` loop per job, and one above 4,294,967,295 ms
+  raised `:timeout_value` in the linked heartbeat process, which killed the
+  handler task and left `Worker.stop/1` waiting forever. Positive intervals are
+  now rounded to at least 1 ms and capped at that limit; non-positive values
+  still disable heartbeats.
+- Never lease a job for 1 ms: `nil`, every float (even `30_000.0` or
+  `60_000 / 2`), and zero, negative or non-numeric `lock_ttl` values were
+  silently turned into a 1 ms lease that expired while the job was still
+  running. `nil` now means the 30_000 ms default, a positive float is rounded up
+  to whole milliseconds, and a value above the broker's limit of
+  9,007,199,254,740,991 ms is capped. Zero, negative and non-number values raise
+  `ArgumentError` before any worker process starts.
+- Normalize connection timeouts: a `timeout` below 1 ms made every connect and
+  receive fail at once, and one above 4,294,965,295 ms raised `:timeout_value`
+  from `Connection.call/3`. A configured value below 1 ms now falls back to the
+  30 s default, an explicit per-call value of at least 0 but below 1 ms to the
+  connection's timeout, and larger values are capped. As before, a per-call
+  `nil` or `false` uses the connection's timeout and a negative or non-number
+  one the 30 s default.
 - Negotiate wire protocol v3 and advertise the `separate-job-name`
   capability in `Hello`.
 - Send ordinary job names through top-level `"name"`, preserve every user term

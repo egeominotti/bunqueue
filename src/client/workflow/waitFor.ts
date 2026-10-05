@@ -16,9 +16,8 @@ import type { Execution, StepJobData, WorkflowNode } from './types';
 import { WaitForSignalError } from './compensator';
 import { hasSignal } from './storeSignals';
 import { clock, type TimerHandle } from './clock';
+import { clampTimerDelay } from '../../shared/timers';
 
-/** Largest delay setTimeout accepts before wrapping (2**31-1 ms, ~24.8 days) */
-export const MAX_TIMER_MS = 2_147_483_647;
 const TIMEOUT_ENQUEUE_RETRY_MS = 5_000;
 
 export interface TimerDeps {
@@ -42,9 +41,10 @@ export interface WaitForDeps {
  * Arm the timer that re-enters a parked node once its wait budget elapses.
  *
  * setTimeout takes a 32-bit signed delay; anything larger wraps to 1ms and fires
- * immediately (`TimeoutOverflowWarning`). Clamping and letting the re-check job
- * re-arm for whatever remains is what makes multi-week approval windows survive
- * (test/repro-workflow-timeout-overflow.test.ts).
+ * immediately (`TimeoutOverflowWarning`). Clamping (`clampTimerDelay`, shared/timers.ts)
+ * and letting the re-check job re-arm for whatever remains is what makes multi-week
+ * approval windows survive (test/repro-workflow-timeout-overflow.test.ts). The timer
+ * goes through the engine clock, so a simulated clock still drives it.
  */
 export function scheduleTimeoutCheck(
   deps: TimerDeps,
@@ -55,7 +55,9 @@ export function scheduleTimeoutCheck(
 ): void {
   const arm = (requestedDelay: number): void => {
     deps.assertActive();
-    const delay = Math.min(Math.max(requestedDelay, 0), MAX_TIMER_MS);
+    // NaN (a wait start that is not a number) re-checks at once, and runWaitFor then
+    // fails the gate; clampTimerDelay would throw out of recovery or a timer callback.
+    const delay = requestedDelay > 0 ? clampTimerDelay(requestedDelay) : 0;
     // Replacing a live timer for the same execution — re-entering a waitFor node used
     // to leak the previous one, which then fired against a node the run had left.
     const previous = deps.timers.get(execId);
@@ -134,8 +136,16 @@ export async function runWaitFor(
     const waitingSince = existing?.startedAt ?? clock().now();
     if (!existing) exec.steps[waitKey] = { status: 'running', startedAt: waitingSince };
 
-    if (clock().now() - waitingSince >= node.timeout) {
-      await expireGate(deps, exec, wf, { node, idx, waitingSince });
+    const elapsed = clock().now() - waitingSince;
+    if (!Number.isFinite(elapsed) || elapsed >= node.timeout) {
+      // A start that is not a finite number (a corrupted row) leaves the budget
+      // unmeasurable: fail the gate through the same claim rather than park it behind
+      // a NaN timer that would re-check forever.
+      const reason = Number.isFinite(elapsed)
+        ? undefined
+        : `Signal "${node.event}" wait has an invalid start time (${String(waitingSince)}); ` +
+          `its ${node.timeout}ms budget cannot be measured`;
+      await expireGate(deps, exec, wf, { node, idx, waitingSince, reason });
       return;
     }
     deps.updateFn(exec);
@@ -174,6 +184,8 @@ interface ExpiredGate {
   node: Extract<WorkflowNode, { type: 'waitFor' }>;
   idx: number;
   waitingSince: number;
+  /** Overrides the timeout reason (a budget that cannot be measured). */
+  reason?: string;
 }
 
 /**
@@ -210,7 +222,7 @@ async function expireGate(
   gate: ExpiredGate
 ): Promise<void> {
   const { node, idx, waitingSince } = gate;
-  const timeoutReason = `Signal "${node.event}" timed out after ${node.timeout}ms`;
+  const timeoutReason = gate.reason ?? `Signal "${node.event}" timed out after ${node.timeout}ms`;
   // Applied to a copy: on `signalled` the caller advances from `exec`, and a failure
   // left in it would be persisted by the very write that moves the cursor on.
   const failed: Execution = {

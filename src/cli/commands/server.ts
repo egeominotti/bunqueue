@@ -9,6 +9,10 @@ import { parseArgs } from 'node:util';
 import { printServerHelp } from '../help';
 import { loadConfigFile, resolveServerConfig } from '../../config';
 import type { BunqueueConfig } from '../../config';
+import { parseTokenList } from '../../config/auth';
+import { parsePortFlagLeniently, requireFlagValue, shownFlagValue } from '../../config/cliFlags';
+import { ConfigError } from '../../config/numbers';
+import { SETTINGS } from '../../config/settings';
 import { bootServer } from '../../infrastructure/server/bootstrap';
 
 /** Server start options (CLI flags only — merged with config file later) */
@@ -25,27 +29,50 @@ interface CliFlags {
   completedRetentionMs?: number;
 }
 
-/** Validate port number */
-function validatePort(value: string, name: string, defaultPort: number): number {
-  const port = parseInt(value, 10);
-  if (Number.isNaN(port) || port < 1 || port > 65535) {
-    console.warn(`Warning: Invalid ${name} "${value}". Using default ${defaultPort}.`);
-    return defaultPort;
-  }
-  return port;
+/**
+ * Validate a port flag with the rule of TCP_PORT / server.tcpPort (0..65535, 0 lets the
+ * OS pick; `+6789` and `6789.5` read as `parseInt` did). A value that is not a port
+ * (`abc`, `70000`, `-5`, no value) prints 2.9.10's warning and uses the default port, as
+ * 2.9.10 did; a misread (`1e4`, read as port 1) stops startup naming the flag.
+ */
+function validatePort(
+  value: string | boolean,
+  setting: typeof SETTINGS.tcpPort | typeof SETTINGS.httpPort,
+  label: string
+): number {
+  const port = parsePortFlagLeniently(setting.flag, value, setting.rule);
+  if (port !== undefined) return port;
+  console.warn(
+    `Warning: Invalid ${label} ${shownFlagValue(value)} (${setting.flag}: expected a whole number between 0 and 65535). Using default ${setting.fallback}.`
+  );
+  return setting.fallback;
 }
 
-function validateInteger(value: string, name: string, minimum: number): number | undefined {
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < minimum) {
-    console.warn(`Warning: Invalid ${name} "${value}". Ignoring it.`);
-    return undefined;
+/**
+ * `--max-completed-jobs` / `--completed-retention-ms`, read with `Number()` as 2.9.10
+ * did (`1e5` is 100000). A value that is not a whole number >= `min` is ignored with
+ * 2.9.10's warning, and the file or env value applies; a flag without a value (`Number(
+ * true)` used to be 1) is an error.
+ */
+function storageFlag(
+  flag: string,
+  label: string,
+  raw: string | boolean,
+  min: number
+): number | undefined {
+  if (typeof raw !== 'string') {
+    throw new ConfigError([`Invalid ${flag}: missing value (expected a whole number >= ${min})`]);
   }
-  return parsed;
+  const value = raw.trim() === '' ? Number.NaN : Number(raw);
+  if (Number.isSafeInteger(value) && value >= min) return value;
+  console.warn(
+    `Warning: Invalid ${label} "${raw}" (${flag}: expected a whole number >= ${min}). Ignoring it.`
+  );
+  return undefined;
 }
 
 /** Parse CLI flags (without env var fallback — that happens in resolveServerConfig) */
-function parseCliFlags(args: string[]): CliFlags {
+export function parseCliFlags(args: string[]): CliFlags {
   const { values } = parseArgs({
     args,
     options: {
@@ -64,45 +91,56 @@ function parseCliFlags(args: string[]): CliFlags {
     strict: false,
   });
 
+  // A flag given without a value parses as `true`; every helper below rejects it. An
+  // empty value (`--tcp-port=`) means "not given", as in 2.9.10, except for the flags
+  // whose empty value would silently open other data or weaken security (`--data-path`,
+  // `--auth-tokens`, `--tls-cert`, `--tls-key`).
+  const value = (name: string): string | boolean | undefined =>
+    values[name] as string | boolean | undefined;
+  const given = (name: string): string | boolean | undefined =>
+    value(name) === '' ? undefined : value(name);
+  const text = (name: string): string | undefined => {
+    const raw = value(name);
+    return raw === undefined ? undefined : requireFlagValue(`--${name}`, raw);
+  };
   const flags: CliFlags = {};
-  if (values['tcp-port']) {
-    flags.tcpPort = validatePort(values['tcp-port'] as string, 'TCP port', 6789);
+  const tcpPort = given('tcp-port');
+  if (tcpPort !== undefined) flags.tcpPort = validatePort(tcpPort, SETTINGS.tcpPort, 'TCP port');
+  const httpPort = given('http-port');
+  if (httpPort !== undefined) {
+    flags.httpPort = validatePort(httpPort, SETTINGS.httpPort, 'HTTP port');
   }
-  if (values['http-port']) {
-    flags.httpPort = validatePort(values['http-port'] as string, 'HTTP port', 6790);
-  }
-  if (values.host) {
-    flags.host = values.host as string;
-  }
-  if (values['data-path']) {
-    flags.dataPath = values['data-path'] as string;
-  }
-  if (values['auth-tokens']) {
-    flags.authTokens = (values['auth-tokens'] as string).split(',').filter(Boolean);
-  }
-  if (values['tls-cert']) {
-    flags.tlsCertFile = values['tls-cert'] as string;
-  }
-  if (values['tls-key']) {
-    flags.tlsKeyFile = values['tls-key'] as string;
-  }
-  if (values['max-completed-jobs']) {
-    flags.maxCompletedJobs = validateInteger(
-      values['max-completed-jobs'] as string,
+  const host = given('host');
+  if (host !== undefined) flags.host = requireFlagValue('--host', host);
+  flags.dataPath = text('data-path');
+  // The AUTH_TOKENS rule: trimmed, stray commas dropped, no token at all is an error
+  // (`--auth-tokens ,` used to yield [] and silently replace AUTH_TOKENS: auth off).
+  const authTokens = text('auth-tokens');
+  if (authTokens !== undefined) flags.authTokens = parseTokenList('--auth-tokens', authTokens);
+  flags.tlsCertFile = text('tls-cert');
+  flags.tlsKeyFile = text('tls-key');
+  const maxCompleted = given('max-completed-jobs');
+  if (maxCompleted !== undefined) {
+    const min = SETTINGS.maxCompletedJobs.rule.min;
+    flags.maxCompletedJobs = storageFlag(
+      '--max-completed-jobs',
       'completed-job cache limit',
-      1
+      maxCompleted,
+      min
     );
   }
-  if (values['completed-retention-ms']) {
-    flags.completedRetentionMs = validateInteger(
-      values['completed-retention-ms'] as string,
+  const retention = given('completed-retention-ms');
+  if (retention !== undefined) {
+    const min = SETTINGS.completedRetentionMs.rule.min;
+    flags.completedRetentionMs = storageFlag(
+      '--completed-retention-ms',
       'completed-job retention',
-      0
+      retention,
+      min
     );
   }
-  if (values.config) {
-    flags.configPath = values.config as string;
-  }
+  const config = given('config');
+  if (config !== undefined) flags.configPath = requireFlagValue('--config', config);
   return flags;
 }
 

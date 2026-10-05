@@ -248,7 +248,8 @@ for (const mode of MODES) {
 const INVALID: Array<[string, Record<string, unknown>]> = [
   ['bunqueue_add_job', { priority: 1.5 }],
   ['bunqueue_add_job', { priority: 2_000_000 }],
-  ['bunqueue_add_job', { delay: -1 }],
+  // A negative delay is accepted: the job is ready at once (repro-job-options-negative-delay).
+  ['bunqueue_add_job', { delay: 365 * 86_400_000 + 1 }],
   ['bunqueue_add_job', { attempts: 0 }],
   ['bunqueue_add_job', { attempts: 1001 }],
   ['bunqueue_add_job', { backoff: -1 }],

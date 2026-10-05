@@ -15,14 +15,20 @@ import { EventEmitter } from 'node:events';
 import { Connection } from './connection.js';
 import type { Command, ConnectionLike, ConnectionOptions, Response } from './connection-types.js';
 import { LIFECYCLE_EVENTS } from './observability.js';
+import { resolveConnectionTimings, resolvePoolSize } from './validation.js';
 
 export class ConnectionPool extends EventEmitter implements ConnectionLike {
   private readonly connections: Connection[];
   private cursor = 0;
 
+  /**
+   * `size`: a whole number up to 65535; below 1 means one connection. The member
+   * options are validated once, naming this pool, before any connection exists.
+   */
   constructor(size: number, options: ConnectionOptions = {}) {
     super();
-    const n = Math.max(1, Math.floor(size));
+    const n = resolvePoolSize('ConnectionPool: size', size);
+    resolveConnectionTimings('ConnectionPool', options);
     this.connections = Array.from({ length: n }, () => {
       const conn = new Connection(options);
       for (const event of LIFECYCLE_EVENTS) {

@@ -7,6 +7,143 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Compatibility: every option value that worked in 0.2.0 keeps its 0.2.0
+result. That includes `None`, a bool, a numeric string where 0.2.0 read the
+option with `float()`/`int()`, and a Simple Mode 0 that meant the default.
+Only values that 0.2.0 could not handle now raise `TypeError` or
+`ValueError` at construction, naming the option: values that crashed a
+thread, never connected, failed every command or job, or spun a hot loop.
+
+### Fixed
+
+- A transient pull failure no longer ends the Worker loop. The loop retried
+  only `ConnectionClosedError` and `CommandTimeoutError`. Broker refusals that
+  pass with time escaped and shut the worker down for good: `Rate limit
+  exceeded`, `Lock acquisition timed out` and its read/write variants, and
+  `Internal server error`. The loop now classifies a failure as the main
+  client does (`isTransientPullError`, `handlePullError` in
+  `src/client/worker/runtime/polling.ts`):
+  - a transient failure is emitted as `error`, logged at debug level and
+    retried after 0.5, 1, 2, then 5 s, the 0.2.0 reconnect schedule. A pull
+    the broker answers resets it.
+  - a permanent refusal (an `AuthError` for a wrong token, a validation
+    refusal, `Not authenticated`) or an unexpected exception still ends the
+    loop and is raised from `run()`, as in 0.2.0, when no `error` listener is
+    attached. In the main client the same unhandled `error` emit ends the
+    process. With a listener (`on` or `once`) the failure is emitted and
+    retried on the same schedule, so fixing a token or a broker setting
+    recovers the same Worker without a restart. The `bunqueue` logger
+    reports a retried refusal as a warning and an unexpected exception as an
+    error with its traceback.
+
+  `KeyboardInterrupt` and `SystemExit` still end a blocking `run()`.
+- An exception that is not a `BunqueueError` no longer kills a Worker thread
+  while `is_running()` keeps reporting the worker as running. An `OSError`
+  raised during a lazy reconnect is one example:
+  - in the first `RegisterWorker`, it ended the loop before it started, and
+    `is_running()` kept reporting the dead worker as running;
+  - in a heartbeat, it stopped the heartbeat thread, so active jobs lost
+    their lock renewals;
+  - in an `ACK` or `FAIL`, it skipped the release of the job's concurrency
+    slot, so a worker with concurrency 1 stopped pulling.
+
+  These paths now log the exception with its traceback, emit `error` and
+  carry on. A failed registration is retried by the next poll, and that
+  pull then follows the policy above.
+- Reconnect backoff no longer overflows. After about 1,025 consecutive failed
+  connects (an outage of roughly 85 minutes), `0.5 * 2 ** (n - 1)` raised
+  `OverflowError` instead of `ConnectionClosedError`. That killed the Worker
+  loop for good, and every later call re-dialed with no backoff. The delay now
+  stays within 0.5–5 s.
+- An empty pull is no longer re-issued at once. `poll_timeout_ms=0` sent
+  about 10,000 `PULLB` per second, until the broker's rate limit stopped the
+  worker; a 1 ms long-poll sent about 700. The loop now follows the main
+  client's rule (`pollTimeout > 0 ? 10 : drainDelay`): it waits 10 ms after an
+  empty long-poll and 50 ms after an empty non-blocking pull. Measured idle
+  rates are now 72 per second at 1 ms and 18 at 0.
+- A `lock_ttl_ms` that is NaN, infinite, below 1, a bool or a string is
+  rejected by the Worker constructor. Such a value is not a usable lease: one
+  below 1 ms has already expired when the broker grants it, so a job could be
+  delivered again while still running, and the others never expire or are not
+  numbers. `None` still sends `lockTtl: null`, and the broker leases for its
+  30000 ms default.
+- An infinite `heartbeat_interval_s` disables heartbeats, and one above
+  `threading.TIMEOUT_MAX` is capped. Neither crashes the heartbeat thread
+  with `OverflowError` any more. `None` means the 10 s default, where it used
+  to kill the loop with `TypeError`. `False` still disables heartbeats and
+  `True` still beats every second.
+- An infinite `ack_batch.max_delay_ms` raises `ValueError`; it crashed the
+  timer thread and left the ACKs buffered until the batch filled. A delay
+  above `threading.TIMEOUT_MAX` is capped. Every other value is still read
+  with `float()`: `"5"` is 5 ms, and a negative or NaN delay flushes at once.
+- `connect_timeout` and `command_timeout` (and an explicit
+  `call(timeout=...)`) must be numbers of seconds > 0. Before:
+  - zero, negative and NaN command deadlines failed every command at once
+    with `CommandTimeoutError`, tearing the socket down every third command;
+  - an infinite command deadline raised `OverflowError` and leaked the
+    pending future. `command_timeout=None` or `math.inf` now means no client
+    deadline;
+  - a zero, negative, NaN or infinite `connect_timeout` never connected, or
+    raised `ValueError`/`OverflowError` out of the Worker loop.
+
+  `connect_timeout=None` keeps the blocking connect of 0.2.0, with no client
+  deadline. `True` still means 1 second, and a long timeout is capped at
+  `threading.TIMEOUT_MAX`.
+- Simple Mode rejects, before the Queue and Worker exist, the `retry`,
+  `circuit_breaker`, `batch`, `priority_aging` and `rate_limit` values that
+  failed later. Before:
+  - a NaN or negative `priority_aging.interval` re-armed its timer at once:
+    about 27,000 aging ticks per second, each running two queries. An
+    infinite one crashed the Timer thread;
+  - a NaN, negative or infinite `retry.delay` raised from `time.sleep`
+    inside the job and masked the processor's own error;
+  - an option read with `int()`/`float()` that it cannot read (NaN
+    `max_attempts`, `threshold`, `boost`, `max_priority` or `max_scan`, an
+    infinite one of the last three, or a non-numeric string) raised inside
+    every job, failure or aging tick;
+  - an infinite `batch.timeout` or `rate_limit.duration` crashed the Timer
+    thread or raised from `time.sleep`, and a `rate_limit.max` below 1
+    blocked every job forever;
+  - a `retry_if`, a `custom_backoff` (with the `custom` strategy) or a
+    `batch.processor` that is not callable failed every job.
+
+  Every other value keeps its 0.2.0 reading, `x or default` and then
+  `int()`/`float()`. A 0 still means the default. A negative
+  `circuit_breaker.reset_timeout` still half-opens at once, and an unknown
+  `retry.strategy` still uses the fixed delay. A missing `batch.size` or
+  `rate_limit.max` still raises `KeyError`, and for `rate_limit` it now does
+  so before the Worker starts. `math.inf` is accepted where it has a
+  meaning:
+  - `retry.max_attempts`: retry until success;
+  - `circuit_breaker.threshold`: the breaker never opens;
+  - `circuit_breaker.reset_timeout`: the breaker stays open until `reset()`;
+  - `batch.size`: flush on timeout or close only.
+- Retry backoff (`exponential`, `jitter`, `fibonacci`) saturates at 2**53 - 1
+  ms instead of raising `OverflowError`; a zero base stays 0.
+- A `custom_backoff` result is still read with `float()`. A result that is
+  NaN, negative, infinite or unreadable used to raise from `time.sleep`; it
+  now fails with an error whose `__cause__` is the processor error.
+- Heartbeat interval, batch size, poll timeout and `wait_for_job` ttl follow
+  `sdk/CLAUDE.md` rule 4 (protocol sections 6.3 and 9; `bunqueue/sdk_clamps.py`).
+  A number never raises, and `None` means the default:
+  - `heartbeat_interval_s`: see the heartbeat entry above.
+  - `batch_size`: still `max(1, min(value, 1000))`. NaN still gives 1,
+    infinity 1000, and a bool 1. `None` means 10, where it used to raise.
+  - `poll_timeout_ms`: clamped to [0, 30000], and NaN means 5000. A NaN or
+    negative value used to reach the broker, which rejected the `PULLB` and
+    shut the worker down. A bool, which the broker also refused, raises
+    `TypeError` at construction.
+  - `wait_for_job(timeout_ms)`: still `max(0, min(value, 600000))`. NaN
+    still waits 0 and `False` 0. `None` means 30000, where it used to raise,
+    and `True` waits 1 ms, where the broker used to refuse it.
+
+  Any other non-number raises `TypeError` naming the option.
+- `Bunqueue.cancel()` and `CancellationManager.cancel()` raise `ValueError`
+  for an infinite `grace_period_ms`: it crashed the Timer thread and never
+  aborted. A grace above `threading.TIMEOUT_MAX` is capped. Any other value
+  keeps its 0.2.0 meaning: above 0 waits (`True` waits 1 ms), anything else
+  (0, negative, NaN, `False`) aborts at once.
+
 ## [0.2.0] - 2026-10-02
 
 The first release after 0.1.5. It also ships every change listed under 0.1.6,

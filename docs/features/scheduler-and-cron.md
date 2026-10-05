@@ -206,7 +206,8 @@ Command shapes in `src/domain/types/commands/cron.ts:4-33`.
 
 `cron:created`, `cron:updated`, `cron:deleted` (from the TCP handler),
 `cron:fired`, `cron:skipped` (reason `no-worker` or `overlap`), and
-`cron:missed` (persist or push failure) —
+`cron:missed` (persist or push failure, or a non-finite `nextRun` rescheduled by
+`repairNextRun`, with an `error` naming the old value and the new slot) —
 `infrastructure/scheduler/cron/execution.ts:47-101,120-140` and
 `handlers/cron.ts:39-45,95-102`.
 
@@ -243,11 +244,27 @@ first-class spawned-job name.
 
 ### Add / upsert (`add`, `cron/runtime.ts:79-107`)
 
-1. Before orphan cleanup or state/storage mutation, reject a supplied
-   `repeatEvery` unless it is a positive safe integer in milliseconds; reject if neither
-   timing field is set; and validate the expanded calendar expression plus IANA
-   timezone. For compatibility, a valid `schedule` takes precedence when both
-   fields are supplied.
+1. Before orphan cleanup or state/storage mutation (`assertValidCronInput`,
+   `cron/validation.ts`), reject a supplied `repeatEvery` unless it is a positive
+   safe integer of at most `MAX_JOB_DURATION_MS` (4,320,000,000,000,000 ms, which
+   keeps every nextRun a valid date); reject if neither timing field is set; validate
+   the spawned-job options with the PUSH rules (`validateJobOptions`, see
+   [Job Options Validation](./job-options-validation.md)), which refuse only what no
+   job can run with, so every template 2.9.10 stored and ran is accepted:
+   `priority`, `dedup.ttl`, and the applied template fields `maxAttempts`,
+   `backoff`, `timeout`, `delay`, `stallTimeout`, reported with a `jobOptions.`
+   prefix (`jobOptions.timeout must be a finite number`; a negative template `delay`
+   is accepted and each spawned job treats it as 0, a `backoff` object without `delay`
+   uses the 1000 ms default base); and validate the
+   expanded calendar expression plus IANA timezone. For compatibility, a valid
+   `schedule` takes precedence when both fields are supplied. Unknown template
+   keys stay ignored. Persisted definitions are not re-validated against the
+   option bounds on load, so an older invalid template does not block startup:
+   `assertPersistedCronsSupported` (`cron/persisted.ts`) logs one warning per such
+   definition at load, through the same `cronTemplateError` check `addCron` uses,
+   naming the cron and the problem (`Persisted cron "<name>" has an invalid job
+   template: <problem>. It still runs with its stored values; ...`). The SQLite
+   pre-check and the runtime load share one report per definition.
 2. The runtime reuses the same centralized validation before its own map/heap
    mutation.
 3. Compute `nextRun` via `getNextCronRun` (cron) or `getNextIntervalRun` (interval) from `now`.
@@ -268,8 +285,9 @@ immediately consumed by the new worker (`application/queue-manager/services.ts`,
 Clears the current timer, pops stale heap entries (generation mismatch), then
 arms one `setTimeout` for the soonest live cron. Runtime timers cannot represent
 delays above `2_147_483_647ms`, so a farther `nextRun` is reached through bounded
-timer chunks. Each intermediate wake runs the normal due-time guard and rearms
-from the unchanged absolute `nextRun`; it does not persist, increment, or push.
+timer chunks (`clampTimerDelay`, [Shared Timers](./shared-timers.md)). Each
+intermediate wake runs the normal due-time guard and rearms from the unchanged
+absolute `nextRun`; it does not persist, increment, or push.
 This prevents Bun from coercing a far-future timer to `1ms` and hot-looping.
 The timer is rearmed after every mutation (add/remove/load/tick).
 
@@ -304,7 +322,7 @@ of requeued. See
 
 ### Client upsert mapping (`upsertJobScheduler`, `scheduler.ts`)
 
-Builds cron `data` from the template (`buildCronData`), merges queue `defaultJobOptions` under per-scheduler `opts` into `CronJobOptions` (`buildCronJobOptions`, issue #86), extracts dedup from `opts.deduplication`, derives spawned-job `priority` from `opts.priority`/queue default (carried on the top-level field the handler reads), and namespaces the id via `toCronName`. Embedded mode calls `manager.addCron` (timezone defaults to `'UTC'`); TCP mode sends the `Cron` command. `removeJobScheduler`/`getJobScheduler(s)` mirror this over `CronDelete`/`CronList`.
+Builds cron `data` from the template (`buildCronData`), merges queue `defaultJobOptions` under per-scheduler `opts` into `CronJobOptions` (`buildCronJobOptions`, issue #86), extracts dedup from `opts.deduplication`, derives spawned-job `priority` from `opts.priority`/queue default (carried on the top-level field the handler reads), and namespaces the id via `toCronName`. Embedded mode calls `manager.addCron` (timezone defaults to `'UTC'`); TCP mode sends the `Cron` command. An invalid schedule or template throws the same message in both modes: embedded from `addCron`, TCP from the broker's `{ ok: false, error }` (it used to return `null`). The template helpers live in `schedulerTemplate.ts`. `removeJobScheduler`/`getJobScheduler(s)` mirror this over `CronDelete`/`CronList`.
 The immediate upsert result preserves the scheduler's normalized `pattern` or
 `every` field and exact `nextRun`. Embedded mode uses the `CronJob` returned by
 `manager.addCron`; TCP uses the broker's nested `cron` response. Both therefore
@@ -335,6 +353,16 @@ schedules as 60-second intervals.
 - **Far-future timer** → delays above the runtime's signed 32-bit timer ceiling
   are chunked without changing the persisted absolute `nextRun`; no early
   execution or 1ms hot loop occurs.
+- **Non-finite `nextRun`** (a corrupted persisted row, or `NaN`/`null`/`±Infinity`
+  written into a scheduled cron) → `repairNextRun` (`cron/runtime.ts`) reschedules
+  it from now, as a restart with `skipMissedOnRestart` does, persists the new slot,
+  logs a warning and emits `cron:missed`; the corrupted slot is not fired. `load()`
+  repairs before building the heap (a non-finite key breaks the heap order), and
+  `scheduleNext`/`tick` repair an entry that reaches the top, so arming never sees
+  `NaN` (`clampTimerDelay` would throw) and an interval cron cannot stay `NaN`
+  (`NaN + repeatEvery`). An entry whose next run cannot be recomputed is logged and
+  left out of the heap; it stays listed until updated
+  (`test/repro-cron-nan-next-run.test.ts`).
 - **Overlap from slow jobs** → suppressed via the `interval * 0.8` window and `preventOverlap` uniqueKey; interval-rate crons anchor to the scheduled slot to avoid drift.
 - **DST spring-forward** → a fixed local time in the missing hour shifts forward
   by the gap; for a multi-minute pattern inside the gap, Bun fires only the first
@@ -360,8 +388,10 @@ schedules as 60-second intervals.
   uses precise `setTimeout` (`types/cronScheduler.ts:4-7`,
   `cron/runtime.ts:38-40,146-168`).
 - `SAFETY_FALLBACK_MS = 60_000` — internal constant, not env-configurable.
-- `MAX_TIMER_DELAY_MS = 2_147_483_647` — internal timer-chunk ceiling, not
-  env-configurable; it does not cap cron intervals or persisted timestamps.
+- `MAX_TIMER_DELAY_MS = 2_147_483_647` — the runtime timer ceiling, shared from
+  `src/shared/timers.ts` ([Shared Timers](./shared-timers.md)) and applied through
+  `clampTimerDelay`; not env-configurable, and it does not cap cron intervals or
+  persisted timestamps.
 - Per-cron knobs (via `CronJobInput`/`RepeatOpts`): `schedule`/`repeatEvery`, `timezone` (embedded default `'UTC'`), `priority`, `maxLimit`, `uniqueKey`/`dedup`, `skipMissedOnRestart` (default `true`), `skipIfNoWorker` (default `false`), `preventOverlap` (default `true`), `immediately`, and `jobOptions` (`maxAttempts`/`backoff`/`timeout`/`delay`/`stallTimeout`/`removeOnComplete`/`removeOnFail`).
 - Queue-level `defaultJobOptions` feed `buildCronJobOptions` as the base,
   overridden by the per-scheduler template `opts` (`scheduler.ts:85-99`).

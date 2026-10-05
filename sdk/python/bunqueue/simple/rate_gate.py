@@ -12,11 +12,16 @@ import threading
 import time
 from typing import Any, Dict, List
 
+from ..durations import MAX_WAIT_S
+from .validation import option
+
 
 class RateGate:
     def __init__(self, options: Dict[str, Any]) -> None:
         self._max = int(options["max"])
-        self._duration = float(options.get("duration") or 1000)
+        # 0 means 1000 ms, as in 0.2.0; a NaN or negative window never fills
+        # (no limit). Bunqueue rejects an infinite one and a max below 1.
+        self._duration = float(option(options, "duration", None, 1000))
         self._group_key = options.get("group_key") or options.get("groupKey")
         self._windows: Dict[str, List[float]] = {}
         self._lock = threading.Lock()
@@ -44,7 +49,7 @@ class RateGate:
                     return
                 self._windows[group] = window
                 oldest = window[0]
-            time.sleep(max((oldest + self._duration - now) / 1000.0, 0.01))
+            time.sleep(min(max((oldest + self._duration - now) / 1000.0, 0.01), MAX_WAIT_S))
 
     def _prune_locked(self, now: float) -> None:
         """Evict fully-expired groups (high-cardinality group_key safety)."""

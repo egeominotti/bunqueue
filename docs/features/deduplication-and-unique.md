@@ -275,7 +275,7 @@ Lifecycle / release:
 - **Memory bounds:** `customIdMap` is an `LRUMap` capped at `maxCustomIds` (default `50_000` in `application/types/config.ts`; initialized in `queue-manager/state.ts`). Unique-key registries are swept every cleanup tick (`cleanExpiredUniqueKeys`, `cleanupTasks.ts`) and any single-queue registry exceeding **1000** entries is force-trimmed by half via insertion-order iteration — under churn a still-live key can be evicted, weakening (not breaking) dedup. LRU eviction of `customIdMap` likewise allows a re-add to slip through.
 - **Debounce is metadata-only (gotcha):** `debounce` sets
   `job.debounceId`/`job.debounceTtl` (`operations/add/single.ts:63-64`,
-  `operations/add/bulk.ts:63-64`, `domain/job/create.ts:88-89`) but does **not**
+  `operations/add/bulk.ts:63-64`, `domain/job/create.ts:103-104`) but does **not**
   populate `uniqueKey`, so it does not itself suppress pushes —
   `handleDeduplication` returns early when `uniqueKey` is falsy. BullMQ-style
   debounce behavior is achieved via `deduplication` with `extend: true` (which

@@ -35,7 +35,12 @@ interface PullRequestOptions {
   group?: GroupPullOptions;
 }
 
-/** Wait until either a notification arrives, the next delay matures, or the pull deadline. */
+/**
+ * Wait until either a notification arrives, the next delay matures, or the pull deadline.
+ * Only a run time that matures before the deadline shortens the wait: a NaN, infinite or
+ * far one (a corrupt or legacy row) waits for a notification or the deadline instead of
+ * re-polling every ~1 ms.
+ */
 async function waitForNextCandidate(options: {
   shard: Shard;
   queue: string;
@@ -46,8 +51,9 @@ async function waitForNextCandidate(options: {
 }): Promise<void> {
   const { shard, queue, deadline, now, nextRunAt, signal } = options;
   const remaining = deadline - now;
-  const untilNextRun = nextRunAt === null ? remaining : Math.max(1, nextRunAt - now);
-  await shard.waitForJob(queue, Math.min(remaining, untilNextRun), signal);
+  const untilNextRun = nextRunAt === null ? remaining : nextRunAt - now;
+  const wait = untilNextRun < remaining ? Math.max(1, untilNextRun) : remaining;
+  await shard.waitForJob(queue, wait, signal);
 }
 
 /**

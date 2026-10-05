@@ -1,3 +1,5 @@
+import { stdoutColorEnabled } from '../../shared/colorSupport';
+
 /** ANSI color codes used by CLI output. */
 export const colors = {
   reset: '\x1b[0m',
@@ -10,7 +12,8 @@ export const colors = {
   cyan: '\x1b[36m',
 } as const;
 
-const supportsColor = process.stdout.isTTY && Bun.env.NO_COLOR !== '1';
+/** FORCE_COLOR / NO_COLOR / TERM=dumb / TTY, as every surface decides (colorSupport.ts). */
+const supportsColor = stdoutColorEnabled();
 
 export function color(text: string, colorCode: string): string {
   return supportsColor ? `${colorCode}${text}${colors.reset}` : text;

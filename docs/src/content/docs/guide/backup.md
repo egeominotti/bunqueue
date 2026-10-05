@@ -59,11 +59,19 @@ export default defineConfig({
 });
 ```
 
+`interval` (`S3_BACKUP_INTERVAL`) must be a whole number of milliseconds of at least `60000`, and `retention` (`S3_BACKUP_RETENTION`) a whole number of at least `1`; in the config file both also accept a numeric string. As in earlier releases, `S3_BACKUP_INTERVAL` or `S3_BACKUP_RETENTION` set to `0` or to a value without a number keeps the default, now with a warning. Any other invalid value, such as `retention: NaN`, `interval: 30000` or `S3_BACKUP_RETENTION=-1`, is never used: the server keeps running without backups and logs `S3 backup configuration invalid` with the setting to fix, at error level, and `bunqueue backup` refuses to run. As a last line of defense, pruning deletes nothing when the retention is not a whole number of at least 1, so the backup just uploaded is never removed by a bad setting. Intervals longer than about 24.8 days are honoured.
+
 See [Configuration File](/guide/configuration/) for the full reference. AWS-style variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_BUCKET`, `AWS_REGION`, `AWS_ENDPOINT`) are also accepted as fallbacks. Temporary credentials can use `S3_SESSION_TOKEN`; `S3_VIRTUAL_HOSTED_STYLE=true` forces bucket-in-host addressing where a provider requires it.
+
+When backup is enabled, the bucket, the access key ID and the secret access key are required (from the config file, `S3_*` or `AWS_*`). If one is missing, the server still starts, as in earlier releases, but runs without backups and logs `S3 backup configuration invalid` at error level, naming each missing setting (`S3 backup required settings are missing: bucket (backup.bucket, S3_BUCKET or AWS_BUCKET), ...`). Watch for that line, or for the backup metrics, after enabling backups.
 
 ## Backup and Restore from the CLI
 
-Backup commands run locally, not through the server: they read the database path from `BUNQUEUE_DATA_PATH` and the S3 credentials from the environment variables above.
+Backup commands run locally, not through the server. They read the same configuration as the server: the config file (`bunqueue.config.ts` in the working directory, or the file given with `--config`), then the environment variables above. The database path is `storage.dataPath`, else `BUNQUEUE_DATA_PATH`.
+
+```bash
+bunqueue backup status --config ./config/production.config.ts
+```
 
 ```bash
 bunqueue backup now              # create a backup right now
@@ -95,7 +103,7 @@ Each backup cycle:
 2. Uses SQLite `VACUUM INTO` to create a standalone, transactionally consistent snapshot (including committed WAL frames even when a reader pins the WAL)
 3. Runs `PRAGMA integrity_check`, compresses the snapshot with gzip, and computes SHA256 over the uncompressed bytes
 4. Uploads `<key>.meta.json` first and the uniquely named `<key>.db` payload second as the publication point, retrying transient errors with exponential backoff and a 30-second timeout per attempt
-5. Deletes old payload/metadata pairs beyond the retention limit
+5. Deletes old payload/metadata pairs beyond the retention limit (never when the retention is invalid)
 
 Only one backup runs at a time within one server/manager process; overlapping
 requests on that manager are rejected. The guard is not distributed, so do not

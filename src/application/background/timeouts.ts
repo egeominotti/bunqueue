@@ -1,10 +1,10 @@
 import type { Job, JobId } from '../../domain/types/job';
 import { FailureReason } from '../../domain/types/dlq';
+import { processingDeadline } from '../../domain/job/timeoutRule';
 import { MinHeap } from '../../shared/minHeap';
 import { queueLog } from '../../shared/logger';
+import { clampTimerDelay } from '../../shared/timers';
 import type { BackgroundContext } from '../types';
-
-export const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 interface TimeoutEntry {
   readonly deadline: number;
@@ -12,14 +12,16 @@ interface TimeoutEntry {
   readonly startedAt: number;
 }
 
+/**
+ * The delay to the earliest deadline: at least 1 ms, at most one native timer
+ * (`clampTimerDelay`). A deadline farther than that fires early with nothing due, and
+ * `expireDue` re-arms for what remains. A NaN distance re-checks in 1 ms, as the runtime
+ * itself did, instead of throwing out of `schedule()` on the pull path.
+ * `processingDeadline` never yields NaN; only a NaN `jobTimeoutCheckMs` retry delay could.
+ */
 export function timeoutTimerDelay(deadline: number, now = Date.now()): number {
-  return Math.max(1, Math.min(MAX_TIMER_DELAY_MS, deadline - now));
-}
-
-function deadlineFor(job: Job): number | null {
-  if (!job.timeout || job.startedAt === null) return null;
-  const deadline = job.startedAt + job.timeout;
-  return Number.isSafeInteger(deadline) ? deadline : Number.MAX_SAFE_INTEGER;
+  const delay = deadline - now;
+  return delay > 1 ? clampTimerDelay(delay) : 1;
 }
 
 function processingJob(ctx: BackgroundContext, id: JobId): Job | null {
@@ -43,7 +45,7 @@ export async function checkJobTimeouts(ctx: BackgroundContext): Promise<void> {
   const timedOut: Array<{ deadline: number; job: Job }> = [];
   for (const processingShard of ctx.processingShards) {
     for (const job of processingShard.values()) {
-      const deadline = deadlineFor(job);
+      const deadline = processingDeadline(job);
       if (deadline !== null && now >= deadline) timedOut.push({ deadline, job });
     }
   }
@@ -86,7 +88,7 @@ export class JobTimeoutScheduler {
 
   schedule(job: Job): void {
     if (this.stopped) return;
-    const deadline = deadlineFor(job);
+    const deadline = processingDeadline(job);
     const startedAt = job.startedAt;
     if (deadline === null || startedAt === null) {
       this.cancel(job.id);
@@ -170,7 +172,7 @@ export class JobTimeoutScheduler {
 
     for (const entry of due) {
       const job = processingJob(ctx, entry.jobId);
-      const deadline = job ? deadlineFor(job) : null;
+      const deadline = job ? processingDeadline(job) : null;
       if (!job || job.startedAt !== entry.startedAt || deadline === null || deadline > now)
         continue;
       try {

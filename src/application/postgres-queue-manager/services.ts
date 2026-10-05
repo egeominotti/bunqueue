@@ -1,3 +1,4 @@
+import { keepLogsArgument } from '../../domain/job/mutations';
 import type { CronJob, CronJobInput } from '../../domain/types/cron';
 import type { JobId } from '../../domain/types/job';
 import type { QueueMetrics, QueueMetricType } from '../../domain/types/metrics';
@@ -167,9 +168,11 @@ export class PostgresQueueManagerServices extends PostgresQueueManagerControl {
   }
 
   async clearLogsDurable(id: JobId, keepLogs?: number): Promise<void> {
+    // The base clearLogs result (keepLogsArgument), for every caller, Cloud included.
+    const keep = keepLogsArgument(keepLogs);
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
-      await this.postgresStore.clearLogs(id, keepLogs);
+      await this.postgresStore.clearLogs(id, keep);
     });
   }
 

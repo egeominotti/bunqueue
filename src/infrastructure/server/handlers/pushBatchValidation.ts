@@ -130,15 +130,7 @@ function validateJobs(jobs: JobInput[], state: BatchDependencyState): string | n
     const groupError = validateGroupId(job.groupId);
     if (groupError) return `jobs[${i}]: ${groupError}`;
 
-    const optionsError = validateJobOptions({
-      groupId: job.groupId,
-      priority: job.priority,
-      delay: job.delay,
-      timeout: job.timeout,
-      maxAttempts: job.maxAttempts,
-      backoff: job.backoff,
-      ttl: job.ttl,
-    });
+    const optionsError = validateJobOptions(job);
     if (optionsError) return `jobs[${i}]: ${optionsError}`;
 
     if (job.dependsOn && job.dependsOn.length > 0) {

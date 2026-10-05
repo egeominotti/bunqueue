@@ -95,14 +95,23 @@ const queue = new Queue('my-queue', {
 });
 ```
 
-| Option               | Default | Description                                                                                                                    |
-| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `pipelining`         | `true`  | Enable TCP pipelining                                                                                                          |
-| `maxInFlight`        | `100`   | Max commands in flight per connection                                                                                          |
-| `poolSize`           | `4`     | Number of TCP connections                                                                                                      |
-| `commandTimeout`     | `30000` | Command timeout (ms)                                                                                                           |
-| `pingInterval`       | `30000` | Health-check ping interval (ms, `0` disables)                                                                                  |
-| `maxCommandTimeouts` | `3`     | Consecutive command timeouts (no intervening success) before the link is concluded dead and reconnect is forced (`0` disables) |
+| Option               | Default | Description                                                                                                                                       |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pipelining`         | `true`  | Enable TCP pipelining                                                                                                                             |
+| `maxInFlight`        | `100`   | Max commands in flight per connection (a whole number `>= 1`, or `Infinity`)                                                                      |
+| `poolSize`           | `4`     | Number of TCP connections (a whole number up to 65535; below 1 means one)                                                                         |
+| `commandTimeout`     | `30000` | Command timeout (ms, `>= 1`; `Infinity` = no client-side timeout)                                                                                 |
+| `pingInterval`       | `30000` | Health-check ping interval (ms; `0` or `Infinity` disables, otherwise `>= 1`)                                                                     |
+| `maxCommandTimeouts` | `3`     | Consecutive command timeouts (no intervening success) before the link is concluded dead and reconnect is forced (a whole number; `0` disables) |
+
+The timeout, interval and in-flight values, and `host` (a non-blank string) and `port`
+(a whole number from 1 to 65535), are checked when the `Queue`, `Worker`,
+`FlowProducer`, `QueueEvents` or `SandboxedWorker` is constructed. A value that is not
+a number throws a `TypeError`; NaN, a negative value, a fraction of a millisecond or a
+fractional count throws a `RangeError` naming the option, for example
+`TcpClient: pingInterval must be a finite number of milliseconds >= 0 or Infinity (got NaN)`.
+`undefined` or `null` keeps the default. Durations have no upper bound: a value above
+2^31 - 1 ms (about 24.8 days) is honoured exactly instead of firing after about 1 ms.
 
 ## Protocol Version Negotiation
 
@@ -140,8 +149,13 @@ inbound protocol boundary.
 
 **Reconnect strategy:**
 
-- Base delay: 100ms
-- Max delay: 30s
+- Base delay: 100ms (`reconnectDelay`)
+- Max delay: 30s (`maxReconnectDelay`)
+- Closing the client always wins: `close()` during a connect attempt closes that
+  socket and rejects the attempt with `ClientClosedError`, and `close()` from a
+  `reconnecting` listener cancels the retry
+- A connection attempt that times out closes its socket, and a superseded socket's
+  late events never affect the current connection
 - Backoff: exponential (2x each attempt)
 - Jitter: additive, up to +30% of the computed delay
 
@@ -282,6 +296,24 @@ const pool = new TcpConnectionPool({
 
 **Selection strategy:** Round-robin, preferring connected sockets.
 
+`TcpConnectionPool` and `getSharedPool` also take the connection-level reconnect and
+health settings, validated like the options above:
+
+| Option                 | Default    | Description                                                                 |
+| ---------------------- | ---------- | --------------------------------------------------------------------------- |
+| `connectTimeout`       | `5000`     | Connection attempt timeout (ms, finite, `>= 1`)                             |
+| `autoReconnect`        | `true`     | Reconnect after a lost connection                                           |
+| `reconnectDelay`       | `100`      | First reconnect delay, doubled per attempt (ms, finite, `>= 1`)             |
+| `maxReconnectDelay`    | `30000`    | Reconnect delay ceiling, plus up to 30% jitter (ms, finite, `>= 1`)         |
+| `maxReconnectAttempts` | `Infinity` | Attempts before giving up (a whole number; `0` gives up at once)            |
+| `maxPingFailures`      | `3`        | Consecutive failed pings before a reconnect (a whole number `>= 1`, or `Infinity`) |
+
+`getSharedPool` checks the options before it looks up an existing pool, so invalid
+options never receive a shared one, and it shares a pool only between callers whose
+options are all equal (unset, `undefined` and the explicit default count as equal): a
+`Queue` with other timeouts, ping or reconnect settings, or another token, gets its own
+pool instead of silently running with the first caller's.
+
 **Features:**
 
 - Automatic reconnection
@@ -300,16 +332,30 @@ Jobs with active locks are automatically requeued for other workers.
 
 ## Validation Limits
 
-| Parameter    | Limit                                |
-| ------------ | ------------------------------------ |
-| Queue name   | Max 256 chars, alphanumeric + `_-.:` |
-| Job data     | Max 10 MB JSON                       |
-| Priority     | -1,000,000 to +1,000,000             |
-| Delay        | 0 to 365 days                        |
-| Timeout      | 0 to 24 hours                        |
-| Max attempts | 1 to 1,000                           |
-| Backoff      | 0 to 24 hours                        |
-| TTL          | 0 to 365 days                        |
+| Parameter                                  | Limit                                                     |
+| ------------------------------------------ | --------------------------------------------------------- |
+| Queue name                                 | Max 256 chars, alphanumeric + `_-.:`                      |
+| Job data                                   | Max 10 MB JSON on push (an `Update` has no size limit)    |
+| Priority                                   | Any finite number (grouped: integer 0 to 2,097,151)       |
+| Delay                                      | Finite; a negative delay is a past run time (ready, sorts first) |
+| Timeout, TTL                               | Finite, 0 or more                                         |
+| Stall timeout (`stallTimeout`)             | Finite                                                    |
+| Max attempts                               | Any number (`Infinity` allowed); 1 or less runs once, a fraction rounds up, at most 2,147,483,647 |
+| Backoff (number, `delay`)                  | Finite, 0 or more; the object form's `delay` defaults to 1000 |
+| Backoff `maxDelay`                         | 0 to 24 hours                                             |
+| `timestamp`                                | Within ±4,320,000,000,000,000                             |
+| `dedup.ttl`, `debounceTtl`, `repeat.every` | Finite (`repeat.every` must be positive)                  |
+| `stackTraceLimit` / `keepLogs` / `sizeLimit` | Finite (stored as given)                                |
+| ChangeDelay/MoveToDelayed `delay`          | Required, finite; a negative delay is a past run time (ready, sorts first) |
+| `lockTtl`, ExtendLock(s)/JobHeartbeat `duration` | Any finite number (as in 2.9.10)                    |
+| ChangePriority `priority`                  | Any finite number; missing means 0; `lifo` is made a boolean |
+
+Every value must be a finite number (a plain numeric string counts as its number);
+durations above about 136,900 years are clamped. Every value 2.9.10 accepted in either
+mode is still accepted with the same result. Embedded mode applies the same rules
+(`Queue.add`, `addBulk`, flows, job schedulers and job commands throw the same
+messages, naming the SDK option such as `attempts`), so a job is never admitted in one
+mode and refused in the other.
 
 ## HTTP Endpoints
 

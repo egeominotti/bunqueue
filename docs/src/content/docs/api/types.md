@@ -119,7 +119,7 @@ interface Job<T = unknown> {
 
   // ── Scheduling & Timing ──────────────────────────────────────
 
-  /** Delay in ms before job becomes available for processing */
+  /** Delay in ms before job becomes available for processing (0 for a negative delay option) */
   delay: number;
 
   /** Timestamp when job started processing */
@@ -164,7 +164,12 @@ interface Job<T = unknown> {
 
   // ── Core Methods ─────────────────────────────────────────────
 
-  /** Update job progress (0-100) with optional status message */
+  /**
+   * Update job progress (0-100, clamped) with optional status message. It never throws
+   * for the value, as in 2.9.10: NaN is 0, `'50'`/`true`/`null` are 50/1/0, other text is
+   * 0 with the text as the message, and an object is 0 with its JSON as the message. The
+   * Worker's `progress` event carries the value you passed.
+   */
   updateProgress(progress: number, message?: string): Promise<void>;
 
   /** Add a log entry to the job */
@@ -213,25 +218,45 @@ interface Job<T = unknown> {
 
   // ── Mutation Methods ─────────────────────────────────────────
 
-  /** Update the job's data payload */
+  /**
+   * Update the job's data payload (JSON serializable; no size limit, as in 2.9.10). Throws
+   * for unserializable data and when the job cannot be updated
+   * (`Job not found or cannot be updated`): the new data would otherwise be lost silently.
+   */
   updateData(data: T): Promise<void>;
 
-  /** Promote a delayed job to the waiting state */
+  /** Promote a delayed job to the waiting state; a job that is not delayed is left as is */
   promote(): Promise<void>;
 
-  /** Change the delay on a delayed job */
+  /**
+   * Change the delay of a job (any finite number of ms; a negative delay makes the job
+   * ready at once with a past run time, ahead of later ready jobs, as in 2.9.10). Throws for a NaN, infinite or non-numeric delay. A job that
+   * can no longer be changed (gone, active or finished) is left as is, as in 2.9.10; a
+   * Worker processor's own `changeDelay` throws instead, since its delivery must end.
+   */
   changeDelay(delay: number): Promise<void>;
 
-  /** Change the job's priority */
+  /**
+   * Change the job's priority: any finite number, for grouped jobs too (as in 2.9.10; a
+   * numeric string is its number). A missing priority is 0 (`{ lifo: true }`, as in
+   * BullMQ), and `lifo` is made a boolean like on add. Throws for a NaN, infinite or
+   * non-numeric priority. A job that is no longer queued is left unchanged.
+   */
   changePriority(opts: ChangePriorityOpts): Promise<void>;
 
   /**
    * Extend the job's lock duration. Returns the new duration on success, 0 if the lock
-   * could not be extended (wrong token, lock expired, or no active lock).
+   * could not be extended (wrong token, lock expired, or no active lock). Any finite
+   * duration is applied, as in 2.9.10 (`extendLock(token, 0)` resolves 0). Throws for a
+   * NaN or infinite duration, and for any other broker rejection.
    */
   extendLock(token: string, duration: number): Promise<number>;
 
-  /** Clear job logs, optionally keeping the last N entries */
+  /**
+   * Clear job logs, optionally keeping the last N entries: 0 or a negative N clears all, a
+   * fraction keeps its whole part, a numeric string is its number (as in 2.9.10). Throws
+   * for NaN or text.
+   */
   clearLogs(keepLogs?: number): Promise<void>;
 
   /**
@@ -311,7 +336,8 @@ interface Job<T = unknown> {
 
   /**
    * Move job to delayed state.
-   * @param timestamp - When the job should become available
+   * @param timestamp - When the job should become available: a finite epoch-ms time (a
+   *   past time means now); a NaN or infinite timestamp throws
    * @param token - Exact lock token, required when the job has a lock
    */
   moveToDelayed(timestamp: number, token?: string): Promise<void>;
@@ -450,10 +476,18 @@ interface JobOptions {
   /** Ungrouped job priority (higher = processed sooner, default: 0) */
   priority?: number;
 
-  /** Delay in milliseconds before job becomes available (default: 0) */
+  /**
+   * Delay in milliseconds before job becomes available (default: 0). A negative delay
+   * makes the job ready at once with a run time in the past, so it runs ahead of later
+   * ready jobs, as in 2.9.10.
+   */
   delay?: number;
 
-  /** Maximum number of processing attempts (default: 3) */
+  /**
+   * Maximum number of processing attempts (default: 3). `0` or less runs the job once (as
+   * `1`), a fraction rounds up, and `Infinity` retries up to 2,147,483,647 times, as in
+   * 2.9.10.
+   */
   attempts?: number;
 
   /**
@@ -570,9 +604,12 @@ interface ParentOpts {
 
 ```typescript
 interface BackoffOptions {
-  /** Backoff strategy type */
+  /** Backoff strategy type: 'fixed', or 'exponential' (any other value runs as exponential) */
   type: 'fixed' | 'exponential';
-  /** Base delay in milliseconds (0 to 86,400,000) */
+  /**
+   * Base delay in milliseconds (finite, >= 0; each retry delay is capped by maxDelay).
+   * When missing at runtime, the 1000 ms default base is used.
+   */
   delay: number;
   /** Upper bound for one retry delay in milliseconds (0 to 86,400,000). Default: 1 hour */
   maxDelay?: number;
@@ -594,7 +631,7 @@ await queue.add('sync', data, {
 });
 ```
 
-The server rejects a `maxDelay` that is not a finite number between 0 and 86,400,000 (24 hours) on `PUSH`, `PUSHB`, HTTP push and atomic flows; atomic flows also reject it in embedded mode. Embedded `Queue.add` and `addBulk`, and scheduler job templates, ignore an invalid `maxDelay` and keep the 1-hour default. `Queue.getJob`, `Queue.getJobs`, `FlowProducer` results, embedded `add()` and the jobs a `Worker` receives (embedded and TCP) return `maxDelay` in `job.opts.backoff` when it was set. A job added with a numeric `backoff` keeps the number in `job.opts.backoff`. The server applies the cap itself when it schedules a retry.
+A `maxDelay` that is not a finite number between 0 and 86,400,000 (24 hours) is rejected on every path: `Queue.add`/`addBulk` in both modes, scheduler job templates, `PUSH`, `PUSHB`, HTTP push and atomic flows. `Queue.getJob`, `Queue.getJobs`, `FlowProducer` results, embedded `add()` and the jobs a `Worker` receives (embedded and TCP) return `maxDelay` in `job.opts.backoff` when it was set. A job added with a numeric `backoff` keeps the number in `job.opts.backoff`. The server applies the cap itself when it schedules a retry.
 
 A processor that throws `DelayedError` postpones the job by its base backoff (`backoff`, or `backoff.delay` for the object form) without growth or jitter, falling back to 1000 ms when the base is 0 or negative, and capped at `maxDelay` (1 hour by default). The wait is never zero: `maxDelay: 0` only makes failed attempts retry immediately, so a `DelayedError` job with `maxDelay: 0` waits its base backoff, capped at 1 hour. See [Postpone a job with DelayedError](/guide/worker/errors/#postpone-a-job-with-delayederror).
 
@@ -784,11 +821,11 @@ interface QueueOptions {
 
 ```typescript
 interface AutoBatchOptions {
-  /** Enable auto-batching (default: true for TCP, false for embedded) */
+  /** Enable auto-batching (default: true for TCP, false for embedded; 'false'/0 also disable) */
   enabled?: boolean;
-  /** Max items before auto-flush (default: 50) */
+  /** Max items before auto-flush (default: 50; below 1 flushes every add, fractions round up, Infinity, NaN or a non-number = no size limit) */
   maxSize?: number;
-  /** Max delay in ms before auto-flush (default: 5) */
+  /** Max delay in ms before auto-flush (default: 5; a negative value, NaN, Infinity or a non-number is 0) */
   maxDelayMs?: number;
 }
 ```
@@ -799,10 +836,10 @@ Jobs added with `durable: true` bypass the batcher and are sent as individual PU
 
 ```typescript
 interface ConnectionOptions {
-  /** Server hostname (default: 'localhost') */
+  /** Server hostname (default: 'localhost'; a non-blank string) */
   host?: string;
 
-  /** TCP port (default: 6789) */
+  /** TCP port (default: 6789; a whole number from 1 to 65535, or its decimal string such as process.env.PORT) */
   port?: number;
 
   /** Declared but not read by the client: connections always use host/port */
@@ -817,18 +854,19 @@ interface ConnectionOptions {
   /**
    * Connection pool size for parallel operations.
    * Default: 4 for Queue/FlowProducer; Worker defaults to min(concurrency, 8).
+   * Up to 65535; below 1 means one connection and a fraction rounds up.
    */
   poolSize?: number;
 
-  /** Ping interval in ms for health checks (default: 30000, 0 to disable) */
+  /** Ping interval in ms for health checks (default: 30000; 0, a negative value or Infinity = disabled, otherwise >= 1) */
   pingInterval?: number;
 
-  /** Command timeout in ms (default: 30000) */
+  /** Command timeout in ms (default: 30000; >= 1, or Infinity = no client-side timeout) */
   commandTimeout?: number;
 
   /**
    * Consecutive command timeouts (no intervening success) before the connection
-   * is concluded dead and a reconnect is forced (default: 3, 0 to disable).
+   * is concluded dead and a reconnect is forced (default: 3; 0, a negative value or NaN disables, a fraction rounds up).
    * Recovery path for a half-open socket, independent of the health-check ping.
    */
   maxCommandTimeouts?: number;
@@ -836,10 +874,18 @@ interface ConnectionOptions {
   /** Enable TCP pipelining (default: true) */
   pipelining?: boolean;
 
-  /** Max commands in flight per connection (default: 100) */
+  /** Max commands in flight per connection (default: 100; > 0, a fraction rounds up, or Infinity) */
   maxInFlight?: number;
 }
 ```
+
+The host, port, token, timeout, interval and in-flight values are checked when the TCP
+connection is created (when the `Queue`, `Worker`, `FlowProducer`, `QueueEvents` or
+`SandboxedWorker` is constructed). A numeric string such as `process.env.PORT` is read
+as that number; otherwise a `TypeError` (not a number) or a `RangeError` names the
+option, e.g.
+`TcpClient: pingInterval must be a finite number of milliseconds >= 0 or Infinity (got NaN)`.
+`undefined` or `null` keeps the default. Durations above 2^31 - 1 ms are honoured exactly.
 
 ### ClientTlsOptions
 
@@ -873,13 +919,13 @@ interface RateLimiterOptions {
 
 ```typescript
 interface WorkerOptions {
-  /** Number of concurrent jobs (default: 1) */
+  /** Number of concurrent jobs (default: 1; > 0, a fraction rounds up, or Infinity) */
   concurrency?: number;
 
   /** Auto-run on creation (default: true) */
   autorun?: boolean;
 
-  /** Heartbeat interval in ms (default: 10000, 0 to disable) */
+  /** Heartbeat interval in ms (default: 10000; 0, a negative value or NaN disables, any other value is finite and >= 1) */
   heartbeatInterval?: number;
 
   /** TCP connection options (for server mode) */
@@ -894,10 +940,10 @@ interface WorkerOptions {
    */
   dataPath?: string;
 
-  /** Number of jobs to pull per batch (default: 10, max: 1000) */
+  /** Number of jobs to pull per batch (default: 10; > 0, a fraction rounds up, larger values and Infinity clamp to 1000) */
   batchSize?: number;
 
-  /** Long poll timeout in ms when queue is empty (default: 0, max: 30000) */
+  /** Long poll timeout in ms when queue is empty (default: 0; a negative value or NaN is 0, larger values and Infinity clamp to 30000) */
   pollTimeout?: number;
 
   /**
@@ -917,7 +963,7 @@ interface WorkerOptions {
   /** Native BullMQ Pro-compatible batch processing */
   batch?: BatchWorkerOptions;
 
-  /** Lock duration in ms (default: 30000). Sent to the server on pull; also used by stall detection. */
+  /** Lock duration in ms (default: 30000; finite, >= 1 when useLocks). Sent to the server on pull; also used by stall detection. */
   lockDuration?: number;
 
   /** Max stalls before moving to failed (default: 1). Applied to stall config in embedded mode. */
@@ -929,7 +975,7 @@ interface WorkerOptions {
   /** Skip lock renewal via heartbeat (default: false) */
   skipLockRenewal?: boolean;
 
-  /** Delay in ms between polls when the queue is drained (default: 50) */
+  /** Delay in ms between polls when the queue is drained (default: 50; finite, >= 1 when pollTimeout is 0) */
   drainDelay?: number;
 
   /** Remove jobs on complete, applied as default for all jobs processed by this worker */
@@ -948,6 +994,14 @@ interface WorkerOptions {
   prefixKey?: string;
 }
 ```
+
+The constructor validates the four durations and the two counts (`concurrency`,
+`batchSize`) before it starts a timer or contacts the broker. A numeric string is read
+as that number; otherwise a `TypeError` (not a number) or a `RangeError` names the
+option, e.g.
+`Worker: heartbeatInterval must be a finite number of milliseconds >= 1 (got NaN)`.
+`undefined` or `null` keeps the default. Durations above 2^31 - 1 ms are honoured
+exactly. See [Duration validation](/guide/worker/options/#duration-validation).
 
 ### GroupWorkerOptions
 
@@ -1332,10 +1386,10 @@ interface SandboxedWorkerOptions {
   /** Path to processor file (must export default async function) */
   processor: string;
 
-  /** Number of worker processes (default: 1) */
+  /** Number of worker threads (default: 1; finite, rounded up, below 1 = one thread) */
   concurrency?: number;
 
-  /** Job timeout in ms (default: 30000, 0 = disabled) */
+  /** Job timeout in ms (default: 30000; 0, a negative value, NaN or Infinity = disabled) */
   timeout?: number;
 
   /** Max memory per worker in MB (default: 256, uses smol mode if <= 64) */
@@ -1347,28 +1401,34 @@ interface SandboxedWorkerOptions {
   /** Auto-restart crashed workers (default: true) */
   autoRestart?: boolean;
 
-  /** Poll interval in ms when no workers are idle (default: 10) */
+  /** Poll interval in ms when no workers are idle (default: 10; finite, >= 1) */
   pollInterval?: number;
 
-  /** Job heartbeat interval in ms (default: 10000 for TCP, 5000 for embedded; 0 disables) */
+  /** Job heartbeat interval in ms (default: 10000 for TCP, 5000 for embedded; <= 0 disables, otherwise finite, >= 1) */
   heartbeatInterval?: number;
 
   /** TCP connection options (omit for embedded mode) */
   connection?: ConnectionOptions;
 
-  /** Auto-stop after this many ms of inactivity (0 = disabled, default: 0) */
+  /** Auto-stop after this many ms of inactivity (default: 0; 0, a negative value, NaN or Infinity = disabled) */
   idleTimeout?: number;
 
-  /** Recycle individual idle worker processes after this many ms (default: 30000, 0 = disabled) */
+  /** Recycle individual idle worker processes after this many ms (default: 30000; 0, a negative value, NaN or Infinity = disabled) */
   idleRecycleMs?: number;
 
   /** Auto-restart the worker pool when new jobs arrive after idle shutdown (default: false) */
   autoStart?: boolean;
 
-  /** Poll interval in ms for checking new jobs while in idle-shutdown state (default: 5000) */
+  /** Wait in ms between checks for new jobs while in idle-shutdown state (default: 5000; finite, >= 1) */
   autoStartPollMs?: number;
 }
 ```
+
+The constructor rejects an invalid `concurrency` or duration with a `TypeError` (not
+a number) or a `RangeError` naming the option, e.g.
+`SandboxedWorker: pollInterval must be a finite number of milliseconds >= 1 (got NaN)`
+or `SandboxedWorker: concurrency must be a finite number of threads (got Infinity)`.
+Durations above 2^31 - 1 ms are honoured exactly.
 
 ### SandboxedWorker Stats
 

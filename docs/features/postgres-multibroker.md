@@ -51,15 +51,46 @@ The supported server settings are:
 | `storage.namespace`                | `BUNQUEUE_POSTGRES_NAMESPACE`                   | `default`                                    |
 | `storage.brokerId`                 | `BUNQUEUE_BROKER_ID`                            | host/PID/random ID                           |
 | `storage.poolSize`                 | `BUNQUEUE_POSTGRES_POOL_SIZE`                   | `4` (runtime minimum `2`)                    |
-| `storage.leaseDurationMs`          | `BUNQUEUE_POSTGRES_LEASE_DURATION_MS`           | `30000` (runtime minimum `1000`)             |
-| `storage.pollIntervalMs`           | `BUNQUEUE_POSTGRES_POLL_INTERVAL_MS`            | `250` (runtime minimum `25`)                 |
-| `storage.statementTimeoutMs`       | `BUNQUEUE_POSTGRES_STATEMENT_TIMEOUT_MS`        | `30000`                                      |
-| `storage.lockTimeoutMs`            | `BUNQUEUE_POSTGRES_LOCK_TIMEOUT_MS`             | `5000`                                       |
-| `storage.idleTransactionTimeoutMs` | `BUNQUEUE_POSTGRES_IDLE_TRANSACTION_TIMEOUT_MS` | `30000`                                      |
+| `storage.leaseDurationMs`          | `BUNQUEUE_POSTGRES_LEASE_DURATION_MS`           | `30000` (runtime minimum `1000`) ¹           |
+| `storage.pollIntervalMs`           | `BUNQUEUE_POSTGRES_POLL_INTERVAL_MS`            | `250` (runtime minimum `25`) ¹               |
+| `storage.statementTimeoutMs`       | `BUNQUEUE_POSTGRES_STATEMENT_TIMEOUT_MS`        | `30000` ²                                    |
+| `storage.lockTimeoutMs`            | `BUNQUEUE_POSTGRES_LOCK_TIMEOUT_MS`             | `5000` ²                                     |
+| `storage.idleTransactionTimeoutMs` | `BUNQUEUE_POSTGRES_IDLE_TRANSACTION_TIMEOUT_MS` | `30000` ²                                    |
 | `storage.maxConcurrentOperations`  | `BUNQUEUE_POSTGRES_MAX_CONCURRENT_OPERATIONS`   | `16`                                         |
 | `storage.maxQueuedOperations`      | `BUNQUEUE_POSTGRES_MAX_QUEUED_OPERATIONS`       | `128`                                        |
 | `storage.maxSnapshotJobs`          | `BUNQUEUE_POSTGRES_MAX_SNAPSHOT_JOBS`           | `100000`                                     |
 | `storage.maxSnapshotPayloadBytes`  | `BUNQUEUE_POSTGRES_MAX_SNAPSHOT_PAYLOAD_BYTES`  | `268435456`                                  |
+
+`runtimeConfig.ts` resolves `leaseDurationMs` and `pollIntervalMs` as before: a
+non-finite value uses the default, a value below the runtime minimum is raised to
+it, and fractions are floored. It also enforces an upper bound and rejects a
+larger value at startup with a `RangeError` that names the setting, for example
+`PostgreSQL storage leaseDurationMs must be at most 9007199254740991 ms (got 1e+20)`.
+The session timeouts follow the server configuration's rule instead (²):
+
+- ¹ `leaseDurationMs` and `pollIntervalMs` accept up to `Number.MAX_SAFE_INTEGER`
+  (`POSTGRES_MAX_INTERVAL_MS`), the largest whole millisecond count a JavaScript
+  number represents exactly. Every value up to it is honoured. Periods longer
+  than the native timer limit (2^31 - 1 ms, about 24.8 days) are armed through
+  [`src/shared/timers.ts`](./shared-timers.md) instead of collapsing into a 1 ms
+  loop, and lease deadlines are clamped as described under
+  [Lease deadlines](#lease-deadlines).
+- ² The three session timeouts, when set, must be a finite number of
+  milliseconds from 1 to `2147483647` (`POSTGRES_MAX_SESSION_TIMEOUT_MS` in
+  `postgres/sessionLimits.ts`, shared with the settings table; PostgreSQL's own
+  limit for `statement_timeout`, `lock_timeout`, and
+  `idle_in_transaction_session_timeout`); fractions are floored and an unset value
+  uses the default. Anything else (`0`, a negative or sub-millisecond value, `NaN`,
+  an infinity, a larger value) throws a `RangeError` that names the setting, for
+  example `PostgreSQL storage statementTimeoutMs must be a finite number of
+  milliseconds between 1 and 2147483647 (got 0)`, before any connection exists.
+  Programmatic `PostgresStorageConfig` and the server configuration
+  (`src/config/settings.ts`) therefore accept exactly the same values. Before,
+  the runtime raised a value below 1 to 1 ms, which failed nearly every
+  statement, and silently replaced `NaN` with the default; PostgreSQL itself
+  refused a value above the limit only when the pool connected
+  (`invalid value for parameter "statement_timeout"`). PostgreSQL's own `0` =
+  disabled is deliberately not offered.
 
 ## Components
 
@@ -71,7 +102,9 @@ dependencies, flow-failure policies, repeat successors, cron state, worker
 registrations, job logs, metrics, DLQ maintenance, and lease renewal/release.
 `admissionStore.ts` isolates single/batch/flow admission from the facade;
 `leaseStore.ts` exposes scalar and set-based renewal without growing the main
-facade, while `leaseRenewal.ts` owns the fenced SQL transaction;
+facade, while `leaseRenewal.ts` owns the fenced SQL transaction and
+`leaseDeadline.ts` turns every claim and renewal length into a valid `lease_until`;
+`maintenanceSchedule.ts` owns the periodic maintenance cadences;
 `admissionResult.ts` is its typed decision contract, while
 `serialAdmission.ts` reconciles final dependency state and the original
 transactional-outbox payload after feature-bearing batch decisions;
@@ -290,8 +323,12 @@ their owning queue from the durable completion row rather than trusting an
 optional request hint. Generation identities are unique for each flight and
 their map entries are reclaimed as soon as refresh or local supersession
 settles, so fencing metadata does not grow with historical job IDs.
-A failed projection is reported through storage health and retried, while the
-already committed public operation keeps its database-defined success result.
+A failed projection is reported through storage health and retried after
+`postgresRetryDelayMs` (`pollIntervalMs`, capped at 1 s, on a `safeTimeout`),
+while the already committed public operation keeps its database-defined success
+result. A fresh request never waits behind a failed batch's retry timer: it runs
+at once, and the failed requests ride along in the same batch, so one transient
+failure cannot delay the projections of later events.
 The failure is recorded under the per-job key `projection-refresh:<jobId>` and
 every path that drops the pending retry must also settle that key. A successful
 refresh clears it. So do the paths that install authoritative state themselves:
@@ -307,10 +344,16 @@ use a dedicated serial queue that retains failures until an observed flush.
 Concurrent flush callers at the same sequence share one checkpoint and observe
 the same failure set; shutdown drains that queue and remains coalesced but
 retryable. A failed authoritative queue refresh keeps its invalidation dirty and
-retries with bounded exponential backoff. This prevents a transient read error
-after journal pruning from leaving only the retained event subset in the local
-snapshot. Per-queue refresh failures remain visible through storage health until
-that queue succeeds; shutdown cancels pending retries before closing the pool.
+retries with bounded exponential backoff (`queueRefreshes.ts`): the first wait is
+`postgresRetryDelayMs` (`pollIntervalMs`, capped at 1 s), later waits double up
+to 1 s, and a refresh made stale by a concurrent event waits the same capped
+delay before reloading. This prevents a
+transient read error after journal pruning from leaving only the retained event
+subset in the local snapshot. Per-queue refresh failures remain visible through
+storage health until that queue succeeds. Every wait is a cancellable
+`safeTimeout`, so shutdown ends a pending wait at once instead of sleeping out a
+long poll interval, then awaits only the loads already running before closing the
+pool.
 Periodic maintenance is single-flight per subsystem, while unrelated subsystems
 may proceed concurrently. Store shutdown closes timer admission and awaits every
 admitted maintenance flight before releasing broker leases or the SQL pool.
@@ -318,6 +361,11 @@ Keyed post-commit maintenance serializes each subsystem and coalesces only work
 that has not started. A late success or failure can neither overlap nor report
 for a newer entry; current failures therefore remain visible and retryable
 without an ABA generation race. Unrelated subsystems may still run in parallel.
+A failed flight keeps a retry entry that only the shared retry timer starts,
+`postgresRetryDelayMs` later (`pollIntervalMs`, capped at 1 s, so a long poll
+interval cannot leave a repair pending for minutes);
+new work for the same subsystem replaces the retry and runs at once. A failing
+operation is therefore retried once per delay rather than back to back.
 Shutdown closes maintenance admission before the SQL pool, skips work submitted
 after that boundary, and drains stale in-flight outcomes without allowing them
 to replace a newer generation. A dedicated
@@ -330,7 +378,26 @@ surfaced as a connection failure. An async scope can call another gated manager
 method without deadlocking, but descendants that escape the admitted scope are
 rejected after it settles. Claims hold admission only for each database attempt,
 not for the surrounding long-poll wait, so an empty 60-second pull never delays
-shutdown. Synchronous compatibility mutations acquire admission together with
+shutdown. Each wait lasts `min(remaining, pollIntervalMs)` on a `safeTimeout`
+and ends early on a wake-up hint or abort. The manager's overrides apply
+the base engine's argument rules (`src/domain/job/options.ts`), because they do not
+call the base methods: `pull`/`pullBatch` and the locked variants clamp the wait to
+0..60 s (`pullTimeoutArgument`; NaN or negative is no wait), a `lockTtl` and every
+`extendLock`/`renewJobLock` duration must be a finite number (`assertLockDuration`;
+any sign, as on 2.9.10), and `changeDelay`/`moveToDelayed` take any finite delay
+(`delayArgument`) and apply `now + max(0, delay)`, as this engine did on 2.9.10 (a
+negative delay is "now"; the SQLite engine keeps the past run time). `push`/`pushBatch` store `normalizeJobInput`'s form
+of the options, and the INTEGER `priority` column receives the priority within the
+INTEGER range (`postgresPriorityColumn`; the payload keeps the exact value). The job
+setters follow `src/domain/job/mutations.ts` in the same way: `updateProgress` stores
+`normalizeProgress`'s value (never refused), `updateJobData` refuses only data that is
+not JSON serializable (`validateUpdatedJobData`), `clearLogsDurable` applies
+`keepLogsArgument` (refusing NaN or text), and `changePriority` applies
+`priorityChangeValue` (any finite priority, grouped jobs included, and a boolean
+`lifo`) before it reports "not changed", as in the base engine. A direct caller
+(the cloud adapter, an embedded manager) therefore gets the same error as a TCP
+client, and nothing is claimed, renewed, delayed, reprioritized or stored. Synchronous compatibility
+mutations acquire admission together with
 their deferred SQL enqueue; after shutdown, disconnect cleanup may clear only
 its local tracking state. The same gate permits 16 active and 128 queued
 PostgreSQL operations by default. Saturation fails fast instead of growing an
@@ -620,6 +687,45 @@ and release the token of a reused generation; local token cleanup also uses an
 exact-token comparison. Graceful broker shutdown releases only leases owned by
 its exact internal session, so it cannot release a successor process's work.
 
+### Lease deadlines
+
+`leaseDeadline.ts` is the only place a lease length becomes a `lease_until`
+value. That column is a `BIGINT`: claims and renewals bind it through a `BIGINT`
+array, which rejects a fraction, `NaN`, or an infinity, and every reader decodes it
+with `numeric()`, which rejects anything beyond `Number.MAX_SAFE_INTEGER`.
+
+- A claim (`postgresClaimLeaseUntil`) shortens the requested `lockTtl`
+  (`leaseDurationMs` when none is given) to the job's `stallTimeout`, since the job
+  must heartbeat within it; a renewal (`postgresLeaseUntil`, ExtendLock or a
+  JobHeartbeat with a duration) grants the requested duration, not shortened to the
+  `stallTimeout`, as on 2.9.10, so a Worker whose heartbeat interval exceeds the
+  job's `stallTimeout` keeps its lease. Neither outlives the job's processing
+  deadline. A claim's lease is never less than 1 ms; a renewal of a job whose
+  deadline is already due is not extended.
+- The processing deadline is the shared rule of the SQLite scheduler and the
+  Worker, `processingDeadline(job)` in `src/domain/job/timeoutRule.ts`, so the
+  engines cannot drift: an absent, `0` or `NaN` timeout is no timeout, the
+  deadline is `ceil(startedAt + timeout)`, a negative timeout is already due, and
+  an infinite or overflowing deadline never comes. Recovery reports a timeout
+  exactly when that deadline is due.
+- A `stallTimeout` of `NaN` means none; `0` or less stalls at once, as the core
+  stall check does.
+- At this layer a requested length or renewal duration that is `NaN` (or not a
+  number) uses `leaseDurationMs`, and fractions round up to whole milliseconds.
+  The manager rejects such values first (see above); this covers stored payloads
+  and direct store callers. `Infinity`, or any length past the deadline range, is
+  a lease that never expires: it is stored as `8640000000000000`
+  (`POSTGRES_NEVER_EXPIRES_MS`), the latest instant a JavaScript `Date`
+  represents. Deadlines before the epoch are stored as `0` (already expired).
+
+Every deadline is therefore a whole millisecond in `[0, 8640000000000000]`. A
+stored fractional `timeout` or `stallTimeout`, or a `NaN` `stallTimeout`, can no
+longer fail the claim of the queue head on every attempt (which blocked the whole
+queue), and a huge TTL can no longer write a row that no broker can decode. The TCP protocol
+validates `lockTtl` and renewal durations before they reach the store (see the
+lease-duration rules in [Data Model](../data-model.md)); this layer also covers
+in-process callers and payloads stored before that validation existed.
+
 ### Recovery
 
 Expired active rows are recovered under row locks. Retryable jobs return to their
@@ -774,8 +880,21 @@ retain their existing host-clock behavior.
   stale takeover uses
   `max(leaseDurationMs, 3 × heartbeatInterval)` (10 seconds and 30 seconds at
   defaults). Expired processing leases are scanned every
-  `max(500, floor(leaseDurationMs / 2))` milliseconds (15 seconds by default),
-  in addition to the worker generation's own `lockDuration` expiry.
+  `min(15000, max(500, floor(leaseDurationMs / 2)))` milliseconds (15 seconds
+  by default), in addition to the worker generation's own `lockDuration` expiry.
+  The 15 s cap (`POSTGRES_MAX_RECOVERY_SCAN_MS`) keeps a long broker lease from
+  delaying the recovery of shorter lock TTLs and job timeouts by half that lease;
+  it changes nothing for leases up to 30 s. A scan is one indexed, `LIMIT`ed
+  query on the partial `(namespace, lease_until)` index, single-flight per broker
+  and row-locked with `SKIP LOCKED`, so scanning more often is cheap and safe. A
+  scan scheduled from the earliest `lease_until` was rejected: it would need
+  re-arming on every local and remote claim and renewal (remote ones are visible
+  only through the journal), adding hot-path work for the same bound.
+  `maintenanceSchedule.ts` arms these two periods, cron polling
+  (`pollIntervalMs`), and the 60-second DLQ/worker/broker/retention sweeps with
+  `safeInterval`, and the durable journal poll uses `safeInterval` too. A lease or
+  poll interval beyond the native timer limit (2^31 - 1 ms) is therefore honoured
+  instead of ticking every millisecond.
 - `bunqueue_workers` makes worker registration and heartbeat state visible to
   every broker. `skipIfNoWorker` therefore evaluates the shared registry rather
   than one process's memory.
@@ -844,6 +963,9 @@ Intentional boundaries:
 
 - Schema or connection initialization failure prevents network listeners from
   binding and closes the partially created pool.
+- A lease or poll interval above `Number.MAX_SAFE_INTEGER`, or a session timeout
+  outside 1 to `2147483647` ms (or `NaN`), fails store construction before any
+  connection with a `RangeError` that names the setting.
 - Lifecycle, event-stream, queue-refresh, per-job projection-refresh,
   heartbeat, recovery, DLQ, and cron health are tracked independently. Only a
   success from the same subsystem clears its prior failure; only a complete
@@ -1062,6 +1184,57 @@ token sets are fenced, resumes through another broker, and completes all 5,000
 jobs. The explicit `BUNQUEUE_POSTGRES_TEN_BROKER_SOAK=1` gate keeps this
 minute-long production-timing campaign out of the normal version-matrix job;
 the package command above sets the gate.
+
+Timer and duration safety has database-free repros that run in the ordinary
+`bun test` suite and PostgreSQL-backed ones in `test:postgres`:
+
+- `test/repro-postgres-timers-config.test.ts`: the duration bounds, their
+  `RangeError` messages, and the unchanged minimums and defaults.
+- `test/repro-postgres-timers-runtime.test.ts`: with a 6.5e9 ms lease and a 2^31
+  ms poll interval, heartbeat, recovery, cron and journal polling stay silent
+  instead of ticking every millisecond; a long event wait stays pending until
+  woken and a `NaN` wait returns at once.
+- `test/repro-postgres-timers-retries.test.ts`: post-commit maintenance waits
+  for its retry delay (also beyond the native limit), still retries and reports
+  recovery after a short delay, and projection refreshes retry once per delay.
+- `test/postgres-timers-units.test.ts` (a `fast-check` property over arbitrary
+  doubles, infinities, `NaN` and non-numbers: every claim deadline is a safe
+  integer at least 1 ms ahead and at most the never-expires instant) and
+  `test/postgres-timers-queue-refreshes.test.ts` (cancellable refresh waits).
+- `test/postgres-timers-lease-safety.test.ts`: stored fractional/`NaN` timeouts
+  no longer block the queue head; `timeout: 0` means no timeout for claims,
+  renewals, and recovery; any lock TTL or renewal duration, and the longest
+  configured lease, write a readable deadline.
+- `test/postgres-timers-manager.test.ts`: a `NaN` or infinite pull timeout is
+  rejected before any claim; a long pull with a poll interval beyond the native
+  limit waits instead of re-claiming yet still wakes for a new job; shutdown
+  cancels a pending queue-refresh wait.
+- `test/repro-postgres-timers-session-timeouts.test.ts`: a programmatic session
+  timeout of `0`, a negative or sub-millisecond value, `NaN`, an infinity or a
+  value above `2147483647` throws a `RangeError` naming the setting (a store is
+  refused before it connects; before, a live pool ran with `1ms`), while unset
+  values keep their defaults and whole values from 1 are kept.
+- `test/repro-postgres-timers-retry-cap.test.ts` and
+  `test/postgres-timers-retry-cap.test.ts`: with a 60 s poll interval,
+  post-commit maintenance, a queue refresh and a projection load are retried
+  within about 1 s, and a fresh projection request is not queued behind a failed
+  batch's retry.
+- `test/postgres-timers-timeout-rule.test.ts`: claim and renewal leases end at
+  exactly the shared `processingDeadline` for every stored timeout shape, and
+  neither the lease module nor recovery keeps a copy of the rule. The
+  lease-safety file also pins that a claim is capped by the stall timeout and a
+  renewal is not (2.9.10's renewal; `test/repro-compat-job-pg-lease.test.ts`).
+- `test/postgres-timers-direct-validation.test.ts`: direct `pull*`,
+  `extendLock`, `renewJobLock`, `changeDelay` and `moveToDelayed` calls with
+  `NaN` or an infinite lease or delay reject with the base engine's messages and
+  change nothing, while every finite value keeps the base engine's result (a lease
+  of 0 is granted, a `NaN` or negative wait means no wait, a delay of `0` means now).
+- `test/postgres-timers-setter-validation.test.ts`: `changePriority` (plain,
+  grouped and missing jobs), `updateProgress`, `updateJobData` and
+  `clearLogsDurable` reject a `NaN`, fractional or out-of-range value and an
+  oversized or unserializable payload with exactly the message an in-memory
+  `QueueManager` gives for the same call, and leave the job and its logs
+  unchanged.
 
 ### Native diagnostic benchmark
 
@@ -1337,5 +1510,7 @@ evidence, not a capacity benchmark.
 - [TCP Server Command Handlers](./tcp-server-handlers.md) — async durable handler
   adapters.
 - [Data Model](../data-model.md) — PostgreSQL tables, indexes, and lease fields.
+- [Shared Timers & Durations](./shared-timers.md) — the timers behind the
+  runtime cadences, retry delays, and long-poll waits.
 - [Architecture](../architecture.md) — single-broker SQLite and multi-broker
   PostgreSQL deployment topologies.

@@ -30,7 +30,7 @@ export abstract class TcpClientHealth extends TcpClientConnectivity {
       if (reqId) {
         const pending = this.commands.removeByReqId(reqId);
         if (pending) {
-          clearTimeout(pending.timeout);
+          pending.timeout.clear();
           pending.resolve(response);
           this.processQueue();
           return;
@@ -39,7 +39,7 @@ export abstract class TcpClientHealth extends TcpClientConnectivity {
 
       const current = this.commands.getCurrentCommand();
       if (current) {
-        clearTimeout(current.timeout);
+        current.timeout.clear();
         current.resolve(response);
         this.commands.setCurrentCommand(null);
         this.processQueue();
@@ -55,10 +55,14 @@ export abstract class TcpClientHealth extends TcpClientConnectivity {
     }
   }
 
+  /**
+   * The current socket closed (events of a retired socket never get here). An attempt
+   * in flight owns `connecting`: it fails on its own and resets it, or schedules the
+   * retry, so a close during an attempt only clears the socket and its commands.
+   */
   protected handleClose(): void {
     const wasConnected = this.connected;
     this.connected = false;
-    this.connecting = false;
     this.socket = null;
     this.health.stopPing();
     this.commands.rejectAll(new Error('Connection lost'));
@@ -115,15 +119,20 @@ export abstract class TcpClientHealth extends TcpClientConnectivity {
 
   private forceReconnect(): void {
     if (this.reconnect.isClosed()) return;
-    if (this.socket) {
+    // Retire the socket (and an attempt in flight): its close, when it comes, must not
+    // run the lost-connection path again against the connection that replaces it.
+    this.generation++;
+    const socket = this.socket;
+    this.socket = null;
+    this.connected = false;
+    this.connecting = false;
+    if (socket) {
       try {
-        this.socket.end();
+        socket.end();
       } catch {
         // Socket already torn down.
       }
-      this.socket = null;
     }
-    this.connected = false;
     this.health.stopPing();
     this.commands.rejectAll(new Error('Connection lost'));
     if (this.reconnect.canReconnect()) this.reconnect.scheduleReconnect(() => this.connect());

@@ -2,7 +2,20 @@ import type { Job } from '../../types';
 import { removeJobDeduplicationKey } from '../../jobDeduplication';
 import { waitJobUntilFinished } from '../../jobWait';
 import { buildFailCommand } from '../failWire';
+import {
+  assertJobDelay,
+  assertDelayChanged,
+  assertLockExtension,
+  assertLogsCleared,
+  assertPriorityChanged,
+  assertProgressUpdated,
+  assertPromoted,
+  delayUntil,
+  lockExtensionResult,
+  progressUpdate,
+} from '../commandArgs';
 import type { JobProxyContext, JobReflectionMeta } from '../types/job';
+import { sendInBackground } from '../backgroundCommand';
 import { computeDependencies } from './dependencies';
 import { reflectFields } from './reflection';
 import { serializeReturnvalue } from '../jobMetadata';
@@ -53,7 +66,8 @@ export function createJobProxy<T>(
     repeatJobKey: reflected.repeatJobKey,
     attemptsStarted,
     updateProgress: async (progress: number, message?: string) => {
-      await tcp.send({ cmd: 'Progress', id, progress, message });
+      const update = progressUpdate(progress, message);
+      assertProgressUpdated(await tcp.send({ cmd: 'Progress', id, ...update }));
     },
     log: async (message: string) => {
       await tcp.send({ cmd: 'AddLog', id, message });
@@ -72,20 +86,25 @@ export function createJobProxy<T>(
       assertMoveResponse(await tcp.send({ cmd: 'Update', id, data: newData }), 'Update');
     },
     promote: async () => {
-      await tcp.send({ cmd: 'Promote', id });
+      assertPromoted(await tcp.send({ cmd: 'Promote', id }));
     },
     changeDelay: async (delay) => {
-      await tcp.send({ cmd: 'ChangeDelay', id, delay });
+      assertJobDelay(delay);
+      assertDelayChanged(await tcp.send({ cmd: 'ChangeDelay', id, delay }));
     },
     changePriority: async (opts) => {
-      await tcp.send({ cmd: 'ChangePriority', id, priority: opts.priority, lifo: opts.lifo });
+      assertPriorityChanged(
+        await tcp.send({ cmd: 'ChangePriority', id, priority: opts.priority, lifo: opts.lifo })
+      );
     },
     extendLock: async (token, duration) => {
+      assertLockExtension(duration);
       const response = await tcp.send({ cmd: 'ExtendLock', id, token, duration });
-      return response.ok === true ? duration : 0;
+      return lockExtensionResult(response, duration);
     },
-    clearLogs: async () => {
-      await tcp.send({ cmd: 'ClearLogs', id });
+    // keepLogs used to be dropped here, so clearLogs(n) cleared every entry over TCP.
+    clearLogs: async (keepLogs?: number) => {
+      assertLogsCleared(await tcp.send({ cmd: 'ClearLogs', id, keepLogs }));
     },
     getDependencies: () => computeDependencies(id, queueName, tcp),
     getDependenciesCount: async () => {
@@ -155,7 +174,7 @@ export function createJobProxy<T>(
       return response.ok === true;
     },
     moveToDelayed: async (targetTimestamp, token) => {
-      const delay = Math.max(0, targetTimestamp - Date.now());
+      const delay = delayUntil(targetTimestamp);
       assertMoveResponse(
         await tcp.send({
           cmd: 'MoveToDelayed',
@@ -179,7 +198,8 @@ export function createJobProxy<T>(
     },
     waitUntilFinished: (queueEvents, ttl) => waitJobUntilFinished({ tcp }, id, queueEvents, ttl),
     discard: () => {
-      void tcp.send({ cmd: 'Discard', id });
+      // Not awaited (sync API); a failure is reported by backgroundCommand.ts.
+      sendInBackground({ name: queueName, tcp }, { cmd: 'Discard', id });
     },
     getFailedChildrenValues: async () => {
       const response = await tcp.send({ cmd: 'GetFailedChildrenValues', id });

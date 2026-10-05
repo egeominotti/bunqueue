@@ -15,8 +15,10 @@ import { toDlqEntry } from '../jobConversion';
 import { createDlqJobMethods, type DlqJobContext } from './dlqJobMethods';
 import { resolvePublicJobPayload } from '../jobHelpers';
 import { toPublicDlqStats } from './dlqStats';
+import { sendInBackground, type BackgroundReporting } from './backgroundCommand';
 
-interface DlqContext {
+/** The sync mutators send without awaiting; see backgroundCommand.ts for failures. */
+interface DlqContext extends BackgroundReporting {
   name: string;
   embedded: boolean;
   tcp: TcpConnectionPool | null;
@@ -32,7 +34,7 @@ export function setDlqConfig(ctx: DlqContext, config: Partial<DlqConfig>): void 
   } else if (ctx.tcp) {
     const current = tcpDlqConfigCache.get(ctx.name) ?? {};
     tcpDlqConfigCache.set(ctx.name, { ...current, ...config });
-    void ctx.tcp.send({ cmd: 'SetDlqConfig', queue: ctx.name, config });
+    sendInBackground(ctx, { cmd: 'SetDlqConfig', queue: ctx.name, config });
   }
 }
 
@@ -154,7 +156,7 @@ export async function getDlqStatsAsync(ctx: DlqContext): Promise<DlqStats> {
 /** Retry DLQ entries */
 export function retryDlq(ctx: DlqContext, id?: string): number {
   if (ctx.embedded) return dlqOps.retryDlqEmbedded(ctx.name, id);
-  if (ctx.tcp) void ctx.tcp.send({ cmd: 'RetryDlq', queue: ctx.name, jobId: id });
+  sendInBackground(ctx, { cmd: 'RetryDlq', queue: ctx.name, jobId: id });
   return 0;
 }
 
@@ -174,9 +176,7 @@ export async function retryDlqAsync(ctx: DlqContext, id?: string): Promise<numbe
 /** Retry DLQ entries by filter */
 export function retryDlqByFilter(ctx: DlqContext, filter: DlqFilter): number {
   if (ctx.embedded) return dlqOps.retryDlqByFilterEmbedded(ctx.name, filter);
-  if (ctx.tcp) {
-    void ctx.tcp.send({ cmd: 'RetryDlq', queue: ctx.name, filter }).catch(() => undefined);
-  }
+  sendInBackground(ctx, { cmd: 'RetryDlq', queue: ctx.name, filter });
   return 0;
 }
 
@@ -192,7 +192,7 @@ export async function retryDlqByFilterAsync(ctx: DlqContext, filter: DlqFilter):
 /** Purge DLQ */
 export function purgeDlq(ctx: DlqContext): number {
   if (ctx.embedded) return dlqOps.purgeDlqEmbedded(ctx.name);
-  if (ctx.tcp) void ctx.tcp.send({ cmd: 'PurgeDlq', queue: ctx.name });
+  sendInBackground(ctx, { cmd: 'PurgeDlq', queue: ctx.name });
   return 0;
 }
 
@@ -229,7 +229,7 @@ export function retryCompleted(ctx: DlqContext, id?: string): number {
     const jid = id ? jobId(id) : undefined;
     return getSharedManager().retryCompleted(ctx.name, jid);
   }
-  if (ctx.tcp) void ctx.tcp.send({ cmd: 'RetryCompleted', queue: ctx.name, id });
+  sendInBackground(ctx, { cmd: 'RetryCompleted', queue: ctx.name, id });
   return 0;
 }
 

@@ -15,6 +15,7 @@ import threading
 from typing import Any, Callable, List, Optional
 
 from .ack_outcome import ignored_ack_indices
+from .durations import timer_delay_ms, wait_seconds
 from .wire import _compact
 
 logger = logging.getLogger("bunqueue")
@@ -40,10 +41,14 @@ class AckItem:
 class AckBatcher:
     """Thread-safe ACK buffer flushed as a single ACKB command."""
 
-    def __init__(self, connection: Any, max_size: int = 50, max_delay_ms: float = 5) -> None:
+    def __init__(self, connection: Any, max_size: int = 50, max_delay_ms: Any = 5) -> None:
         self._connection = connection
         self._max_size = max(1, max_size)
-        self._max_delay_s = max_delay_ms / 1000.0
+        # float() as in 0.2.0 ("5" and True still work); NaN or a negative
+        # delay flushes at once as before. Infinity crashed the timer thread
+        # and raises ValueError; long finite delays are capped (never early).
+        delay_ms = timer_delay_ms(max_delay_ms, "ack_batch.max_delay_ms")
+        self._max_delay_s = wait_seconds(delay_ms)
         self._buffer: List[AckItem] = []
         self._lock = threading.Lock()
         self._timer: Optional[threading.Timer] = None

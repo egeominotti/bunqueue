@@ -1,4 +1,6 @@
 import type { JobId } from '../../domain/types/job';
+import { assertDuration } from '../../shared/durations';
+import { safeTimeout, type SafeTimer } from '../../shared/timers';
 import type { PostgresJobProjection } from '../../infrastructure/persistence/postgres/readModels';
 import type { PostgresQueueSnapshot } from './snapshot';
 
@@ -42,7 +44,9 @@ export class PostgresProjectionRefreshes {
   private readonly generationQueues = new Map<JobId, string>();
   private readonly pending = new Map<JobId, PendingProjection>();
   private readonly active = new Set<Promise<boolean>>();
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private timer: SafeTimer | null = null;
+  /** The armed timer is a failed batch's retry, which a fresh request may advance. */
+  private retryArmed = false;
   private accepting = true;
   private started = false;
 
@@ -51,7 +55,9 @@ export class PostgresProjectionRefreshes {
     private readonly apply: ProjectionApplier,
     private readonly report: ProjectionReporter,
     private readonly retryDelayMs: number
-  ) {}
+  ) {
+    assertDuration(retryDelayMs, 'PostgresProjectionRefreshes: retryDelayMs');
+  }
 
   request(id: JobId, queue: string): void {
     if (!this.accepting) return;
@@ -155,8 +161,9 @@ export class PostgresProjectionRefreshes {
     this.pending.clear();
     this.generations.clear();
     this.generationQueues.clear();
-    if (this.timer) clearTimeout(this.timer);
+    this.timer?.clear();
     this.timer = null;
+    this.retryArmed = false;
   }
 
   async drain(): Promise<void> {
@@ -167,14 +174,21 @@ export class PostgresProjectionRefreshes {
     if (
       !this.accepting ||
       !this.started ||
-      this.timer ||
       this.active.size >= PostgresProjectionRefreshes.MAX_ACTIVE_BATCHES ||
       this.pending.size === 0
     ) {
       return;
     }
-    this.timer = setTimeout(() => {
+    if (this.timer) {
+      // A fresh request never waits behind a failed batch's retry: it runs now, and
+      // the failed requests ride along in the same batch (one query, no extra load).
+      if (delayMs > 0 || !this.retryArmed) return;
+      this.timer.clear();
+    }
+    this.retryArmed = delayMs > 0;
+    this.timer = safeTimeout(() => {
       this.timer = null;
+      this.retryArmed = false;
       const execution = this.runBatch();
       this.active.add(execution);
       void execution.then((retry) => {

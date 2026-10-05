@@ -18,12 +18,20 @@ head:
 A typed `bunqueue.config.ts` can replace most of these, with IntelliSense and everything in one place. See [Configuration File](/guide/configuration/). Environment variables still work as a fallback (priority: CLI flags > config file > env vars > defaults).
 :::
 
+**Numbers are validated at startup.** Every numeric server variable must be a whole number within its range; an empty value counts as unset. Earlier releases read these variables with `parseInt`, so the forms it read as written still work: a leading `+`, a decimal fraction (dropped, as before: `SHUTDOWN_TIMEOUT_MS=1500.5` is 1500), the variable's own unit (`5000ms` for milliseconds, `512mb` for megabytes, any case) and a trailing comment from a Docker `--env-file` line (`STATS_INTERVAL_MS=60000 # 1 minute`). A value `parseInt` misread, such as `1e12` (read as `1`), `1.5e3`, `30s` (read as `30`), `5m` or `6789abc`, stops the server before it binds a port, with an error that names the variable: `Invalid STATS_INTERVAL_MS: "30s" (expected a whole number of milliseconds >= 1)`. All problems are reported at once.
+
+**Values earlier releases tolerated keep working, with a warning.** Where an earlier release replaced an invalid value and kept running, the server keeps the same value and logs a warning that names the variable: `-1` or a value without a number disables the TCP idle timeout, the TCP write-queue cap and the monitoring thresholds; an invalid completed-job retention means "no retention"; an invalid `METRICS_MAX_QUEUES`, `BUNQUEUE_MAX_COMPLETED_JOBS` or PostgreSQL count means its default; `RATE_LIMIT_CLEANUP_MS=0` keeps the default sweep; `RATE_LIMIT_MAX_REQUESTS` without a number disables rate limiting; `WEBHOOK_RETRY_DELAY_MS` without a number or negative retries at once (0 ms). Settings of a feature that is not in use never stop the server: the `BUNQUEUE_POSTGRES_*` variables on SQLite or in-memory storage, the Cloud numbers without Cloud, `BUNQUEUE_CLOUD_INTERVAL_MS` (never applied) and the `S3_BACKUP_*` numbers with backups off are warnings.
+
+**Booleans and words.** Every boolean variable (`S3_BACKUP_ENABLED`, `S3_VIRTUAL_HOSTED_STYLE`, `METRICS_AUTH` and the `BUNQUEUE_CLOUD_*` switches) accepts `1`/`0`, `true`/`false`, `yes`/`no` or `on`/`off`, in any case. Before, `S3_BACKUP_ENABLED=yes` silently meant false and `BUNQUEUE_CLOUD_REMOTE_COMMANDS=0` meant true. Any other word (`enabled`, `"true"` with quotes) keeps the value earlier releases gave it, with a warning: off for `S3_BACKUP_ENABLED`, `S3_VIRTUAL_HOSTED_STYLE` and `METRICS_AUTH`, on for the Cloud switches. `LOG_LEVEL` and `LOG_FORMAT` accept their values in any case, with surrounding quotes removed, and the level also accepts `warning`, `trace`, `verbose`, `fatal` and `critical`; any other word is a warning and is ignored.
+
+**Aliases.** A legacy alias is read only when the main variable is not set at all: an empty `BUNQUEUE_MAX_COMPLETED_JOBS` means the default even when `MAX_COMPLETED_JOBS` is set, as in earlier releases.
+
 ## Server & storage
 
 | Variable                                        | Type                 | Default     | Description                                                                    |
 | ----------------------------------------------- | -------------------- | ----------- | ------------------------------------------------------------------------------ |
-| `TCP_PORT`                                      | number               | `6789`      | TCP server port for client connections                                         |
-| `HTTP_PORT`                                     | number               | `6790`      | HTTP server port for REST API and metrics                                      |
+| `TCP_PORT`                                      | port (0-65535)       | `6789`      | TCP server port for client connections (`0` lets the OS pick one)              |
+| `HTTP_PORT`                                     | port (0-65535)       | `6790`      | HTTP server port for REST API and metrics (`0` lets the OS pick one)           |
 | `HOST`                                          | string               | `0.0.0.0`   | Bind address (`127.0.0.1` for local-only)                                      |
 | `BUNQUEUE_STORAGE_DRIVER`                       | string               | inferred    | `memory`, `sqlite`, or `postgres`                                              |
 | `BUNQUEUE_DATA_PATH`                            | string               | (in-memory) | SQLite database path. Without it or a PostgreSQL URL, jobs are lost on restart |
@@ -35,9 +43,9 @@ A typed `bunqueue.config.ts` can replace most of these, with IntelliSense and ev
 | `BUNQUEUE_POSTGRES_POOL_SIZE`                   | positive integer     | `4`         | PostgreSQL pool size (runtime minimum `2`)                                     |
 | `BUNQUEUE_POSTGRES_LEASE_DURATION_MS`           | positive integer     | `30000`     | Default database-clock lease duration (runtime minimum `1000`)                 |
 | `BUNQUEUE_POSTGRES_POLL_INTERVAL_MS`            | positive integer     | `250`       | Event/cron fallback polling interval (runtime minimum `25`)                    |
-| `BUNQUEUE_POSTGRES_STATEMENT_TIMEOUT_MS`        | positive integer     | `30000`     | Maximum PostgreSQL statement duration                                          |
-| `BUNQUEUE_POSTGRES_LOCK_TIMEOUT_MS`             | positive integer     | `5000`      | Maximum wait for a PostgreSQL lock                                             |
-| `BUNQUEUE_POSTGRES_IDLE_TRANSACTION_TIMEOUT_MS` | positive integer     | `30000`     | Maximum idle time inside a transaction                                         |
+| `BUNQUEUE_POSTGRES_STATEMENT_TIMEOUT_MS`        | positive integer     | `30000`     | Maximum PostgreSQL statement duration (at most `2147483647`)                   |
+| `BUNQUEUE_POSTGRES_LOCK_TIMEOUT_MS`             | positive integer     | `5000`      | Maximum wait for a PostgreSQL lock (at most `2147483647`)                      |
+| `BUNQUEUE_POSTGRES_IDLE_TRANSACTION_TIMEOUT_MS` | positive integer     | `30000`     | Maximum idle time inside a transaction (at most `2147483647`)                  |
 | `BUNQUEUE_POSTGRES_MAX_CONCURRENT_OPERATIONS`   | positive integer     | `16`        | Active PostgreSQL manager operations per broker                                |
 | `BUNQUEUE_POSTGRES_MAX_QUEUED_OPERATIONS`       | non-negative integer | `128`       | Waiting PostgreSQL manager operations before fail-fast saturation              |
 | `BUNQUEUE_POSTGRES_MAX_SNAPSHOT_JOBS`           | positive integer     | `100000`    | Maximum job/result entities in one compatibility snapshot                      |
@@ -58,7 +66,11 @@ BUNQUEUE_DATA_PATH=/var/lib/queue.db TCP_PORT=6789 bunqueue start
 retention is opt-in through `BUNQUEUE_COMPLETED_RETENTION_MS` (legacy alias:
 `COMPLETED_RETENTION_MS`); when unset, completed SQLite rows are retained until
 an explicit clean or obliterate operation. `0` makes every unprotected
-completed row eligible on the next cleanup tick.
+completed row eligible on the next cleanup tick. A negative or non-numeric
+value disables retention, as in earlier releases, with a warning; a misread value
+such as `1e12` (read as 1 ms by earlier releases) stops startup. An empty
+`BUNQUEUE_COMPLETED_RETENTION_MS` disables retention even when the legacy alias
+is set.
 
 **Storage selection.** An explicit driver wins. Otherwise a PostgreSQL URL
 selects PostgreSQL, a data path selects SQLite, and neither selects memory.
@@ -86,13 +98,13 @@ The variable is accepted and shown in the startup banner, but the TCP listener a
 
 ## Authentication & security
 
-| Variable                      | Type    | Default | Description                                                                                             |
-| ----------------------------- | ------- | ------- | ------------------------------------------------------------------------------------------------------- |
-| `AUTH_TOKENS`                 | string  | (none)  | Comma-separated tokens for every TCP connection and protected HTTP endpoint; health probes stay public |
-| `BQ_TOKEN` / `BUNQUEUE_TOKEN` | string  | (none)  | Default token for CLI client commands (avoids `--token` on every command)                               |
-| `METRICS_AUTH`                | boolean | `false` | Require auth for `/prometheus`. Only `true` enables it; without `AUTH_TOKENS`, the endpoint returns 503 |
-| `METRICS_MAX_QUEUES`          | integer | `100`   | Maximum queue names exposed as Prometheus label values; `0` disables per-queue series                   |
-| `CORS_ALLOW_ORIGIN`           | string  | (none)  | Comma-separated allowed CORS origins for the HTTP API                                                   |
+| Variable                      | Type        | Default | Description                                                                                                                                        |
+| ----------------------------- | ----------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_TOKENS`                 | string      | (none)  | Comma-separated non-empty tokens for every TCP connection and protected HTTP endpoint; health probes stay public                                   |
+| `BQ_TOKEN` / `BUNQUEUE_TOKEN` | string      | (none)  | Default token for CLI client commands (avoids `--token` on every command)                                                                          |
+| `METRICS_AUTH`                | boolean     | `false` | Require auth for `/prometheus` (`1`/`true`/`yes`/`on`); without `AUTH_TOKENS`, the endpoint returns 503. Another word keeps it off, with a warning |
+| `METRICS_MAX_QUEUES`          | integer ≥ 0 | `100`   | Maximum queue names exposed as Prometheus label values; `0` disables per-queue series                                                              |
+| `CORS_ALLOW_ORIGIN`           | string      | (none)  | Comma-separated allowed CORS origins for the HTTP API                                                                                              |
 
 ```bash
 # Server side
@@ -107,16 +119,28 @@ export BQ_TOKEN=secret-token-1
 bunqueue stats
 ```
 
+`AUTH_TOKENS` is split on commas and each entry is trimmed, so `a, b` means the
+tokens `a` and `b` (a client may send the token with surrounding whitespace, such
+as a secret file's trailing newline). Empty entries from stray or trailing commas are ignored. An
+unset or empty variable disables authentication, but a value with no token at all
+(`,` or a few spaces) stops startup with
+`Invalid AUTH_TOKENS: "," (expected a comma-separated list of non-empty tokens)`
+instead of silently turning authentication off. The `bunqueue start --auth-tokens`
+flag follows the same rule, and its errors name the flag. The server never accepts
+an empty token, so a request without credentials can't match one.
+
 The JSON `/metrics` endpoint is already covered by the general `AUTH_TOKENS`
 check; `METRICS_AUTH` adds the same requirement to `/prometheus`. Enabling it
 without configuring any token fails closed with 503.
 
 ## Logging
 
-| Variable     | Type   | Default | Values                           |
-| ------------ | ------ | ------- | -------------------------------- |
-| `LOG_LEVEL`  | string | `info`  | `debug`, `info`, `warn`, `error` |
-| `LOG_FORMAT` | string | `text`  | `text`, `json`                   |
+| Variable     | Type   | Default | Values                                                                                                  |
+| ------------ | ------ | ------- | ------------------------------------------------------------------------------------------------------- |
+| `LOG_LEVEL`  | string | `info`  | `debug`, `info`, `warn`, `error` (any case; aliases `warning`, `trace`, `verbose`, `fatal`, `critical`) |
+| `LOG_FORMAT` | string | `text`  | `text`, `json` (any case)                                                                               |
+
+An unknown value is logged as a warning and ignored. The config-file equivalents are `logging.level` and `logging.format`, which win over the env; with the Docker image, `LOG_FORMAT=json` keeps JSON output even when the file says `text`.
 
 ```bash
 LOG_LEVEL=debug LOG_FORMAT=json bunqueue start
@@ -142,17 +166,19 @@ Automatic snapshots of the SQLite database to any S3-compatible storage. Full gu
 
 | Variable                  | Type    | Default          | Description                                                   |
 | ------------------------- | ------- | ---------------- | ------------------------------------------------------------- |
-| `S3_BACKUP_ENABLED`       | boolean | `false`          | Enable automated backups (`1` / `true`)                       |
+| `S3_BACKUP_ENABLED`       | boolean | `false`          | Enable automated backups (`1` / `true` / `yes` / `on`)        |
 | `S3_BUCKET`               | string  | (none)           | Bucket name (alias: `AWS_BUCKET`)                             |
 | `S3_ACCESS_KEY_ID`        | string  | (none)           | Access key (alias: `AWS_ACCESS_KEY_ID`)                       |
 | `S3_SECRET_ACCESS_KEY`    | string  | (none)           | Secret key (alias: `AWS_SECRET_ACCESS_KEY`)                   |
 | `S3_SESSION_TOKEN`        | string  | (none)           | Temporary credential token (alias: `AWS_SESSION_TOKEN`)       |
 | `S3_REGION`               | string  | `us-east-1`      | Region (alias: `AWS_REGION`)                                  |
 | `S3_ENDPOINT`             | string  | (none)           | Custom endpoint for non-AWS providers (alias: `AWS_ENDPOINT`) |
-| `S3_VIRTUAL_HOSTED_STYLE` | boolean | provider default | Force bucket-in-host addressing (`1` / `true`)                |
-| `S3_BACKUP_INTERVAL`      | number  | `21600000` (6h)  | Interval between backups in ms                                |
-| `S3_BACKUP_RETENTION`     | number  | `7`              | Number of backups to keep                                     |
+| `S3_VIRTUAL_HOSTED_STYLE` | boolean | provider default | Force bucket-in-host addressing (`1` / `true` / `yes` / `on`) |
+| `S3_BACKUP_INTERVAL`      | number  | `21600000` (6h)  | Interval between backups in ms (whole number ≥ `60000`)       |
+| `S3_BACKUP_RETENTION`     | number  | `7`              | Number of backups to keep (whole number ≥ `1`)                |
 | `S3_BACKUP_PREFIX`        | string  | `backups/`       | Key prefix for backup files                                   |
+
+`0` or a value without a number keeps the default interval or retention, with a warning, as in earlier releases. A backup that cannot run (backups enabled without a bucket or credentials, an interval under a minute, a negative retention) does not stop the server: it logs `S3 backup configuration invalid` with the settings to fix, at error level, and runs without backups. The invalid value is never used, so pruning never runs with it; the `bunqueue backup` command refuses it. With backups off, an invalid value is only a warning.
 
 Backups require a persistent SQLite data path (`BUNQUEUE_DATA_PATH`,
 `BQ_DATA_PATH`, `DATA_PATH`, or `SQLITE_PATH`). There is no file to snapshot in
@@ -170,77 +196,88 @@ S3_ENDPOINT=http://localhost:9000 S3_BACKUP_ENABLED=1 bunqueue start
 
 ## Timeouts & limits
 
-| Variable                     | Type   | Default            | Description                                                                                                                                                                    |
-| ---------------------------- | ------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `SHUTDOWN_TIMEOUT_MS`        | number | `30000`            | How long graceful shutdown waits for active jobs                                                                                                                               |
-| `STATS_INTERVAL_MS`          | number | `300000`           | Stats logging interval                                                                                                                                                         |
-| `WORKER_TIMEOUT_MS`          | number | `30000`            | Worker-registration freshness window. Older heartbeats mark a worker stale; cleanup removes it after 3× this value                                                             |
-| `LOCK_TIMEOUT_MS`            | number | `5000`             | Timeout for acquiring internal locks                                                                                                                                           |
-| `WORKER_CLEANUP_INTERVAL_MS` | number | `60000`            | Interval for removing inactive worker registrations                                                                                                                            |
-| `TCP_IDLE_TIMEOUT_MS`        | number | `60000`            | Slowloris mitigation: close a connection that starts a frame but makes no progress within this window. Idle connections with no partial frame are never affected. `0` disables |
-| `TCP_MAX_WRITE_QUEUE_BYTES`  | number | `67108864` (64 MB) | Max bytes buffered per connection's outbound queue before it is dropped (protects against clients that stop reading). `0` disables                                             |
+| Variable                     | Type   | Default            | Description                                                                                                                                                                       |
+| ---------------------------- | ------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SHUTDOWN_TIMEOUT_MS`        | number | `30000`            | How long graceful shutdown waits for active jobs (whole ms ≥ 0; `0` does not wait)                                                                                                |
+| `STATS_INTERVAL_MS`          | number | `300000`           | Stats logging interval (whole ms ≥ 1; values above 24.8 days are honoured)                                                                                                        |
+| `WORKER_TIMEOUT_MS`          | number | `30000`            | Worker-registration freshness window (whole ms ≥ 1). Older heartbeats mark a worker stale; cleanup removes it after 3× this value. The config file's `timeouts.worker` is ignored |
+| `LOCK_TIMEOUT_MS`            | number | `5000`             | Timeout for acquiring internal locks (whole ms ≥ 1; values above 24.8 days are honoured). The config file's `timeouts.lock` is ignored                                            |
+| `WORKER_CLEANUP_INTERVAL_MS` | number | `60000`            | Interval for removing inactive worker registrations (whole ms ≥ 1; values above 24.8 days are honoured)                                                                           |
+| `TCP_IDLE_TIMEOUT_MS`        | number | `60000`            | Slowloris guard: close a connection holding a partial frame that makes no progress in this window (whole ms). Connections without a partial frame are unaffected. `0` disables    |
+| `TCP_MAX_WRITE_QUEUE_BYTES`  | number | `67108864` (64 MB) | Max bytes buffered per connection's outbound queue before it is dropped (protects against clients that stop reading). Whole bytes; `0` disables                                   |
+
+The worker, lock and TCP variables in this table accept whole numbers (an empty value keeps the default; `5000ms` is accepted). A misread value, such as `1e12`, `60s` or `64MB` for a byte count, stops the server at startup, before it prints the banner or opens a port, and the first embedded `Queue`/`Worker` for the worker and lock variables, with `Invalid NAME: "value" (expected ...)`. `TCP_IDLE_TIMEOUT_MS` and `TCP_MAX_WRITE_QUEUE_BYTES` set to `-1` or a value without a number disable the limit, as in earlier releases, with a warning.
 
 ## Webhooks
 
-| Variable                 | Type   | Default | Description                    |
-| ------------------------ | ------ | ------- | ------------------------------ |
-| `WEBHOOK_MAX_RETRIES`    | number | `3`     | Max delivery retry attempts    |
-| `WEBHOOK_RETRY_DELAY_MS` | number | `1000`  | Delay between delivery retries |
+| Variable                 | Type   | Default | Description                                                                                                       |
+| ------------------------ | ------ | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `WEBHOOK_MAX_RETRIES`    | number | `3`     | Delivery attempts per event, the first try included (whole number ≥ 1)                                            |
+| `WEBHOOK_RETRY_DELAY_MS` | number | `1000`  | Base delay between attempts: attempt n + 1 waits `n ×` this (whole ms ≥ 0; `abc` or `-1` means 0, with a warning) |
+
+The config file's `webhooks.maxRetries` and `webhooks.retryDelay` are ignored (they never took effect; the server logs a warning). The variables are also read by embedded mode, where an invalid value makes the `Queue`/`Worker` constructor throw.
 
 ## Server rate limiting
 
 Protects the server itself from misbehaving clients (per TCP connection or HTTP client IP). Unrelated to per-queue job rate limiting, which is set via the [Queue API](/guide/rate-limiting/).
 
-| Variable                  | Type   | Default | Description                               |
-| ------------------------- | ------ | ------- | ----------------------------------------- |
-| `RATE_LIMIT_MAX_REQUESTS` | number | `10000` | Max requests per client within the window |
-| `RATE_LIMIT_WINDOW_MS`    | number | `60000` | Window duration                           |
-| `RATE_LIMIT_CLEANUP_MS`   | number | `60000` | Cleanup interval for tracking data        |
+| Variable                  | Type                 | Default | Description                                                                                                                  |
+| ------------------------- | -------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `RATE_LIMIT_MAX_REQUESTS` | positive integer     | `10000` | Max requests per client within the window; a value without a number disables rate limiting, with a warning (`0` is an error) |
+| `RATE_LIMIT_WINDOW_MS`    | non-negative integer | `60000` | Window duration in ms; `0` disables rate limiting                                                                            |
+| `RATE_LIMIT_CLEANUP_MS`   | positive integer     | `60000` | Interval in ms for evicting idle clients' tracking data; `0` or no number keeps the default, with a warning                  |
+
+An invalid value (for example `0`, `1e4` or `1m`) fails server startup with `Invalid NAME: "value" (expected ...)`, printed as one `Fatal error:` line before the startup banner. `0` is rejected for all three: no limit, a window that never counts, or a sweep that never runs.
 
 ## Monitoring thresholds
 
 These control the real-time monitoring events (`queue:idle`, `queue:threshold`, `worker:overloaded`, `server:memory-warning`, `storage:size-warning`) delivered over WebSocket/SSE. See the [HTTP API events reference](/api/http/#explicit-subscription-events-86).
 
-| Variable                       | Default        | Description                                                                             |
-| ------------------------------ | -------------- | --------------------------------------------------------------------------------------- |
-| `QUEUE_IDLE_THRESHOLD_MS`      | `30000`        | Emit `queue:idle` when a queue is empty with no active jobs for this long. `0` disables |
-| `QUEUE_SIZE_THRESHOLD`         | `0` (disabled) | Emit `queue:threshold` when a queue's waiting count reaches this size                   |
-| `WORKER_OVERLOAD_THRESHOLD_MS` | `30000`        | Emit `worker:overloaded` when a worker stays at max concurrency for this long           |
-| `MEMORY_WARNING_MB`            | `0` (disabled) | Emit `server:memory-warning` when heap usage exceeds this many MB                       |
-| `STORAGE_WARNING_MB`           | `0` (disabled) | Emit `storage:size-warning` when the SQLite database exceeds this many MB               |
+| Variable                       | Default        | Description                                                                                 |
+| ------------------------------ | -------------- | ------------------------------------------------------------------------------------------- |
+| `QUEUE_IDLE_THRESHOLD_MS`      | `30000`        | Emit `queue:idle` when a queue is empty with no active jobs for this long. `0` disables     |
+| `QUEUE_SIZE_THRESHOLD`         | `0` (disabled) | Emit `queue:threshold` when a queue's waiting count reaches this size                       |
+| `WORKER_OVERLOAD_THRESHOLD_MS` | `30000`        | Emit `worker:overloaded` when a worker stays at max concurrency for this long. `0` disables |
+| `MEMORY_WARNING_MB`            | `0` (disabled) | Emit `server:memory-warning` when heap usage exceeds this many MB                           |
+| `STORAGE_WARNING_MB`           | `0` (disabled) | Emit `storage:size-warning` when the SQLite database exceeds this many MB                   |
+
+Each threshold is a whole number ≥ 0 (`512mb` is accepted for the megabyte ones). A misread value stops the server at startup (`1e12` used to be read as 1 ms) and makes an embedded `QueueManager` throw. `-1` or a value without a number disables the alert, as it did before, now with a warning.
 
 ## bunqueue Cloud
 
-Telemetry agent for the bunqueue Cloud dashboard. Cloud mode activates only when `BUNQUEUE_CLOUD_URL`, `BUNQUEUE_CLOUD_API_KEY`, **and** `BUNQUEUE_CLOUD_INSTANCE_ID` are all set.
+Telemetry agent for the bunqueue Cloud dashboard. Cloud mode activates only when `BUNQUEUE_CLOUD_URL`, `BUNQUEUE_CLOUD_API_KEY`, **and** `BUNQUEUE_CLOUD_INSTANCE_ID` are all set. With Cloud mode on, an invalid numeric variable below stops startup (server and `bunqueue-mcp`); with Cloud mode off it is only a warning. An unknown word for a switch keeps it on, with a warning.
 
-| Variable                                   | Default  | Description                                                      |
-| ------------------------------------------ | -------- | ---------------------------------------------------------------- |
-| `BUNQUEUE_CLOUD_URL`                       | (none)   | Cloud dashboard URL. Required for cloud mode                     |
-| `BUNQUEUE_CLOUD_API_KEY`                   | (none)   | API key. Required for cloud mode                                 |
-| `BUNQUEUE_CLOUD_INSTANCE_ID`               | (none)   | Unique instance identifier. Required for cloud mode              |
-| `BUNQUEUE_CLOUD_INSTANCE_NAME`             | hostname | Display name for this instance                                   |
-| `BUNQUEUE_CLOUD_SIGNING_SECRET`            | (none)   | HMAC signing secret for payloads                                 |
-| `BUNQUEUE_CLOUD_INTERVAL_MS`               | `15000`  | Snapshot upload interval in ms                                   |
-| `BUNQUEUE_CLOUD_INCLUDE_JOB_DATA`          | `true`   | Include job payloads in telemetry. Set `false` for metadata only |
-| `BUNQUEUE_CLOUD_REDACT_FIELDS`             | (none)   | Comma-separated payload fields to redact                         |
-| `BUNQUEUE_CLOUD_EVENTS`                    | (all)    | Comma-separated event filter                                     |
-| `BUNQUEUE_CLOUD_BUFFER_SIZE`               | `720`    | Snapshot buffer size while offline                               |
-| `BUNQUEUE_CLOUD_CIRCUIT_BREAKER_THRESHOLD` | `5`      | Consecutive failures before the circuit breaker opens            |
-| `BUNQUEUE_CLOUD_CIRCUIT_BREAKER_RESET_MS`  | `60000`  | Circuit breaker reset window in ms                               |
-| `BUNQUEUE_CLOUD_USE_WEBSOCKET`             | `true`   | Stream via WebSocket. Set `false` to disable                     |
-| `BUNQUEUE_CLOUD_USE_HTTP`                  | `true`   | Upload via HTTP. Set `false` to disable                          |
-| `BUNQUEUE_CLOUD_REMOTE_COMMANDS`           | `true`   | Allow remote commands from the dashboard. Set `false` to disable |
+| Variable                                   | Default  | Description                                                                                                         |
+| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `BUNQUEUE_CLOUD_URL`                       | (none)   | Cloud dashboard URL. Required for cloud mode                                                                        |
+| `BUNQUEUE_CLOUD_API_KEY`                   | (none)   | API key. Required for cloud mode                                                                                    |
+| `BUNQUEUE_CLOUD_INSTANCE_ID`               | (none)   | Unique instance identifier. Required for cloud mode                                                                 |
+| `BUNQUEUE_CLOUD_INSTANCE_NAME`             | hostname | Display name for this instance                                                                                      |
+| `BUNQUEUE_CLOUD_SIGNING_SECRET`            | (none)   | HMAC signing secret for payloads                                                                                    |
+| `BUNQUEUE_CLOUD_INTERVAL_MS`               | `15000`  | Reserved: not applied (an invalid value is only a warning). Uploads use an adaptive 5–30 s cadence by snapshot size |
+| `BUNQUEUE_CLOUD_INCLUDE_JOB_DATA`          | `true`   | Include job payloads in telemetry. Set `false` (or `0`/`no`/`off`) for metadata only                                |
+| `BUNQUEUE_CLOUD_REDACT_FIELDS`             | (none)   | Comma-separated payload fields to redact                                                                            |
+| `BUNQUEUE_CLOUD_EVENTS`                    | (all)    | Comma-separated event filter                                                                                        |
+| `BUNQUEUE_CLOUD_BUFFER_SIZE`               | `720`    | Snapshot buffer size while offline (whole number ≥ 1)                                                               |
+| `BUNQUEUE_CLOUD_CIRCUIT_BREAKER_THRESHOLD` | `5`      | Consecutive failures before the circuit breaker opens (≥ 1)                                                         |
+| `BUNQUEUE_CLOUD_CIRCUIT_BREAKER_RESET_MS`  | `60000`  | Circuit breaker reset window in ms (whole number ≥ 1)                                                               |
+| `BUNQUEUE_CLOUD_USE_WEBSOCKET`             | `true`   | Stream via WebSocket. Set `false` (or `0`/`no`/`off`) to disable                                                    |
+| `BUNQUEUE_CLOUD_USE_HTTP`                  | `true`   | Upload via HTTP. Set `false` (or `0`/`no`/`off`) to disable                                                         |
+| `BUNQUEUE_CLOUD_REMOTE_COMMANDS`           | `true`   | Allow remote commands from the dashboard. Set `false` (or `0`/`no`/`off`) to disable                                |
 
 ## Client & CLI
 
-| Variable             | Type   | Default     | Description                                                                  |
-| -------------------- | ------ | ----------- | ---------------------------------------------------------------------------- |
-| `BUNQUEUE_MODE`      | string | `embedded`  | Connection mode for the MCP server (`embedded` or `tcp`)                     |
-| `BUNQUEUE_HOST`      | string | `localhost` | Server host for the MCP server in TCP mode; also a CLI fallback for `--host` |
-| `BUNQUEUE_PORT`      | number | `6789`      | Server port for the MCP server in TCP mode                                   |
-| `BUNQUEUE_POOL_SIZE` | number | `2`         | Connection pool size for the MCP server in TCP mode                          |
-| `BUNQUEUE_EMBEDDED`  | string | (none)      | Set to `1` to make embedded mode the client default; `embedded: false` wins  |
-| `NO_COLOR`           | string | (none)      | Set to `1` to disable colored CLI output                                     |
+| Variable             | Type   | Default     | Description                                                                                                                                                                                                                    |
+| -------------------- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BUNQUEUE_MODE`      | string | `embedded`  | Connection mode for the MCP server (`embedded` or `tcp`)                                                                                                                                                                       |
+| `BUNQUEUE_HOST`      | string | `localhost` | Server host for the MCP server in TCP mode; also a CLI fallback for `--host`                                                                                                                                                   |
+| `BUNQUEUE_PORT`      | number | `6789`      | Server port for the MCP server in TCP mode: an integer from 1 to 65535 (`6789.0` accepted); anything else stops startup with an error naming the variable                                                                      |
+| `BUNQUEUE_POOL_SIZE` | number | `2`         | Connection pool size for the MCP server in TCP mode, read with `Number()` (`1e1` is 10). A value that is not a whole number ≥ 1 (`abc`, `0`, `Infinity`) means 2, with a warning on stderr; above the pool ceiling is an error |
+| `BUNQUEUE_EMBEDDED`  | string | (none)      | Set to `1` to make embedded mode the client default; `embedded: false` wins                                                                                                                                                    |
+| `NO_COLOR`           | string | (none)      | Any non-empty value disables colored output (CLI, help, doctor, server banner)                                                                                                                                                 |
+| `FORCE_COLOR`        | string | (none)      | Any non-empty value forces color, even on a pipe and over `NO_COLOR`; `0` or `false` force it off                                                                                                                              |
+
+Color follows one rule everywhere (CLI results, `--help`, `doctor` and the server startup banner): `FORCE_COLOR` first, then `NO_COLOR` or `TERM=dumb`, otherwise color only on a TTY. A pipe, a log file or `docker logs` therefore gets plain text by default.
 
 ```bash
 # Point the MCP server at a remote bunqueue instance
@@ -276,7 +313,7 @@ The MCP server also reads `BUNQUEUE_TOKEN` for authentication.
 
 The `BUNQUEUE_MCP_HTTP_*` variables are read only when `BUNQUEUE_MCP_TRANSPORT=http`.
 
-**CLI port fallback.** When `--port` is not passed, the CLI reads, in priority order: `TCP_PORT` > `BUNQUEUE_TCP_PORT` > `BQ_TCP_PORT`. Using `TCP_PORT` means the same variable that binds the server also routes the client in the same shell:
+**CLI port fallback.** When `--port` is not passed (or is passed empty, `--port=`), the CLI reads the first of `TCP_PORT`, `BUNQUEUE_TCP_PORT`, `BQ_TCP_PORT` that is set; an empty `TCP_PORT` means 6789. A value that is not a port (from 1 to 65535) prints a warning naming the variable and uses 6789, as in earlier releases: Kubernetes sets `BUNQUEUE_TCP_PORT=tcp://<ip>:<port>` for a Service named `bunqueue-tcp`, and that must not break the CLI. An explicit `--port` must be valid. Using `TCP_PORT` means the same variable that binds the server also routes the client in the same shell:
 
 ```bash
 export TCP_PORT=7000
@@ -325,7 +362,7 @@ S3_BACKUP_PREFIX=production/
 ```yaml
 services:
   bunqueue:
-    image: egeominotti/bunqueue:2.9.10
+    image: egeominotti/bunqueue:2.9.11
     ports:
       - '6789:6789'
       - '6790:6790'

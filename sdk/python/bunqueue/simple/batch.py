@@ -5,10 +5,13 @@ original."""
 
 from __future__ import annotations
 
+import math
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
+from ..durations import wait_seconds
 from ..job import Job
+from .validation import option
 
 
 class _Entry:
@@ -23,8 +26,13 @@ class _Entry:
 
 class BatchAccumulator:
     def __init__(self, config: Dict[str, Any]) -> None:
-        self._size = int(config["size"])
-        self._timeout_ms = float(config.get("timeout") or 5000)
+        # 0.2.0 reading: int(size), so 2.5 -> 2 and a size <= 0 flushes every
+        # job at once; math.inf flushes on timeout or close only. A timeout of
+        # 0 means 5000 ms; NaN or a negative one flushes at once (Bunqueue
+        # rejects an infinite one, which crashed the Timer thread).
+        size = config["size"]
+        self._size = size if size == math.inf else int(size)
+        self._timeout_ms = float(option(config, "timeout", None, 5000))
         self._processor: Callable[[List[Job]], List[Any]] = config["processor"]
         self._buffer: List[_Entry] = []
         self._timer: Optional[threading.Timer] = None
@@ -40,7 +48,8 @@ class BatchAccumulator:
                 if len(self._buffer) >= self._size:
                     self._flush_locked()
                 elif self._timer is None:
-                    self._timer = threading.Timer(self._timeout_ms / 1000.0, self.flush)
+                    delay = wait_seconds(self._timeout_ms) if self._timeout_ms > 0 else 0.0
+                    self._timer = threading.Timer(delay, self.flush)
                     self._timer.daemon = True
                     self._timer.start()
             entry.event.wait()

@@ -82,6 +82,7 @@ describe('FlowProducer production safety', () => {
     }
   });
 
+  // Flows share the PUSH validator, named as the caller's option (`attempts`).
   test('addBulk validates the whole batch before publishing its first flow', async () => {
     const queueName = 'repro-flow-addbulk-rollback';
     const queue = new Queue(queueName, { embedded: true });
@@ -96,11 +97,11 @@ describe('FlowProducer production safety', () => {
             name: 'second-parent',
             queueName,
             data: { branch: 2 },
-            opts: { attempts: 0 },
+            opts: { attempts: Number.NaN },
             children: [{ name: 'second-child', queueName, data: { branch: 2 } }],
           },
         ])
-      ).rejects.toThrow('attempts');
+      ).rejects.toThrow('attempts must be a number');
 
       const counts = await queue.getJobCountsAsync();
       expect(

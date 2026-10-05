@@ -380,6 +380,8 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 
 On `close()`, remaining buffered jobs are flushed.
 
+In TypeScript, `size` is a number (a value below 1 flushes every job, as 1 does, and a fraction rounds up) or `Infinity` to flush only on `timeout` (an omitted or NaN `size` does the same), and `timeout` a finite number of milliseconds (a negative value or NaN means 0); `timeout: Infinity` or a non-number throws when the app is created. A timeout longer than about 24.8 days (the runtime's timer limit) is honoured, not fired at once.
+
 ## Advanced retry
 
 Five backoff strategies (how long to wait between retry attempts) plus a predicate to decide what is worth retrying:
@@ -478,6 +480,10 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 | `custom` | `customBackoff(attempt, error) → ms` | Anything |
 
 This is **in-process retry**: the job stays active while retrying. Different from core `attempts`/`backoff`, which re-queues the job. Synchronous throws and rejected Promises follow the same retry policy. The pending backoff is tied to the job's cancellation signal, so `cancel()` or `close()` clears it and cannot invoke the processor again after shutdown.
+
+Every delay is honoured exactly, even past the runtime's 24.8-day timer limit (with the default 1000 ms base, `exponential` crosses it at attempt 23), and growth saturates at `Number.MAX_SAFE_INTEGER` ms instead of overflowing. Unlike core `backoff`, which is capped at 1 hour by default, these formulas have no cap: bound them in `customBackoff`, for example `(attempt) => Math.min(1000 * 2 ** attempt, 60_000)`.
+
+In TypeScript, `maxAttempts` is a number (a value below 1 makes one attempt, as 1 does, and a fraction rounds up), or `Infinity` (or NaN) to retry until success, `cancel()` or `close()` (pair it with a non-zero `delay`), and `delay` is a finite number of milliseconds (a negative value or NaN means 0); `delay: Infinity` or a non-number throws when the app is created. A `strategy` outside the five listed runs as `'fixed'` and logs one warning when the app is created. A falsy `retryIf` or `customBackoff` is ignored. `customBackoff` returns a finite number of milliseconds; a negative value, `NaN`, `undefined` or `null` retries at once and a numeric string is that many milliseconds, as before. `Infinity` or another non-number fails the job with a `TypeError` or `RangeError` whose `cause` is your processor's error, instead of retrying.
 
 ## Graceful cancellation
 
@@ -581,6 +587,10 @@ process alive after the job or app has finished. This cleanup also runs when a
 processor or middleware throws synchronously before returning a Promise, and
 it remains guaranteed if a user circuit-breaker callback throws.
 
+In TypeScript, the grace period is a finite number of milliseconds; a negative value
+or `NaN` cancels at once, as `0` does. `Infinity` throws, even for an unknown job id. A grace
+period longer than about 24.8 days is honoured, not fired at once.
+
 ## Circuit breaker
 
 When a downstream service is down, retrying every job just burns attempts. A circuit breaker pauses the worker after too many consecutive failures, then probes periodically until the service recovers:
@@ -666,6 +676,8 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 </Tabs>
 
 When both retry and circuit breaker are active: one job exhausting all its retries counts as one circuit breaker failure. `close()` terminally destroys the breaker, so aborting a pending retry during shutdown cannot call hooks or arm another reset timer. Explicit cancellation keeps the normal cooperative outcome: a processor that ignores the signal and completes still reports success, while a cancellation-induced rejection reports failure.
+
+In TypeScript, `threshold` is a number (a value below 1 opens on the first failure, as 1 does, and a fraction rounds up) and `resetTimeout` a finite number of milliseconds (a negative value or NaN means 0). `resetTimeout: Infinity` keeps the circuit open until `resetCircuit()`, and `threshold: Infinity` (or NaN) never opens it; a non-number throws when the app is created. A `resetTimeout` longer than about 24.8 days is honoured, not fired at once.
 
 ## Event triggers
 
@@ -955,7 +967,16 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 
 The aging scheduler owns one interval. Shutdown invalidates callbacks that were
 already queued or waiting on a job query before clearing that interval, so an
-old tick cannot modify priorities after `close()`.
+old tick cannot modify priorities after `close()`. Aging is best-effort: a tick
+whose job queries fail is skipped, and the next tick tries again. At most one
+tick runs at a time: if job queries take longer than `interval`, the firings
+that land during the tick are dropped rather than overlapping it, so a job is
+boosted at most once per tick and skipped ticks are not replayed in a burst.
+
+In TypeScript, `interval` must be a finite number of milliseconds ≥ 1, `minAge` a
+number of milliseconds (a negative value means 0), `boost` any number but NaN (0
+never ages), `maxPriority` any number (`Infinity` is no cap) and `maxScan` a finite
+number; anything else throws when the app is created.
 
 ## Deduplication defaults
 
@@ -1401,6 +1422,8 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 </TabItem>
 </Tabs>
 
+Some calls return before the broker answers: `pause()`, `resume()`, `setGlobalRateLimit()`, `removeGlobalRateLimit()`, `setDlqConfig()`, `retryDlq()`, `purgeDlq()`, the `dlq` constructor option, and the jobs that [event triggers](#event-triggers) enqueue. If one of them fails (for example over TCP, when the broker is unreachable, `commandTimeout` elapses, or the app is already closed), the `error` event receives an `Error` whose `command` (for example `Pause`, `RateLimit`, `SetDlqConfig`, or `add` for a trigger) and `queue` properties say what failed. Without an `error` listener the failure is logged once with `console.error`. Either way it never crashes the process. Await the `Async` variants when your code needs the outcome.
+
 ## Full example
 
 <Tabs syncKey="lang">
@@ -1594,6 +1617,8 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 | `debounce` | `{ ttl }` |
 | `rateLimit` | `{ max, duration, groupKey }` |
 | `dlq` | `{ autoRetry, autoRetryInterval, maxAutoRetries, maxAge, maxEntries }` |
+
+An invalid duration or count in `retry`, `circuitBreaker`, `batch` or `priorityAging` throws a `TypeError` or `RangeError` naming the option, for example `Bunqueue: priorityAging.interval must be a finite number of milliseconds >= 1 (got NaN)`, before the queue and worker are created. `undefined` keeps the default.
 
 ### Methods
 

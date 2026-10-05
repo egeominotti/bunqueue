@@ -1,10 +1,14 @@
 import { hostname } from 'os';
 import { jobId } from '../../../domain/types/job';
 import { EventType } from '../../../domain/types/queue';
+import { assertDuration } from '../../../shared/durations';
+import { safeInterval, safeTimeout, type SafeTimer } from '../../../shared/timers';
 import { getSharedManager } from '../../manager';
+import { coerceNumericString } from '../../tcp/numeric';
 import { TcpEventSubscription } from '../../queue-events/tcpSubscription';
 import type { Job } from '../../types';
 import { startHeartbeat } from '../workerHeartbeat';
+import { resolveWorkerConcurrency } from './options';
 import { WorkerState } from './state';
 
 export abstract class WorkerControl<T = unknown, R = unknown> extends WorkerState<T, R> {
@@ -32,9 +36,11 @@ export abstract class WorkerControl<T = unknown, R = unknown> extends WorkerStat
       this.registerWithServer();
     }
 
+    // heartbeatInterval is validated (finite, >= 0; 0 disables) and armed with
+    // safeInterval, so an interval above the native timer limit cannot spin.
     if (this.opts.heartbeatInterval > 0 && !this.opts.skipLockRenewal && !this.heartbeatTimer) {
       if (this.embedded) {
-        this.heartbeatTimer = setInterval(() => {
+        this.heartbeatTimer = safeInterval(() => {
           const manager = getSharedManager();
           for (const id of this.pulledJobIds) {
             const token = this.opts.useLocks ? this.jobTokens.get(id) : undefined;
@@ -113,8 +119,18 @@ export abstract class WorkerControl<T = unknown, R = unknown> extends WorkerStat
     return this.opts.concurrency;
   }
 
+  /**
+   * As on 2.9.10 (`Math.max(1, value)`): values below 1 and `null` are clamped to 1
+   * (documented), a fraction rounds up (the gate is `active >= concurrency`), Infinity
+   * removes the limit and a numeric string is that number. NaN (the gate would never
+   * close) or another non-number throws.
+   */
   set concurrency(value: number) {
-    const clamped = Math.max(1, value);
+    const coerced = coerceNumericString(value);
+    const clamped =
+      coerced === null || (typeof coerced === 'number' && coerced < 1)
+        ? 1
+        : resolveWorkerConcurrency(coerced, 'Worker.concurrency');
     const previous = this.opts.concurrency;
     (this.opts as { concurrency: number }).concurrency = clamped;
     this.ackBatcher.notifyCapacityChanged();
@@ -159,8 +175,17 @@ export abstract class WorkerControl<T = unknown, R = unknown> extends WorkerStat
     return this.rateLimiter.getRateLimiterInfo();
   }
 
+  /**
+   * Block new starts for `expireTimeMs`. As on 2.9.10 (BullMQ v5), a value that is not
+   * a positive finite number (0, negative, NaN, Infinity, `null`) does nothing, and a
+   * numeric string is that number; any other non-number throws a TypeError. A wait
+   * above the native timer limit parks the pull loop on a `safeTimeout` instead of
+   * spinning.
+   */
   rateLimit(expireTimeMs: number): void {
-    this.rateLimiter.rateLimit(expireTimeMs);
+    const ms = coerceNumericString(expireTimeMs ?? 0);
+    if (typeof ms !== 'number') assertDuration(ms, 'Worker.rateLimit: expireTimeMs');
+    this.rateLimiter.rateLimit(ms as number);
     this.ackBatcher.notifyCapacityChanged();
   }
 
@@ -193,16 +218,30 @@ export abstract class WorkerControl<T = unknown, R = unknown> extends WorkerStat
     // No-op for API compatibility; stall detection is automatic.
   }
 
-  async delay(milliseconds = 0, abortController?: AbortController): Promise<void> {
-    if (milliseconds <= 0) return;
+  /**
+   * BullMQ-compatible `delay(milliseconds?, abortController?)`. Omitted, `null`, 0 or a
+   * negative value resolves at once (as on 2.9.10 and in BullMQ), and a numeric string
+   * is that number; NaN, Infinity and another non-number reject. Any longer delay is honoured exactly. Aborting, or passing a
+   * controller that is already aborted, rejects with `Delay aborted`.
+   */
+  async delay(milliseconds?: number, abortController?: AbortController): Promise<void> {
+    const requested = coerceNumericString(milliseconds ?? 0);
+    if (typeof requested === 'number' && requested <= 0) return;
+    const ms = assertDuration(requested, 'Worker.delay: milliseconds');
+    if (ms === 0) return;
+    const signal = abortController?.signal;
+    if (signal?.aborted) throw new Error('Delay aborted');
     return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(resolve, milliseconds);
-      if (abortController) {
-        abortController.signal.addEventListener('abort', () => {
-          clearTimeout(timeout);
-          reject(new Error('Delay aborted'));
-        });
-      }
+      let timer: SafeTimer | null = null;
+      const onAbort = (): void => {
+        timer?.clear();
+        reject(new Error('Delay aborted'));
+      };
+      timer = safeTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      signal?.addEventListener('abort', onAbort, { once: true });
     });
   }
 }

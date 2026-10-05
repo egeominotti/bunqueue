@@ -1,4 +1,6 @@
 import { createConnection } from '../connection';
+import { ClientClosedError } from '../errors';
+import type { SocketWrapper } from '../types';
 import { TcpClientState } from './state';
 
 /** Connection establishment and authentication lifecycle. */
@@ -14,19 +16,26 @@ export abstract class TcpClientConnectivity extends TcpClientState {
 
     this.connecting = true;
     this.reconnect.setClosed(false);
+    const generation = ++this.generation;
 
     try {
-      await this.doConnect();
+      await this.doConnect(generation);
       this.reconnect.reset();
       this.emit('connected');
+      // A 'connected' listener may have closed the client: close() wins.
+      if (generation !== this.generation) return;
       this.health.startPing(async () => {
         await this.ping();
       });
       this.processQueue();
     } catch (error) {
-      this.connecting = false;
-      if (this.reconnect.canReconnect()) {
-        this.reconnect.scheduleReconnect(() => this.connect());
+      // A retired attempt leaves the state to whoever retired it (close() or a newer
+      // attempt) and never schedules a reconnect of its own.
+      if (generation === this.generation) {
+        this.connecting = false;
+        if (this.reconnect.canReconnect()) {
+          this.reconnect.scheduleReconnect(() => this.connect());
+        }
       }
       throw error;
     }
@@ -37,19 +46,28 @@ export abstract class TcpClientConnectivity extends TcpClientState {
   private waitForConnection(): Promise<void> {
     return new Promise((resolve, reject) => {
       const onConnect = () => {
-        this.off('error', onError);
+        settle();
         resolve();
       };
       const onError = (error: Error) => {
-        this.off('connected', onConnect);
+        settle();
         reject(error);
+      };
+      const settle = () => {
+        this.off('connected', onConnect);
+        this.off('error', onError);
+        this.connectWaiters.delete(onError);
       };
       this.once('connected', onConnect);
       this.once('error', onError);
+      this.connectWaiters.add(onError);
     });
   }
 
-  private async doConnect(): Promise<void> {
+  private async doConnect(generation: number): Promise<void> {
+    // Events of a socket whose generation was retired never reach the client: a late
+    // close cannot tear down a newer connection, nor late data answer its commands.
+    const current = () => generation === this.generation;
     const { socket } = await createConnection(
       {
         host: this.options.host,
@@ -59,30 +77,53 @@ export abstract class TcpClientConnectivity extends TcpClientState {
       this.options.connectTimeout,
       {
         onData: (frame) => {
-          this.handleData(frame);
+          if (current()) this.handleData(frame);
         },
         onClose: () => {
-          this.handleClose();
+          if (current()) this.handleClose();
         },
-        onError: (error) => this.emit('error', error),
+        onError: (error) => {
+          if (current()) this.emit('error', error);
+        },
       }
     );
 
+    if (!current()) this.abandon(socket);
     this.socket = socket;
 
     if (this.options.token) {
       try {
         await this.authenticate();
       } catch (error) {
-        this.socket.end();
-        this.socket = null;
-        throw error;
+        this.release(socket);
+        throw current() ? error : this.retiredError();
       }
+      if (!current()) this.abandon(socket);
     }
 
     this.connected = true;
     this.connecting = false;
     this.health.recordConnected();
+  }
+
+  /** Close the socket of a retired attempt and fail the attempt. */
+  private abandon(socket: SocketWrapper): never {
+    this.release(socket);
+    throw this.retiredError();
+  }
+
+  /** End `socket`, and forget it if it is still the client's. */
+  private release(socket: SocketWrapper): void {
+    if (this.socket === socket) this.socket = null;
+    try {
+      socket.end();
+    } catch {
+      // Already closed.
+    }
+  }
+
+  private retiredError(): Error {
+    return this.reconnect.isClosed() ? new ClientClosedError() : new Error('Connection lost');
   }
 
   private async authenticate(): Promise<void> {

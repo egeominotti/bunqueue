@@ -16,8 +16,10 @@ import { resolvePublicJobPayload } from '../../jobHelpers';
 import { removeJobDeduplicationKey } from '../../jobDeduplication';
 import { fetchTcpJobRows } from './queryTcpPages';
 import { metadataFromJob, type TerminalJobView } from '../jobMetadata';
+import { progressUpdate } from '../commandArgs';
+import { runInBackground, type BackgroundReporting } from '../backgroundCommand';
 
-export interface QueryContext {
+export interface QueryContext extends BackgroundReporting {
   name: string;
   embedded: boolean;
   tcp: TcpConnectionPool | null;
@@ -68,7 +70,8 @@ export async function getJob<T>(ctx: QueryContext, id: string): Promise<Job<T> |
         returnvalue: meta.returnvalue,
         failedReason: meta.failedReason,
         updateProgress: async (jid, progress, message) => {
-          await mgr.updateProgress(jobId(jid), progress, message);
+          const update = progressUpdate(progress, message);
+          await mgr.updateProgress(jobId(jid), update.progress, update.message);
         },
         log: (jid, message) => Promise.resolve(void mgr.addLog(jobId(jid), message)),
         getState: (jid) => ctx.getJobState(jid),
@@ -94,7 +97,8 @@ export async function getJob<T>(ctx: QueryContext, id: string): Promise<Job<T> |
         waitUntilFinished: ctx.waitJobUntilFinished,
         // Direct-to-manager callbacks (no server primitive or Queue-level wrapper)
         discard: (jid) => {
-          void mgr.discard(jobId(jid));
+          // Not awaited (sync API); a failure is reported by backgroundCommand.ts.
+          runInBackground(ctx, 'Discard', mgr.discard(jobId(jid)));
         },
         getFailedChildrenValues: (jid) => mgr.getFailedChildrenValues(jobId(jid)),
         getIgnoredChildrenFailures: (jid) => mgr.getIgnoredChildrenFailures(jobId(jid)),

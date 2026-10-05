@@ -52,6 +52,7 @@ export interface GroupJobOptions {
 /** Options accepted when adding a job. */
 export interface JobOptions {
   priority?: number;
+  /** Ms before the job is ready (at most 365 days); a negative delay is treated as 0. */
   delay?: number;
   attempts?: number;
   backoff?: number | BackoffOptions;

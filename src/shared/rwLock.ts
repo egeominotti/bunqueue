@@ -1,13 +1,18 @@
 /** Writer-priority read/write lock with FIFO writer handoff. */
 
-import { LockTimeoutError } from './lockError';
-import { DEFAULT_LOCK_TIMEOUT_MS } from './lockTimeout';
+import {
+  LockTimeoutError,
+  READ_LOCK_TIMEOUT_MESSAGE,
+  WRITE_LOCK_TIMEOUT_MESSAGE,
+} from './lockError';
+import { lockTimeoutMs } from './lockTimeout';
+import { safeTimeout, type SafeTimer } from './timers';
 import type { LockGuard } from './types/lock';
 
 interface RWWaiter {
   resolve: (guard: LockGuard) => void;
   reject: (error: LockTimeoutError) => void;
-  timer?: ReturnType<typeof setTimeout>;
+  timer?: SafeTimer;
   settled: boolean;
 }
 
@@ -18,37 +23,46 @@ export class RWLock {
   private readonly readerQueue: RWWaiter[] = [];
   private readonly writerQueue: RWWaiter[] = [];
 
-  acquireRead(timeoutMs: number = DEFAULT_LOCK_TIMEOUT_MS): Promise<LockGuard> {
+  /**
+   * Acquire a shared read guard. `timeoutMs` defaults to LOCK_TIMEOUT_MS; a value <= 0
+   * rejects at once when contended, and any longer value is honoured (`safeTimeout`).
+   */
+  acquireRead(timeoutMs?: number): Promise<LockGuard> {
     if (!this.writer && this.writerWaiting === 0) {
       this.readers++;
       return Promise.resolve(this.createReadGuard());
     }
-    if (timeoutMs <= 0) {
-      return Promise.reject(new LockTimeoutError('Read lock acquisition timed out'));
-    }
 
     return new Promise<LockGuard>((resolve, reject) => {
-      const waiter = this.createWaiter(resolve, reject, timeoutMs, () => {
-        waiter.reject(new LockTimeoutError('Read lock acquisition timed out'));
+      const waitMs = timeoutMs ?? lockTimeoutMs();
+      if (waitMs <= 0) {
+        reject(new LockTimeoutError(READ_LOCK_TIMEOUT_MESSAGE));
+        return;
+      }
+      const waiter = this.createWaiter(resolve, reject, waitMs, () => {
+        waiter.reject(new LockTimeoutError(READ_LOCK_TIMEOUT_MESSAGE));
         this.drain();
       });
       this.readerQueue.push(waiter);
     });
   }
 
-  acquireWrite(timeoutMs: number = DEFAULT_LOCK_TIMEOUT_MS): Promise<LockGuard> {
+  /** Acquire the exclusive write guard; `timeoutMs` as for `acquireRead`. */
+  acquireWrite(timeoutMs?: number): Promise<LockGuard> {
     if (!this.writer && this.readers === 0 && this.writerWaiting === 0) {
       this.writer = true;
       return Promise.resolve(this.createWriteGuard());
     }
-    if (timeoutMs <= 0) {
-      return Promise.reject(new LockTimeoutError('Write lock acquisition timed out'));
-    }
 
     return new Promise<LockGuard>((resolve, reject) => {
-      const waiter = this.createWaiter(resolve, reject, timeoutMs, () => {
+      const waitMs = timeoutMs ?? lockTimeoutMs();
+      if (waitMs <= 0) {
+        reject(new LockTimeoutError(WRITE_LOCK_TIMEOUT_MESSAGE));
+        return;
+      }
+      const waiter = this.createWaiter(resolve, reject, waitMs, () => {
         this.writerWaiting--;
-        waiter.reject(new LockTimeoutError('Write lock acquisition timed out'));
+        waiter.reject(new LockTimeoutError(WRITE_LOCK_TIMEOUT_MESSAGE));
         this.drain();
       });
       this.writerWaiting++;
@@ -72,7 +86,7 @@ export class RWLock {
       reject,
       settled: false,
     };
-    waiter.timer = setTimeout(() => {
+    waiter.timer = safeTimeout(() => {
       if (waiter.settled) return;
       waiter.settled = true;
       onTimeout();
@@ -87,7 +101,7 @@ export class RWLock {
       const waiter = this.takeWriter();
       if (waiter) {
         waiter.settled = true;
-        if (waiter.timer) clearTimeout(waiter.timer);
+        waiter.timer?.clear();
         this.writerWaiting--;
         this.writer = true;
         waiter.resolve(this.createWriteGuard());
@@ -109,7 +123,7 @@ export class RWLock {
     for (const waiter of waiters) {
       if (waiter.settled) continue;
       waiter.settled = true;
-      if (waiter.timer) clearTimeout(waiter.timer);
+      waiter.timer?.clear();
       this.readers++;
       waiter.resolve(this.createReadGuard());
     }

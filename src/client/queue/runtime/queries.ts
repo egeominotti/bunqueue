@@ -1,6 +1,7 @@
 import type { Job, JobOptions, JobStateType } from '../../types';
 import * as countsOps from '../operations/counts';
 import * as addOps from '../operations/add';
+import { assertAddOptions } from '../operations/add/validation';
 import * as queryOps from '../operations/query';
 import * as queryStateOps from '../operations/queryStates';
 import * as groupOps from '../operations/groups';
@@ -83,6 +84,12 @@ export class QueueQueries<T> extends QueueState<T> {
 
   add(name: string, data: T, opts?: JobOptions): Promise<Job<T>> {
     if (this.addBatcher && !opts?.durable) {
+      // Validate before batching: an invalid add must not fail the rest of its PUSHB.
+      try {
+        assertAddOptions(this.opts.defaultJobOptions, opts);
+      } catch (error) {
+        return Promise.reject(error as Error);
+      }
       return this.addBatcher.enqueue(name, data, opts) as Promise<Job<T>>;
     }
     return addOps.add(this.addCtx, name, data, opts);

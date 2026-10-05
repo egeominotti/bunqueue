@@ -36,15 +36,36 @@ defmodule Bunqueue.Worker do
 
   @type t :: %__MODULE__{}
 
+  # Wait before the next pull after an empty one, as the main client does
+  # (`src/client/worker/runtime/polling.ts`:
+  # `pollTimeout > 0 ? 10 : drainDelay`, drainDelay defaulting to 50 ms). A
+  # non-blocking poll returns at once and a short long poll returns after it,
+  # so without the wait `run/1` re-polls at broker-wait plus round-trip speed.
+  @empty_long_poll_delay 10
+  @empty_poll_delay 50
+  # The BEAM rejects `receive ... after` timeouts above 2^32 - 1 ms.
+  @max_timer 4_294_967_295
+  # The broker accepts lease TTLs up to Number.MAX_SAFE_INTEGER ms.
+  @max_lock_ttl 9_007_199_254_740_991
+  @default_lock_ttl 30_000
+
   @spec new(String.t(), (Job.t() -> term()), keyword()) :: t()
   def new(queue, handler, options \\ []) when is_function(handler, 1) do
+    # Validate before any linked process starts, so a rejected option leaks none.
+    lock_ttl = options |> Keyword.get(:lock_ttl) |> lock_ttl!()
+    concurrency = options |> Keyword.get(:concurrency, 1) |> positive()
+    batch_size = options |> Keyword.get(:batch_size, concurrency) |> clamp_batch()
+    poll_timeout = options |> Keyword.get(:poll_timeout, 1_000) |> clamp_poll()
+
+    heartbeat_interval =
+      options |> Keyword.get(:heartbeat_interval, 10_000) |> heartbeat_interval!()
+
     connection_options = Keyword.get(options, :connection, options)
     {:ok, connection} = Connection.start_link(connection_options)
     {:ok, heartbeat_connection} = Connection.start_link(connection_options)
     {:ok, lifecycle} = WorkerLifecycle.start_link()
     stats = :atomics.new(3, signed: false)
     worker_id = Keyword.get(options, :worker_id, unique_id())
-    concurrency = options |> Keyword.get(:concurrency, 1) |> positive()
 
     %__MODULE__{
       queue: queue,
@@ -55,10 +76,10 @@ defmodule Bunqueue.Worker do
       stats: stats,
       lifecycle: lifecycle,
       concurrency: concurrency,
-      batch_size: options |> Keyword.get(:batch_size, concurrency) |> clamp_batch(),
-      poll_timeout: options |> Keyword.get(:poll_timeout, 1_000) |> clamp_poll(),
-      lock_ttl: options |> Keyword.get(:lock_ttl, 30_000) |> positive(),
-      heartbeat_interval: normalize_interval(Keyword.get(options, :heartbeat_interval, 10_000)),
+      batch_size: batch_size,
+      poll_timeout: poll_timeout,
+      lock_ttl: lock_ttl,
+      heartbeat_interval: heartbeat_interval,
       stack_trace_limit: options |> Keyword.get(:stack_trace_limit, 10) |> positive(),
       name: Keyword.get(options, :name, worker_id)
     }
@@ -110,7 +131,8 @@ defmodule Bunqueue.Worker do
       :ok
     else
       case run_once(worker) do
-        {:ok, _count} ->
+        {:ok, count} ->
+          idle_wait(worker, count)
           run(worker)
 
         {:error, _error} ->
@@ -141,6 +163,8 @@ defmodule Bunqueue.Worker do
     :ok
   end
 
+  # Best effort: a stopper that takes over from a dead owner may find the
+  # connection already closed, and stop must still return.
   defp unregister(worker) do
     if Connection.generation(worker.connection) > 0 do
       Connection.call(
@@ -149,6 +173,8 @@ defmodule Bunqueue.Worker do
         1_000
       )
     end
+  catch
+    :exit, _reason -> :ok
   end
 
   @doc false
@@ -184,6 +210,10 @@ defmodule Bunqueue.Worker do
 
   defp stopped?(worker), do: :atomics.get(worker.stats, 3) == 1
 
+  defp idle_wait(%{poll_timeout: 0}, 0), do: Process.sleep(@empty_poll_delay)
+  defp idle_wait(_worker, 0), do: Process.sleep(@empty_long_poll_delay)
+  defp idle_wait(_worker, _count), do: :ok
+
   defp summarize(results) do
     case Enum.find_value(results, fn
            {:ok, {:error, error}} -> error
@@ -195,14 +225,50 @@ defmodule Bunqueue.Worker do
     end
   end
 
+  # Explicit values map exactly as in 0.1.1: any value that is not a positive
+  # integer is a batch of 1 (`nil`, a float, a non-number), and the batch is
+  # capped at the broker's 1000.
   defp clamp_batch(value), do: value |> positive() |> min(1_000)
 
+  # As in 0.1.1, a number is clamped to 0..30_000 and anything else (`nil`
+  # included) is a non-blocking poll; `idle_wait/2` keeps 0 from spinning.
   defp clamp_poll(value) when is_number(value),
     do: value |> trunc() |> max(0) |> min(30_000)
 
   defp clamp_poll(_value), do: 0
-  defp normalize_interval(value) when is_number(value) and value > 0, do: trunc(value)
-  defp normalize_interval(_value), do: nil
+
+  # As in 0.1.1, a number <= 0, `nil`, `false` or another atom disables
+  # heartbeats. A positive number never becomes `after 0` (a JobHeartbeatB
+  # loop) or exceeds the BEAM timer limit (a `:timeout_value` crash in the
+  # linked heartbeat process). `true` and other non-numbers raise: 0.1.1
+  # silently dropped the heartbeats they asked for, so a job outliving its lease
+  # was delivered again while still running.
+  defp heartbeat_interval!(value) when is_number(value) and value > 0,
+    do: value |> trunc() |> max(1) |> min(@max_timer)
+
+  defp heartbeat_interval!(value) when is_number(value), do: nil
+  defp heartbeat_interval!(value) when is_atom(value) and value != true, do: nil
+
+  defp heartbeat_interval!(value) do
+    raise ArgumentError,
+          ":heartbeat_interval must be a number of milliseconds, nil or false, " <>
+            "got: #{inspect(value)}"
+  end
+
+  # `nil` means the default lease. A positive number becomes whole milliseconds,
+  # rounded up so a fraction never reaches 0, and is capped at the broker's
+  # limit. Zero, negative and non-number values raise: 0.1.1 turned each of
+  # them, and every float, into a 1 ms lease that expired mid-job.
+  defp lock_ttl!(nil), do: @default_lock_ttl
+
+  defp lock_ttl!(value) when is_number(value) and value > 0,
+    do: value |> ceil() |> min(@max_lock_ttl)
+
+  defp lock_ttl!(value) do
+    raise ArgumentError,
+          ":lock_ttl must be a positive number of milliseconds, got: #{inspect(value)}"
+  end
+
   defp positive(value) when is_integer(value) and value > 0, do: value
   defp positive(_value), do: 1
   defp hostname, do: :inet.gethostname() |> elem(1) |> to_string()

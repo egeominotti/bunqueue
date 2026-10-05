@@ -81,7 +81,9 @@ async function launch(): Promise<void> {
       process.exit(1);
     }
 
-    process.stderr.write(`Fatal error: ${err}\n`);
+    // The message only, as the server entry points print it: `${err}` would prefix
+    // the class name ("Fatal error: Error: ...", "Fatal error: ConfigError: ...").
+    process.stderr.write(`Fatal error: ${msg}\n`);
     process.exit(1);
   }
 }

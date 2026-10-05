@@ -9,10 +9,13 @@ export { FrameParser, FrameSizeError, MAX_FRAME_SIZE } from './protocol/framePar
 export { LineBuffer } from './protocol/lineBuffer';
 export {
   validateBackoffField,
+  validateDelayArgument,
   validateGroupId,
   validateJobData,
   validateJobOptions,
+  validateLockDuration,
   validateNumericField,
+  validatePullTimeout,
   validateQueueName,
 } from './protocol/validation';
 export type { ConnectionState } from './types/protocol';

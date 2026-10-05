@@ -159,7 +159,9 @@ async function recoverWaiting(exec: Execution, wf: Workflow, deps: RecoverDeps):
     const elapsed = clock().now() - waitingSince;
     const remaining = node.timeout - elapsed;
 
-    if (remaining <= 0) {
+    // A remaining budget that is not a finite number (a corrupted start time) cannot be
+    // armed; the node re-runs now and runWaitFor fails the gate cleanly.
+    if (!Number.isFinite(remaining) || remaining <= 0) {
       deps.assertActive();
       exec.state = 'running';
       deps.store.update(exec);

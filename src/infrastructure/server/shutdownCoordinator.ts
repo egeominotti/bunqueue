@@ -1,4 +1,5 @@
 import { serverLog } from '../../shared/logger';
+import { safeTimeout, type SafeTimer } from '../../shared/timers';
 import { stopRateLimiter } from './rateLimiter';
 
 export interface ServerShutdownResources {
@@ -46,9 +47,9 @@ async function withTimeout(
   timeoutMs: number,
   label: string
 ): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timer: SafeTimer | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
+    timer = safeTimeout(
       () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
       timeoutMs
     );
@@ -56,7 +57,7 @@ async function withTimeout(
   try {
     await Promise.race([Promise.resolve().then(operation), timeout]);
   } finally {
-    if (timer) clearTimeout(timer);
+    timer?.clear();
   }
 }
 
@@ -72,6 +73,11 @@ async function bestEffort(
   }
 }
 
+/**
+ * Poll active jobs once per second until none remain or `shutdownTimeoutMs` has elapsed.
+ * Any timeout length works (the poll uses `sleep`, never a timer armed for the whole
+ * timeout), so a value above 2^31 - 1 ms neither skips the drain nor ends it early.
+ */
 async function drainActiveJobs(
   resources: ServerShutdownResources,
   runtime: ServerShutdownRuntime

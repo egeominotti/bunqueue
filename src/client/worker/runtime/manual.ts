@@ -1,12 +1,33 @@
+import { processingTimeoutDelay } from '../../../domain/job/timeoutRule';
 import type { Job as InternalJob } from '../../../domain/types/job';
+import { assertDuration } from '../../../shared/durations';
+import { safeTimeout } from '../../../shared/timers';
 import { resolvePublicJobPayload } from '../../jobHelpers';
+import { coerceNumericString } from '../../tcp/numeric';
 import { getSharedManager } from '../../manager';
 import { parseJobFromResponse } from '../jobParser';
+import { PullFailureLog } from '../pullFailureLog';
+import { PullRefusedError } from '../workerPull';
 import { processJob } from '../processor';
 import type { ManualJob } from '../types';
 import { WorkerControl } from './control';
 
 export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerControl<T, R> {
+  /** Rate limit of the console line for pull failures nobody listens to. */
+  private readonly pullFailureLog = new PullFailureLog();
+
+  /**
+   * Report a failed pull, decorated with `queue` and `context: 'pull'` (`PullFailureLog`):
+   * a transient refusal is not reported (2.9.10 read it as an empty queue); anything
+   * else is emitted as `error` while the Worker has a listener (a listener that throws
+   * is logged, never rethrown), otherwise a permanent failure is logged at most once a
+   * minute. An unheard `error` is never emitted, since EventEmitter would throw it and
+   * end the process. Never throws.
+   */
+  protected reportPullFailure(error: Error): void {
+    this.pullFailureLog.report(`Worker "${this.name}"`, this, error);
+  }
+
   private registerManualJob(job: InternalJob, token: string | null): ManualJob<T> {
     const payload = resolvePublicJobPayload(job);
     const manualJob: ManualJob<T> = {
@@ -50,7 +71,18 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
     }
 
     const response = await this.tcp.send(command);
-    if (!response.ok || !response.job) return undefined;
+    if (response.ok !== true) {
+      // A refusal is "no job" to the caller, as on 2.9.10, so a loop written for it never
+      // breaks. A permanent one (a validation or auth error) is reported: to an `error`
+      // listener (context 'pull'), else logged at most once a minute. A transient one
+      // (`isTransientRefusal`: the rate limit, a shard lock timeout, a storage failure
+      // redacted to `Internal server error`) is "no job right now" and not reported. A
+      // timed-out command or a lost connection rejects from send().
+      const refusal = new PullRefusedError('PULL', response);
+      this.reportPullFailure(Object.assign(refusal, { queue: this.name, context: 'pull' }));
+      return undefined;
+    }
+    if (!response.job) return undefined;
     const job = parseJobFromResponse(response.job as Record<string, unknown>, this.queueKey);
     const lockToken = this.opts.useLocks ? ((response.token as string | undefined) ?? null) : null;
     return this.registerManualJob(job, lockToken);
@@ -97,15 +129,17 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
     const jobId = String(processingJob.id);
     const abortController = this.createAbortController(jobId);
     let timedOut = false;
+    // Same rule as automatic processing: only a deadline the broker enforces.
+    const timeoutMs = processingTimeoutDelay(processingJob);
     const timeout =
-      processingJob.timeout === null
+      timeoutMs === null
         ? null
-        : setTimeout(() => {
+        : safeTimeout(() => {
             timedOut = true;
             abortController.abort(
               new Error(`Job ${jobId} timed out after ${processingJob.timeout}ms`)
             );
-          }, processingJob.timeout);
+          }, timeoutMs);
 
     try {
       await processJob(processingJob, {
@@ -125,7 +159,7 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
       if (fetchNextCallback) return await fetchNextCallback();
     } finally {
       this.retireAckCandidate(delivery);
-      if (timeout !== null) clearTimeout(timeout);
+      timeout?.clear();
       this.releaseAbortController(jobId, abortController);
       this.activeJobs--;
       this.finishDelivery(delivery);
@@ -133,8 +167,21 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
     }
   }
 
+  /**
+   * Renew the leases of `jobIds` for `duration` ms from now. Like `lockDuration`, the
+   * duration must be finite and >= 1: the broker sets the expiry to `now + duration`, so
+   * 0 or less expires the lease and NaN or Infinity would make it never expire. As on
+   * 2.9.10, an omitted or `null` duration renews each lease with its own TTL, a numeric
+   * string is that number, and a closed Worker or an empty `jobIds` returns 0 before
+   * any check.
+   */
   async extendJobLocks(jobIds: string[], tokens: string[], duration: number): Promise<number> {
     if (this.closed || jobIds.length === 0) return 0;
+    const requested = coerceNumericString(duration);
+    const ttl =
+      requested === undefined || requested === null
+        ? undefined
+        : assertDuration(requested, 'Worker.extendJobLocks: duration', { min: 1 });
     if (jobIds.length !== tokens.length) {
       throw new Error('jobIds and tokens arrays must have the same length');
     }
@@ -143,7 +190,8 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
       const manager = getSharedManager();
       let extended = 0;
       for (let index = 0; index < jobIds.length; index++) {
-        const success = await manager.extendLock(jobIds[index], tokens[index], duration);
+        // `undefined` keeps the lease's own TTL (renewLock: `newTtl ?? lock.ttl`).
+        const success = await manager.extendLock(jobIds[index], tokens[index], ttl as number);
         if (success) extended++;
       }
       return extended;
@@ -154,7 +202,7 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
       cmd: 'ExtendLocks',
       ids: jobIds,
       tokens,
-      durations: jobIds.map(() => duration),
+      durations: jobIds.map(() => ttl ?? null),
     });
     const extended = response.count as number | undefined;
     return extended ?? 0;

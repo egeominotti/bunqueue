@@ -4,14 +4,15 @@
 
 import type { S3Client } from 'bun';
 import { backupLog } from '../../shared/logger';
+import { safeTimeout, type SafeTimer } from '../../shared/timers';
 
 export const DEFAULT_S3_TIMEOUT_MS = 30_000;
 
 /** Race a promise against a timeout and always release the timeout handle. */
 export async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timer: SafeTimer | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
+    timer = safeTimeout(() => {
       reject(new Error(`${label} timed out after ${ms}ms`));
     }, ms);
   });
@@ -19,9 +20,7 @@ export async function withTimeout<T>(promise: Promise<T>, ms: number, label: str
   try {
     return await Promise.race([promise, timeout]);
   } finally {
-    if (timer) {
-      clearTimeout(timer);
-    }
+    timer?.clear();
   }
 }
 

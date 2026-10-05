@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
-import { MAX_TIMER_DELAY_MS, timeoutTimerDelay } from '../src/application/background/timeouts';
+import { timeoutTimerDelay } from '../src/application/background/timeouts';
+import { MAX_TIMER_DELAY_MS } from '../src/shared/timers';
 import type { JobId } from '../src/domain/types/job';
 
 let manager: QueueManager | null = null;
@@ -33,6 +34,9 @@ describe('job timeout deadline scheduler', () => {
     expect(timeoutTimerDelay(now + MAX_TIMER_DELAY_MS + 60_000, now)).toBe(MAX_TIMER_DELAY_MS);
     expect(timeoutTimerDelay(now + 250, now)).toBe(250);
     expect(timeoutTimerDelay(now - 1, now)).toBe(1);
+    // A NaN distance re-checks in 1 ms instead of throwing out of schedule() on the
+    // pull path; expireDue then re-validates against the job itself.
+    expect(timeoutTimerDelay(NaN, now)).toBe(1);
   });
 
   test('creates the lease before arming an immediate locked timeout', async () => {

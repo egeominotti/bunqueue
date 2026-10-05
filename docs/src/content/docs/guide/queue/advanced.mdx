@@ -274,6 +274,17 @@ let ids = queue.add_bulk(vec![
 
 _Auto-batching is available in both TypeScript packages (`bunqueue/client` and `bunqueue-client`); in the other SDKs, use `addBulk` to batch producer traffic into one round-trip._
 
+The `Queue` constructor checks these options. `enabled` is a boolean; the strings
+`'true'`/`'false'` and the numbers `1`/`0` are read with their meaning, and any other
+value keeps batching on with one console warning. `maxSize` is a number: a value below
+`1` flushes every add (as `1` does), a fraction rounds up, and `Infinity`, NaN or a
+non-number never flushes by size. `maxDelayMs` is a finite number of milliseconds (a long
+window is honoured exactly); a negative value, NaN, `Infinity` or a non-number means `0`,
+an immediate flush. A numeric string such as `'50'` is read as that number. None of
+these options throws. Each `add()` is also validated before it joins a batch,
+so a job with an invalid option rejects on its own instead of failing the other
+adds that share its round trip.
+
 :::caution[Durable jobs bypass the batcher]
 Jobs with `durable: true` are always sent individually rather than through the
 client batcher. On a SQLite server they also bypass its write buffer;

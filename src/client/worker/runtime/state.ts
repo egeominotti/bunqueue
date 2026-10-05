@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import type { Job as InternalJob } from '../../../domain/types/job';
+import type { SafeTimer } from '../../../shared/timers';
 import type { Job, Processor, WorkerOptions } from '../../types';
 import { getSharedManager } from '../../manager';
 import type { TcpConnectionPool } from '../../tcpPool';
@@ -41,7 +42,7 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
   protected _closingPromise: Promise<void> | null = null;
   protected closed = false;
   protected activeJobs = 0;
-  protected pollTimer: ReturnType<typeof setTimeout> | null = null;
+  protected pollTimer: SafeTimer | null = null;
   protected pollDeadline: number | null = null;
   protected consecutiveErrors = 0;
   protected readonly pulledJobIds: Set<string> = new Set();
@@ -52,8 +53,8 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
   private readonly currentDeliveries = new Map<string, WorkerDelivery>();
   private readonly activeDeliveries = new Map<string, Set<number>>();
   private readonly unqueuedAckCandidates = new Set<number>();
-  protected heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-  protected workerHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  protected heartbeatTimer: SafeTimer | null = null;
+  protected workerHeartbeatTimer: SafeTimer | null = null;
   protected processedCount = 0;
   protected failedCount = 0;
   protected readonly startedAt: number;
@@ -264,7 +265,7 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
     const timer = this.pollTimer;
     this.pollTimer = null;
     this.pollDeadline = null;
-    if (timer !== null) clearTimeout(timer);
+    timer?.clear();
   }
 
   private reachableUnqueuedAckCount(): number {
