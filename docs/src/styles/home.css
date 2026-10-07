@@ -126,6 +126,9 @@
 }
 
 .home-announce-tag {
+  /* On phones the pill text wraps; without these the tag shrinks to "Ne/w". */
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 2px 9px;
   border-radius: 999px;
   background: var(--home-accent);

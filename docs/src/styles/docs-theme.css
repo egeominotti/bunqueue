@@ -34,8 +34,9 @@
 /* Header: translucent, so the page reads through it while scrolling. */
 header.header {
   background-color: color-mix(in srgb, var(--sl-color-bg) 84%, transparent);
-  backdrop-filter: saturate(140%) blur(12px);
+  /* Prefixed first, or the minifier keeps only the -webkit- form (see custom.css). */
   -webkit-backdrop-filter: saturate(140%) blur(12px);
+  backdrop-filter: saturate(140%) blur(12px);
 }
 
 /* Page title: the breadcrumb already says where you are, so no eyebrow above it, and

@@ -72,9 +72,13 @@ const year = new Date().getFullYear();
       <a href="https://x.com/bunqueue">X</a>
       <a href="/blog/">Blog</a>
       <a href="/rss.xml">RSS</a>
+      <a href="mailto:founder@bunqueue.dev">Contact</a>
     </nav>
   </div>
-  <p class="bq-footer-legal">MIT licensed · © {year} Egeo Minotti · bunqueue.dev</p>
+  <p class="bq-footer-legal">
+    MIT licensed · © {year} Egeo Minotti · bunqueue.dev ·
+    <a href="mailto:founder@bunqueue.dev">founder@bunqueue.dev</a>
+  </p>
 </footer>
 
 <style>
@@ -144,6 +148,14 @@ const year = new Date().getFullYear();
     border-top: 1px solid var(--bq-line, var(--sl-color-hairline));
     font-size: 0.76rem;
     color: var(--sl-color-gray-3);
+  }
+
+  .bq-footer-legal a {
+    color: inherit;
+  }
+
+  .bq-footer-legal a:hover {
+    color: var(--sl-color-white);
   }
 
   @media (max-width: 50rem) {

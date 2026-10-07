@@ -540,6 +540,7 @@ export default defineConfig({
             publisher: {
               '@type': 'Person',
               name: 'egeominotti',
+              email: 'founder@bunqueue.dev',
             },
             codeRepository: 'https://github.com/egeominotti/bunqueue',
             downloadUrl: 'https://www.npmjs.com/package/bunqueue',

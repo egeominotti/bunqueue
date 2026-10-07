@@ -18,6 +18,21 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## Unreleased
+
+### Documentation
+
+- **The docs header blurs the page behind it in Chrome and Firefox again.** The
+  stylesheets declared `backdrop-filter` before `-webkit-backdrop-filter`, and
+  Lightning CSS, which minifies the site's CSS, kept only the prefixed form, so
+  only Safari blurred and other browsers showed text through the translucent
+  header. The prefixed declaration now comes first and both ship.
+- **The homepage "New" tags no longer wrap to "Ne/w" on phones.** The tag
+  stays on one line and the announcement text wraps beside it.
+- **A contact address, founder@bunqueue.dev, is in the site footer** and in the
+  publisher of the site-wide SoftwareApplication and per-page TechArticle
+  structured data.
+
 ## [2.9.11] - 2026-10-05
 
 Bun and Node.js run a timer whose delay is `NaN`, negative, infinite or above
