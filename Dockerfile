@@ -15,7 +15,7 @@ RUN case "$TARGETARCH" in amd64) arch=x64 ;; arm64) arch=arm64 ;; *) exit 1 ;; e
     bun build --compile --minify --target="bun-linux-${arch}${libc}" src/main.ts --outfile bunqueue
 RUN mkdir /app/data
 
-FROM alpine:3.22 AS alpine-base
+FROM alpine:3.24 AS alpine-base
 RUN apk add --no-cache ca-certificates libgcc libstdc++
 
 FROM debian:trixie AS debian-base
