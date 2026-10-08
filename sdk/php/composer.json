@@ -10,7 +10,7 @@
         "rybakit/msgpack": "^0.9"
     },
     "require-dev": {
-        "giorgiosironi/eris": "1.1.0",
+        "giorgiosironi/eris": "1.2.0",
         "phpunit/phpunit": "^10.5"
     },
     "autoload": {
