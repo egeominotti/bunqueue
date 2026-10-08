@@ -56,10 +56,16 @@ export function getDlqRetryState(job: Job): DlqRetryState | null {
   return (job as { [DLQ_RETRY_STATE]?: DlqRetryState })[DLQ_RETRY_STATE] ?? null;
 }
 
-/** Restore internal DLQ state from SQLite as a non-enumerable Job property. */
+/**
+ * Restore internal DLQ state from SQLite as a non-enumerable Job property.
+ * Clearing assigns `undefined` instead of deleting the property: a delete gave
+ * every retried job a hidden class (Structure) of its own, plus its own
+ * property-name cache once serialized, about 1 KB per retained job.
+ */
 export function setDlqRetryState(job: Job, state: DlqRetryState | null): void {
+  const holder = job as { [DLQ_RETRY_STATE]?: DlqRetryState };
   if (state === null) {
-    delete (job as { [DLQ_RETRY_STATE]?: DlqRetryState })[DLQ_RETRY_STATE];
+    if (holder[DLQ_RETRY_STATE] !== undefined) holder[DLQ_RETRY_STATE] = undefined;
     return;
   }
   Object.defineProperty(job, DLQ_RETRY_STATE, {

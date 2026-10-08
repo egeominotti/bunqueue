@@ -473,7 +473,8 @@ table's `entry` column. See [Dead Letter Queue](./features/dead-letter-queue.md)
 While an automatic DLQ retry is waiting or active, its original entry times,
 attempt history, retry count and next backoff live in a non-enumerable Job
 symbol and in `jobs.dlq_retry_state`. This state is absent from the public Job
-wire shape. Completion and manual retry clear it; a terminal re-failure consumes
+wire shape. Completion and manual retry clear it (by assigning `undefined`, so
+the Job keeps its hidden class); a terminal re-failure consumes
 it to reconstruct the same bounded DLQ generation.
 
 `DlqEntry.reason` is the final failure classification, while each
