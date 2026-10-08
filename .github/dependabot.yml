@@ -1,3 +1,14 @@
+# Dependabot policy:
+# - Major updates are ignored here: they can break the public API, the TCP
+#   protocol or persisted data, so they are done by hand through an RFC
+#   (see GOVERNANCE.md and VERSIONING.md).
+#   This includes GitHub Actions: their majors (often a new Node.js runtime)
+#   are reviewed by hand before GitHub retires the runtime they use.
+# - Minor and patch updates are grouped into one pull request per ecosystem
+#   and directory.
+# - Security alerts still appear under Security > Dependabot alerts. A security
+#   fix that exists only in a new major version gets no automatic pull request
+#   (the major ignore applies to it too): handle it by hand from the alert.
 version: 2
 
 updates:
@@ -5,52 +16,122 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
-      dev-dependencies:
-        dependency-type: development
+      minor-and-patch:
+        update-types: ['minor', 'patch']
 
   - package-ecosystem: bun
     directory: /docs
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
-      actions:
-        patterns: ['*']
+      minor-and-patch:
+        update-types: ['minor', 'patch']
 
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # The Rust image is the SDK's minimum supported Rust version
+      # (`rust-version` in sdk/rust/Cargo.toml); it changes only with that.
+      - dependency-name: 'rust'
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
 
   # Official SDKs
   - package-ecosystem: bun
     directory: /sdk/typescript
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+
   - package-ecosystem: pip
     directory: /sdk/python
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+
   - package-ecosystem: gomod
     directory: /sdk/go
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+
   - package-ecosystem: cargo
     directory: /sdk/rust
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+
   - package-ecosystem: composer
     directory: /sdk/php
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+
   - package-ecosystem: mix
     directory: /sdk/elixir
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
