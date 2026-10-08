@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e5865cc00ae5518249e7068daf252803",
+    "content-hash": "96f3fe25a6052585444ad480585ae719",
     "packages": [
         {
             "name": "rybakit/msgpack",
@@ -72,16 +72,16 @@
     "packages-dev": [
         {
             "name": "giorgiosironi/eris",
-            "version": "1.1.0",
+            "version": "1.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/giorgiosironi/eris.git",
-                "reference": "be4969c653431ba8de75bff16efcb825742c7177"
+                "reference": "90a317156ff522845d092cb261d92914d32ba49a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/giorgiosironi/eris/zipball/be4969c653431ba8de75bff16efcb825742c7177",
-                "reference": "be4969c653431ba8de75bff16efcb825742c7177",
+                "url": "https://api.github.com/repos/giorgiosironi/eris/zipball/90a317156ff522845d092cb261d92914d32ba49a",
+                "reference": "90a317156ff522845d092cb261d92914d32ba49a",
                 "shasum": ""
             },
             "require": {
@@ -89,7 +89,7 @@
             },
             "require-dev": {
                 "friendsofphp/php-cs-fixer": "^3.0",
-                "ilario-pierbattista/reverse-regex": "0.5.0",
+                "ilario-pierbattista/reverse-regex": "^0.6.0",
                 "phpstan/phpstan": "^2.0",
                 "phpunit/phpunit": "^10.0.4 || ^11.0 || ^12.0 || ^13.0",
                 "psalm/phar": "^5.4",
@@ -130,9 +130,9 @@
             "description": "PHP library for property-based testing. Integrates with PHPUnit.",
             "support": {
                 "issues": "https://github.com/giorgiosironi/eris/issues",
-                "source": "https://github.com/giorgiosironi/eris/tree/1.1.0"
+                "source": "https://github.com/giorgiosironi/eris/tree/1.2.0"
             },
-            "time": "2026-03-31T04:14:43+00:00"
+            "time": "2026-09-30T09:36:57+00:00"
         },
         {
             "name": "myclabs/deep-copy",
