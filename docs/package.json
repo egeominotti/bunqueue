@@ -19,10 +19,10 @@
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/inter": "^5.2.8",
     "@resvg/resvg-js": "^2.6.2",
-    "@types/react": "^19.0.0",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19.0.0",
     "astro": "^7.3.5",
-    "react": "^19.0.0",
+    "react": "^19.3.0",
     "react-dom": "^19.0.0",
     "satori": "^0.26.0",
     "sharp": "^0.35.5"
