@@ -28,7 +28,7 @@ defmodule Bunqueue.MixProject do
       {:msgpax, "~> 2.4"},
       {:jason, "~> 1.4", only: [:dev, :test]},
       {:stream_data, "== 1.4.0", only: :test},
-      {:muex, "== 0.8.1", only: [:dev, :test], runtime: false}
+      {:muex, "== 0.11.3", only: [:dev, :test], runtime: false}
     ]
   end
 
