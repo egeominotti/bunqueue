@@ -146,7 +146,7 @@
     "prepublishOnly": "bun run build:lib"
   },
   "dependencies": {
-    "msgpackr": "^1.11.8"
+    "msgpackr": "^2.1.0"
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^4.0.22",
