@@ -65,10 +65,10 @@
   "devDependencies": {
     "@types/node-20": "npm:@types/node@20.19.43",
     "@types/node-22": "npm:@types/node@22.20.4",
-    "fast-check": "4.9.0",
-    "oxfmt": "0.64.0",
-    "oxlint": "1.79.0",
-    "oxlint-tsgolint": "7.0.2001",
+    "fast-check": "4.10.2",
+    "oxfmt": "0.72.0",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
     "typescript": "^5.7.0"
   },
   "author": "Egeo Minotti",
