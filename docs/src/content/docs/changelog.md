@@ -18,7 +18,7 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## [Unreleased]
+## [2.9.13] - 2026-10-09
 
 ### Fixed
 
@@ -109,7 +109,7 @@ head:
   once it has stopped reading, so the descriptor is never reused while a TLS
   alert can still be written through it. macOS was not affected, and the other
   official SDKs never close a socket while another thread is reading it. The
-  fix ships in the next Python `bunqueue-client` release;
+  fix ships in Python `bunqueue-client` 0.2.1, published to PyPI by hand;
   `sdk/python/tests/e2e_connection_close.py` pins it.
 
 ### Testing

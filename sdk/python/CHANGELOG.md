@@ -5,7 +5,7 @@ All notable changes to `bunqueue-client` (Python SDK) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.1] - 2026-10-09
 
 Compatibility: every option value that worked in 0.2.0 keeps its 0.2.0
 result. That includes `None`, a bool, a numeric string where 0.2.0 read the
