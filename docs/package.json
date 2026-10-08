@@ -16,7 +16,7 @@
     "@astrojs/sitemap": "^3.7.4",
     "@astrojs/starlight": "^0.42.5",
     "@fontsource-variable/bricolage-grotesque": "^5.2.10",
-    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/inter": "^5.2.8",
     "@resvg/resvg-js": "^2.6.2",
     "@types/react": "^19.0.0",
