@@ -28,7 +28,7 @@ dependencies = ["msgpack>=1.0.0"]
 
 [project.optional-dependencies]
 test = [
-  "hypothesis==6.141.1",
+  "hypothesis==6.168.4",
   # 9.0.3 fixes CVE-2025-71176 (insecure tmpdir handling) and requires
   # Python 3.10+. No patched release supports Python 3.9, so the pytest-based
   # suites need Python 3.10+; the runtime package still supports Python 3.9.
