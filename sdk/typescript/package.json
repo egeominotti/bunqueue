@@ -60,7 +60,7 @@
     "cloudflare-workers"
   ],
   "dependencies": {
-    "msgpackr": "^1.11.8"
+    "msgpackr": "^2.1.0"
   },
   "devDependencies": {
     "@types/node-20": "npm:@types/node@20.19.43",
