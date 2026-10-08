@@ -35,7 +35,7 @@ test = [
   "pytest==9.0.3; python_version >= '3.10'",
 ]
 mutation = [
-  "mutmut==3.6.0; python_version >= '3.10'",
+  "mutmut==3.8.0; python_version >= '3.10'",
 ]
 
 [project.urls]
