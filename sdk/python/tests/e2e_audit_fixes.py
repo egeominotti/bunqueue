@@ -38,6 +38,9 @@ def test_outgoing_frame_rejects_protocol_oversize(_server: Server) -> None:
         def sendall(self, _frame: bytes) -> None:
             pass
 
+        def shutdown(self, _how: int) -> None:
+            pass
+
         def close(self) -> None:
             pass
 

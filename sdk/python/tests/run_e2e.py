@@ -30,6 +30,7 @@ import e2e_durations  # noqa: F401
 import e2e_durations_simple  # noqa: F401
 import e2e_sdk_clamps  # noqa: F401
 import e2e_compat  # noqa: F401
+import e2e_connection_close  # noqa: F401
 import test_compat_options
 import test_compat_simple
 import test_worker_pull_errors

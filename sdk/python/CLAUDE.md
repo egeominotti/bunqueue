@@ -91,11 +91,11 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[test,mutation]'
   tests/test_flow_commit.py \
   --hypothesis-seed=20260730
 .venv/bin/mutmut run                       # final gate; Python 3.10+
-.venv/bin/python tests/test_integration.py   # smoke (8) — also pytest-compatible
+.venv/bin/python tests/test_integration.py   # smoke (9) — also pytest-compatible
 .venv/bin/python -m pytest tests/test_worker_pull_errors.py \
   tests/test_worker_wire_errors.py \
   tests/test_compat_options.py tests/test_compat_simple.py  # no broker
-.venv/bin/python tests/run_e2e.py            # full e2e (172)
+.venv/bin/python tests/run_e2e.py            # full e2e (174)
 BUNQUEUE_SDK_SOAK_SECONDS=3600 .venv/bin/python tests/soak.py
 ```
 

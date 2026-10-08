@@ -48,3 +48,32 @@ def enable_keepalive(raw: socket.socket) -> None:
                 raw.setsockopt(socket.IPPROTO_TCP, code, value)
             except OSError:
                 pass
+
+
+def shutdown_socket(sock: socket.socket) -> None:
+    """Send FIN and wake the reader thread parked in ``recv()`` on ``sock``.
+
+    On Linux, ``close()`` on a socket that another thread is reading neither
+    wakes that thread nor sends FIN, so the broker keeps the connection until
+    the process exits and the jobs it leased until their locks expire.
+    ``shutdown()`` does both.
+    It raises ``OSError`` when the socket is already disconnected, e.g. when
+    the reader itself tears down after the peer closed.
+    """
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+
+
+def close_socket(sock: socket.socket) -> None:
+    """Close ``sock`` from its reader thread, once the read loop has ended.
+
+    Closing it earlier frees the descriptor number while the reader can still
+    use it: handling the EOF, OpenSSL writes a TLS alert through the raw
+    descriptor, which by then may belong to another socket or file.
+    """
+    try:
+        sock.close()
+    except OSError:
+        pass

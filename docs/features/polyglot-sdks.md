@@ -193,6 +193,30 @@ Events may contain endpoint, generation, command name, request id, duration,
 outcome, and sanitized error text. They must never contain authentication
 tokens, job payloads, job results, private keys, or CA contents.
 
+## Connection close
+
+Closing a client must end its TCP connection at once. The broker releases a
+disconnected client's unacknowledged leases immediately, and a graceful server
+shutdown keeps open connections served while it waits for active jobs. A
+connection that only looks closed stays open until the client process exits:
+the broker's `TCP_IDLE_TIMEOUT_MS` reaps only connections holding a partial
+frame. Its unacknowledged jobs stay `active` until their locks expire (`lockTtl`,
+30 s by default), and they hold a graceful restart for up to
+`SHUTDOWN_TIMEOUT_MS`.
+
+Python is the only SDK whose reader thread stays blocked in `recv()` for the
+life of a connection. On Linux, closing a socket that another thread is reading
+neither wakes that thread nor sends FIN. Python's teardown therefore shuts the
+socket down (`SHUT_RDWR`), and the reader thread closes it once its loop ends
+(`sdk/python/tests/e2e_connection_close.py`). Closing it from the tearing-down
+thread instead freed the descriptor while OpenSSL could still write a TLS alert
+through it, into whatever socket or file reused the number.
+
+The other SDKs never close a socket while another thread is blocked reading it.
+Rust and Go read and close under the connection mutex, an Elixir connection is
+one process that owns its socket, and PHP is single-threaded. TypeScript has no
+blocked reader: its socket is event-driven and closed with `socket.destroy()`.
+
 ## Saturated worker wake-up
 
 The TypeScript and Python workers use a one-shot completion signal while all

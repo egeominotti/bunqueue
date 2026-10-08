@@ -92,6 +92,26 @@ head:
   the signal is now checked right before every claim. A claim already running
   in the database when the signal aborts still completes and is delivered.
 
+**Python SDK**
+
+- **Python SDK: closing a client now ends its TCP connection on Linux.** The
+  SDK's reader thread stays blocked in `recv()`, and on Linux closing a socket
+  that another thread is reading neither wakes that thread nor sends FIN. So
+  `Queue.close()`, `Worker.close()`, the context managers and every other
+  close path left the connection open on the broker until the Python process
+  exited. A job it had leased and not acknowledged stayed `active` until its
+  lock expired (`lockTtl`, 30 s by default) instead of returning to `waiting`
+  at once. With the graceful shutdown above, which keeps open connections
+  served while it waits for active jobs, such a job held a server restart for
+  the whole `SHUTDOWN_TIMEOUT_MS` (30 s). That is how the Python SDK
+  integration job in CI failed: its teardown gives the server 10 s to exit.
+  Teardown now shuts the socket down, and only the reader thread closes it,
+  once it has stopped reading, so the descriptor is never reused while a TLS
+  alert can still be written through it. macOS was not affected, and the other
+  official SDKs never close a socket while another thread is reading it. The
+  fix ships in the next Python `bunqueue-client` release;
+  `sdk/python/tests/e2e_connection_close.py` pins it.
+
 ### Testing
 
 - **The test sandbox image now ships `jq`.** The `docker-sbom` digest test

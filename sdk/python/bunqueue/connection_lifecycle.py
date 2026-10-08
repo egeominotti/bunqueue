@@ -7,7 +7,7 @@ import threading
 import time
 
 from .errors import AuthError, CommandError, CommandTimeoutError, ConnectionClosedError
-from .transport import enable_keepalive
+from .transport import close_socket, enable_keepalive
 from .wire import _build_ssl_context
 
 
@@ -59,7 +59,13 @@ class ConnectionLifecycle:
             self._sock = raw
             self._generation += 1
             self._consecutive_timeouts = 0
-            threading.Thread(target=self._read_loop, args=(raw,), daemon=True).start()
+            try:
+                threading.Thread(target=self._read_loop, args=(raw,), daemon=True).start()
+            except RuntimeError:
+                # Teardown leaves closing to the reader; with none, close here.
+                self._sock = None
+                close_socket(raw)
+                raise
 
             if self.token:
                 try:

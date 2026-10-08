@@ -85,6 +85,9 @@ def serialization_rejection_precedes_pending_registration_and_write(
         def sendall(self, _frame: bytes) -> None:
             self.write_count += 1
 
+        def shutdown(self, _how: int) -> None:
+            pass
+
         def close(self) -> None:
             pass
 

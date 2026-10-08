@@ -16,6 +16,25 @@ thread, never connected, failed every command or job, or spun a hot loop.
 
 ### Fixed
 
+- Closing a client now ends its TCP connection on Linux. The reader thread
+  stays blocked in `recv()` for the life of a connection, and on Linux closing
+  a socket that another thread is reading neither wakes that thread nor sends
+  FIN. Every close path (`Queue.close()`, `Worker.close()`,
+  `FlowProducer.close()`, `Connection.close()`, the context managers, and the
+  teardown after repeated command timeouts, a failed send or a failed
+  authentication) therefore left the connection open on the broker until the
+  process exited. A job the connection had leased and not acknowledged stayed
+  `active` until its lock expired (`lockTtl`, 30 s by default) instead of
+  returning to `waiting` at once. Because a graceful bunqueue shutdown keeps
+  open connections served while it waits for active jobs, such a job also
+  held a server restart for the whole `SHUTDOWN_TIMEOUT_MS` (30 s). Teardown
+  now shuts the socket down (`SHUT_RDWR`), which sends FIN and wakes the
+  reader, and the reader thread closes the socket once its loop ends. Only the
+  reader closes it, so a freed descriptor can no longer receive a TLS alert
+  that OpenSSL writes while handling the EOF; if the reader thread cannot be
+  started, `connect()` closes the socket itself. macOS was not affected.
+  `tests/e2e_connection_close.py` pins the behavior; it failed 3/3 on Linux
+  before the fix.
 - A transient pull failure no longer ends the Worker loop. The loop retried
   only `ConnectionClosedError` and `CommandTimeoutError`. Broker refusals that
   pass with time escaped and shut the worker down for good: `Rate limit

@@ -28,7 +28,7 @@ from .errors import (
     ConnectionClosedError,
 )
 from .telemetry import Telemetry, TelemetryHandler
-from .transport import encode_command
+from .transport import close_socket, encode_command, shutdown_socket
 from .wire import (
     MAX_FRAME_SIZE,
     PROTOCOL_VERSION,
@@ -215,6 +215,7 @@ class Connection(ConnectionLifecycle):
             # reader from a previous connection must not kill a fresh one.
             if self._sock is sock:
                 self._teardown()
+            close_socket(sock)  # only the reader closes: see transport.close_socket
 
     def _dispatch(self, frame: bytes) -> None:
         try:
@@ -235,10 +236,7 @@ class Connection(ConnectionLifecycle):
             self._connected = False
             sock, self._sock = self._sock, None
         if sock is not None:
-            try:
-                sock.close()
-            except OSError:
-                pass
+            shutdown_socket(sock)  # wakes the reader, which then closes it
         with self._pending_lock:
             pending, self._pending = self._pending, {}
         for fut in pending.values():

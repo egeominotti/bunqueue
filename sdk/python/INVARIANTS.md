@@ -14,6 +14,13 @@ must preserve the wire contract and lifecycle semantics.
 - Pending futures and timers are removed on success, command error, timeout,
   disconnect, and close. A timeout from an older socket generation cannot tear
   down a newer connection.
+- Closing or tearing down a connection ends the TCP connection at once, so the
+  broker sees the disconnect and releases the jobs it leased. Teardown shuts
+  the socket down (`SHUT_RDWR`): on Linux, `close()` alone neither wakes the
+  reader thread parked in `recv()` nor sends FIN. Only the reader thread closes
+  its socket, after its loop ends, so the descriptor number is never freed
+  while OpenSSL may still write a TLS alert through it. A socket whose reader
+  thread fails to start is closed by `connect()`.
 - Calls from multiple producer/worker threads remain safe: connection-state,
   writes, and the pending map use their dedicated locks without reversing lock
   order.
