@@ -54,7 +54,7 @@ RUN go mod download
 RUN cd /workspace/sdk/conformance/drivers/go && go build -o ../go-driver .
 WORKDIR /workspace
 
-FROM rust:1.85.0-bookworm AS rust-sdk
+FROM rust:1.98.1-bookworm AS rust-sdk
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/* \
     && rustup component add clippy rustfmt
