@@ -30,7 +30,8 @@ const ci = Bun.YAML.parse(await Bun.file(`${root}/.github/workflows/ci.yml`).tex
 const version = ((await Bun.file(`${root}/package.json`).json()) as { version: string }).version;
 const SOURCE = '${{ needs.version-gate.outputs.source_sha }}';
 const VERSION = '${{ needs.version-gate.outputs.version }}';
-const PUBLISHING_JOBS = ['build', 'docker-test', 'docker', 'npm', 'release'] as const;
+// `npm` checks out nothing: it publishes the tarball `npm-pack` built from SOURCE.
+const PUBLISHING_JOBS = ['build', 'docker-test', 'docker', 'npm-pack', 'release'] as const;
 const TAG_COMMIT = '1'.repeat(40);
 const TAG_OBJECT = '2'.repeat(40);
 const MAIN_COMMIT = '3'.repeat(40);

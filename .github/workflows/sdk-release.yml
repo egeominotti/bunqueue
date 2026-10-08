@@ -20,14 +20,19 @@ jobs:
     with:
       run_soak: false
 
-  publish:
-    name: Publish TypeScript SDK
+  # Publication is split in two jobs so that the OIDC publish credential is
+  # never available to code that installs dependencies or builds: `pack` runs
+  # without any credential, and `publish` only downloads that tarball,
+  # publishes it through npm trusted publishing and tags the commit.
+  pack:
+    name: Pack TypeScript SDK
     runs-on: ubuntu-latest
     needs: [sdk]
-    # `contents: write` pushes the release tag. No OIDC `id-token` is granted
-    # because no step exchanges one; the npm token authenticates publication.
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+      commit: ${{ steps.validate.outputs.commit }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -41,10 +46,6 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
       - name: Install canonical build dependencies
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Install and package reproducibly
@@ -56,11 +57,12 @@ jobs:
           mkdir -p /tmp/typescript-package
           bun pm pack --destination /tmp/typescript-package
       - name: Validate requested version and tag
+        id: validate
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          VERSION=$(node -p "require('./sdk/typescript/package.json').version")
+          VERSION=$(bun -p "require('./sdk/typescript/package.json').version")
           test "$REQUESTED_VERSION" = "$VERSION"
           case "$VERSION" in
             ''|*[!0-9A-Za-z.+-]*) echo "Invalid SDK version: $VERSION" >&2; exit 1 ;;
@@ -83,27 +85,56 @@ jobs:
             const response = await fetch("https://registry.npmjs.org/bunqueue-client/" + encodeURIComponent(process.env.REQUESTED_VERSION));
             if (response.status !== 404) throw new Error("Publication blocked: registry returned " + response.status);
           '
-          echo "SDK_VERSION=$VERSION" >> "$GITHUB_ENV"
-      # The pinned Bun CLI reads the registry token only from NPM_CONFIG_TOKEN,
-      # not from the setup-node .npmrc; expose it only to the two steps below.
-      - name: Verify npm authentication and publication dry run
-        working-directory: sdk/typescript
-        run: |
-          set -euo pipefail
-          bun pm whoami
-          bun publish --dry-run "/tmp/typescript-package/bunqueue-client-$SDK_VERSION.tgz"
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: npm-bunqueue-client-${{ inputs.version }}
-          path: /tmp/typescript-package/*.tgz
+          path: /tmp/typescript-package/bunqueue-client-${{ inputs.version }}.tgz
+          if-no-files-found: error
           retention-days: 7
-      - name: Publish the verified tarball
-        working-directory: sdk/typescript
-        run: bun publish --access public "/tmp/typescript-package/bunqueue-client-$SDK_VERSION.tgz"
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish:
+    name: Publish TypeScript SDK
+    runs-on: ubuntu-latest
+    needs: [pack]
+    # npm trusted publishing (trusted publisher: sdk-release.yml, environment
+    # `npm`): npm exchanges the GitHub OIDC token for a short-lived publish
+    # credential, so no long-lived npm token exists, and attaches a signed
+    # provenance attestation. `contents: write` pushes the release tag. This job
+    # installs no dependencies and runs no repository code.
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      SDK_VERSION: ${{ needs.pack.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.pack.outputs.commit }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-bunqueue-client-${{ inputs.version }}
+          path: /tmp/typescript-package
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm >= 11.5.1; Bun's publisher has no OIDC support.
+      - name: Install the npm CLI used for trusted publishing
+        run: |
+          set -euo pipefail
+          npm install -g npm@11.6.2
+          node -e '
+            const [major, minor, patch] = process.argv[1].trim().split(".").map(Number);
+            if (major * 1e6 + minor * 1e3 + patch < 11005001) throw new Error("npm " + process.argv[1] + " cannot use trusted publishing");
+          ' "$(npm --version)"
+      - name: Publication dry run
+        run: npm publish --dry-run --ignore-scripts --access public "/tmp/typescript-package/bunqueue-client-$SDK_VERSION.tgz"
+      # Publishes the exact tarball the pack job built.
+      - name: Publish the verified tarball with provenance
+        run: npm publish --ignore-scripts --access public --provenance "/tmp/typescript-package/bunqueue-client-$SDK_VERSION.tgz"
       - name: Tag the published commit
         run: |
           set -euo pipefail

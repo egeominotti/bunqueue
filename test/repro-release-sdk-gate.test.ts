@@ -281,23 +281,23 @@ describe('release graph SDK gate', () => {
     }
   });
 
-  test('the npm SDK release is manual, tested by all SDKs, pinned, and uses Bun', () => {
+  test('the npm SDK release is manual, tested by all SDKs, pinned, and built with Bun', () => {
     expect(sdkRelease.on.workflow_dispatch).toBeDefined();
     expect(sdkRelease.on.push).toBeUndefined();
     expect(sdkRelease.jobs.sdk?.uses).toBe('./.github/workflows/sdk.yml');
-    expect(dependencies(sdkRelease.jobs.publish)).toEqual(['sdk']);
+    expect(dependencies(sdkRelease.jobs.pack)).toEqual(['sdk']);
+    expect(dependencies(sdkRelease.jobs.publish)).toEqual(['pack']);
     expect(releaseText).toContain('bun-version: 1.4.2');
     expect(releaseText).toContain('bun install --frozen-lockfile');
     expect(releaseText).not.toContain('|| bun install');
     expect(releaseText).toContain('test "$GITHUB_REF" = refs/heads/main');
     expect(releaseText).toContain('git rev-parse origin/main');
-    // Bun has no npm provenance and ignores NODE_AUTH_TOKEN: publish the
-    // verified tarball with NPM_CONFIG_TOKEN (test/repro-sdk-release-auth.test.ts).
+    // Bun packs; npm publishes that tarball through OIDC trusted publishing with
+    // provenance, since Bun has no OIDC support (test/repro-sdk-release-auth.test.ts).
     expect(releaseText).toContain(
-      'bun publish --access public "/tmp/typescript-package/bunqueue-client-$SDK_VERSION.tgz"'
+      'npm publish --ignore-scripts --access public --provenance "/tmp/typescript-package/bunqueue-client-$SDK_VERSION.tgz"'
     );
-    expect(releaseText).toContain('NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}');
-    expect(releaseText).not.toContain('--provenance');
-    expect(releaseText).not.toContain('npm publish');
+    expect(releaseText).not.toContain('NPM_TOKEN');
+    expect(releaseText).not.toContain('bun publish');
   });
 });

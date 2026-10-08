@@ -519,13 +519,15 @@ fails before dependencies are installed, packaged artifacts are created, or
 registry credentials are used. It packs `bunqueue-client-<version>.tgz` once,
 requires the requested version to match `sdk/typescript/package.json`, treats
 only Git exit status 2 as an absent `sdk-ts-v<version>` tag and only a registry
-404 as an unpublished version, then verifies `bun pm whoami` and
-`bun publish --dry-run` on that tarball before publishing the same tarball.
-The pinned Bun CLI reads the token only from `NPM_CONFIG_TOKEN` (it ignores the
-`setup-node` `.npmrc`), so `NPM_TOKEN` is passed under that name to the dry-run
-and publication steps only. Bun produces no npm provenance, so none is
-requested and the job holds no `id-token` permission. The tag is pushed only
-after publication succeeds. See [Testing](../testing.md#ci).
+404 as an unpublished version, then runs `npm publish --dry-run` on that
+tarball before publishing the same tarball with `npm publish --provenance`.
+Publication uses npm trusted publishing in two jobs: `pack` installs, builds,
+validates and uploads the tarball with no credential, and `publish` runs in the
+GitHub environment `npm` with `id-token: write`, runs no repository code, and
+publishes that tarball (trusted publisher `sdk-release.yml`), so dependency
+code never sees the publish credential and no long-lived npm token exists. The
+npm CLI is pinned (>= 11.5.1) because Bun's publisher has no OIDC support. The
+tag is pushed only after publication succeeds, on the commit `pack` built. See [Testing](../testing.md#ci).
 
 Each SDK also owns an opt-in sustained profile that reuses one connection while
 repeatedly adding, querying, and resetting configurable batches. Weekly CI runs

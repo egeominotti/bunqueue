@@ -273,8 +273,9 @@ and assert both the returned result and any affected counters/state.
   contains its corresponding changelog update and has a compliant commit
   message. Do not edit the changelog solely because a push is being performed.
 - Do not create commits, push, bump the package version, or publish unless the
-  user explicitly authorizes the relevant action. Version bumps and
-  `bun publish` are separate release actions and are not implied by permission
-  to commit or push. Never publish with `npm publish`.
+  user explicitly authorizes the relevant action. Version bumps and package
+  publication are separate release actions and are not implied by permission
+  to commit or push. Never publish locally: npm packages are published only by
+  the CI release jobs through npm trusted publishing (OIDC, environment `npm`).
 - Report the files changed, behavior fixed, and exact validation commands/results.
 - Call out any test or check that could not be run and why.

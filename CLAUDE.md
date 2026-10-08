@@ -122,10 +122,11 @@ A code change is not complete until `/docs` reflects it. No exceptions.
    push-time requirement is verification, not another changelog cycle.
 3. Run `git push origin main` only with the user's explicit authorization.
 
-Version bumps and `bun publish` are separate release actions. Perform either
-one only when the user explicitly requests it; permission to commit or push
-does not authorize a version change or package publication. Never use
-`npm publish`.
+Version bumps and package publication are separate release actions. Perform
+either one only when the user explicitly requests it; permission to commit or
+push does not authorize a version change or package publication. Never publish
+from a local machine: npm packages are published only by the CI release jobs
+through npm trusted publishing (see Publishing below).
 
 High-performance job queue server for Bun. SQLite persistence, cron jobs, priorities, DLQ, S3 backups.
 
@@ -571,11 +572,13 @@ bun run bench                           # Native macOS benchmarks only
 
 ## Publishing
 
-Always use `bun publish` (not `npm publish`) to publish to npm.
-
-```bash
-bun publish
-```
+npm packages (`bunqueue` from `ci.yml`, `bunqueue-client` from
+`sdk-release.yml`) are published only by GitHub Actions through **npm trusted
+publishing** (OIDC, GitHub environment `npm`), with a provenance attestation and
+no long-lived npm token. Bun installs, builds and packs the tarball; the npm CLI
+(>= 11.5.1) dry-runs and publishes exactly that tarball, because Bun's publisher
+has no OIDC or provenance support. Never run `bun publish` or `npm publish`
+locally, and never reintroduce an `NPM_TOKEN` secret.
 
 ## Performance
 

@@ -631,8 +631,12 @@ jobs:
   # ============================================
   # Root npm package: explicit version request, after all product/image gates.
   # ============================================
-  npm:
-    name: Publish bunqueue to npm
+  # npm publication is split in two jobs so that the OIDC publish credential is
+  # never available to code that installs dependencies or runs tests:
+  # `npm-pack` builds, verifies and packs without any credential, and `npm`
+  # only downloads that tarball and publishes it through npm trusted publishing.
+  npm-pack:
+    name: Pack bunqueue for npm
     runs-on: ubuntu-latest
     needs: [version-gate, build, docker]
     if: >-
@@ -643,6 +647,7 @@ jobs:
       contents: read
     env:
       REQUESTED_VERSION: ${{ inputs.npm_version }}
+      SOURCE_SHA: ${{ needs.version-gate.outputs.source_sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -650,14 +655,18 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
       - name: Verify the explicitly requested unpublished version
         run: |
           set -euo pipefail
-          test "$REQUESTED_VERSION" = "$(node -p "require('./package.json').version")"
+          test "$REQUESTED_VERSION" = "$(bun -p "require('./package.json').version")"
+          # npm provenance records the triggering commit (GITHUB_SHA). Publishing
+          # contents from a different commit would produce a misleading
+          # attestation, so publication runs only while main still points at
+          # the release commit; once main has moved on, bump the version.
+          if [ "$SOURCE_SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::Version $REQUESTED_VERSION is tagged at $SOURCE_SHA, but main is now at $GITHUB_SHA. npm provenance would name the wrong commit: bump the version and publish the new release instead."
+            exit 1
+          fi
           bun -e '
             const response = await fetch("https://registry.npmjs.org/bunqueue/" + encodeURIComponent(process.env.REQUESTED_VERSION));
             if (response.status !== 404) throw new Error("Publication blocked: registry returned " + response.status);
@@ -668,21 +677,52 @@ jobs:
           bun test test/package-consumer-smoke.test.ts
           mkdir -p /tmp/npm-package
           bun pm pack --ignore-scripts --destination /tmp/npm-package
-      - name: Verify npm authentication and publication dry run
-        run: |
-          bun pm whoami
-          bun publish --dry-run "/tmp/npm-package/bunqueue-$REQUESTED_VERSION.tgz"
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: npm-bunqueue-${{ inputs.npm_version }}
-          path: /tmp/npm-package/*.tgz
+          path: /tmp/npm-package/bunqueue-${{ inputs.npm_version }}.tgz
+          if-no-files-found: error
           retention-days: 7
-      - name: Publish the verified tarball
-        run: bun publish --access public "/tmp/npm-package/bunqueue-$REQUESTED_VERSION.tgz"
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  npm:
+    name: Publish bunqueue to npm
+    runs-on: ubuntu-latest
+    needs: [version-gate, npm-pack]
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.npm_version != '' &&
+      github.ref == 'refs/heads/main' && needs.npm-pack.result == 'success'
+    # npm trusted publishing (trusted publisher: ci.yml, environment `npm`): npm
+    # exchanges the GitHub OIDC token for a short-lived publish credential, so no
+    # long-lived npm token exists, and attaches a signed provenance attestation.
+    # This job checks out no code and installs no dependencies.
+    environment: npm
+    permissions:
+      id-token: write
+    env:
+      REQUESTED_VERSION: ${{ inputs.npm_version }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-bunqueue-${{ inputs.npm_version }}
+          path: /tmp/npm-package
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm >= 11.5.1; Bun's publisher has no OIDC support.
+      - name: Install the npm CLI used for trusted publishing
+        run: |
+          set -euo pipefail
+          npm install -g npm@11.6.2
+          node -e '
+            const [major, minor, patch] = process.argv[1].trim().split(".").map(Number);
+            if (major * 1e6 + minor * 1e3 + patch < 11005001) throw new Error("npm " + process.argv[1] + " cannot use trusted publishing");
+          ' "$(npm --version)"
+      - name: Publication dry run
+        run: npm publish --dry-run --ignore-scripts --access public "/tmp/npm-package/bunqueue-$REQUESTED_VERSION.tgz"
+      # Publishes the exact tarball Bun packed and the smoke test verified.
+      - name: Publish the verified tarball with provenance
+        run: npm publish --ignore-scripts --access public --provenance "/tmp/npm-package/bunqueue-$REQUESTED_VERSION.tgz"
 
   # ============================================
   # Create Release (only on main)
