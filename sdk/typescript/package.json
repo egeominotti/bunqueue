@@ -65,7 +65,7 @@
   "devDependencies": {
     "@types/node-20": "npm:@types/node@20.19.43",
     "@types/node-22": "npm:@types/node@22.20.4",
-    "fast-check": "4.9.0",
+    "fast-check": "4.10.2",
     "oxfmt": "0.64.0",
     "oxlint": "1.79.0",
     "oxlint-tsgolint": "7.0.2001",
