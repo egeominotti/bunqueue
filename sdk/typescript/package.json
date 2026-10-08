@@ -68,7 +68,7 @@
     "fast-check": "4.9.0",
     "oxfmt": "0.64.0",
     "oxlint": "1.79.0",
-    "oxlint-tsgolint": "7.0.2001",
+    "oxlint-tsgolint": "7.0.2003",
     "typescript": "^5.7.0"
   },
   "author": "Egeo Minotti",
