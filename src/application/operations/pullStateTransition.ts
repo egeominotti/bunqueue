@@ -16,6 +16,7 @@ import type { SqliteStorage } from '../../infrastructure/persistence/sqlite';
 import { processingShardIndex } from '../../shared/hash';
 import type { RWLock } from '../../shared/lock';
 import { withWriteLock } from '../../shared/lock';
+import { persistRelease } from './releasePersistence';
 
 /** Dependencies shared by the single and batch pull paths. */
 export interface PullContext {
@@ -158,10 +159,17 @@ export async function requeueJob(
     const shard = ctx.shards[idx];
     if (job.groupId) shard.releaseGroup(queue, job.groupId);
     shard.releaseConcurrency(queue);
+    // The job never reached a worker: drop the `active` entry this dequeue appended
+    // (same timestamp as `startedAt`; none is appended once the timeline is full).
+    const last = job.timeline.at(-1);
+    if (last?.state === 'active' && last.timestamp === job.startedAt) job.timeline.pop();
     job.startedAt = null;
     shard.getQueue(queue).push(job);
     shard.incrementQueued(job.id, false, job.createdAt, queue, job.runAt);
     ctx.jobIndex.set(job.id, { type: 'queue', shardIdx: idx, queueName: queue });
+    // A failed handoff may already have stored the job `active`; store it queued again
+    // before the shard lock is released, so startup recovery never charges it.
+    persistRelease(job, ctx.storage);
     shard.notify(queue);
     requeued = true;
   });

@@ -152,7 +152,7 @@ Only surrounding whitespace is ignored; a blank token never matches.
 
 ### TCP auth gate
 
-On `open`, `authenticated` is initialized to `authTokens.size === 0` — i.e. auto-authenticated when no tokens are configured (`TcpConnectionRegistry.init`, `tcp/connections.ts:27-48`). In `handleCommand` (`handler.ts:55-67`): `Auth` is always routed to `handleAuth`; any other command is rejected with `error('Not authenticated')` when tokens exist and the connection is not yet authenticated. `handleAuth` (`handler.ts:29-50`, also used by WebSocket clients) requires the supplied token to be a non-blank string, compares it trimmed against each non-blank configured token (trimmed) with `constantTimeEqual`, sets `ctx.authenticated = true` on the first match, and otherwise emits `auth:failed` and returns `Invalid token` (a missing or non-string token included).
+On `open`, `authenticated` is initialized to `authTokens.size === 0` — i.e. auto-authenticated when no tokens are configured (`TcpConnectionRegistry.init`, `tcp/connections.ts:31-59`). In `handleCommand` (`handler.ts:55-67`): `Auth` is always routed to `handleAuth`; any other command is rejected with `error('Not authenticated')` when tokens exist and the connection is not yet authenticated. `handleAuth` (`handler.ts:29-50`, also used by WebSocket clients) requires the supplied token to be a non-blank string, compares it trimmed against each non-blank configured token (trimmed) with `constantTimeEqual`, sets `ctx.authenticated = true` on the first match, and otherwise emits `auth:failed` and returns `Invalid token` (a missing or non-string token included).
 
 ### CORS
 

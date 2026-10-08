@@ -6,8 +6,7 @@
 import type { Server, ServerWebSocket } from 'bun';
 import type { QueueManager } from '../../application/queueManager';
 import type { HandlerContext } from './types';
-import { isBlankToken } from '../../config/auth';
-import { constantTimeEqual, uuid } from '../../shared/hash';
+import { uuid } from '../../shared/hash';
 import type { JobEvent } from '../../domain/types/queue';
 import { httpLog } from '../../shared/logger';
 import { getRateLimiter, rateLimiterEnvConfig } from './rateLimiter';
@@ -24,33 +23,7 @@ import {
 import { loadTlsOptions, type TlsServerOptions } from './tls';
 import { routeHttpRequest } from './httpRouter';
 import { sanitizeServerError } from './errors';
-
-/**
- * Validate auth token against valid tokens set, both sides trimmed (as the TCP `Auth`
- * command compares them). A missing header reads as `''`, so a blank presented or
- * configured token never matches, even if one reached the set (config validation
- * already refuses it): an empty token must not authenticate.
- */
-function validateAuthToken(token: string, authTokens: Set<string>): boolean {
-  if (isBlankToken(token)) return false;
-  const presented = token.trim();
-  for (const validToken of authTokens) {
-    if (!isBlankToken(validToken) && constantTimeEqual(presented, validToken.trim())) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/** Check auth and return 401 response if invalid, or null if OK */
-function checkAuth(req: Request, authTokens: Set<string>): Response | null {
-  if (authTokens.size === 0) return null;
-  const token = req.headers.get('Authorization')?.replace('Bearer ', '') ?? '';
-  if (!validateAuthToken(token, authTokens)) {
-    return jsonResponse({ ok: false, error: 'Unauthorized' }, 401);
-  }
-  return null;
-}
+import { checkAuth } from './httpAuth';
 
 /** HTTP Server configuration */
 export interface HttpServerConfig {
@@ -75,6 +48,10 @@ export function createHttpServer(queueManager: QueueManager, config: HttpServerC
   const corsOrigins = new Set(config.corsOrigins ?? ['*']);
   const wsHandler = new WsHandler();
   const sseHandler = new SseHandler();
+  // Aborted by `beginDrain()`: HTTP and WebSocket pulls, parked or new, deliver nothing.
+  const drainController = new AbortController();
+  // Aborted by `stop()`: ends every pull still held by the drain.
+  const stopController = new AbortController();
 
   // Subscribe to queue events for broadcast
   const unsubscribe = queueManager.subscribe((event: JobEvent) => {
@@ -164,8 +141,17 @@ export function createHttpServer(queueManager: QueueManager, config: HttpServerC
         return jsonResponse({ ok: false, error: 'Too many WebSocket connections' }, 503);
       }
       const queueFilter = path.startsWith('/ws/queues/') ? path.slice('/ws/queues/'.length) : null;
+      const closed = new AbortController();
+      const connectionSignal = AbortSignal.any([closed.signal, stopController.signal]);
       const upgraded = server.upgrade(req, {
-        data: { id: uuid(), authenticated: true, queueFilter, subscriptions: null },
+        data: {
+          id: uuid(),
+          authenticated: true,
+          queueFilter,
+          subscriptions: null,
+          closed,
+          connectionSignal,
+        },
       });
       return upgraded ? undefined : new Response('WebSocket upgrade failed', { status: 400 });
     }
@@ -213,7 +199,14 @@ export function createHttpServer(queueManager: QueueManager, config: HttpServerC
 
     // HTTP is stateless — no clientId. Job ownership tracking is only for persistent
     // connections (TCP/WebSocket). Orphaned HTTP jobs are handled by stall detection.
-    const ctx: HandlerContext = { queueManager, authTokens, authenticated: true };
+    const ctx: HandlerContext = {
+      queueManager,
+      authTokens,
+      authenticated: true,
+      signal: drainController.signal,
+      drainSignal: drainController.signal,
+      connectionSignal: AbortSignal.any([req.signal, stopController.signal]),
+    };
 
     try {
       return await routeHttpRequest(req, path, ctx, corsOrigins);
@@ -238,11 +231,15 @@ export function createHttpServer(queueManager: QueueManager, config: HttpServerC
         authTokens,
         authenticated: ws.data.authenticated,
         clientId: ws.data.id,
+        signal: drainController.signal,
+        drainSignal: drainController.signal,
+        connectionSignal: ws.data.connectionSignal,
       };
       await wsHandler.onMessage(ws, message, ctx);
     },
     close(ws: ServerWebSocket<WsData>) {
       const clientId = ws.data.id;
+      ws.data.closed?.abort();
       wsHandler.onClose(ws);
       getRateLimiter().removeClient(clientId);
       queueManager.unregisterWorkersByClientId(clientId);
@@ -284,7 +281,13 @@ export function createHttpServer(queueManager: QueueManager, config: HttpServerC
     sseClients: sseHandler.getClients(),
     getWsClientCount: () => wsHandler.size,
     getSseClientCount: () => sseHandler.size,
+    /** Shutdown drain: refuse new connections and pulls; open WebSockets stay served. */
+    beginDrain(): void {
+      drainController.abort();
+      void server.stop();
+    },
     stop(): void {
+      stopController.abort();
       unsubscribe();
       wsHandler.stopBroadcasts();
       sseHandler.closeAll();

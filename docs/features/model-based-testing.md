@@ -8,7 +8,11 @@ small executable specifications. They use
 `fast-check` commands, preconditions, shrinking, and seed replay. The primary
 queue command model is not mocked: every property run starts `src/main.ts`, uses
 the public MessagePack TCP protocol, writes a fresh SQLite database, and can
-terminate the process with `SIGKILL` before reconnecting. Focused workflow and
+terminate the process with `SIGKILL` before reconnecting. A crash restart kills
+the broker while the model client is still connected and closes the client only
+afterwards (`stopModelBroker`): closing it first would let the broker persist a
+disconnect release, so whether a held job is charged would depend on which of
+the socket close and the signal the broker saw first. Focused workflow and
 FlowProducer models use their real embedded engines so they can run many
 structural cases cheaply; dedicated E2E suites cover their TCP boundary.
 

@@ -167,10 +167,11 @@ More deployment recipes (systemd, Kubernetes, Fly.io) in the [deployment guide](
 
 On `SIGINT` or `SIGTERM` the server:
 
-1. Stops accepting new connections
-2. Waits for active jobs to finish (30s timeout, configurable via `SHUTDOWN_TIMEOUT_MS`)
-3. Flushes SQLite writes or drains admitted PostgreSQL operations and maintenance
-4. Exits cleanly
+1. Stops accepting new connections and stops handing out jobs (a pull delivers nothing; one with a timeout waits it out before answering), while open connections keep working so workers can still acknowledge, fail and heartbeat the jobs they hold
+2. Waits for active jobs to finish, and moves on as soon as none is active (30s timeout, configurable via `SHUTDOWN_TIMEOUT_MS`; a job still active at the timeout is recovered by the next start as interrupted work)
+3. Closes the TCP and HTTP servers
+4. Flushes SQLite writes or drains admitted PostgreSQL operations and maintenance
+5. Exits cleanly
 
 ## Connect AI agents (MCP)
 

@@ -94,6 +94,8 @@ Flow/dependencies: `updateJobParent`, `removeChildDependency`,
 
 Stats/lifecycle: `getStats`, `getQueuesSummary`, `getQueueJobCounts`,
 `getMemoryStats`, `getStorageStatus`, `compactMemory`, `getPrometheusMetrics`,
+`flushPersistence` (snapshot flush; throws while rows stay buffered),
+`flushPendingWrites` (backoff-aware, non-throwing; embedded `Queue.close()`),
 `shutdown` (`queue-manager/stats.ts`, `queue-manager/observability.ts`,
 `queue-manager/lifecycle.ts`). See [Stats & Monitoring](./stats-and-monitoring.md).
 

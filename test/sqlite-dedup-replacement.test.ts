@@ -100,7 +100,7 @@ describe('SqliteStorage dedup replacement', () => {
     expect(storage.getJob(invalidReplacement.id)).toBeNull();
   });
 
-  test('retires buffered and persisted copies before buffering a non-durable replacement', () => {
+  test('retires buffered and persisted copies and commits a non-durable replacement with them', () => {
     const oldJob = makeJob('old-buffered', { version: 'persisted' });
     const pendingOldJob = makeJob('old-buffered', { version: 'pending' });
     const newJob = makeJob('new-buffered');
@@ -110,9 +110,13 @@ describe('SqliteStorage dedup replacement', () => {
 
     storage.replaceJob(oldJob.id, newJob);
 
+    // The retirement and the successor share one transaction: no crash window
+    // can leave neither generation on disk.
     expect(storage.getJob(oldJob.id)).toBeNull();
-    expect(storage.getJob(newJob.id)).toBeNull();
-    expect(storage.flushWriteBuffer()).toBe(1);
+    expect(storage.getJob(newJob.id)?.id).toBe(newJob.id);
+    expect(storage.getBufferedJob(oldJob.id)).toBeNull();
+    expect(storage.getBufferedJob(newJob.id)).toBeNull();
+    expect(storage.flushWriteBuffer()).toBe(0);
     expect(storage.getJob(oldJob.id)).toBeNull();
     expect(storage.getJob(newJob.id)?.id).toBe(newJob.id);
   });
@@ -186,7 +190,7 @@ describe('SqliteStorage dedup replacement', () => {
     expect(storage.getJob(bufferedB.id)?.id).toBe(bufferedB.id);
   });
 
-  test('clears the active key before buffering a non-durable successor', () => {
+  test('clears the active key and commits a non-durable successor in one transaction', () => {
     const key = 'active-transfer-buffered';
     const oldJob = makeDedupJob('old-active-buffered', key);
     const newJob = makeDedupJob('new-active-buffered', key);
@@ -196,8 +200,27 @@ describe('SqliteStorage dedup replacement', () => {
     storage.transferActiveDedupJob(oldJob.id, newJob);
 
     expect(storage.getJob(oldJob.id)?.uniqueKey).toBeNull();
-    expect(storage.getJob(newJob.id)).toBeNull();
-    expect(storage.flushWriteBuffer()).toBe(1);
     expect(storage.getJob(newJob.id)?.uniqueKey).toBe(key);
+    expect(storage.getBufferedJob(newJob.id)).toBeNull();
+    expect(storage.flushWriteBuffer()).toBe(0);
+  });
+
+  test('keeps the active key when a non-durable successor insert fails', () => {
+    const key = 'active-transfer-buffered-rollback';
+    const oldJob = makeDedupJob('old-active-buffered-rollback', key);
+    const invalidReplacement = {
+      ...makeDedupJob('new-active-buffered-invalid', key),
+      queue: null,
+    } as unknown as Job;
+    storage.insertJobImmediate(oldJob);
+    storage.markActive(oldJob.id, Date.now());
+
+    expect(() => storage.transferActiveDedupJob(oldJob.id, invalidReplacement)).toThrow(
+      /NOT NULL constraint failed: jobs\.queue/
+    );
+
+    expect(storage.getJob(oldJob.id)?.uniqueKey).toBe(key);
+    expect(storage.getJob(invalidReplacement.id)).toBeNull();
+    expect(storage.flushWriteBuffer()).toBe(0);
   });
 });

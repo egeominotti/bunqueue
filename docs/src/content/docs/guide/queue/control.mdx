@@ -40,7 +40,7 @@ queue.remove('job-id');            // Remove one job (fire-and-forget)
 await queue.removeAsync('job-id'); // Remove one job and wait for it
 
 await queue.waitUntilReady();      // Wait until queue/server is ready
-queue.close();                     // Close TCP connection (no-op in embedded mode)
+queue.close();                     // Close TCP connection (embedded: write buffered adds to SQLite)
 ```
 
 </TabItem>

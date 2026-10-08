@@ -244,6 +244,8 @@ export async function bootServer(
   const shutdown = createServerShutdown({
     shutdownTimeoutMs: config.shutdownTimeoutMs,
     stopStats: () => statsTimer.clear(),
+    stopTcpIntake: () => tcpServer.beginDrain(),
+    stopHttpIntake: () => httpServer.beginDrain(),
     stopTcp: () => tcpServer.stop(),
     stopHttp: () => httpServer.stop(),
     getActiveJobs: () => queueManager.getStats().active,

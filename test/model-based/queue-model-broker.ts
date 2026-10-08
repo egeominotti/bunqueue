@@ -82,11 +82,17 @@ export async function startModelBroker(
   throw startupError(port, 'exited', 'startup retry budget exhausted', startupRetries);
 }
 
+/**
+ * SIGKILL the broker while its client is still connected, then close the client. A
+ * crash restart must model a crash: closing the client first lets the broker run the
+ * disconnect release, which is persisted, so whether a held job is charged would
+ * depend on which of the socket close and the signal the broker sees first.
+ */
 export async function stopModelBroker(broker: StartedModelBroker): Promise<void> {
-  broker.client.close();
   try {
     await stopProcess(broker.process, broker.stderr);
   } finally {
+    broker.client.close();
     releasePortPair(broker.port);
   }
 }

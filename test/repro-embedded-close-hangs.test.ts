@@ -12,8 +12,10 @@
  *
  * The supported shutdown is therefore `close()` THEN `shutdownManager()`, which is
  * what the guides document (guide/quickstart, integrations, hono, elysia,
- * simple-mode) and what actually flushes: `SqliteStorage.close()` drains the write
- * buffer and checkpoints the WAL before closing the database.
+ * simple-mode): `SqliteStorage.close()` drains the write buffer and checkpoints the
+ * WAL before closing the database. An embedded `Queue.close()` also flushes the
+ * write buffer (test/repro-embedded-close-exit-loses-buffered-jobs.test.ts), but
+ * leaves the manager and its timers running.
  *
  * These tests pin that contract in both directions, because a script that ends
  * without terminating is the shape of a CLI task, a cron container or a CI step, and

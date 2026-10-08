@@ -13,10 +13,10 @@ Owns:
 - **Length-prefixed framing** — `FrameParser` (`protocol/frameParser.ts:13-71`) reassembles complete frames from arbitrary TCP segment boundaries, and `FrameParser.frame()` (`protocol/frameParser.ts:63-70`) prepends the 4-byte big-endian length prefix on the way out.
 - **MessagePack (de)serialization of the wire body** — the hardened `encodeMessagePack`/`decodeMessagePack` helpers wrap `msgpackr` (`shared/msgpack.ts:68-76`); the server decodes inbound commands in `tcp.ts:58-64` and frames responses in `tcp/responses.ts:5-10`.
 - **TCP listener lifecycle** — `createTcpServer()` (`tcp.ts:20-148`) wires `Bun.listen` with `open`/`data`/`close`/`error`/`drain` socket handlers, plus `broadcast()` and `stop()`.
-- **Per-connection pipelining** — frames in one read are decoded and processed in parallel, bounded by a `Semaphore` of `MAX_CONCURRENT_PER_CONNECTION = 50` (`tcp/constants.ts:6`, `tcp/connections.ts:43`, `tcp.ts:93-108`).
+- **Per-connection pipelining** — frames in one read are decoded and processed in parallel, bounded by a `Semaphore` of `MAX_CONCURRENT_PER_CONNECTION = 50` (`tcp/constants.ts:6`, `tcp/connections.ts:52`, `tcp.ts:93-108`).
 - **Write-side backpressure** — `SocketWriteQueue` (`socketWriteQueue.ts:24`) buffers unwritten tails on short writes and flushes them on `drain`.
 - **Transport DoS bounds** — 64MB max frame size (`protocol/frameParser.ts:1`), slowloris stall timer (`tcp/connections.ts:52-73`), and a write-queue byte cap (`tcp/constants.ts:29-57`, `tcp/connections.ts:75-86`).
-- **Per-connection identity & cleanup** — assigns a `clientId` (uuid) when the connection state is initialized (`TcpConnectionRegistry.init`, `tcp/connections.ts:27-49`), releases that client's leased jobs on close (`tcp/connections.ts:87-111`).
+- **Per-connection identity & cleanup** — assigns a `clientId` (uuid) when the connection state is initialized (`TcpConnectionRegistry.init`, `tcp/connections.ts:31-59`), releases that client's leased jobs on close (`tcp/connections.ts:97-125`).
 - **Queue event streaming** — each connection may select one queue with
   `SubscribeEvents`; matching lifecycle events are emitted as unsolicited
   MessagePack frames through the same bounded write queue. The shared manager
@@ -200,7 +200,7 @@ outside the `Response` union because it does not answer a command.
 
 **Server creation (`createTcpServer`, `tcp.ts:25-35`)**: before anything binds, resolve `idleTimeoutMs` and `maxWriteQueueBytes` (an explicit config value is validated; otherwise `tcpIdleTimeoutMs()` / `tcpMaxWriteQueueBytes()` parse `TCP_IDLE_TIMEOUT_MS` / `TCP_MAX_WRITE_QUEUE_BYTES`) and read `rateLimiterEnvConfig()` (`RATE_LIMIT_*`). A malformed value throws (`Invalid TCP_IDLE_TIMEOUT_MS: "1e12" (expected a whole number of milliseconds >= 0)`, or a `RangeError` naming `TcpServerConfig.idleTimeoutMs`), so the server fails at startup instead of on the first connection or request. The env rules are exported (`TCP_IDLE_TIMEOUT_SETTING`, `TCP_MAX_WRITE_QUEUE_SETTING` in `tcp/constants.ts`) and the standalone server validates them earlier, in `resolveServerConfig`, before storage opens or the banner prints. The env values are strict: digits only, an empty value keeps the default, and `1e12`, `-1`, `abc` or `64MB` are rejected (`parseInt` used to read them as 1 ms, "disabled" or a 64-byte cap).
 
-**Connection open (`TcpConnectionRegistry.init`, `tcp/connections.ts:28-50`)**: allocate `clientId = uuid()`, build `HandlerContext` with `authenticated = authTokens.size === 0` (auto-auth when no tokens configured), and attach per-connection `TcpConnectionData`: a fresh `FrameParser`, `Semaphore(50)`, `SocketWriteQueue(maxWriteQueueBytes)`, abort controller, null `stallTimer`, and null event queue. Register in `connections` map and emit `client:connected`. `init` is idempotent (returns early if `socket.data` exists) and is called from **both** the `open` handler and lazily at the top of the `data` handler (`tcp.ts:38-44`): under native TLS, Bun can deliver `data` before `open` has run, and the handler previously destructured a null `socket.data`, escalating a TypeError to the process-level unhandledRejection handler (a pre-auth remote DoS on an exposed TLS port, #108). Lazy init preserves that first frame instead of dropping it.
+**Connection open (`TcpConnectionRegistry.init`, `tcp/connections.ts:31-59`)**: allocate `clientId = uuid()`, build `HandlerContext` with `authenticated = authTokens.size === 0` (auto-auth when no tokens configured) and `signal = AbortSignal.any([connection signal, server drain signal])`, and attach per-connection `TcpConnectionData`: a fresh `FrameParser`, `Semaphore(50)`, `SocketWriteQueue(maxWriteQueueBytes)`, abort controller, null `stallTimer`, and null event queue. Register in `connections` map and emit `client:connected`. `init` is idempotent (returns early if `socket.data` exists) and is called from **both** the `open` handler and lazily at the top of the `data` handler (`tcp.ts:38-44`): under native TLS, Bun can deliver `data` before `open` has run, and the handler previously destructured a null `socket.data`, escalating a TypeError to the process-level unhandledRejection handler (a pre-auth remote DoS on an exposed TLS port, #108). Lazy init preserves that first frame instead of dropping it.
 
 **Inbound data** (`tcp.ts:42-109`):
 
@@ -223,17 +223,32 @@ outside the `Response` union because it does not answer a command.
 
 **Outbound write & backpressure — `SocketWriteQueue`** (`socketWriteQueue.ts`): if a tail is already pending, append the new chunk (never write ahead of older bytes — preserves frame order). Otherwise `socket.write(data)`; a return `< 0` means the socket is closed (`write` returns `false`), and a short write buffers the unwritten `data.subarray(written)` tail. `flush()`, invoked from both server and client `drain` handlers, drains the pending queue in order, advancing `offset` within the current chunk on a partial write and stopping at zero or another short write. It returns `false` for a closed or throwing socket so the owner can terminate it. Server responses and reference-client commands use a queue owned by the individual physical socket; neither queue survives reconnect. This matters because Bun's `socket.write()` may write fewer bytes than supplied; silently dropping the tail would corrupt the length-prefixed stream.
 
-**Connection close** (`tcp/connections.ts:87-111`): if the socket closed before its state was ever
+**Connection close** (`tcp/connections.ts:97-125`): if the socket closed before its state was ever
 initialized (e.g. an aborted TLS handshake), return immediately, nothing to
 release (#108). Otherwise abort the connection-scoped signal first, cancelling
 pending `PULL`/`PULLB` waiters before they can claim future jobs; then clear the
 stall timer and buffered writes, remove connection/rate-limiter/worker state,
 emit `client:disconnected`, and call `releaseClientJobsWithRetry` for jobs
-already delivered to that client.
+already delivered to that client. The release is skipped only when the server
+itself closes every connection after its shutdown drain (`closeAll(true)`):
+jobs still held then stay `active` for the next process's startup recovery.
+
+**Shutdown drain (`TcpServer.beginDrain`, `tcp.ts`)**: aborts the server drain
+signal, so every pull (new or parked) claims no job, and stops the listener
+(`stop(false)`, plain or TLS) from accepting connections. A drained `PULL`/`PULLB`
+with `timeout > 0` holds its empty answer until its own timeout or until the
+connection closes (the connection's abort signal, which `stop()` also fires through
+`close()`); with `timeout` 0 it answers empty at once. A long-polling worker thus
+re-polls once per poll timeout instead of every 10 ms
+(`test/server-drain-long-poll.test.ts`). Open connections keep
+serving every other command, so a worker can ACK, FAIL, heartbeat or report
+progress for the job it holds. `TcpServer.stop()` then terminates the remaining
+connections (`closeAll`) and stops the listener; see the shutdown order in
+[TCP Server & Handlers](./tcp-server-handlers.md).
 
 ## Concurrency & Locking
 
-- **Per-connection pipelining is bounded by a `Semaphore(50)`** (`MAX_CONCURRENT_PER_CONNECTION`, `tcp/constants.ts:6`; construction at `tcp/connections.ts:43`). All frames from a single `data` event are launched together (`tcp.ts:108`), but at most 50 commands per connection are in-flight at once; the rest await a permit. The semaphore (`shared/semaphore.ts`) is a simple FIFO permit queue.
+- **Per-connection pipelining is bounded by a `Semaphore(50)`** (`MAX_CONCURRENT_PER_CONNECTION`, `tcp/constants.ts:6`; construction at `tcp/connections.ts:52`). All frames from a single `data` event are launched together (`tcp.ts:108`), but at most 50 commands per connection are in-flight at once; the rest await a permit. The semaphore (`shared/semaphore.ts`) is a simple FIFO permit queue.
 - **No lock is taken in this module.** Frame parsing is synchronous per `data` callback (single-threaded JS event loop), and the per-connection `FrameParser`/`SocketWriteQueue`/`stallTimer` are touched only from that connection's own callbacks. Job-state locking (the `jobIndex → completedJobs → shards → processingShards` hierarchy) happens downstream inside `QueueManager`; see [Concurrency & Locking](./concurrency-and-locking.md).
 - **Lease ownership** is keyed by the connection `clientId`: jobs pulled over a connection are released on disconnect. `PULL`/`PULLB` accept `owner`/`lockTtl`, and `detach: true` (CLI use) opts out of auto-release on disconnect. Lock-token mechanics belong to [Job Lifecycle](./job-lifecycle.md).
 - **Token-bearing transitions** include `ACK`, `FAIL`, both `ACKB` forms,
@@ -245,8 +260,8 @@ already delivered to that client.
   Single `ACK`/`FAIL` use `{ applied:false, reason:'already-finalized' }` for
   that exact retired generation. Clients validate this evidence and do not
   retry it as a transport failure.
-- **Pending pull ownership** is also connection-scoped. Disconnect aborts
-  single/batch and owner/detached long-polls; a cancelled request cannot consume
+- **Pending pull ownership** is also connection-scoped. Disconnect (and the
+  server's shutdown drain) aborts single/batch and owner/detached long-polls; a cancelled request cannot consume
   a later push, increment pulled counters, activate a group, consume a
   concurrency slot, or create a lock.
 - **`SocketWriteQueue` ordering invariant:** once any tail is pending, every subsequent `write` must enqueue rather than write directly, or response bytes would interleave and corrupt the frame stream.
@@ -271,7 +286,7 @@ already delivered to that client.
   constraint, relation, driver, host, SQLite, and network diagnostics to
   `Internal server error` before framing. Non-throwing storage-status payloads
   apply the same projection; SQLite disk-full retains its actionable detail.
-- **Job release on disconnect with retry:** `releaseClientJobsWithRetry` (`tcp/clientRelease.ts:4-23`) retries up to 3× with exponential backoff (100/200/400ms). If all retries fail, `TcpConnectionRegistry.close` falls back to `forceReleaseClientJobs` (`tcp/connections.ts:103-110`), which unconditionally clears client tracking (prevents a `connections`/ownership Map leak) and resets heartbeats so the stall detector recovers any orphaned `active` jobs on its next tick — chosen over leaking the jobs. Both paths act only on deliveries the connection still owns: a job recovered from it (stall, orphan, lock expiry, timeout) is detached at recovery, and a later delivery to another worker is never released or expired by this connection's close (see [Webhooks, Events & Job Logs](./webhooks-and-events.md)).
+- **Job release on disconnect with retry:** `releaseClientJobsWithRetry` (`tcp/clientRelease.ts:4-23`) retries up to 3× with exponential backoff (100/200/400ms). If all retries fail, `TcpConnectionRegistry.close` falls back to `forceReleaseClientJobs` (`tcp/connections.ts:116-124`), which unconditionally clears client tracking (prevents a `connections`/ownership Map leak) and resets heartbeats so the stall detector recovers any orphaned `active` jobs on its next tick — chosen over leaking the jobs. Both paths act only on deliveries the connection still owns: a job recovered from it (stall, orphan, lock expiry, timeout) is detached at recovery, and a later delivery to another worker is never released or expired by this connection's close (see [Webhooks, Events & Job Logs](./webhooks-and-events.md)).
 - **Idempotency** is a command-level concern (`jobId`/`uniqueKey`/`dedup`), not a transport one; the transport delivers exactly the frames it parsed. `reqId` is purely for client-side response correlation and is echoed back verbatim, including on errors.
 - **TLS startup invariant:** `loadTlsOptions` runs _before_ `Bun.listen` binds the port (`tcp.ts:120-126`), so a bad cert/key path fails fast at startup instead of leaving a half-started listener.
 - **`stop()`** terminates every connection through `TcpConnectionRegistry.closeAll()` and then stops the listener (`tcp.ts:141-144`); `broadcast()` frames the message once and fans it out through each connection's `SocketWriteQueue` (`tcp/connections.ts:114-124`).

@@ -222,6 +222,24 @@ the constructor is released exactly once. Repeated `close()` calls, including
 `disconnect()` followed by `close()`, therefore cannot close a shared pool
 still owned by another Queue.
 
+In embedded mode `close()` (and therefore `disconnect()`) also flushes the
+shared manager's SQLite write buffer before returning, so a job whose `add()` or
+`addBulk()` resolved survives an immediate `process.exit()`. It calls
+`peekSharedManager()?.flushPendingWrites()`: it never creates a manager, is a
+no-op after `shutdownManager()`, for an in-memory manager and for PostgreSQL
+(which returns `0`), and leaves the manager and its timers running, so
+`shutdownManager()` is still what lets the process exit. The flush is best
+effort and uses the buffer's backoff-aware gate (`flushIfReady`), not the
+snapshot flush (`flushPersistence()`, which throws and bypasses backoff):
+`close()` stays synchronous and never throws, and while a write retry backoff is
+armed it writes nothing and makes no insert attempt, so closing queues cannot
+spend the buffer's retry budget. Rows it leaves buffered stay under the
+`WriteBuffer` retry and critical-loss handling and are written by the scheduled
+retry. TCP queues do not touch the embedded manager. Pinned by
+`test/repro-embedded-close-exit-loses-buffered-jobs.test.ts`,
+`test/repro-embedded-close-respects-writebuffer-backoff.test.ts` and
+`test/embedded-queue-close-flush.test.ts`.
+
 Also exported: `QueuePro` (the `Queue` implementation), `QueueEventsPro` (the
 `QueueEvents` implementation), the type alias `JobPro<T>`,
 `QueueEvents<R, P>`, `QueueEventsOptions`, `QueueMetrics`,

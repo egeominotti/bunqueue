@@ -4,8 +4,10 @@ ARG BUN_VERSION=1.4.2
 FROM oven/bun:${BUN_VERSION}
 
 USER root
+# jq: workflow steps executed by the CI-workflow tests pipe JSON through it, as on
+# GitHub's ubuntu-latest runners.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates openssl \
+    && apt-get install -y --no-install-recommends ca-certificates jq openssl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace

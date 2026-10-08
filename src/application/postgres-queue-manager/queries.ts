@@ -284,4 +284,8 @@ export class PostgresQueueManagerQueries extends PostgresQueueManagerGroupQuerie
   override flushPersistence(): number {
     return 0;
   }
+
+  override flushPendingWrites(): number {
+    return 0;
+  }
 }

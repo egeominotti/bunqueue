@@ -78,6 +78,11 @@ export class QueueManagerStats extends QueueManagerJobManagement {
     return this.storage?.flushWriteBuffer() ?? 0;
   }
 
+  /** Non-throwing flush that respects a scheduled write retry backoff. */
+  flushPendingWrites(): number {
+    return this.storage?.flushPendingWrites() ?? 0;
+  }
+
   compactMemory(): void {
     statsMgr.compactMemory(this.contextFactory.getStatsContext());
     this.dashboardEmit?.('memory:compacted', {});

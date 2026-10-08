@@ -446,12 +446,21 @@ describe('issue #118 obliterate admission fences', () => {
       data: { generation: 'new-a' },
     });
     expect(current.id).toBe(first.id);
-    expect(storage.pendingCount).toBe(2);
+    // The retirement and the successor row commit in one transaction, even while
+    // the buffer cannot flush: the evicted buffered completion of generation A is
+    // dropped, the new generation is already on disk, and only B's completion
+    // remains buffered.
+    expect(storage.pendingCount).toBe(1);
+    expect(storage.getJobStateRaw(first.id)).toBe('waiting');
+    expect(storage.getJobStateRaw(second.id)).toBeNull();
+    expect(storage.getResult(first.id)).toBeNull();
     expect(manager.getResult(first.id)).toBeUndefined();
 
     storage.restore();
     storage.flushWriteBuffer();
+    // A later flush cannot resurrect the retired completed generation over the new one.
     expect(storage.getJobStateRaw(first.id)).toBe('waiting');
+    expect(storage.getJobStateRaw(second.id)).toBe('completed');
     expect(storage.getResult(first.id)).toBeNull();
 
     const recovered = restart(harness, { maxCompletedJobs: 1, maxJobResults: 10 });

@@ -691,6 +691,12 @@ Bunqueue.Worker.stop(worker)
 </TabItem>
 </Tabs>
 
+In embedded mode, `queue.close()` also writes the jobs still in the SQLite write
+buffer before it returns, so an awaited `add()` survives an immediate
+`process.exit()`. It leaves the process-wide timers running, so call
+`shutdownManager()` once every embedded client is closed: that is what lets the
+process exit on its own.
+
 ## Need more than one process?
 
 The Bun examples above run in a single process. When multiple services need to share one queue, run bunqueue as a standalone server instead:

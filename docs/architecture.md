@@ -100,7 +100,11 @@ The CLI surface is centralized in `src/cli/commandRegistry.ts`;
 E2E/property/concurrency matrices are checked against the same registry.
 TCP connections carry an abort signal into long-poll handlers so disconnecting
 a CLI or SDK socket cancels its waiter before any later job or limiter token can
-be claimed.
+be claimed. The same signal also aborts when the server starts its shutdown
+drain (HTTP requests and WebSocket messages carry the drain signal alone), so no
+pull delivers a job once shutdown has begun; a drained pull with a timeout holds
+its empty answer until that timeout or its connection ends, so long-polling workers
+do not re-poll in a tight loop.
 
 - **`domain/`** — Pure, synchronous, side-effect-free. `Shard` composes
   `IndexedPriorityQueue` (authoritative waiting/delayed membership),
@@ -132,7 +136,8 @@ be claimed.
   (`clientJobs` and its `clientJobOwners` reverse index) lives in
   `clientOwnership.ts`; every delivery-ending recovery detaches it, and
   `clientTracking.ts` releases on disconnect only deliveries the connection
-  still owns. Cleanup's orphan recovery, a backstop for the stall checker that
+  still owns, and persists each release (`markReleased`) so restart recovery
+  sees the queued job the live broker sees, with no attempt charged. Cleanup's orphan recovery, a backstop for the stall checker that
   follows the per-queue stall configuration, lives in `orphanRecovery.ts`. Houses DLQ, Events, Worker,
   JobLogs, Stats managers, and the batch `QueueStatsAggregator`. DLQ reads/purge
   live in `dlqManager.ts`; manual and automatic DLQ retry transitions live in
@@ -436,11 +441,14 @@ IoT/edge that must tolerate intermittent connectivity. See
    and optional existing-parent state and builds a mutation plan without
    exposing the candidate.
 5. Every SQLite-backed admission owns either its buffered row or immediate
-   transaction before RAM publication. SQLite commits all prerequisite
-   retirement/pin/link changes first. A durable insert,
-   terminal deterministic-ID reuse, dedup replacement, active-key transfer, or
-   parent link therefore fails closed: an error leaves the old durable and RAM
-   state authoritative, with no executable candidate or half-edge.
+   transaction before RAM publication. A durable insert, terminal
+   deterministic-ID reuse, dedup replacement, active-key transfer, or parent
+   link commits its retirement/pin/link changes and the successor row in one
+   immediate transaction, even without `durable`, so a crash never leaves a
+   retired generation without its successor. Each therefore fails closed: an
+   error leaves the old durable and RAM state authoritative, with no
+   executable candidate or half-edge. Only completion pins of a plain
+   buffered insert commit ahead of its buffered row.
 6. After commit or buffer insertion, the application publishes heap/wait-set
    membership, `jobIndex`, counters and ownership maps together and emits
    `pushed`. Plain non-durable inserts use the normal 10 ms `WriteBuffer`.
@@ -805,6 +813,12 @@ to make a consumer runnable. Server process teardown is independently owned by
 `server/shutdownCoordinator.ts`: duplicate signals share one task, optional
 backup/Cloud failures cannot skip storage cleanup, transient storage close is
 retried once with a bound, and an exit code is emitted in every terminal path.
+Its order is intake stop (listeners refuse connections, pulls deliver nothing)
+→ active-job drain with the existing TCP connections and WebSockets still
+served, so workers can ACK/FAIL/heartbeat → TCP and HTTP close → storage
+shutdown; the drain ends as soon as no job is active, and jobs still active at
+`shutdownTimeoutMs` are left `active` for the next process's startup recovery
+([TCP Server & Handlers](./features/tcp-server-handlers.md)).
 
 - **Admission and outcomes.** Jobs, dependencies, result/DLQ state, repeat links,
   metrics, and durable events change inside PostgreSQL transactions. Independent

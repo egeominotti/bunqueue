@@ -116,26 +116,18 @@ export abstract class SqliteMutations extends SqliteJobs {
     };
   }
 
+  /**
+   * Retire a pending dedup owner and insert its successor in one transaction. The
+   * retirement deletes the persisted owner, so the successor is never buffered: a
+   * crash inside the flush window would otherwise erase both. `_durable` is accepted
+   * for call-site symmetry and does not change the write path.
+   */
   replaceJob(
     oldJobId: JobId,
     newJob: Job,
-    durable?: boolean,
+    _durable?: boolean,
     admission?: DurableAdmissionMetadata
   ): void {
-    if (!durable) {
-      this.safeWrite(() => {
-        const transaction = this.db.transaction((id: JobId) => {
-          this.runDeleteJobRows(id);
-          this.runAdmissionMetadata(admission);
-        });
-        transaction(oldJobId);
-      });
-      this.writeBuffer.removePending(oldJobId);
-      this.finalizeAdmissionMetadata(admission);
-      this.writeBuffer.add(newJob);
-      return;
-    }
-
     this.safeWrite(() => {
       const transaction = this.db.transaction(() => {
         this.runDeleteJobRows(oldJobId);
@@ -148,25 +140,17 @@ export abstract class SqliteMutations extends SqliteJobs {
     this.finalizeAdmissionMetadata(admission);
   }
 
+  /**
+   * Move an active owner's dedup key to its successor in one transaction. Clearing
+   * the persisted key (and any custom-ID retirement) commits with the successor row,
+   * so a crash never leaves the key unowned. `_durable` does not change the write path.
+   */
   transferActiveDedupJob(
     oldJobId: JobId,
     newJob: Job,
-    durable?: boolean,
+    _durable?: boolean,
     admission?: DurableAdmissionMetadata
   ): void {
-    if (!durable) {
-      this.safeWrite(() => {
-        const transaction = this.db.transaction(() => {
-          this.runClearActiveDedupKey(oldJobId);
-          this.runAdmissionMetadata(admission);
-        });
-        transaction();
-      });
-      this.finalizeAdmissionMetadata(admission);
-      this.writeBuffer.add(newJob);
-      return;
-    }
-
     this.safeWrite(() => {
       const transaction = this.db.transaction(() => {
         this.runClearActiveDedupKey(oldJobId);

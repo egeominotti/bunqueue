@@ -379,7 +379,17 @@ method without deadlocking, but descendants that escape the admitted scope are
 rejected after it settles. Claims hold admission only for each database attempt,
 not for the surrounding long-poll wait, so an empty 60-second pull never delays
 shutdown. Each wait lasts `min(remaining, pollIntervalMs)` on a `safeTimeout`
-and ends early on a wake-up hint or abort. The manager's overrides apply
+and ends early on a wake-up hint or abort. A cancelled pull (its client
+disconnected, or the server started its shutdown drain) claims nothing, as in
+the core engine: `claimUntil` checks the signal on entry and again inside the
+admitted operation, right before each claim, so a cancellation that lands during
+readiness, the deferred write flush or operation admission still claims nothing
+(`test/postgres-drain-claim-guard.test.ts`, a stubbed test that needs no
+database). Before, the loop made one claim attempt first. A claim already
+running when the signal aborts completes and is delivered; the server's pull
+handler holds a drained empty pull until its timeout. Disconnect release was already durable here: it rewrites the row
+to `waiting`/`prioritized` with `started_at = NULL` and unchanged attempts, so a
+restart agrees with the live broker. The manager's overrides apply
 the base engine's argument rules (`src/domain/job/options.ts`), because they do not
 call the base methods: `pull`/`pullBatch` and the locked variants clamp the wait to
 0..60 s (`pullTimeoutArgument`; NaN or negative is no wait), a `lockTtl` and every

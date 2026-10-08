@@ -68,6 +68,15 @@ export function setBufferedJobState(job: Job, state: PersistedJobState): void {
   bufferedJobStates.set(job, state);
 }
 
+/** The durable state of a job held in its queue: by run time, then by priority. */
+export function queuedJobState(
+  job: Pick<Job, 'runAt' | 'priority'>,
+  now: number = Date.now()
+): 'delayed' | 'prioritized' | 'waiting' {
+  if (job.runAt > now) return 'delayed';
+  return job.priority > 0 ? 'prioritized' : 'waiting';
+}
+
 /** Derive the current durable state when a buffered job is eventually inserted. */
 export function persistedJobStateForWrite(job: Job, now: number = Date.now()): PersistedJobState {
   const bufferedState = bufferedJobStates.get(job);
@@ -83,8 +92,7 @@ export function persistedJobStateForWrite(job: Job, now: number = Date.now()): P
   ) {
     return latest;
   }
-  if (job.runAt > now) return 'delayed';
-  return job.priority > 0 ? 'prioritized' : 'waiting';
+  return queuedJobState(job, now);
 }
 
 /**

@@ -6,16 +6,25 @@ import {
   type JobTimelineEntry,
 } from '../../../domain/types/job';
 import { encodeJobOptions } from '../jobOptionsBlob';
-import { pack, persistedJobStateForWrite, persistedStallCount } from '../sqliteSerializer';
+import {
+  pack,
+  persistedJobStateForWrite,
+  persistedStallCount,
+  queuedJobState,
+} from '../sqliteSerializer';
 import type { DurableAdmissionMetadata } from '../types/admission';
 import type { ActiveJobWrite, CompletedJobWrite } from '../types/sqlite';
 import { SqliteAdmission } from './admission';
 
 /** Buffered admission and lifecycle state persistence. */
 export abstract class SqliteJobLifecycle extends SqliteAdmission {
+  /**
+   * Buffer a plain admission. A durable admission, or one that retires a previous
+   * generation, commits the retirement and the successor row in one transaction.
+   */
   insertJob(job: Job, durable?: boolean, admission?: DurableAdmissionMetadata): void {
     assertWellFormedJobId(job.id);
-    if (durable) {
+    if (durable || this.retiresGeneration(admission)) {
       this.insertJobImmediate(job, admission);
       return;
     }
@@ -129,6 +138,23 @@ export abstract class SqliteJobLifecycle extends SqliteAdmission {
         const statement = this.statements.get('updateJobState')!;
         for (const row of batch) statement.run('active', row.startedAt, row.timeline, row.jobId);
       })(rows);
+    });
+  }
+
+  /**
+   * Persist an active job's return to its queue without a charged attempt (a worker
+   * disconnect release): the queued state the live broker holds it in, `started_at`
+   * cleared, attempts and stall count untouched. A job still in the WriteBuffer keeps
+   * that state when its insert lands, so startup recovery never sees it as `active`.
+   */
+  markReleased(job: Job): void {
+    const state = queuedJobState(job);
+    this.writeBuffer.setPendingState(job.id, state);
+    this.flushIfBuffered(job.id);
+    this.safeWrite(() => {
+      this.statements
+        .get('updateJobState')!
+        .run(state, null, job.timeline.length > 0 ? pack(job.timeline) : null, job.id);
     });
   }
 

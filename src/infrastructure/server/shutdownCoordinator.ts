@@ -5,6 +5,10 @@ import { stopRateLimiter } from './rateLimiter';
 export interface ServerShutdownResources {
   readonly shutdownTimeoutMs: number;
   readonly stopStats: () => void;
+  /** Refuse new TCP connections and job deliveries; open connections stay served. */
+  readonly stopTcpIntake: () => void;
+  /** Refuse new HTTP connections and job deliveries; open WebSockets stay served. */
+  readonly stopHttpIntake: () => void;
   readonly stopTcp: () => void;
   readonly stopHttp: () => void;
   readonly getActiveJobs: () => number;
@@ -75,8 +79,10 @@ async function bestEffort(
 
 /**
  * Poll active jobs once per second until none remain or `shutdownTimeoutMs` has elapsed.
- * Any timeout length works (the poll uses `sleep`, never a timer armed for the whole
- * timeout), so a value above 2^31 - 1 ms neither skips the drain nor ends it early.
+ * The listeners are still open on their existing connections, so workers can ACK, FAIL
+ * and heartbeat the jobs they hold; no new job is handed out. Any timeout length works
+ * (the poll uses `sleep`, never a timer armed for the whole timeout), so a value above
+ * 2^31 - 1 ms neither skips the drain nor ends it early.
  */
 async function drainActiveJobs(
   resources: ServerShutdownResources,
@@ -129,13 +135,18 @@ async function performShutdown(
   runtime.info(`Received ${signal}, shutting down...`);
   try {
     await bestEffort('Statistics timer cleanup', resources.stopStats, runtime);
-    await bestEffort('Rate limiter cleanup', runtime.stopRateLimiter, runtime);
-    await bestEffort('TCP server stop', resources.stopTcp, runtime);
-    await bestEffort('HTTP server stop', resources.stopHttp, runtime);
+    // Stop new work first, but keep existing connections open through the drain: a
+    // worker must be able to ACK the job it holds, or the drain runs out the clock and
+    // the job stays `active` on disk for startup recovery to charge.
+    await bestEffort('TCP intake stop', resources.stopTcpIntake, runtime);
+    await bestEffort('HTTP intake stop', resources.stopHttpIntake, runtime);
     if (resources.stopBackup) {
       await bestEffort('Backup manager stop', resources.stopBackup, runtime);
     }
     await bestEffort('Active-job drain', () => drainActiveJobs(resources, runtime), runtime);
+    await bestEffort('TCP server stop', resources.stopTcp, runtime);
+    await bestEffort('HTTP server stop', resources.stopHttp, runtime);
+    await bestEffort('Rate limiter cleanup', runtime.stopRateLimiter, runtime);
     await bestEffort('Shutdown event emission', () => resources.emitShutdown(signal), runtime);
     const stopCloud = resources.stopCloud;
     if (stopCloud) {

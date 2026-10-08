@@ -379,7 +379,7 @@ lock.createdAt`. Pull stamps `startedAt` before the lease is created, so a
 | `StallConfig.maxStalls`         | `3`         | Stalls before the job is moved to DLQ.                                                                                                                 |
 | `StallConfig.gracePeriod`       | `5_000` ms  | Quiet period after start before stall checks apply.                                                                                                    |
 | `stallCheckMs` (config)         | `5_000` ms  | Interval for **both** `checkStalledJobs` and `checkExpiredLocks`; finite ms >= 1 (`application/types/config.ts`, `background/lifecycle.ts`).           |
-| `MAX_CONCURRENT_PER_CONNECTION` | `50`        | Per-socket semaphore permits for pipelined TCP command processing (`server/tcp/constants.ts:6`, constructed at `server/tcp/connections.ts:43`).        |
+| `MAX_CONCURRENT_PER_CONNECTION` | `50`        | Per-socket semaphore permits for pipelined TCP command processing (`server/tcp/constants.ts:6`, constructed at `server/tcp/connections.ts:52`).        |
 
 Per-queue `StallConfig` is set via `queue.setStallConfig({...})` (embedded) and read by the sweeps through `shard.getStallConfig(queue)`.
 

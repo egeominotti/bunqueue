@@ -1,7 +1,6 @@
 import type { Command } from '../../../domain/types/command';
 import type { Response } from '../../../domain/types/response';
 import * as resp from '../../../domain/types/response';
-import { validateGroupPullOptions } from '../../../domain/types/group';
 import { jobId, normalizeLegacyJobPayload } from '../../../domain/types/job';
 import type { HandlerContext } from '../types';
 import { tcpLog } from '../../../shared/logger';
@@ -11,11 +10,10 @@ import {
   validateGroupId,
   validateJobData,
   validateJobOptions,
-  validateLockDuration,
-  validateNumericField,
-  validatePullTimeout,
 } from '../protocol';
 import { validatePushBatchJobs, validatePushDependencies } from './pushBatchValidation';
+
+export { handlePull, handlePullBatch } from './pull';
 
 export async function handlePush(
   cmd: Extract<Command, { cmd: 'PUSH' }>,
@@ -104,95 +102,6 @@ export async function handlePushBatch(
   } catch (error) {
     return resp.error(sanitizeServerError(error), reqId);
   }
-}
-
-export async function handlePull(
-  cmd: Extract<Command, { cmd: 'PULL' }>,
-  ctx: HandlerContext,
-  reqId?: string
-): Promise<Response> {
-  const queueError = validateQueueName(cmd.queue);
-  if (queueError) return resp.error(queueError, reqId);
-
-  const timeoutError = validatePullTimeout(cmd.timeout);
-  if (timeoutError) return resp.error(timeoutError, reqId);
-  const pullError =
-    validateGroupPullOptions(cmd.group) ?? validateLockDuration(cmd.lockTtl, 'lockTtl');
-  if (pullError) return resp.error(pullError, reqId);
-
-  if (cmd.owner) {
-    const { job, token } = await ctx.queueManager.pullWithLock(
-      cmd.queue,
-      cmd.owner,
-      cmd.timeout,
-      cmd.lockTtl ?? undefined,
-      ctx.signal,
-      cmd.group
-    );
-    if (job && ctx.clientId) {
-      ctx.queueManager.registerClientJob(ctx.clientId, job.id);
-    }
-    return resp.pulledJob(job, token, reqId);
-  }
-
-  // Standard pull (no lock, but still track for client release unless detached)
-  const job = await ctx.queueManager.pull(cmd.queue, cmd.timeout, ctx.signal, cmd.group);
-  if (job && ctx.clientId && !cmd.detach) {
-    ctx.queueManager.registerClientJob(ctx.clientId, job.id);
-  }
-  return resp.nullableJob(job, reqId);
-}
-
-export async function handlePullBatch(
-  cmd: Extract<Command, { cmd: 'PULLB' }>,
-  ctx: HandlerContext,
-  reqId?: string
-): Promise<Response> {
-  const queueError = validateQueueName(cmd.queue);
-  if (queueError) return resp.error(queueError, reqId);
-
-  const countError = validateNumericField(cmd.count, 'count', { min: 1, max: 1000 });
-  if (countError) return resp.error(countError, reqId);
-
-  const timeoutError = validatePullTimeout(cmd.timeout);
-  if (timeoutError) return resp.error(timeoutError, reqId);
-  const pullError =
-    validateGroupPullOptions(cmd.group) ?? validateLockDuration(cmd.lockTtl, 'lockTtl');
-  if (pullError) return resp.error(pullError, reqId);
-
-  if (cmd.owner) {
-    const { jobs, tokens } = await ctx.queueManager.pullBatchWithLock(
-      cmd.queue,
-      cmd.count,
-      cmd.owner,
-      cmd.timeout ?? 0,
-      cmd.lockTtl ?? undefined,
-      ctx.signal,
-      cmd.group
-    );
-    if (ctx.clientId) {
-      for (const job of jobs) {
-        ctx.queueManager.registerClientJob(ctx.clientId, job.id);
-      }
-    }
-    return resp.pulledJobs(jobs, tokens, reqId);
-  }
-
-  // Standard pull (no locks, but still track for client release) — the
-  // non-owner branch honors cmd.timeout exactly like the owner branch and PULL.
-  const jobs = await ctx.queueManager.pullBatch(
-    cmd.queue,
-    cmd.count,
-    cmd.timeout ?? 0,
-    ctx.signal,
-    cmd.group
-  );
-  if (ctx.clientId) {
-    for (const job of jobs) {
-      ctx.queueManager.registerClientJob(ctx.clientId, job.id);
-    }
-  }
-  return resp.jobs(jobs, reqId);
 }
 
 /** Handle ACK command */

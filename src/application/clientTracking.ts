@@ -7,6 +7,7 @@ import type { Job, JobId } from '../domain/types/job';
 import { shardIndex } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
 import { detachClientJob, dropClient, ownsCurrentDelivery } from './clientOwnership';
+import { persistRelease } from './operations/releasePersistence';
 import type { LockContext } from './types';
 
 export { registerClientJob, unregisterClientJob } from './clientOwnership';
@@ -225,6 +226,8 @@ function releaseJobToQueue(opts: ReleaseJobOptions): number {
   const isDelayed = job.runAt > now;
   shard.incrementQueued(jobId, isDelayed, job.createdAt, job.queue, job.runAt);
   ctx.jobIndex.set(jobId, { type: 'queue', shardIdx: queueShardIdx, queueName: job.queue });
+  // Still under the shard and processing locks (see persistRelease).
+  persistRelease(job, ctx.storage);
 
   return 1;
 }

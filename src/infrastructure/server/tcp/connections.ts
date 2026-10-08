@@ -17,12 +17,15 @@ import { MAX_CONCURRENT_PER_CONNECTION } from './constants';
 export class TcpConnectionRegistry {
   readonly connections = new Map<string, Socket<TcpConnectionData>>();
   private eventUnsubscribe: (() => void) | null = null;
+  /** Set by a post-drain `closeAll`: jobs still held are abandoned, not released. */
+  private abandonJobsOnClose = false;
 
   constructor(
     private readonly queueManager: QueueManager,
     private readonly authTokens: Set<string>,
     private readonly idleTimeoutMs: number,
-    private readonly maxWriteQueueBytes: number
+    private readonly maxWriteQueueBytes: number,
+    private readonly drainSignal?: AbortSignal
   ) {}
 
   init(socket: Socket<TcpConnectionData>): void {
@@ -38,7 +41,13 @@ export class TcpConnectionRegistry {
         authTokens: this.authTokens,
         authenticated: this.authTokens.size === 0,
         clientId,
-        signal: abortController.signal,
+        // Pulls stop when this client disconnects or when the server starts draining.
+        signal: this.drainSignal
+          ? AbortSignal.any([abortController.signal, this.drainSignal])
+          : abortController.signal,
+        drainSignal: this.drainSignal,
+        // `close()` aborts it, including when `stop()` terminates the connection.
+        connectionSignal: abortController.signal,
       },
       semaphore: new Semaphore(MAX_CONCURRENT_PER_CONNECTION),
       writeQueue: new SocketWriteQueue(this.maxWriteQueueBytes),
@@ -100,6 +109,9 @@ export class TcpConnectionRegistry {
       clientId,
       transport: 'tcp',
     });
+    // Server shutdown closes every connection only after the active-job drain: a job
+    // still held then is abandoned to the next process's stall recovery, not released.
+    if (this.abandonJobsOnClose) return;
 
     releaseClientJobsWithRetry(this.queueManager, clientId).catch((error: unknown) => {
       const touched = this.queueManager.forceReleaseClientJobs(clientId);
@@ -155,7 +167,12 @@ export class TcpConnectionRegistry {
     this.eventUnsubscribe = null;
   }
 
-  closeAll(): void {
+  /**
+   * Terminate every connection. `abandonJobs` (server shutdown after its drain) leaves
+   * the jobs those clients still hold in place instead of releasing them to the queue.
+   */
+  closeAll(abandonJobs = false): void {
+    this.abandonJobsOnClose = abandonJobs;
     this.eventUnsubscribe?.();
     this.eventUnsubscribe = null;
     for (const socket of this.connections.values()) {

@@ -1,6 +1,6 @@
 # HTTP / REST / SSE / WebSocket API
 
-> **Category:** Transport · **Source:** `src/infrastructure/server/http.ts`, `src/infrastructure/server/httpRouter.ts`, `src/infrastructure/server/httpEndpoints.ts`, `src/infrastructure/server/httpDashboardEndpoints.ts`, `src/infrastructure/server/httpRouteJobs.ts`, `src/infrastructure/server/httpRouteQueues.ts`, `src/infrastructure/server/httpRouteQueueConfig.ts`, `src/infrastructure/server/httpRouteResources.ts`, `src/infrastructure/server/sseHandler.ts`, `src/infrastructure/server/wsHandler.ts`
+> **Category:** Transport · **Source:** `src/infrastructure/server/http.ts`, `src/infrastructure/server/httpAuth.ts`, `src/infrastructure/server/httpRouter.ts`, `src/infrastructure/server/httpEndpoints.ts`, `src/infrastructure/server/httpDashboardEndpoints.ts`, `src/infrastructure/server/httpRouteJobs.ts`, `src/infrastructure/server/httpRouteQueues.ts`, `src/infrastructure/server/httpRouteQueueConfig.ts`, `src/infrastructure/server/httpRouteResources.ts`, `src/infrastructure/server/sseHandler.ts`, `src/infrastructure/server/wsHandler.ts`
 
 ## Purpose
 
@@ -10,7 +10,7 @@ This module is the HTTP-side transport for bunqueue, served on port `6790` by de
 
 Owns:
 
-- Bun HTTP server creation, binding (TCP port or Unix socket), and optional TLS termination (`createHttpServer`, `http.ts:70`).
+- Bun HTTP server creation, binding (TCP port or Unix socket), and optional TLS termination (`createHttpServer`, `http.ts:45`).
 - Request routing: URL/method → internal `Command`, via pre-compiled regexes and four sub-routers (jobs, queues, queue-config, resources).
 - Auth gate, CORS headers/preflight, and per-IP rate limiting on the HTTP edge.
 - Diagnostic/observability endpoints: `/health`, `/healthz`, `/live`, `/ready`, `/stats`, `/metrics`, `/prometheus`, `/gc`, `/heapstats`, `/dashboard*`.
@@ -32,7 +32,7 @@ Internal:
 - `QueueManager` — `subscribe`, `setDashboardEmit`, `emitDashboardEvent`, `getStats`, `getQueueJobCounts`, `getPerQueueStats`, `getDlqEntries`, `getDlqStats`, `getStorageStatus`, `getMemoryStats`, `getPrometheusMetrics`, `releaseClientJobs`, `unregisterWorkersByClientId`, `workerManager`, `listCrons`.
 - `parseCommand`, `serializeResponse`, `errorResponse`, `validateQueueName` (`protocol.ts`).
 - `getRateLimiter()` (`rateLimiter.ts`) — sliding-window per-client limiter.
-- `loadTlsOptions` (`tls.ts`); `constantTimeEqual`, `uuid` (`shared/hash.ts`); `throughputTracker`, `latencyTracker`; `pausedView` (`shared/pausedView.ts`); `VERSION`.
+- `checkAuth` (`httpAuth.ts`, bearer-token check with `constantTimeEqual`); `loadTlsOptions` (`tls.ts`); `uuid` (`shared/hash.ts`); `throughputTracker`, `latencyTracker`; `pausedView` (`shared/pausedView.ts`); `VERSION`.
 
 External/runtime:
 
@@ -42,7 +42,7 @@ External/runtime:
 
 Exported symbols:
 
-- `createHttpServer(queueManager: QueueManager, config: HttpServerConfig)` — `http.ts:70`. Returns `{ server, wsClients, sseClients, getWsClientCount(), getSseClientCount(), stop() }`. `stop()` unsubscribes from the event bus, stops WS broadcasts, closes all SSE streams, and stops the Bun server.
+- `createHttpServer(queueManager: QueueManager, config: HttpServerConfig)` — `http.ts:45`. Returns `{ server, wsClients, sseClients, getWsClientCount(), getSseClientCount(), beginDrain(), stop() }`. `beginDrain()` (server shutdown, before the active-job drain) aborts the server's drain signal, which every HTTP request and WebSocket message context carries, so `PULL`/`PULLB` (including a parked long poll) claim no job, and stops the Bun server from accepting connections; open WebSockets and in-flight requests keep being served, so a WebSocket worker can still ACK/FAIL/heartbeat. A drained pull with `timeout > 0` holds its empty answer until its timeout, until the HTTP client disconnects (`req.signal`) or the WebSocket closes (`ws.data.closed`), or until `stop()`; with `timeout` 0 it answers at once (see [TCP Server & Handlers](./tcp-server-handlers.md)). `stop()` aborts the stop signal (ending every held pull), unsubscribes from the event bus, stops WS broadcasts, closes all SSE streams, and stops the Bun server.
 - `interface HttpServerConfig` — `http.ts`: `port?`, `hostname?`,
   `socketPath?`, `authTokens?: string[]`, `corsOrigins?: string[]`,
   `requireAuthForMetrics?: boolean`,
@@ -158,30 +158,30 @@ Frame format (server → client): `{ event, ts, data }` (`wsHandler.ts:132-143`)
 
 See [data-model](../data-model.md) for full definitions. Key shapes here:
 
-- `HandlerContext` (`types.ts:8`): `{ queueManager, authTokens: Set<string>, authenticated: boolean, clientId? }`. For HTTP, `clientId` is intentionally absent (stateless; `http.ts:214`). For WS, `clientId = ws.data.id`.
+- `HandlerContext` (`types.ts:8`): `{ queueManager, authTokens: Set<string>, authenticated: boolean, clientId?, signal? }`. For HTTP, `clientId` is intentionally absent (stateless; `http.ts:200-209`). For WS, `clientId = ws.data.id`. Both carry `signal` and `drainSignal`, the server's drain signal (see `beginDrain()`), and `connectionSignal`: HTTP `AbortSignal.any([req.signal, stop])`, WS `ws.data.connectionSignal` (`AbortSignal.any([ws.data.closed, stop])`, built at upgrade). `WsData` (`types/ws.ts`) gains the optional `closed` controller and `connectionSignal`.
 - `WsData` (`types/ws.ts:1-6`): `{ id, authenticated, queueFilter: string | null, subscriptions: Set<string> | null }`. `subscriptions === null` = legacy mode (receives every job event in the raw `JobEvent` shape).
 - `SseClient` (`types/sse.ts:1-5`): `{ id, controller, queueFilter }`. `BufferedSseEvent` (`types/sse.ts:7-12`): `{ id, event, data, queue }` in the replay ring buffer.
 - `JobEvent` (from `domain/types/queue`) is the input to both `broadcast` methods; `WS_EVENT_MAP` (`ws/constants.ts:5-18`) renames legacy `eventType`s (`pushed`→`job:pushed`, `pulled`→`job:active`, `drained`→`queue:drained`, …), defaulting unknown types to `job:<eventType>`.
 
 ## Business Logic / Control Flow
 
-`fetch(req, server)` request pipeline (`http.ts:108-221`), short-circuiting in this order:
+`fetch(req, server)` request pipeline (`http.ts:87-216`), short-circuiting in this order:
 
-1. `OPTIONS` → `corsResponse` preflight (`http.ts:112-115`).
-2. Unauthenticated liveness: `/health`, `/healthz`, `/live`, `/ready` (`http.ts:117-133`). These skip both auth and rate limiting.
-3. Debug endpoints `POST /gc`, `GET /heapstats` → `checkAuth` then run (`http.ts:135-145`).
-4. Rate limiting: `clientIp` from `x-forwarded-for[0]` / `x-real-ip` / `'unknown'`; if `getRateLimiter().isAllowed(ip)` is false → emit `ratelimit:hit`, return `429` (`http.ts:147-155`).
-5. `/ws*` → auth, `wsHandler.canAccept()` (else `503`), then `server.upgrade(req, { data: { id: uuid(), authenticated: true, queueFilter, subscriptions: null } })` (`http.ts:157-169`).
-6. `/events*` → auth, build SSE response via `sseHandler.createResponse(queueFilter, corsOrigin, lastEventId)` (`http.ts:171-180`).
-7. `/prometheus` → conditional auth, return `text/plain; version=0.0.4` (`http.ts:182-201`).
-8. General `checkAuth` for everything else; failure emits `auth:failed` (`http.ts:203-210`).
+1. `OPTIONS` → `corsResponse` preflight (`http.ts:91-94`).
+2. Unauthenticated liveness: `/health`, `/healthz`, `/live`, `/ready` (`http.ts:96-112`). These skip both auth and rate limiting.
+3. Debug endpoints `POST /gc`, `GET /heapstats` → `checkAuth` then run (`http.ts:114-124`).
+4. Rate limiting: `clientIp` from `x-forwarded-for[0]` / `x-real-ip` / `'unknown'`; if `getRateLimiter().isAllowed(ip)` is false → emit `ratelimit:hit`, return `429` (`http.ts:126-134`).
+5. `/ws*` → auth, `wsHandler.canAccept()` (else `503`), then `server.upgrade(req, { data: { id: uuid(), authenticated: true, queueFilter, subscriptions: null, closed, connectionSignal } })` (`http.ts:136-157`).
+6. `/events*` → auth, build SSE response via `sseHandler.createResponse(queueFilter, corsOrigin, lastEventId)` (`http.ts:159-168`).
+7. `/prometheus` → conditional auth, return `text/plain; version=0.0.4` (`http.ts:170-189`).
+8. General `checkAuth` for everything else; failure emits `auth:failed` (`http.ts:191-198`).
 9. `routeHttpRequest` (`httpRouter.ts:23-70`): stats/metrics/dashboard, then cascade through `routeJobRoutes` → `routeQueueRoutes` → `routeQueueConfigRoutes` → `routeResourceRoutes`, each returning a `Response` or `null` (no match). Fallthrough → `404`. Any thrown error → `500` JSON.
 
 Each REST handler reads the body (`req.json()` or `parseJsonBody`, which tolerates empty body as `{}` and returns a `400` on malformed JSON — `httpEndpoints.ts:28`), builds the matching `Command`, awaits `handleCommand`, and maps the result to a status: typically `r.ok ? 200 : 400` (or `404` for read/lookup commands, plain `200` for list/idempotent commands).
 
-Auth (`checkAuth`, `http.ts:43-51`): no-op when `authTokens` is empty; otherwise extracts the `Authorization: Bearer <token>` header (a missing header reads as `''`) and compares against every configured token with `constantTimeEqual` (timing-safe). `validateAuthToken` (`http.ts:28-41`) never accepts a blank presented token and skips a blank configured one (`isBlankToken`, `src/config/auth.ts`), so an empty token cannot authenticate an anonymous request even if one reached the set. The `Auth` command used by TCP and WebSocket clients (`handleAuth`, `handler.ts`) applies the same rule to its `token`, which must also be a string.
+Auth (`checkAuth`, `httpAuth.ts`): no-op when `authTokens` is empty; otherwise extracts the `Authorization: Bearer <token>` header (a missing header reads as `''`) and compares against every configured token with `constantTimeEqual` (timing-safe). `validateAuthToken` (`httpAuth.ts`) never accepts a blank presented token and skips a blank configured one (`isBlankToken`, `src/config/auth.ts`), so an empty token cannot authenticate an anonymous request even if one reached the set. The `Auth` command used by TCP and WebSocket clients (`handleAuth`, `handler.ts`) applies the same rule to its `token`, which must also be a string.
 
-Event fan-out is wired once in `createHttpServer` (`http.ts:77-91`): `queueManager.subscribe` forwards each `JobEvent` to both `wsHandler.broadcast` and `sseHandler.broadcast`; `setDashboardEmit` routes non-job events (worker/queue/dlq/cron/…) to both handlers' `emitEvent`. Periodic broadcasters are started for both channels.
+Event fan-out is wired once in `createHttpServer` (`http.ts:56-70`): `queueManager.subscribe` forwards each `JobEvent` to both `wsHandler.broadcast` and `sseHandler.broadcast`; `setDashboardEmit` routes non-job events (worker/queue/dlq/cron/…) to both handlers' `emitEvent`. Periodic broadcasters are started for both channels.
 
 SSE broadcast (`sseHandler.broadcast`): assigns a monotonic `id`, maps and serializes the event, buffers it in the replay ring, writes to matching clients, and schedules the affected queue for a count refresh. `QueueCountsScheduler` deduplicates queue names for 10 ms and obtains all pending counts with one batch aggregation before emitting `queue:counts`. `createResponse` registers the client, sends the retry/connected frames, and replays buffered events newer than `Last-Event-ID`. Stream cancellation deletes the client and releases its jobs/workers.
 
@@ -191,9 +191,9 @@ WS broadcast (`wsHandler.broadcast`): for each client, skips on `queueFilter` mi
 
 The HTTP layer holds no shard locks itself; all locking happens inside `handleCommand`/`QueueManager` (see [Concurrency & Locking](./concurrency-and-locking.md)). Relevant connection-lifecycle behavior:
 
-- **Stateless HTTP, no job ownership**: HTTP requests carry no `clientId`, so jobs pulled over REST are not tracked to a connection; orphaned/in-flight jobs are recovered only by stall detection (`http.ts:212-214`, see [Background Tasks](./background-tasks.md)).
-- **WS/SSE own their pulled jobs**: on WS `close` (`http.ts:242-256`) and SSE stream `cancel` (`sseHandler.ts:255-260`), the handler calls `unregisterWorkersByClientId(clientId)` and `releaseClientJobs(clientId)` so jobs leased through that persistent connection are returned to the queue. WS additionally calls `getRateLimiter().removeClient(clientId)`.
-- **WS idle/keepalive**: Bun auto-pings with a `120s` idle timeout and `maxPayloadLength` of 1 MiB (`http.ts:224-230`). SSE sends a `:heartbeat` comment every 30 s and prunes clients that error on write (`sseHandler.ts:111-125`).
+- **Stateless HTTP, no job ownership**: HTTP requests carry no `clientId`, so jobs pulled over REST are not tracked to a connection; orphaned/in-flight jobs are recovered only by stall detection (`http.ts:200-201`, see [Background Tasks](./background-tasks.md)).
+- **WS/SSE own their pulled jobs**: on WS `close` (`http.ts:240-255`) and SSE stream `cancel` (`sseHandler.ts:255-260`), the handler calls `unregisterWorkersByClientId(clientId)` and `releaseClientJobs(clientId)` so jobs leased through that persistent connection are returned to the queue. WS additionally calls `getRateLimiter().removeClient(clientId)`.
+- **WS idle/keepalive**: Bun auto-pings with a `120s` idle timeout and `maxPayloadLength` of 1 MiB (`http.ts:220-224`). SSE sends a `:heartbeat` comment every 30 s and prunes clients that error on write (`sseHandler.ts:111-125`).
 
 ## Edge Cases & Failure Modes
 

@@ -189,7 +189,15 @@ phase-progress, and completion diagnostics at debug level on stderr:
    their bounds, retry scheduling, and retention fields are needed to classify
    interrupted work. It then repeatedly loads the first
    `RECOVERY_BATCH_SIZE = 10000` rows. Every handled row leaves the active result
-   set, so incrementing `OFFSET` over the shrinking set would skip rows.
+   set, so incrementing `OFFSET` over the shrinking set would skip rows. Each
+   `active` row is treated as interrupted work and charged one attempt and one
+   stall (DLQ when either bound is exhausted). Only genuinely abandoned work must
+   reach this phase: a job the live broker returned to its queue without a charge
+   (worker disconnect release, `requeueJob`, `MoveToWait`, `MoveToDelayed`) is
+   persisted in its queued state at that moment, and a graceful shutdown lets
+   workers ACK during its drain, so neither arrives here as `active`
+   ([Webhooks, Events & Job Logs](./webhooks-and-events.md),
+   [TCP Server & Handlers](./tcp-server-handlers.md)).
 2. **Phase 2 — pending jobs** (`background/recovery/pending.ts`): paginated by deterministic `priority DESC, run_at ASC, id ASC`. Each page collects only its referenced dependency IDs and asks SQLite which of those IDs are retained completions; it never materializes the full completed table. This phase is the single authoritative enqueue path for both original pending jobs and retries persisted by Phase 1, preventing duplicate heap entries/counter increments. Corrupt-deps are quarantined; unsatisfied dependencies enter `waitingDeps`; dedup mappings are restored.
 3. **DLQ restore** (`background/recovery/restore.ts`): `loadDlq()` restores every persisted entry into memory exactly once (this is why `quarantineCorruptDependsOn` deliberately does NOT touch in-memory DLQ — it only persists + drops the job row).
 4. **Queue control-state restore** (`background/recovery/restore.ts`, issue

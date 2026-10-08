@@ -96,6 +96,38 @@ function persistedCounts(path: string, queue: string): { jobs: number; results: 
   }
 }
 
+/** The persisted generation that owns a job ID, with its result presence. */
+function persistedGeneration(
+  path: string,
+  id: string
+): { queue: string; state: string; hasResult: boolean } | null {
+  const database = new Database(path, { readonly: true });
+  try {
+    const row = database
+      .query<{ queue: string; state: string }, [string]>(
+        'SELECT queue, state FROM jobs WHERE id = ?'
+      )
+      .get(id);
+    const results = database
+      .query<{ count: number }, [string]>(
+        'SELECT COUNT(*) AS count FROM job_results WHERE job_id = ?'
+      )
+      .get(id)?.count;
+    return row ? { ...row, hasResult: (results ?? 0) > 0 } : null;
+  } finally {
+    database.close();
+  }
+}
+
+/** Restart a harness on the same database and return the recovered manager. */
+function restartHarness(harness: Harness): QueueManager {
+  harness.manager.shutdown();
+  active.splice(active.indexOf(harness), 1);
+  const restarted = new QueueManager({ dataPath: harness.path, cleanupIntervalMs: 60_000 });
+  active.push({ directory: harness.directory, path: harness.path, manager: restarted });
+  return restarted;
+}
+
 async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!predicate() && Date.now() < deadline) await Bun.sleep(10);
@@ -479,8 +511,9 @@ describe('issue #118 SQLite completed retention', () => {
     }
   });
 
-  test('obliterate preserves a newer buffered generation with the same ID in another queue', async () => {
-    const { manager } = createHarness({ maxCompletedJobs: 1, maxJobResults: 10 });
+  test('obliterate preserves a newer generation with the same ID in another queue', async () => {
+    const harness = createHarness({ maxCompletedJobs: 1, maxJobResults: 10 });
+    const { manager, path } = harness;
     const oldQueue = 'issue118-old-generation-obliterate';
     const newQueue = 'issue118-new-generation-obliterate';
     const sharedId = 'issue118-shared-obliterate-generation';
@@ -498,7 +531,11 @@ describe('issue #118 SQLite completed retention', () => {
       customId: sharedId,
       data: { generation: 'new' },
     });
-    expect(buffer.pendingCount).toBe(1);
+    // The retirement and the successor commit in one transaction, so the newer
+    // generation is persisted in its own queue rather than waiting in the buffer.
+    expect(buffer.pendingCount).toBe(0);
+    const newer = { queue: newQueue, state: 'waiting', hasResult: false };
+    expect(persistedGeneration(path, sharedId)).toEqual(newer);
 
     manager.obliterate(oldQueue);
 
@@ -510,12 +547,20 @@ describe('issue #118 SQLite completed retention', () => {
     expect(manager.getShards()[shardIndex(newQueue)].getQueue(newQueue).find(current.id)?.id).toBe(
       current.id
     );
-    expect(buffer.pendingCount).toBe(1);
+    expect(buffer.pendingCount).toBe(0);
     expect(manager.getResult(current.id)).toBeUndefined();
+    // Obliterating the old queue must not delete the newer persisted row by ID.
+    expect(persistedGeneration(path, sharedId)).toEqual(newer);
+
+    const restarted = restartHarness(harness);
+    expect(await restarted.getJobState(current.id)).toBe('waiting');
+    expect((await restarted.getJob(current.id))?.queue).toBe(newQueue);
+    expect(restarted.getResult(current.id)).toBeUndefined();
   });
 
   test('custom-ID admission retires the old completion before clean', async () => {
-    const { manager } = createHarness({ maxCompletedJobs: 1, maxJobResults: 10 });
+    const harness = createHarness({ maxCompletedJobs: 1, maxJobResults: 10 });
+    const { manager, path } = harness;
     const oldQueue = 'issue118-old-generation-clean';
     const newQueue = 'issue118-new-generation-clean';
     const sharedId = 'issue118-shared-clean-generation';
@@ -534,6 +579,11 @@ describe('issue #118 SQLite completed retention', () => {
     });
 
     expect(manager.getResult(current.id)).toBeUndefined();
+    // The old completion and its result are retired in the transaction that
+    // persists the successor, so clean of the old queue cannot see that ID.
+    expect(buffer.pendingCount).toBe(0);
+    const newer = { queue: newQueue, state: 'waiting', hasResult: false };
+    expect(persistedGeneration(path, sharedId)).toEqual(newer);
     expect(manager.clean(oldQueue, 0, 'completed', 100)).toEqual([fillerId]);
 
     expect(manager.getJobIndex().get(current.id)).toMatchObject({
@@ -544,7 +594,14 @@ describe('issue #118 SQLite completed retention', () => {
     expect(manager.getShards()[shardIndex(newQueue)].getQueue(newQueue).find(current.id)?.id).toBe(
       current.id
     );
-    expect(buffer.pendingCount).toBe(1);
+    expect(buffer.pendingCount).toBe(0);
+    expect(persistedGeneration(path, sharedId)).toEqual(newer);
+    expect(persistedGeneration(path, fillerId)).toBeNull();
+
+    const restarted = restartHarness(harness);
+    expect(await restarted.getJobState(current.id)).toBe('waiting');
+    expect((await restarted.getJob(current.id))?.queue).toBe(newQueue);
+    expect(restarted.getResult(current.id)).toBeUndefined();
   });
 
   test('obliterate removes orphan flow-failure rows by child queue ownership', () => {

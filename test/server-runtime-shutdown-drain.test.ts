@@ -41,6 +41,8 @@ async function drain(
   const resources: ServerShutdownResources = {
     shutdownTimeoutMs,
     stopStats: () => undefined,
+    stopTcpIntake: () => undefined,
+    stopHttpIntake: () => undefined,
     stopTcp: () => undefined,
     stopHttp: () => undefined,
     getActiveJobs: () => {

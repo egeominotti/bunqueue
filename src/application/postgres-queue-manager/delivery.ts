@@ -178,6 +178,10 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     groupOptions?: GroupPullOptions
   ) {
     assertGroupPullOptions(groupOptions);
+    // As in the core engine, a cancelled pull (client gone, server draining) claims
+    // nothing. The server's pull handler, not this loop, holds a drained empty pull
+    // until its timeout, so a long-polling worker does not re-poll in a tight loop.
+    if (signal?.aborted) return [];
     await this.postgresReady;
     await this.flushPostgresWrites();
     // As in the core engine, a NaN or non-positive timeout is a single attempt.
@@ -185,6 +189,9 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     const deadline = Date.now() + waitMs;
     do {
       const claims = await this.runPostgresOperation(async () => {
+        // Re-checked where the claim starts: a drain or disconnect that began during an
+        // await above (readiness, write flush, operation admission) claims nothing.
+        if (signal?.aborted) return [];
         const admitted = await this.postgresStore.claim(
           queue,
           count,

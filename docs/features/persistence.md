@@ -25,7 +25,7 @@ Owns:
   `insertJobImmediate`, `insertJobsBatch`), plus two-phase admission metadata
   that makes persistence-sensitive queue publication fail closed.
 - State-mutating writes: scalar `markActive`/`markCompleted`, transactional
-  `markActiveBatch`/`markCompletedBatch`, `markWaitingChildren`, `markFailed`,
+  `markActiveBatch`/`markCompletedBatch`, `markReleased`, `markWaitingChildren`, `markFailed`,
   `updateForRetry`, `updateJobData`, `updateJobChildrenIds`, `clearJobUniqueKey`,
   and `deleteJob`.
 - Results, DLQ rows, cron rows, queue control-state rows, the durable
@@ -106,10 +106,13 @@ Key methods (real signatures):
   `insertJobsBatch(jobs: Job[], durable?: boolean): void`.
 - Admission-sensitive replacement/linking:
   `replaceJob(oldJobId, newJob, durable?, admission?)`,
-  `transferActiveDedupJob(oldJobId, newJob, durable?, admission?)`, and
+  `transferActiveDedupJob(oldJobId, newJob, durable?, admission?)` (both
+  always one immediate transaction; `durable` is accepted but ignored), and
   `commitFlowLink(child, parent, parentState, mode, admission?)`.
 - State: `markActive(jobId, startedAt, timeline?)`,
   `markActiveBatch(updates: readonly ActiveJobWrite[])`,
+  `markReleased(job)` (persists an uncharged return to the queue: disconnect
+  release and a cancelled pull handoff),
   `markWaitingChildren(jobId, timeline?)`,
   `markCompleted(jobId, completedAt, timeline?)`,
   `markCompletedBatch(updates: readonly CompletedJobWrite[])`,
@@ -154,6 +157,8 @@ isProtected?)` returns committed `{ jobId, queue }` ownership records;
   `getDiskFullStatus()`, `getCriticalLosses()`, `clearCriticalLosses()`,
   `getSize()`, `close()`. `flushWriteBuffer` throws if a flush attempt leaves
   any row pending; S3 backup uses that fail-closed boundary before snapshotting.
+  `flushPendingWrites(): number` is the non-throwing, backoff-aware variant
+  used by embedded `Queue.close()`.
 
 `sqliteBatch.ts` is the stable compatibility facade. It re-exports
 `BatchInsertManager` from `batchInsert.ts`, `WriteBuffer` from `writeBuffer.ts`,
@@ -247,7 +252,9 @@ the blob receives the historical defaults.
 Buffered write (default path):
 
 1. `insertJob(job)` in `persistence/sqlite/jobLifecycle.ts` calls
-   `writeBuffer.add(job)` (`persistence/writeBuffer.ts`).
+   `writeBuffer.add(job)` (`persistence/writeBuffer.ts`). The exception is an
+   admission whose metadata carries `retireGenerationId`: it takes the
+   immediate path below even without `durable` (see the admission section).
 2. The buffer auto-flushes every `writeBufferFlushMs` (10ms), or immediately
    when `activeBuffer.length >= bufferSize` (`persistence/writeBuffer.ts`).
 3. A synchronous `pushBatch` defers threshold-triggered flushes across the
@@ -275,20 +282,31 @@ Persistence-sensitive job admission is a two-phase operation coordinated by
 1. The application inspects custom-ID, deduplication, dependency-completion and
    parent state without performing destructive RAM mutations.
 2. SQLite runs the requested retirement and completion pins in the same
-   immediate transaction as a durable insert, dedup replacement, active-key
-   transfer, or parent-link insert/update.
+   immediate transaction as a durable insert, a retiring insert (durable or
+   not), a dedup replacement, an active-key transfer, or a parent-link
+   insert/update.
 3. A terminal retirement deletes the exact old generation from `jobs`,
    `job_results`, `dlq`, `dependency_completions`, and both sides of
    `flow_failures`. Duplicate completion-pin IDs are coalesced.
 4. Only after the transaction commits does the application publish the new
    heap/wait-set membership, indexes, counters and ownership maps.
 
-For a buffered successor, any retirement/pin metadata still commits
-synchronously before the successor enters the normal `WriteBuffer`. A durable
-successor commits metadata and its row atomically. Dedup replacement and
-parent-link methods follow the same split. A synchronous storage error cannot
-therefore leave an executable RAM-only durable job, remove the previous
-completed/DLQ generation, leak a completion pin, or expose half a parent edge.
+A retirement deletes persisted rows, so its successor row always commits in
+that same transaction, whatever the `durable` flag: `insertJob` routes an
+admission with `retireGenerationId` to `insertJobImmediate`, and
+`replaceJob` / `transferActiveDedupJob` always delete (or clear the key of) the
+predecessor and insert the successor together; their `durable` argument no
+longer changes the write path. A crash can therefore never leave the old
+generation retired while the successor still waits in the `WriteBuffer`.
+These admissions already paid a synchronous retirement transaction, so moving
+the insert into it adds no commit. `commitBufferedAdmissionMetadata` rejects a
+retirement and only pre-commits completion pins of a plain buffered insert. A
+pin without its consumer after a crash is harmless: startup
+`reconcileDependencyCompletionPins` rebuilds pins from the surviving dependency
+index, so the stale pin is released and pruned by retention. Plain buffered
+inserts are unchanged. A synchronous storage error cannot therefore leave an
+executable RAM-only durable job, remove the previous completed/DLQ generation,
+leak a completion pin, or expose half a parent edge.
 
 `PUSHF` always selects that immediate batch path when storage exists, regardless
 of individual node `durable` flags. The jobs transaction completes before the
@@ -318,6 +336,14 @@ heartbeat in one synchronous update. Priority persistence writes both
 `priority` and the effective `lifo` tie-break so recovery reconstructs the same
 heap order. `moveActiveToWait` also uses `updateRunAt`, clearing the persisted
 active marker so restart recovery cannot treat a manual requeue as a crash.
+`markReleased(job)` does the same for a job a disconnecting client gives back
+(`releaseJobToQueue`) or a pull handoff restores (`requeueJob`): it stamps and
+writes `queuedJobState(job)` (`delayed` when `run_at` is in the future, else
+`prioritized` for a positive priority, else `waiting`) through the
+`updateJobState` statement with `started_at = NULL`, leaving `attempts` and
+`stall_count` unchanged, so startup recovery does not charge the job as
+interrupted work (`test/client-release-persistence.test.ts`,
+`test/pull-handoff-requeue-persistence.test.ts`).
 `markWaitingChildren` similarly records the dedicated buffered state, clears
 `started_at`, and persists the transition timeline when a row is available. Explicit
 deduplication-key release uses `clearJobUniqueKey` after its owner-aware
@@ -495,9 +521,10 @@ This module is not lock-coordinated with the shard locks documented in [Concurre
 - `WriteBuffer.flushing` is a reentrancy guard: a concurrent `flush()` returns
   zero. The timer also skips while a backoff retry is pending
   (`persistence/writeBuffer.ts`).
-- Threshold additions, nested deferral exit, and lifecycle-triggered flushes
-  use the same backoff-aware gate. Only explicit administrative flushes such as
-  snapshot/shutdown attempts may bypass the scheduled delay. A successful
+- Threshold additions, nested deferral exit, lifecycle-triggered flushes, and
+  the embedded `Queue.close()` flush use the same backoff-aware gate. Only
+  explicit administrative flushes such as snapshot/shutdown attempts may bypass
+  the scheduled delay. A successful
   explicit flush cancels the obsolete retry timer so automatic flushing resumes
   immediately; retry exhaustion and removal of the last buffered job clear it
   for the same reason.
@@ -519,8 +546,9 @@ This module is not lock-coordinated with the shard locks documented in [Concurre
   `persistence/sqlite/state.ts`; a successful write clears the health flag.
   Immediate durable admission is fail closed: a rejected single or batch job
   is absent from the heap, wait sets, `jobIndex`, custom-ID/dedup maps, queries,
-  and worker delivery in Embedded and TCP modes. Rejected reuse preserves the
-  previous completed/DLQ generation and result across restart. Buffered jobs
+  and worker delivery in Embedded and TCP modes. Rejected reuse, durable or
+  not, preserves the previous completed/DLQ generation and result across
+  restart, because the retirement and the successor share one transaction. Buffered jobs
   retain their documented acknowledgement-before-flush contract; a later
   asynchronous flush failure is surfaced through storage health, retries and
   critical-loss reporting.
@@ -542,6 +570,16 @@ This module is not lock-coordinated with the shard locks documented in [Concurre
   `pendingCount` remains non-zero after its flush attempt. This is expected
   during storage retry/backoff and prevents an incomplete S3 recovery point
   from being published.
+- **Embedded `Queue.close()` flush is best effort.** `close()` and
+  `disconnect()` call `QueueManager.flushPendingWrites()` on the existing shared
+  manager so resolved adds survive an immediate `process.exit()`. It reaches
+  `SqliteStorage.flushPendingWrites()`, which runs `writeBuffer.flushIfReady()`
+  and never throws: while a retry backoff is armed it writes nothing and makes
+  no insert attempt, so repeated closes cannot spend the ten-attempt retry
+  budget, and the rows stay buffered for the scheduled retry or critical-loss
+  reporting. PostgreSQL and in-memory managers return `0`
+  (`client/queue/runtime/connection.ts`,
+  `test/repro-embedded-close-respects-writebuffer-backoff.test.ts`).
 - **Buffered reads are immediate and non-destructive.** `getBufferedJobs(queue)`
   exposes both active and in-flight buffer ownership for that queue.
   SQLite-backed queries resolve each pending ID through current `jobIndex`,
@@ -578,8 +616,9 @@ This module is not lock-coordinated with the shard locks documented in [Concurre
   preserves result/outbox rows whenever any same-ID DLQ generation survives,
   including one in the cleaned queue. Cold custom-ID reuse asks
   SQLite or the current write buffer for an evicted completed generation and
-  retires its pending row and stale result in the same admission boundary as
-  the successor.
+  retires its pending row and stale result in the same transaction that
+  persists the successor, so a later flush cannot resurrect the old generation
+  and a clean or obliterate of the old queue never deletes the newer row.
 - **Cold completed retry.** Bulk retry reads at most 500 completed rows per
   oldest-first `(retained timestamp,id)` keyset page, and a specific-ID retry
   uses a primary-key SQLite lookup constrained by `state='completed'`. Completion

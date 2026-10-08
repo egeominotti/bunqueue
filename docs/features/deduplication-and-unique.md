@@ -154,9 +154,12 @@ Single push: `pushJob` takes the required write locks and runs both checks insid
    `CustomIdRetirement`. The inspection phase does not remove the old job,
    result, DLQ entry, completion proof, index, or map entry.
 4. The matching SQLite admission retires the exact persisted generation and
-   inserts the durable successor in one transaction. If that transaction is
-   rejected, including because the disk is full, the previous generation and
-   result remain authoritative before and after restart.
+   inserts the successor in one transaction. This holds for non-durable adds
+   too: an admission that carries a retirement bypasses the `WriteBuffer`
+   (`SqliteJobLifecycle.insertJob`), so a crash can never leave the old
+   generation deleted while its successor is still buffered. If that
+   transaction is rejected, including because the disk is full, the previous
+   generation and result remain authoritative before and after restart.
 5. After persistence succeeds, `commitCustomIdAdmission` applies the matching
    RAM retirement, clears stale timeout/retired-lease markers, and records
    `customIdMap.set(customId, id)`. The recycled ID therefore exposes exactly
@@ -169,13 +172,15 @@ Single push: `pushJob` takes the required write locks and runs both checks insid
    the job is published after any required persistence succeeds.
 3. **`replace`**: retire the exact pending owner from the runnable heap or
    dependency wait set together with its queue counters, temporal index,
-   dependency consumer, custom-id mapping, and `jobIndex` entry. Durable
-   replacement deletes the superseded SQLite row and inserts the new row in one
-   transaction before publishing the in-memory transition. A same-key batch
-   collapses intermediate generations so only its final replacement reaches
-   persistence. Active owners are never removed. A durable replacement clears
-   the active row's key and inserts the successor in one SQLite transaction;
-   a non-durable successor follows the configured write-buffer semantics. RAM
+   dependency consumer, custom-id mapping, and `jobIndex` entry. Replacement
+   deletes the superseded SQLite row and inserts the new row in one
+   transaction before publishing the in-memory transition, whether or not the
+   successor is `durable`: the successor never waits in the `WriteBuffer`
+   after its predecessor's row is gone. A same-key batch collapses
+   intermediate generations so only its final replacement survives in
+   persistence. Active owners are never removed. A replacement clears the
+   active row's key and inserts the successor in one SQLite transaction, again
+   regardless of `durable`, so the key always has a persisted owner. RAM
    ownership moves only after the persistence step succeeds. The predecessor
    finishes under its old lease, and its later completion or failure cannot
    release the successor's key. Replacement is rejected before persistence when
@@ -245,18 +250,27 @@ Lifecycle / release:
 - **TTL semantics:** `ttl` undefined ⇒ `expiresAt = null` ⇒ never expires (`calculateExpiration`, `deduplication.ts:60`). Expiry is lazy on read plus a periodic sweep.
 - **Re-add of an active / waiting-children custom id is idempotent:** when the prior job has been popped from the PriorityQueue (active = `jobIndex` type `processing`; or waiting-children = type `queue` but held in `shard.waitingDeps`) its row is still on disk, so re-adding the same `jobId` must NOT take the reuse path — that would re-insert the same deterministic id and collide on the `jobs.id` PRIMARY KEY (durable → throws `UNIQUE constraint failed: jobs.id`; buffered → the write buffer silently drops the insert, turning the intended no-op into a reject). `handleCustomId` instead returns the existing job (or, when the live `Job` is unreachable without `processingShards`, an `existingId` result) and inserts nothing (`src/application/operations/customId.ts:45-65`). This is the custom-id twin of the unique-key fix #69. The guard is `!ctx.completedJobs.has(id)` plus a `queue`/`processing` location check, so completed (#92) and DLQ jobs still fall through to reuse.
 - **Custom-id reuse after completion (#92):** completed rows survive on disk; the reuse path evicts them so the recycled id does not falsely report `completed` or collide on the PK at flush (`src/application/operations/customId.ts:67-73`).
-- **Custom-id reuse after DLQ:** a terminal DLQ generation is retired from the owning shard, `jobIndex`, its O(1) counter, and SQLite before the replacement jobs row is inserted. Both `PUSH` and `PUSHB` share this path, so the deterministic id has exactly one observable generation and the old entry cannot keep `failed` inflated or reappear after restart.
+- **Custom-id reuse after DLQ:** a terminal DLQ generation is retired from SQLite in the same transaction that inserts the replacement jobs row (durable or not), and then from the owning shard, `jobIndex` and its O(1) counter. Both `PUSH` and `PUSHB` share this path, so the deterministic id has exactly one observable generation and the old entry cannot keep `failed` inflated or reappear after restart.
 - **Orphan-row reconciliation via upsert:** a durable `jobs` row can outlive its in-memory tracking when the legacy fire-and-forget `obliterate()` races an in-flight durable insert, or when a write-buffer flush is reordered relative to that insert. (`obliterateAsync()` is the authoritative ordered API for new code.) The `customIdMap` / `jobIndex` entries may be cleared while the row survives. A later re-add of the same custom id finds no mapping → reuse path → insert. To stop the recycled id colliding on the PK (`UNIQUE constraint failed: jobs.id`), **both** insert statements use `ON CONFLICT(id) DO UPDATE` (upsert): the orphan row is overwritten in place at insert time. The `DO UPDATE SET` clause covers **all** non-id columns — including the per-execution fields `started_at` / `completed_at` / `progress` / `progress_msg` / `last_heartbeat` / `stacktrace`, which are absent from the INSERT column list so `excluded.<col>` resolves to their DEFAULT (the fresh-job value). Without resetting these, an upsert over a previously-completed orphan would leave a brand-new `waiting` job reporting `progress=100` / a stale `completed_at` / a prior life's `stacktrace`. A brand-new id is a plain INSERT with **zero** extra cost, so the customId hot path is not taxed (`statements.ts` `insertJob`, `sqliteBatch.ts` batch insert). In the buffered batch path this also prevents one collision from failing the whole flush and dropping every innocent job batched in the same window (`reportLostJobs`). `jobs` has no foreign keys; its completion-count triggers intentionally observe the `DO UPDATE` state/queue transition, while avoiding `REPLACE`'s separate DELETE+INSERT lifecycle. Covered by `test/repro-idem-active-readd.test.ts`.
 - **Recycled-id timeout marker (#33/#75):** stale `timedOutJobs` entries are cleared on reuse so the new job's stall-retry recovery is not silently dropped (`src/application/operations/customId.ts:101-107`).
 - **`extend` with vanished owner:** throws `Duplicate unique_key (extended TTL)` rather than silently inserting (`src/application/operations/pushDeduplication.ts:81-94`).
 - **Restart rehydration:** `recoverPendingJobs` re-populates `customIdMap` for pending jobs and re-registers unique keys via `registerUniqueKeyWithTtl(..., job.deduplicationTtl ?? undefined)` (`background/recovery/pending.ts`). `recoverCompletedJobs` deliberately does **not** add completed jobs to `customIdMap`, avoiding LRU eviction of pending mappings (`background/recovery/restore.ts`); custom-id collisions against completed jobs are caught by the storage fallback in `handleCustomId`.
-- **Replace durability:** after a successful durable replacement the retired id
-  resolves as unknown and cannot be restored by recovery. A restart sees only
-  the final payload, including when multiple same-key replacements arrived in
-  one batch.
+- **Replace durability:** after a successful replacement (durable or not) the
+  retired id resolves as unknown and cannot be restored by recovery. A restart
+  sees only the final payload, including when multiple same-key replacements
+  arrived in one batch.
+- **Crash right after a buffered retirement:** previously a non-durable
+  re-add of a terminal custom id, or a non-durable `replace`, committed the
+  retirement on its own and buffered the successor, so a crash inside the
+  10 ms flush window left neither generation on disk. The retirement and the
+  successor row now always share one transaction (`PUSH`, `PUSHB`, dedup
+  replacement and active-key transfer). Covered by
+  `test/repro-custom-id-retire-not-atomic.test.ts`,
+  `test/repro-custom-id-retire-bulk-active.test.ts` and
+  `test/sqlite-buffered-retirement.test.ts`.
 - **Active replacement durability:** the active row remains recoverable but no
   longer persists the deduplication key. The successor row and ownership transfer
-  are committed together, so restart before the predecessor acknowledgement
+  are committed together (also without `durable`), so restart before the predecessor acknowledgement
   restores the successor as the only key owner.
 - **Dependent owners cannot be replaced:** a replacement throws
   `Cannot replace deduplicated job <id> because live jobs depend on it` while a

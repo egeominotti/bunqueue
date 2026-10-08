@@ -199,6 +199,19 @@ export abstract class SqliteState {
     return flushed;
   }
 
+  /**
+   * Best-effort flush for client close(): a no-op while a retry backoff is armed,
+   * so it never spends the buffer's retry budget, and it never throws. Failures
+   * stay with the buffer's own error, retry and critical-loss handling.
+   */
+  flushPendingWrites(): number {
+    try {
+      return this.writeBuffer.flushIfReady();
+    } catch {
+      return 0;
+    }
+  }
+
   withDeferredBufferFlush<T>(operation: () => T): T {
     return this.writeBuffer.withDeferredAutoFlush(operation);
   }

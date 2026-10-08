@@ -27,11 +27,14 @@ export function createTcpServer(queueManager: QueueManager, config: TcpServerCon
   const maxWriteQueueBytes = resolveMaxWriteQueueBytes(config.maxWriteQueueBytes);
   rateLimiterEnvConfig();
   const authTokens = new Set(config.authTokens ?? []);
+  // Aborted by `beginDrain()`: pulls on every connection, parked or new, deliver nothing.
+  const drainController = new AbortController();
   const registry = new TcpConnectionRegistry(
     queueManager,
     authTokens,
     idleTimeoutMs,
-    maxWriteQueueBytes
+    maxWriteQueueBytes,
+    drainController.signal
   );
 
   const socketHandlers = {
@@ -143,8 +146,19 @@ export function createTcpServer(queueManager: QueueManager, config: TcpServerCon
       registry.broadcast(message);
     },
 
+    /**
+     * Shutdown drain: stop accepting connections and handing out jobs. Existing
+     * connections keep every other command (ACK, FAIL, heartbeats, PUSH, ...) so
+     * workers can finish the jobs they hold before `stop()`.
+     */
+    beginDrain(): void {
+      drainController.abort();
+      server.stop(false);
+    },
+
     stop(): void {
-      registry.closeAll();
+      // After a drain, jobs still held are abandoned to the next process's recovery.
+      registry.closeAll(drainController.signal.aborted);
       server.stop(true);
     },
   };

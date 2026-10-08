@@ -112,9 +112,11 @@ export interface Job {
 `customId` is a broker-wide identity key, not a per-queue key. When supplied it
 also becomes `jobs.id`, whose SQLite primary key is global. Re-adding a live
 custom ID from any queue returns the existing generation; after a terminal
-generation, reuse first retires the completed/DLQ record and its result/log
-ownership, then admits one new generation. At no point may two rows or two live
-jobs share the same custom ID.
+generation, reuse retires the completed/DLQ record and its result in the same
+SQLite transaction that inserts the new generation (also for a non-durable
+add, which then bypasses the `WriteBuffer`), and only afterwards retires the
+in-memory record and result/log ownership. At no point may two rows or two live
+jobs share the same custom ID, and a crash never leaves zero generations.
 Persisted job IDs must be well-formed Unicode. Standalone custom IDs and every
 planned atomic-flow ID are rejected if they contain an isolated UTF-16
 surrogate, because such values do not round-trip through Bun SQLite TEXT and
@@ -1078,6 +1080,9 @@ an owner-aware in-memory release, preventing startup recovery from restoring a
 key the public API already removed. `markWaitingChildren(jobId, timeline)`
 writes `state='waiting-children'`, clears `started_at`, and persists the
 transition timeline without altering the job identity or dependency blobs.
+`markReleased(job)` writes the queued state the live broker holds a released
+job in (`delayed`, `prioritized` or `waiting`, by `run_at` then `priority`),
+clears `started_at` and leaves `attempts`/`stall_count` unchanged.
 
 Indexes on `jobs`:
 
