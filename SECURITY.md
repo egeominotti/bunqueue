@@ -77,4 +77,8 @@ Out of scope:
   avoid `*`. When it is unset, the server sends no usable CORS origin.
 - Set `METRICS_AUTH=true` when `/metrics` is reachable outside the monitoring network.
 - Protect the SQLite data directory and S3 backup bucket: they contain job payloads.
-- Pin a released version and verify artifacts before deploying.
+- Pin a released version and verify artifacts before deploying. Release archives
+  and container images (from the first release after 2.9.12) carry signed build
+  provenance, and images a CycloneDX SBOM:
+  `gh attestation verify <archive> --repo egeominotti/bunqueue` or
+  `gh attestation verify oci://ghcr.io/egeominotti/bunqueue:<version> --repo egeominotti/bunqueue`.

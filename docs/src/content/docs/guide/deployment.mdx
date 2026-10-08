@@ -346,6 +346,17 @@ The same release is available as `ghcr.io/egeominotti/bunqueue:2.9.12`.
 Both registries provide Linux amd64 and arm64 images. The volume preserves SQLite
 data across container replacement. Pin a version or digest for deployments.
 
+Releases after 2.9.12 sign their images and binary archives with GitHub artifact
+attestations (Sigstore, no keys to manage): signed build provenance for both
+registries, plus a CycloneDX SBOM for each image (generated for linux/amd64).
+Verify that an image or archive was built by this repository's CI before
+deploying it (add `--predicate-type https://cyclonedx.org/bom` to check the SBOM):
+
+```bash
+gh attestation verify oci://ghcr.io/egeominotti/bunqueue:<version> --repo egeominotti/bunqueue
+gh attestation verify bunqueue-linux-x64.tar.gz --repo egeominotti/bunqueue
+```
+
 Choose `2.9.12-alpine`, `2.9.12-debian`, `2.9.12-slim`, or `2.9.12-distroless`.
 The moving tags are `alpine`, `debian`, `slim`, and `distroless`. Unsuffixed version
 tags and `latest` continue to select Alpine. All variants support amd64 and arm64,

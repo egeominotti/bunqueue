@@ -789,8 +789,14 @@ manual runs with a blank npm version cannot publish to npm.
 The binary matrix builds eight standalone targets: Linux glibc and musl, macOS,
 and Windows, each for x64 and arm64. Linux/macOS assets are compressed as
 `.tar.gz`; Windows assets use `.zip`. All eight archives appear in the release
-download table and `SHA256SUMS`. Missing binaries or unmatched release assets
-fail publication rather than producing an incomplete release. Cross-compilation
+download table and `SHA256SUMS`. Before the release is created, the `release`
+job attests SLSA build provenance for every archive with `actions/attest`
+(keyless Sigstore, `id-token: write` + `attestations: write`), verifiable with
+`gh attestation verify <archive> --repo egeominotti/bunqueue`; images are signed
+by the separate `docker-sbom` and `docker-attest` jobs (see
+[Docker images](./features/docker-images.md)). Missing binaries
+or unmatched release assets fail publication rather than producing an
+incomplete release. Cross-compilation
 alone does not establish native runtime compatibility on each target.
 `test/repro-release-sdk-gate.test.ts` locks both the version and `latest` tags.
 The TypeScript package publisher (`.github/workflows/sdk-release.yml`) is

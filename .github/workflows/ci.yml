@@ -628,6 +628,136 @@ jobs:
           docker buildx imagetools create "${ghcr_tags[@]}" "${refs[@]}"
           docker buildx imagetools create "${hub_tags[@]}" "$image_index"
 
+  # Images are signed in two jobs that the release does not depend on, so a
+  # signing failure (for example a Sigstore outage) never blocks the release or
+  # npm, and the jobs can be re-run on their own at any time: `docker-sbom`
+  # resolves the published digests and generates the SBOM without any signing
+  # credential; `docker-attest` runs no repository or third-party build code and
+  # only signs. Provenance records the triggering commit, so a rebuild of an
+  # already released version (source_sha != github.sha) is not attested.
+  docker-sbom:
+    name: Docker SBOM (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    needs: [version-gate, docker]
+    if: >-
+      needs.docker.result == 'success' &&
+      needs.version-gate.outputs.source_sha == github.sha
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [alpine, debian, slim, distroless]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      # The attestation subject is the immutable multi-platform index digest,
+      # which every tag of this variant (version, alias, latest) resolves to.
+      - name: Resolve the published image digests
+        id: digests
+        env:
+          VARIANT: ${{ matrix.variant }}
+          VERSION: ${{ needs.version-gate.outputs.version }}
+          SOURCE_SHA: ${{ needs.version-gate.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          digest() {
+            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r '.digest'
+          }
+          ghcr=$(digest "$REGISTRY/$IMAGE_NAME:$SOURCE_SHA-$VARIANT")
+          hub=$(digest "docker.io/egeominotti/bunqueue:$VERSION-$VARIANT")
+          for value in "$ghcr" "$hub"; do
+            [[ "$value" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::Invalid image digest: $value"; exit 1; }
+          done
+          mkdir -p /tmp/attest
+          printf 'ghcr=%s\nhub=%s\n' "$ghcr" "$hub" > /tmp/attest/digests.env
+          echo "ghcr=$ghcr" >> "$GITHUB_OUTPUT"
+
+      # CycloneDX SBOM of the image for the runner's platform (linux/amd64).
+      - name: Generate the image SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digests.outputs.ghcr }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          format: cyclonedx-json
+          output-file: /tmp/attest/sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: attest-${{ matrix.variant }}
+          path: /tmp/attest/
+          if-no-files-found: error
+          retention-days: 7
+
+  docker-attest:
+    name: Docker attestations (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    needs: [version-gate, docker-sbom]
+    if: needs.docker-sbom.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [alpine, debian, slim, distroless]
+    # Keyless Sigstore attestations (GitHub artifact attestations), verifiable
+    # with `gh attestation verify`. `packages: write` stores the GHCR
+    # attestations next to the image for admission controllers.
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: attest-${{ matrix.variant }}
+          path: /tmp/attest
+
+      - name: Read the attested digests
+        id: digests
+        run: |
+          set -euo pipefail
+          ghcr=$(sed -n 's/^ghcr=//p' /tmp/attest/digests.env)
+          hub=$(sed -n 's/^hub=//p' /tmp/attest/digests.env)
+          for value in "$ghcr" "$hub"; do
+            [[ "$value" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::Invalid image digest: $value"; exit 1; }
+          done
+          echo "ghcr=$ghcr" >> "$GITHUB_OUTPUT"
+          echo "hub=$hub" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Storage records exist only for organization-owned repositories.
+      - name: Attest image provenance (GHCR)
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.digests.outputs.ghcr }}
+          push-to-registry: true
+          create-storage-record: false
+
+      - name: Attest image provenance (Docker Hub)
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: docker.io/egeominotti/bunqueue
+          subject-digest: ${{ steps.digests.outputs.hub }}
+          create-storage-record: false
+
+      - name: Attest the image SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.digests.outputs.ghcr }}
+          sbom-path: /tmp/attest/sbom.cdx.json
+          push-to-registry: true
+          create-storage-record: false
+
   # ============================================
   # Root npm package: explicit version request, after all product/image gates.
   # ============================================
@@ -737,8 +867,12 @@ jobs:
       needs.version-gate.outputs.should_release == 'true' &&
       needs.build.result == 'success' &&
       needs.docker.result == 'success'
+    # `id-token` and `attestations` sign the release archives (keyless Sigstore
+    # attestations, verifiable with `gh attestation verify`).
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -785,6 +919,15 @@ jobs:
           sha256sum bunqueue-* > SHA256SUMS
           ls -la
 
+      # Build provenance (SLSA) for every published archive, bound to its
+      # SHA-256 digest.
+      - name: Attest the release archives
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release/bunqueue-*.tar.gz
+            release/bunqueue-*.zip
+
       - name: Create Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
@@ -820,11 +963,16 @@ jobs:
             ```
 
             The immutable version tag and `latest` point to the same multi-arch image.
+            Images carry signed build provenance and a CycloneDX SBOM (add
+            `--predicate-type https://cyclonedx.org/bom` to check the SBOM):
+            `gh attestation verify oci://ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }} --repo ${{ github.repository }}`.
 
             ### Binary
 
             Compressed downloads (~30–40MB; extract to get the standalone
-            executable, which embeds the Bun runtime). Verify with `SHA256SUMS`.
+            executable, which embeds the Bun runtime). Verify with `SHA256SUMS`
+            and check that an archive was built by this repository's CI:
+            `gh attestation verify <archive> --repo ${{ github.repository }}`.
 
             | Platform | Architecture | Download |
             |----------|-------------|----------|

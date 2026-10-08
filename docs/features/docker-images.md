@@ -71,6 +71,28 @@ after `source_sha`, not the dispatching commit. The GitHub release action sets
 `target_commitish` to `source_sha`, so a commit landing on main during the
 pipeline cannot move the new tag.
 
+After publishing, two jobs sign each variant with keyless Sigstore attestations
+(`actions/attest`, GitHub artifact attestations). Neither the release nor npm
+depends on them, so a signing failure (for example a Sigstore outage) never
+blocks a release; re-run them on their own within the 7-day artifact retention
+and before any rebuild of the same version.
+`docker-sbom` (`contents: read`, `packages: read`, no signing credential)
+resolves the multi-platform index digest on GHCR (`<source_sha>-<variant>`) and
+Docker Hub (`<version>-<variant>`), fails on anything that is not a `sha256:`
+digest, and has Syft (`anchore/sbom-action`) generate a CycloneDX SBOM of the
+GHCR digest for the runner's platform (linux/amd64). `docker-attest`
+(`id-token: write`, `attestations: write`) checks out nothing and only signs:
+SLSA build provenance for both digests, with the GHCR attestation also pushed
+next to the image for admission controllers, and the SBOM attested to the same
+GHCR digest. Artifact storage records are disabled because they exist only for
+organization-owned repositories. Provenance records the triggering commit, so a
+rebuild of an already released version (`source_sha` differs from `github.sha`)
+is published unsigned rather than with a misleading attestation. Consumers
+verify with
+`gh attestation verify oci://ghcr.io/egeominotti/bunqueue:<version> --repo egeominotti/bunqueue`
+(add `--predicate-type https://cyclonedx.org/bom` for the SBOM).
+`test/release-attestations-workflow.test.ts` locks this.
+
 Normal pushes publish only new package versions. A manual CI run on main with
 `rebuild_docker=true` repeats all quality, binary, and image gates and republishes
 Docker images for the current package version from its existing tag's commit,
