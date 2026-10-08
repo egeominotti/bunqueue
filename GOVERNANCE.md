@@ -26,7 +26,7 @@ images and the official SDKs under `sdk/`).
 | **Maintainer**  | Listed in [MAINTAINERS.md](MAINTAINERS.md)                | Review and merge pull requests in their area, triage issues, take part in security response.                  |
 | **Lead maintainer** | Listed in [MAINTAINERS.md](MAINTAINERS.md)            | Final decision when consensus fails, releases and publishing, security response lead, maintainer appointments. |
 
-Code ownership for review routing is defined in [`.github/CODEOWNERS`](.github/CODEOWNERS).
+Maintainers and their areas are listed in [MAINTAINERS.md](MAINTAINERS.md).
 
 ### Becoming a maintainer
 
@@ -43,7 +43,7 @@ they move to emeritus. Emeritus maintainers can return by the same nomination pr
 
 ## Decision making
 
-1. **Lazy consensus** for routine changes: a pull request approved by a code owner
+1. **Lazy consensus** for routine changes: a pull request approved by a maintainer
    with green CI can be merged.
 2. **Request for Comments (RFC)** for significant changes, required for:
    - TCP protocol or HTTP API changes;

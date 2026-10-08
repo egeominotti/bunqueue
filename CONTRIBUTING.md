@@ -74,7 +74,7 @@ A change is complete only when, in the same pull request:
   describes what changed (no placeholders such as "fix" or "update").
 - Describe the motivation, the behavior change and how you tested it.
 - Call out breaking changes explicitly; they follow the deprecation policy below.
-- CI must be green. A maintainer listed in `.github/CODEOWNERS` reviews every change.
+- CI must be green. A maintainer listed in [MAINTAINERS.md](MAINTAINERS.md) reviews every change.
 
 ## Versioning and deprecation
 
