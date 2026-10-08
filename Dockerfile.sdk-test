@@ -44,7 +44,7 @@ WORKDIR /workspace/sdk/php
 RUN composer install --no-interaction --no-progress
 WORKDIR /workspace
 
-FROM golang:1.26.5-bookworm AS go-sdk
+FROM golang:1.27.0-bookworm AS go-sdk
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=worktree /usr/local/bin/bun /usr/local/bin/bun
