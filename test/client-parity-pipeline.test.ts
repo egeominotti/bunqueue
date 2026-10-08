@@ -32,7 +32,8 @@ test('native CI builds ignored portable artifacts before unit tests', () => {
 });
 
 test('SDK publishing installs root build dependencies before SDK compilation', () => {
-  const pipeline = steps('sdk-release.yml', 'publish');
+  // The credential-free `pack` job builds; `publish` only uploads its tarball.
+  const pipeline = steps('sdk-release.yml', 'pack');
   const build = pipeline.findIndex(
     (step) => step['working-directory'] === 'sdk/typescript' && step.run?.includes('bun run build')
   );
