@@ -64,7 +64,8 @@
     "!dist/bunqueue",
     "!dist/benchmark",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "DISCLAIMER.md"
   ],
   "type": "module",
   "main": "dist/main.js",

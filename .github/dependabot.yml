@@ -1,0 +1,56 @@
+version: 2
+
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  - package-ecosystem: bun
+    directory: /docs
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Official SDKs
+  - package-ecosystem: bun
+    directory: /sdk/typescript
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /sdk/python
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /sdk/go
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /sdk/rust
+    schedule:
+      interval: weekly
+  - package-ecosystem: composer
+    directory: /sdk/php
+    schedule:
+      interval: weekly
+  - package-ecosystem: mix
+    directory: /sdk/elixir
+    schedule:
+      interval: weekly

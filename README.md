@@ -668,6 +668,15 @@ SQLite or public-API claim. Run `bun run bench`, `bun run bench:tcp`, or
 - [CLI Reference](https://bunqueue.dev/guide/cli/) — run and manage from the terminal
 - [Migrate from BullMQ](https://bunqueue.dev/guide/migration/)
 
+## Project & Governance
+
+- [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md)
+- [Security Policy](SECURITY.md) — report vulnerabilities privately
+- [Versioning & Support](VERSIONING.md) — SemVer contract, support windows, deprecations
+- [Disclaimer](DISCLAIMER.md) — provided as is, with no liability for lost data or money
+
 ## License
 
-MIT
+MIT — provided **as is, without warranty of any kind**. The authors accept no liability
+for lost data, lost money or any other damage arising from official or unofficial use
+of bunqueue. See [DISCLAIMER.md](DISCLAIMER.md).

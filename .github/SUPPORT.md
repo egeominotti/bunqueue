@@ -20,4 +20,4 @@ Check the official docs first: **[bunqueue.dev](https://bunqueue.dev)**
 
 ## Security
 
-For security vulnerabilities, **do not open a public issue**. Email the maintainer directly or use [GitHub Security Advisories](https://github.com/egeominotti/bunqueue/security/advisories/new).
+For security vulnerabilities, **do not open a public issue**. Follow the [Security Policy](../SECURITY.md): report through [GitHub Security Advisories](https://github.com/egeominotti/bunqueue/security/advisories/new) or email [founder@bunqueue.dev](mailto:founder@bunqueue.dev).

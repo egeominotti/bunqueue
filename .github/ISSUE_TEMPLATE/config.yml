@@ -3,3 +3,6 @@ contact_links:
   - name: Documentation
     url: https://bunqueue.dev
     about: Check the docs before opening an issue.
+  - name: Report a security vulnerability
+    url: https://github.com/egeominotti/bunqueue/security/advisories/new
+    about: Never report vulnerabilities in public issues. See SECURITY.md.
