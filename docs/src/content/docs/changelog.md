@@ -71,7 +71,10 @@ published benchmark results.
   single and batch ACKs on jobs already on disk; unserializable results)
   and compares error, persisted state, result rows, job index, in-memory
   completion sets, disk-full flag and log lines with output recorded from
-  2.9.11 (`test/fixtures/write-path-faults-2.9.11.jsonl`).
+  2.9.11 (`test/fixtures/write-path-faults-2.9.11.jsonl`). It runs in a child
+  process with the shard count pinned (`test/fixtures/pin-shard-count.ts`),
+  because a batch ACK extracts its jobs in shard order and the shard count
+  follows the host's CPU count.
   `test/repro-write-path-equivalence.test.ts` covers full-disk failures for
   still-buffered jobs, unserializable results, an ACK after the storage
   closed, telemetry around a rolled-back obliteration, payload mutation after
