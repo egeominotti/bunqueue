@@ -64,7 +64,7 @@ WORKDIR /workspace/sdk/rust
 RUN cargo fetch --locked
 WORKDIR /workspace
 
-FROM elixir:1.20.1-otp-28-slim AS elixir-sdk
+FROM elixir:1.20.3-otp-29-slim AS elixir-sdk
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=worktree /usr/local/bin/bun /usr/local/bin/bun
