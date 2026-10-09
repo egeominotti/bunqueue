@@ -1,0 +1,184 @@
+/* agentvm: intro and command, internals and measured figures. The tour is in home-agentvm-tour.css. */
+.bq-home .home-agentvm {
+  display: grid;
+  gap: 48px;
+}
+
+.bq-home .home-agentvm-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  align-items: end;
+  gap: 32px 64px;
+}
+
+.bq-home .home-agentvm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  color: var(--home-accent);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.home-agentvm-badge span {
+  padding-left: 12px;
+  border-left: 1px solid var(--home-line);
+  color: var(--home-muted);
+  font-weight: 400;
+}
+
+.bq-home .home-agentvm-copy h2 + p {
+  max-width: 56ch;
+  margin-top: 20px;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.bq-home .home-agentvm-command {
+  margin: 0;
+  padding: 14px 18px;
+  overflow-x: auto;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  background: var(--home-surface);
+  color: var(--sl-color-text);
+  font: 0.9rem/1.6 var(--bq-mono);
+}
+
+.home-agentvm-command span {
+  color: var(--home-muted);
+  user-select: none;
+}
+
+.bq-home .home-agentvm-command code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  white-space: pre;
+}
+
+.bq-home .home-agentvm-start .home-note {
+  margin-top: 14px;
+}
+
+.bq-home .home-agentvm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 20px;
+}
+
+.bq-home .home-agentvm-actions .home-text-link {
+  margin-top: 0;
+}
+
+.bq-home .home-agentvm-inside h3 {
+  margin-bottom: 20px;
+}
+
+.home-agentvm-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--home-line);
+}
+
+.bq-home .home-agentvm-list li {
+  margin: 0;
+  padding: 22px 28px 0 0;
+}
+
+.bq-home .home-agentvm-list li + li {
+  padding-left: 28px;
+  border-left: 1px solid var(--home-line);
+}
+
+.bq-home .home-agentvm-list h4 {
+  margin: 0;
+  font: 650 1.05rem/1.3 var(--home-display);
+  letter-spacing: -0.02em;
+}
+
+.bq-home .home-agentvm-list p {
+  margin-top: 8px;
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+
+.home-agentvm-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bq-home .home-agentvm-figures div {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid var(--home-line);
+  border-radius: 10px;
+  background: var(--home-surface);
+}
+
+.bq-home .home-agentvm-figures dd {
+  font: 760 1.9rem/1 var(--home-display);
+  font-stretch: 75%;
+  color: var(--sl-color-text);
+}
+
+.bq-home .home-agentvm-figures dt {
+  color: var(--home-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.bq-home .home-agentvm-measured {
+  margin-top: -36px;
+}
+
+@media (max-width: 1024px) {
+  .bq-home .home-agentvm-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-agentvm-list,
+  .home-agentvm-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-agentvm-list {
+    row-gap: 8px;
+  }
+  .bq-home .home-agentvm-list li:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .bq-home .home-agentvm {
+    gap: 40px;
+  }
+  .bq-home .home-agentvm-command {
+    padding-inline: 14px;
+  }
+  .home-agentvm-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bq-home .home-agentvm-list li,
+  .bq-home .home-agentvm-list li + li {
+    padding: 20px 0 0;
+    border-left: 0;
+  }
+  .bq-home .home-agentvm-figures dd {
+    font-size: 1.6rem;
+  }
+  .bq-home .home-agentvm-measured {
+    margin-top: -28px;
+  }
+}

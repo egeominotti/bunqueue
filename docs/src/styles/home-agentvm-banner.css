@@ -1,0 +1,86 @@
+/* agentvm banner: the first thing in the hero, above the license and the announcements. */
+.bq-home .home-agentvm-banner {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 36px;
+  padding: 14px 24px 14px 14px;
+  border: 1px solid color-mix(in srgb, var(--home-accent) 50%, var(--home-line));
+  border-radius: 16px;
+  background: linear-gradient(110deg, color-mix(in srgb, var(--home-accent) 16%, transparent), var(--home-surface) 70%);
+  color: var(--sl-color-text);
+  text-decoration: none;
+  box-shadow: 0 24px 60px -36px color-mix(in srgb, var(--home-accent) 70%, transparent);
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.bq-home .home-agentvm-banner:hover {
+  border-color: var(--home-accent);
+  transform: translateY(-1px);
+}
+
+.bq-home .home-agentvm-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+}
+
+.home-agentvm-banner-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.home-agentvm-banner-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--home-accent);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.bq-home .home-agentvm-banner strong {
+  font: 700 clamp(1.15rem, 1.9vw, 1.5rem)/1.2 var(--home-display);
+  letter-spacing: -0.02em;
+}
+
+.home-agentvm-banner-sub {
+  color: var(--home-muted);
+  font-size: 0.92rem;
+}
+
+.home-agentvm-banner-cta {
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--home-accent);
+  color: var(--home-accent-ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .bq-home .home-agentvm-banner {
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 16px;
+    padding: 12px 16px 12px 12px;
+  }
+  .home-agentvm-banner-cta {
+    grid-column: 2;
+    justify-self: start;
+    padding: 7px 14px;
+  }
+}
+
+@media (max-width: 560px) {
+  .bq-home .home-agentvm-banner {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+  .home-agentvm-banner-cta {
+    grid-column: auto;
+  }
+}

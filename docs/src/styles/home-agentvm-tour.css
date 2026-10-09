@@ -1,0 +1,161 @@
+/* agentvm tour: seven steps, each a screenshot and how that part works. */
+/* Until its script runs, every panel shows in order and the tab list stays hidden. */
+.bq-home .home-agentvm-tour {
+  display: grid;
+  gap: 48px;
+}
+
+.home-agentvm-tour:not([data-ready]) .home-agentvm-tabs {
+  display: none;
+}
+
+.bq-home .home-agentvm-tour[data-ready] {
+  grid-template-columns: minmax(0, 290px) minmax(0, 1fr);
+  align-items: start;
+  gap: 40px;
+}
+
+.home-agentvm-tabs {
+  display: grid;
+  gap: 4px;
+}
+
+.bq-home .home-agentvm-tabs button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 11px 14px 11px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--sl-color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.bq-home .home-agentvm-tabs button:hover {
+  background: var(--home-surface);
+}
+
+.bq-home .home-agentvm-tabs button[aria-selected='true'] {
+  border-color: color-mix(in srgb, var(--home-accent) 40%, var(--home-line));
+  background: var(--home-tint);
+}
+
+.home-agentvm-step {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--home-line);
+  border-radius: 50%;
+  color: var(--home-muted);
+  font: 700 0.85rem var(--home-display);
+}
+
+[aria-selected='true'] > .home-agentvm-step {
+  border-color: var(--home-accent);
+  background: var(--home-accent);
+  color: var(--home-accent-ink);
+}
+
+.home-agentvm-tab-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.home-agentvm-tab-title {
+  color: var(--home-muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.bq-home .home-agentvm-panel {
+  display: grid;
+  gap: 24px;
+}
+
+.bq-home .home-agentvm-panel[hidden] {
+  display: none;
+}
+
+/* Every screenshot sits in the same 16:10 frame, so switching steps never moves the page. */
+.bq-home .home-agentvm-shot {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--home-line);
+  border-radius: 12px;
+  background: var(--home-surface);
+  box-shadow: 0 24px 60px -32px rgb(0 0 0 / 0.55);
+}
+
+.bq-home .home-agentvm-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.bq-home .home-agentvm-text {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 32px;
+}
+
+.bq-home .home-agentvm-text h3 {
+  grid-column: 1 / -1;
+}
+
+.bq-home .home-agentvm-text p {
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.bq-home .home-agentvm-text code {
+  font-size: 0.86em;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1024px) {
+  .bq-home .home-agentvm-tour[data-ready] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  /* On narrow screens the steps become a row of pills that scrolls sideways. */
+  .home-agentvm-tabs {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+  }
+  .bq-home .home-agentvm-tabs button {
+    flex: none;
+    grid-template-columns: auto auto;
+    padding: 6px 14px 6px 6px;
+    border-color: var(--home-line);
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .home-agentvm-step {
+    grid-row: auto;
+    width: 26px;
+    height: 26px;
+  }
+  .home-agentvm-tab-title {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .bq-home .home-agentvm-text {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

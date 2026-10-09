@@ -1,0 +1,143 @@
+---
+// agentvm is a separate project by the bunqueue author; it does not use bunqueue. It sits
+// right after the AI agents section, and the hero's third announcement jumps here
+// (#agentvm). A seven-step tour shows every screenshot of the agentvm README with how
+// that part works; content and figures live in src/data/agentvm.ts.
+import '../../styles/home-agentvm.css';
+import '../../styles/home-agentvm-tour.css';
+import { AGENTVM_REPO, agentvmFigures, agentvmInternals, agentvmSteps } from '../../data/agentvm';
+---
+
+<section class="home-section home-agentvm" id="agentvm" aria-labelledby="agentvm-title">
+  <div class="home-agentvm-head">
+    <div class="home-agentvm-copy">
+      <span class="home-agentvm-badge">agentvm <span>From the maker of bunqueue</span></span>
+      <h2 id="agentvm-title">Every terminal is a sealed machine.</h2>
+      <p>
+        agentvm runs Claude Code agents in parallel on your Mac, each in its own disposable Debian VM
+        on Apple’s Virtualization.framework. Inside, Claude is root with every permission; your files
+        stay out of reach. The work comes back to your repository as a branch, and the VM is thrown
+        away.
+      </p>
+    </div>
+    <div class="home-agentvm-start">
+      <pre class="home-agentvm-command"><code><span aria-hidden="true">$ </span>git clone \
+  {AGENTVM_REPO}
+<span aria-hidden="true">$ </span>cd agentvm && ./quickstart</code></pre>
+      <p class="home-note">
+        Needs a Mac with Apple silicon, Xcode Command Line Tools, Rust and Bun. No tagged releases yet:
+        it runs from source.
+      </p>
+      <div class="home-agentvm-actions">
+        <a class="home-button" href={AGENTVM_REPO}>agentvm on GitHub <span aria-hidden="true">↗</span></a>
+        <a class="home-text-link" href={`${AGENTVM_REPO}#quickstart`}>Quickstart <span aria-hidden="true">↗</span></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-agentvm-tour" data-agentvm-tour>
+    <div class="home-agentvm-tabs" role="tablist" aria-label="How agentvm works" aria-orientation="vertical">
+      {agentvmSteps.map((step, index) => (
+        <button
+          type="button"
+          role="tab"
+          id={`agentvm-tab-${step.id}`}
+          aria-controls={`agentvm-panel-${step.id}`}
+          aria-selected={index === 0 ? 'true' : 'false'}
+          tabindex={index === 0 ? 0 : -1}
+        >
+          <span class="home-agentvm-step" aria-hidden="true">{index + 1}</span>
+          <span class="home-agentvm-tab-label">{step.label}</span>
+          <span class="home-agentvm-tab-title">{step.title}</span>
+        </button>
+      ))}
+    </div>
+
+    {agentvmSteps.map((step, index) => (
+      <div
+        class="home-agentvm-panel"
+        role="tabpanel"
+        id={`agentvm-panel-${step.id}`}
+        aria-labelledby={`agentvm-tab-${step.id}`}
+        tabindex="0"
+      >
+        <figure class="home-agentvm-shot">
+          <img
+            src={`/agentvm/${step.image}`}
+            width={step.width}
+            height={step.height}
+            loading="lazy"
+            decoding="async"
+            alt={step.alt}
+          />
+        </figure>
+        <div class="home-agentvm-text">
+          <h3><span aria-hidden="true">{index + 1}. </span>{step.title}</h3>
+          {step.body.map((paragraph) => <p set:html={paragraph} />)}
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <div class="home-agentvm-inside">
+    <h3>Under the hood</h3>
+    <ul class="home-agentvm-list" role="list">
+      {agentvmInternals.map(({ title, body }) => (
+        <li>
+          <h4>{title}</h4>
+          <p>{body}</p>
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <dl class="home-agentvm-figures">
+    {agentvmFigures.map(({ value, label }) => (
+      <div><dt>{label}</dt><dd>{value}</dd></div>
+    ))}
+  </dl>
+  <p class="home-note home-agentvm-measured">Measured by agentvm on an M5 Max with 18 cores and 64 GB of memory.</p>
+</section>
+
+<script>
+  // Tabs with automatic activation (WAI-ARIA tabs pattern). Without this script every panel
+  // stays visible, one after another, and the tab list stays hidden.
+  function start(root: HTMLElement): void {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls') ?? ''));
+
+    const select = (next: number, focus: boolean) => {
+      tabs.forEach((tab, index) => {
+        const active = index === next;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+        panels[index]?.toggleAttribute('hidden', !active);
+      });
+      if (focus) tabs[next].focus();
+    };
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => select(index, false));
+      tab.addEventListener('keydown', (event) => {
+        const last = tabs.length - 1;
+        const moves: Record<string, number> = {
+          ArrowDown: index === last ? 0 : index + 1,
+          ArrowRight: index === last ? 0 : index + 1,
+          ArrowUp: index === 0 ? last : index - 1,
+          ArrowLeft: index === 0 ? last : index - 1,
+          Home: 0,
+          End: last,
+        };
+        if (!(event.key in moves)) return;
+        event.preventDefault();
+        select(moves[event.key], true);
+      });
+    });
+
+    panels.forEach((panel, index) => panel?.toggleAttribute('hidden', index !== 0));
+    root.dataset.ready = '';
+  }
+
+  const root = document.querySelector<HTMLElement>('[data-agentvm-tour]');
+  if (root) start(root);
+</script>
