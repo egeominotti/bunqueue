@@ -129,7 +129,7 @@ jobs:
       # Without this the job dies at "server start failed: exec: bun ... not found".
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.3
       # The broker imports msgpackr. Without an explicit frozen
       # install it would only start via Bun's implicit auto-install, which is
       # network-dependent and unpinned — the opposite of what CI must do.

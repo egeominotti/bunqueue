@@ -18,7 +18,7 @@ Security problems follow [SECURITY.md](SECURITY.md), never a public issue.
 
 ## Development setup
 
-Requirements: Bun at the version pinned in CI (`1.4.2`), Git, and Docker or OrbStack
+Requirements: Bun at the version pinned in CI (`1.4.3`), Git, and Docker or OrbStack
 for the isolated test gates.
 
 ```bash

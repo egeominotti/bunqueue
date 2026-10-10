@@ -10,7 +10,7 @@ Alpine 3.22 uses musl. Debian 13, Debian 13 slim, and distroless
 `cc-debian13:nonroot` use glibc. The cc base supplies the C++ runtime required by
 the executable. All bases include CA certificates and required runtime libraries.
 
-The builder uses Bun 1.4.2 on the build host's architecture, installs the frozen
+The builder uses Bun 1.4.3 on the build host's architecture, installs the frozen
 lockfile with lifecycle scripts disabled, runs typecheck, and cross-compiles for
 Docker's target architecture using `--compile --minify`. Only amd64 and arm64
 are accepted. The musl target is selected only for Alpine. The final stage copies

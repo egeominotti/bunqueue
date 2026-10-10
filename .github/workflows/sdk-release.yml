@@ -45,7 +45,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.3
       - name: Install canonical build dependencies
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Install and package reproducibly

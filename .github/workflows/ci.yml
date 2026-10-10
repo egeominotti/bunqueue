@@ -22,7 +22,7 @@ concurrency:
 
 env:
   # Keep local sandbox, CI, and release builds reproducible.
-  BUN_VERSION: '1.4.2'
+  BUN_VERSION: '1.4.3'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 

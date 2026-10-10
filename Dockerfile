@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG VARIANT=alpine
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.2 AS builder
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.3 AS builder
 ARG TARGETARCH
 ARG VARIANT
 WORKDIR /app

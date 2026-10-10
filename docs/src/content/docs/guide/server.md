@@ -144,7 +144,7 @@ ghcr.io/egeominotti/bunqueue:<tag>` prints the digest a rollout should pin.
 To build an application-specific image instead:
 
 ```dockerfile
-FROM oven/bun:1.4.2-alpine
+FROM oven/bun:1.4.3-alpine
 WORKDIR /app
 COPY package.json bun.lock* ./
 RUN bun install --production
