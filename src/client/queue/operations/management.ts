@@ -14,6 +14,7 @@ import {
   requireDataUpdated,
 } from '../commandArgs';
 import { runInBackground, sendInBackground, type BackgroundReporting } from '../backgroundCommand';
+import { assertCancelReply, removeJob } from '../../jobRemoval';
 
 export { changeJobDelay, changeJobPriority, extendJobLock } from './jobSetters';
 
@@ -34,16 +35,19 @@ export function remove(ctx: ManagementContext, id: string): void {
   else sendInBackground(ctx, { cmd: 'Cancel', id });
 }
 
-/** Remove a job (async) */
+/**
+ * Remove a job (async): resolves once a pending or completed job is removed, or when the
+ * job does not exist; rejects when it exists but cannot be removed (active, failed).
+ */
 export async function removeAsync(ctx: ManagementContext, id: string): Promise<void> {
   if (ctx.embedded) {
     // Must await: cancel() does the removal inside an async write-lock, so without
     // the await the returned promise resolves before the job is actually removed
     // (and any cancel error is swallowed) — inconsistent with the TCP path below.
-    await getSharedManager().cancel(jobId(id));
+    await removeJob(true, null, id);
     return;
   }
-  await ctx.tcp!.send({ cmd: 'Cancel', id });
+  assertCancelReply(await ctx.tcp!.send({ cmd: 'Cancel', id }));
 }
 
 // ============ Retry Operations ============

@@ -133,14 +133,11 @@ export async function handleWaitJob(
     } as Response;
   }
 
-  const completed = await context.queueManager.waitForJobCompletion(id, timeout);
-  if (completed) {
-    return {
-      ok: true,
-      completed: true,
-      result: await context.queueManager.getResultAsync(id),
-      reqId: requestId,
-    } as Response;
+  // The completion that wakes this hold carries the result, which a job removed on
+  // completion keeps nowhere a later read could find it.
+  const outcome = await context.queueManager.waitForJobResult(id, timeout);
+  if (outcome.completed) {
+    return { ok: true, completed: true, result: outcome.result, reqId: requestId } as Response;
   }
   return { ok: true, completed: false, reqId: requestId } as Response;
 }

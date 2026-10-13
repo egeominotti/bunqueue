@@ -3,6 +3,7 @@ import { getSharedManager } from '../../manager';
 import type { ChangePriorityOpts } from '../../types';
 import type { TcpConnection } from '../types';
 import { assertFlowTcpOk } from '../../flowJobTypes';
+import { removeJob } from '../../jobRemoval';
 import {
   assertJobDelay,
   assertLockExtension,
@@ -22,18 +23,12 @@ function tokenError(response: Record<string, unknown>): Error | null {
   return null;
 }
 
+/** `job.remove()` of a processor job: the Queue's rule (src/client/jobRemoval.ts). */
 export function createRemoveHandler(
   embedded: boolean,
   tcp: TcpConnection | null
 ): (id: string) => Promise<void> {
-  return async (id: string) => {
-    if (embedded) {
-      await getSharedManager().cancel(jobId(id));
-      return;
-    }
-    if (!tcp) return;
-    await tcp.send({ cmd: 'Cancel', id });
-  };
+  return (id: string) => removeJob(embedded, tcp, id);
 }
 
 export function createRetryHandler(

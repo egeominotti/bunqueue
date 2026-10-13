@@ -31,6 +31,15 @@ export function decodePostgresValue<T>(value: Uint8Array | null, fallback: T, co
   return value ? unpack<T>(value, fallback, context) : fallback;
 }
 
+/**
+ * The result of a completion tombstone. Every completion stores an encoded value, an
+ * undefined result included, so SQL NULL marks only a completed job removed by Cancel:
+ * its result is gone and reads as undefined (issue #155).
+ */
+export function decodePostgresCompletionResult(value: Uint8Array | null, context: string): unknown {
+  return value === null ? undefined : unpack<unknown>(value, null, context);
+}
+
 export function decodePostgresJob(row: PostgresJobRow): PostgresStoredJob {
   const job = decodePostgresValue<Job | null>(row.payload, null, `postgresJob:${row.id}`);
   if (!job) throw new Error(`Corrupt PostgreSQL payload for job ${row.id}`);

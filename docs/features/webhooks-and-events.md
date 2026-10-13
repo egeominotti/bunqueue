@@ -1,6 +1,6 @@
 # Webhooks, Events & Job Logs
 
-> **Category:** Observability · **Source:** `src/application/webhookManager.ts`, `src/domain/types/webhook.ts`, `src/application/eventsManager.ts`, `src/application/jobLogsManager.ts`, `src/application/clientTracking.ts`, `src/application/clientOwnership.ts`, `src/infrastructure/server/tcp/connections.ts`, `src/client/events.ts`
+> **Category:** Observability · **Source:** `src/application/webhookManager.ts`, `src/domain/types/webhook.ts`, `src/application/eventsManager.ts`, `src/application/completionWaiters.ts`, `src/application/jobLogsManager.ts`, `src/application/clientTracking.ts`, `src/application/clientOwnership.ts`, `src/infrastructure/server/tcp/connections.ts`, `src/client/events.ts`
 
 ## Purpose
 
@@ -11,9 +11,10 @@ This module provides the server's outbound and inbound observability surfaces fo
 Owns:
 
 - Webhook registry (in-memory `Map<WebhookId, Webhook>`), URL validation, delivery with retries, HMAC-SHA256 signing, and per-webhook success/failure counters (`webhookManager.ts:32`).
-- The canonical webhook event vocabulary and event→webhook mapping (`webhook.ts:16`, `eventsManager.ts:185`).
+- The canonical webhook event vocabulary and event→webhook mapping (`webhook.ts:16`, `eventsManager.ts:216`).
 - In-process scalar/batch event broadcast to subscribers and event-driven
-  completion waiters used by `WaitJob` (`eventsManager.ts`).
+  completion waiters used by `WaitJob` (`eventsManager.ts`; the waiter
+  registration, timeout and abort handling live in `completionWaiters.ts`).
 - Bounded per-job log buffers (`jobLogsManager.ts:19`).
 - Client-job ownership tracking (`clientOwnership.ts`) and disconnect-time release/requeue (`clientTracking.ts`).
 
@@ -81,12 +82,26 @@ class EventsManager {
   get completionWaiterCount(): number;
   subscribe(callback: EventSubscriber,
             batchCallback?: EventBatchSubscriber): () => void; // returns unsubscribe fn
-  clear(): void;                                               // shutdown: resolves all waiters
+  clear(): void;                                               // shutdown: resolves all waiters (no event)
   waitForJobCompletion(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<boolean>; // true=done, false=timeout/abort
+  waitForJobOutcome(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<CompletionWaitOutcome>;
   needsBroadcast(): boolean;                                   // batch fast-path check
   broadcast(event: Partial<JobEvent> & { eventType; queue; jobId; timestamp; error? }): void;
   broadcastBatch(events: readonly JobEvent[]): void;
 }
+
+// completionWaiters.ts (CompletionWaitOutcome is re-exported by eventsManager.ts)
+type CompletionWaitOutcome =
+  | { completed: false }                                  // timeout or abort
+  | { completed: true; fromEvent: true; result: unknown } // woken by `completed`: result = event.data
+  | { completed: true; fromEvent: false };                // released by clear() at shutdown
+
+// queue-manager/services.ts (QueueManager), used by WaitJob's hold
+interface JobWaitResult { completed: boolean; result: unknown }
+waitForJobResult(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<JobWaitResult>;
+// result: the waking event's data; after a release without an event, getResultAsync(jobId);
+// undefined on timeout/abort. The PostgreSQL manager overrides it with its
+// waitForJobCompletion followed by the completion-record read (unchanged behavior).
 
 // jobLogsManager.ts
 function addJobLog(jobId, message, ctx: JobLogsContext, level?: 'info'|'warn'|'error'): boolean;
@@ -196,10 +211,10 @@ interface JobLogEntry {
 1. The queue engine builds a `JobEvent` and calls `eventsManager.broadcast(...)`.
    `PUSHB`, `PULLB`, and `ACKB` instead build an ordered array and call
    `broadcastBatch(...)`.
-2. `broadcast` computes `hasSubscribers`, `hasWebhooks` (`webhookManager.hasEnabledWebhooks()`), and `hasWaiters` (only for `Completed`). **Fast path:** if all three are false it returns immediately, doing zero work (`eventsManager.ts:133`).
-3. Subscribers are invoked in a try/catch — a throwing subscriber is swallowed so one bad listener can't break the fan-out (`eventsManager.ts:139`).
-4. For `Completed`, all completion waiters for that `jobId` are resolved and the map entry deleted (`eventsManager.ts:149`).
-5. If webhooks are enabled, `mapEventToWebhook` translates the `EventType` (`pushed→job.pushed`, `pulled→job.started`, `completed→job.completed`, `failed→job.failed`; everything else → `null`/no webhook) and calls `webhookManager.trigger(...)` fire-and-forget (`eventsManager.ts:164`).
+2. `broadcast` computes `hasSubscribers`, `hasWebhooks` (`webhookManager.hasEnabledWebhooks()`), and `hasWaiters` (only for `Completed`). **Fast path:** if all three are false it returns immediately, doing zero work (`eventsManager.ts:130`).
+3. Subscribers are invoked in a try/catch — a throwing subscriber is swallowed so one bad listener can't break the fan-out (`eventsManager.ts:135`).
+4. For `Completed`, all completion waiters for that `jobId` are resolved with the event and the map entry deleted (`notifyCompletionWaiters`). A `waitForJobOutcome` waiter resolves `{ completed: true, fromEvent: true, result: event.data }`: the event's `data` is the job's return value on every completion path (single `ACK` in `operations/ack/completion.ts`, `ACKB` with results in `ackHelpers.ts` `finalizeBatchAck`, where `ACKB` without results carries `undefined` and stores none, and a stall-retried late `ACK` in `queue-manager/delivery.ts`), so the waiter gets the result even for a job removed on completion, which keeps it nowhere else (issue #155). Both `broadcast` and `broadcastBatch` hand the event over.
+5. If webhooks are enabled, `mapEventToWebhook` translates the `EventType` (`pushed→job.pushed`, `pulled→job.started`, `completed→job.completed`, `failed→job.failed`; everything else → `null`/no webhook) and calls `webhookManager.trigger(...)` fire-and-forget (`eventsManager.ts:197`).
 
 The optional batch callback is an internal optimization used by the telemetry
 journal. It receives the array once; regular subscribers are still called once
@@ -277,8 +292,8 @@ its remaining untransferred leases; expired protected cron leases are discarded.
   they are lost on broker restart.
 - **Fixed 10 s per-request timeout** via `AbortSignal.timeout(10000)`; linear (not exponential) inter-attempt backoff.
 - **`hasEnabledWebhooks` / `getStats` are O(1)** thanks to the `enabledCount` running counter maintained in `add`/`remove`/`setEnabled` (`webhookManager.ts:39`).
-- **Completion-waiter memory safety:** `waitForJobCompletion` registers a timer that, on timeout, marks the waiter `cancelled`, splices it out, and deletes empty arrays — preventing a leak when `WaitJob` times out without completion (`eventsManager.ts:78-117`). `clear()` resolves all outstanding non-cancelled waiters on shutdown.
-- **Wait timeout validation:** this is the public `QueueManager.waitForJobCompletion` path (TCP/HTTP `WaitJob` validate 0..600000 and MCP 100..30000 before calling it). `timeoutMs` must be a finite number >= 0: `0` resolves `false` on the next tick, and a timeout above 2^31 - 1 ms is honoured through `safeTimeout`. NaN, a negative value, `Infinity` (a waiter that could outlive any job) or a non-number throws a `RangeError`/`TypeError` synchronously, before a waiter is registered: `QueueManager.waitForJobCompletion: timeoutMs must be a finite number of milliseconds >= 0 (got NaN)`. Before, each of these resolved `false` after about 1 ms while the job was still running (`test/repro-server-runtime-wait.test.ts`). The check is a few comparisons on a path that already allocates a promise, closures and a timer.
+- **Completion-waiter memory safety:** `waitForJobCompletion` and `waitForJobOutcome` share `awaitCompletion` (`completionWaiters.ts`), which registers a timer that, on timeout or abort, marks the waiter `cancelled`, removes it from its set, and deletes empty sets — preventing a leak when `WaitJob` times out without completion. `clear()` resolves all outstanding non-cancelled waiters on shutdown, without an event: `waitForJobCompletion` resolves `true` and `waitForJobOutcome` resolves `{ completed: true, fromEvent: false }`, after which `QueueManager.waitForJobResult` reads the stored result (`getResultAsync`), as `WaitJob` did before.
+- **Wait timeout validation:** this is the public `QueueManager.waitForJobCompletion` path and `QueueManager.waitForJobResult` (TCP/HTTP `WaitJob` validate 0..600000 and MCP 100..30000 before calling them; `waitForJobResult` names itself in the error). `timeoutMs` must be a finite number >= 0: `0` resolves `false` on the next tick, and a timeout above 2^31 - 1 ms is honoured through `safeTimeout`. NaN, a negative value, `Infinity` (a waiter that could outlive any job) or a non-number throws a `RangeError`/`TypeError` synchronously, before a waiter is registered: `QueueManager.waitForJobCompletion: timeoutMs must be a finite number of milliseconds >= 0 (got NaN)`. Before, each of these resolved `false` after about 1 ms while the job was still running (`test/repro-server-runtime-wait.test.ts`). The check is a few comparisons on a path that already allocates a promise, closures and a timer.
 - **Subscriber isolation:** exceptions thrown by scalar or batch subscribers
   are caught and ignored; a failed telemetry batch performs isolated scalar
   retries before returning.

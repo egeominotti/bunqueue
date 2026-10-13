@@ -51,11 +51,58 @@ async function deleteParentFailureValues(
   `;
 }
 
-/** Cancel only a pending job, matching the existing QueueManager contract. */
+/**
+ * Remove a completed row (issue #155) with the end state of a removeOnComplete
+ * completion, except that the result does not survive either: the row, its logs and its
+ * dependency edges are deleted, and the completion tombstone stays as payload-free
+ * dependency evidence (original completion time, result cleared), so dependents keep
+ * resolving. Live consumers do not protect it: the tombstone is what they resolve from.
+ * The `removed` event carries no job: it would write a fresh copy of the payload the
+ * caller wants gone, and its consumers need only the ID, queue and state.
+ */
+async function removeCompletedRow(
+  tx: TransactionSQL,
+  ctx: PostgresContext,
+  row: PostgresJobRow
+): Promise<true> {
+  const job = decodePostgresJob(row).job;
+  const id = job.id;
+  const completedAt = Number(row.completed_at ?? job.completedAt ?? (await databaseNow(tx)));
+  await tx`
+    INSERT INTO bunqueue_completions (namespace, job_id, queue, completed_at, result)
+    VALUES (${ctx.config.namespace}, ${String(id)}, ${job.queue}, ${completedAt}, NULL)
+    ON CONFLICT (namespace, job_id) DO UPDATE SET result = NULL
+  `;
+  await deleteJobDependencies(tx, ctx, id);
+  await tx`
+    DELETE FROM bunqueue_job_logs
+    WHERE namespace = ${ctx.config.namespace} AND job_id = ${String(id)}
+  `;
+  await deleteParentFailureValues(tx, ctx, id);
+  await tx`
+    DELETE FROM bunqueue_jobs
+    WHERE namespace = ${ctx.config.namespace} AND id = ${String(id)}
+  `;
+  await recordPostgresEvent(tx, ctx, {
+    queue: job.queue,
+    type: 'removed',
+    jobId: id,
+    occurredAt: await databaseNow(tx),
+    state: 'completed',
+    removed: true,
+  });
+  return true;
+}
+
+/**
+ * Cancel a pending job, or remove a completed one, matching the QueueManager contract:
+ * an active or failed job is never removed by Cancel.
+ */
 export async function cancelPostgresJob(ctx: PostgresContext, id: JobId): Promise<boolean> {
   return await ctx.sql.begin(async (tx) => {
     await lockPostgresDestructionCandidates(tx, ctx, [id]);
     const row = await lockJob(tx, ctx, id);
+    if (row?.state === 'completed') return await removeCompletedRow(tx, ctx, row);
     if (!row || !['waiting', 'prioritized', 'delayed', 'waiting-children'].includes(row.state)) {
       return false;
     }

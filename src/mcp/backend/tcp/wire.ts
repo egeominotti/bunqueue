@@ -30,7 +30,8 @@ export function assertOk(command: Record<string, unknown>, reply: WireReply): Wi
  * Rejections that report a negative domain outcome rather than a failure: the target job,
  * lock, cron, webhook or worker does not exist, or is not in a state the operation accepts.
  * Matched phrases: "not found" (also "Job not found or cannot be cancelled / be updated /
- * change delay"), "not active" ("Job is not active (current state: completed)"), "not
+ * change delay"), "cannot be cancelled" ("Job cannot be cancelled (current state:
+ * active)"), "not active" ("Job is not active (current state: completed)"), "not
  * delayed", "not in queue", "invalid token" ("Lock not found or invalid token") and
  * "Cannot move job from state '<state>' to waiting". A bare "cannot" is deliberately not
  * matched: it also appears in forwarded JavaScript runtime errors ("Cannot read properties
@@ -38,7 +39,7 @@ export function assertOk(command: Record<string, unknown>, reply: WireReply): Wi
  * Authentication, validation, unknown command and internal errors never match.
  */
 const NEGATIVE_OUTCOME =
-  /\bnot found\b|\bnot active\b|\bnot delayed\b|\bnot in queue\b|\binvalid token\b|\bcannot move job from state\b/i;
+  /\bnot found\b|\bcannot be cancelled\b|\bnot active\b|\bnot delayed\b|\bnot in queue\b|\binvalid token\b|\bcannot move job from state\b/i;
 
 /** True when `error` is a broker rejection that means "no such target / wrong state". */
 export function isNegativeOutcome(error: unknown): boolean {

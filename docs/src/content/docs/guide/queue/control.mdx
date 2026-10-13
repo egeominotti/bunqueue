@@ -37,7 +37,7 @@ const n = await queue.drainAsync();    // Drain, wait, get removed count
 await queue.obliterateAsync(); // Remove ALL queue data and wait for it
 
 queue.remove('job-id');            // Remove one job (fire-and-forget)
-await queue.removeAsync('job-id'); // Remove one job and wait for it
+await queue.removeAsync('job-id'); // Remove one job (pending or completed) and wait for it
 
 await queue.waitUntilReady();      // Wait until queue/server is ready
 queue.close();                     // Close TCP connection (embedded: write buffered adds to SQLite)
@@ -129,6 +129,21 @@ queue.close();             // Close the TCP connection
 </Tabs>
 
 Gotcha: in TCP mode the fire-and-forget forms return before the server has processed them. If you drain or obliterate and immediately add new jobs, the wipe can land after the add and delete the new job. Use the `Async` variants when the next step depends on the command being done. A fire-and-forget command that fails (for example, the broker is unreachable) is logged as one line naming the command and the queue and never crashes the process; the `Async` variants reject to the caller instead.
+
+### Remove one job
+
+`removeAsync(id)` and `job.remove()` remove a job that is waiting, delayed, prioritized or waiting for children, and also a **completed** job: its data and its result are deleted, so "read the result, then make sure the job is gone" works. A payload-free completion record stays behind (the same one `removeOnComplete` keeps), so jobs that depend on the removed one still run.
+
+```typescript
+const result = await job.waitUntilFinished(null, 30_000); // read the result first
+await job.remove();                                       // then delete data and result
+await queue.getJobState(job.id);                          // 'unknown'
+await job.remove();                                       // a second call still resolves
+```
+
+An **active** job (including the job a processor is running, when it calls `job.remove()` on itself) and a **failed** job are never removed: the awaited call rejects with the job's state, for example `Job cannot be cancelled (current state: active)`. Removing a job that does not exist resolves, so cleanup code can call it twice. Failed jobs leave through the [DLQ](/guide/dlq/). The fire-and-forget `queue.remove(id)` cannot report a refusal; use `removeAsync` when it matters. On PostgreSQL, a waiting job that another live job still depends on is refused too, with `Job cannot be cancelled (current state: waiting)`; remove the dependent job first.
+
+Removing a job deletes the job, its result and what the broker holds for it in memory. It does not rewrite history: events already recorded in the queue's bounded event journal (`queue_events` on SQLite, `bunqueue_events` on PostgreSQL), such as the `completed` event that carried the return value, stay there until the journal's retention trims them, exactly as for a job added with `removeOnComplete`. To drop older journal entries sooner, call `queue.trimEvents(maxLength)` (see [Metrics](/guide/queue/metrics/)).
 
 ## Maintenance
 

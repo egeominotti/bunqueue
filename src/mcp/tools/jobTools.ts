@@ -93,7 +93,7 @@ export function registerJobTools(server: McpServer, backend: McpBackend) {
 
   server.tool(
     'bunqueue_cancel_job',
-    'Cancel a waiting or delayed job.',
+    'Remove a waiting, delayed, prioritized, waiting-children or completed job (a completed job loses its data and result). Active and failed jobs are not removed.',
     {
       jobId: z.string().describe('Job ID to cancel'),
     },

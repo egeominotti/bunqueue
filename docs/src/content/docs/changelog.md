@@ -20,6 +20,73 @@ head:
 
 ## Unreleased
 
+### Fixed
+
+- **`waitUntilFinished` returned `undefined` for a job added with
+  `removeOnComplete: true`** ([#155](https://github.com/egeominotti/bunqueue/issues/155)).
+  Over TCP without `QueueEvents` the wait holds `WaitJob` on the broker. The
+  hold saw the completion, then re-read the result from the completed-job
+  store, where a job removed on completion keeps nothing, and answered
+  `completed: true` with no result. The `completed` event that wakes the hold
+  already carries the worker's return value, and the hold now answers with it
+  (single ACK, batch ACK and late ACK of a stall-retried job). A completion
+  that lands while no wait is registered still settles as `Job <id> not found`
+  on memory and SQLite, because such a job keeps no result; PostgreSQL, which
+  keeps a completion record with the result, is unchanged. With a fast worker
+  that happens often (in the issue's request/reply script, about half of the
+  jobs complete before the first hold arrives), so request/reply with
+  `removeOnComplete` over TCP should pass a `QueueEvents`, whose `completed`
+  event delivers the result to every wait started before the job completes,
+  or use embedded mode.
+- **`job.remove()` on a completed job answered ok and removed nothing**
+  ([#155](https://github.com/egeominotti/bunqueue/issues/155)). The broker's
+  `Cancel` removed only pending jobs, and the client ignored its refusal, so
+  the job kept its data and result until retention while the caller believed
+  it was gone. `Cancel` now also removes a completed job: one SQLite
+  transaction (one PostgreSQL transaction, which also deletes its logs)
+  deletes its row and its result, then its in-memory projections and logs go. It keeps only the payload-free
+  completion record that `removeOnComplete` keeps, so a job that depends on it
+  still runs. As for a `removeOnComplete` child, a flow parent that has not
+  run yet still reads the removed child's value from memory until a broker
+  restart on SQLite; PostgreSQL drops it with the result. The bounded event
+  journals (`queue_events`, `bunqueue_events`) keep the events already
+  recorded, such as the `completed` event with the return value, until their
+  retention trims them; the PostgreSQL `removed` event carries no job data.
+  `removeAsync()` and every `job.remove()`, FlowProducer jobs included, now
+  reject when the job exists but was not removed, with the broker's message,
+  and still resolve when the job does not exist.
+
+### Upgrade notes
+
+- **`Cancel` removes completed jobs** for every client: `job.remove()`,
+  `queue.removeAsync()`, `DELETE /jobs/:id`, `bunqueue job cancel`, the MCP
+  `cancel_job` tool, the dashboard `job:cancel` command and the Python, Go,
+  PHP, Rust, Elixir and TypeScript SDKs. Before, a completed job answered
+  `ok: false` and stayed. Active and failed jobs are still never removed.
+- **`Cancel` names the state that refused it.** A missing job still gets
+  `Job not found or cannot be cancelled`; an existing job it does not remove
+  now gets `Job cannot be cancelled (current state: active)` (or `failed`, or
+  `waiting` for a PostgreSQL job that another live job depends on), without
+  "not found". The Go `Queue.Remove` and the PHP `QueueControl::remove`, which
+  returned `false` for any "not found" reply, now return an error for those
+  jobs and still return `false` for a missing one. When the job moves into a
+  removable state between the refusal and the state read (an active job that
+  completes), Cancel tries again, at most three times in all; it targets the
+  ID, so a job re-added under the same custom ID meanwhile can be the one
+  removed, as with a Cancel sent a moment later.
+- **`removeAsync()` and `job.remove()` reject for an existing job that was not
+  removed**: an active or failed job (the `remove()` of a DLQ job included),
+  `job.remove()` called by a processor on its own job, which used to resolve
+  while the job kept running, and on PostgreSQL a waiting job that another live
+  job depends on. The fire-and-forget `queue.remove()` is unchanged. A TCP
+  FlowProducer job's `remove()` on a missing job now resolves, as every other
+  `job.remove()` does, instead of rejecting. With a broker older than this
+  release the refusal still contains "not found", so the client keeps
+  resolving as before.
+- **PostgreSQL:** after a completed job is removed, `WaitJob` on its ID
+  answers `completed: true` with no result, because the completion record
+  stays without the result; memory and SQLite answer `Job not found`.
+
 ### Documentation
 
 - **agentvm on the homepage.** A new section after AI agents presents

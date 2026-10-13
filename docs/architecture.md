@@ -132,7 +132,11 @@ do not re-poll in a tight loop.
   explicit contexts from `ContextFactory`; their contracts live separately in
   [`application/types/`](../src/application/types). Active-job management claims
   are split into `jobMoveOperations.ts` (state/resource transitions) and
-  `jobClaim.ts` (lease/client ownership cleanup). Per-delivery client ownership
+  `jobClaim.ts` (lease/client ownership cleanup). `Cancel` lives in
+  `jobCancel.ts` (pending jobs) and `completedRemoval.ts` (a completed job,
+  removed with the end state of `removeOnComplete`); the reply rule shared by the
+  server handler and both client modes is
+  [`src/domain/job/cancellation.ts`](../src/domain/job/cancellation.ts). Per-delivery client ownership
   (`clientJobs` and its `clientJobOwners` reverse index) lives in
   `clientOwnership.ts`; every delivery-ending recovery detaches it, and
   `clientTracking.ts` releases on disconnect only deliveries the connection
@@ -700,6 +704,8 @@ proceed during the writer's flush.
   counters outside the hot cache. Manual and opt-in age-based cleanup scan
   queue-scoped or global deterministic retention indexes oldest-first and
   commit job/result/outbox deletion before converging in-memory projections.
+  `Cancel` of one completed job converges the same projections
+  (`releaseCompletedProjections`) after its delete-plus-proof transaction.
   Each committed removal carries its queue owner, so cleanup cannot erase a
   newer in-memory generation that reused the same ID in another queue.
   The final cleanup reconciliation reads those counters in 500-name primary-key

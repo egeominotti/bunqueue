@@ -4,7 +4,7 @@
  */
 
 import type { Job, JobId, JobLock } from '../../domain/types/job';
-import { type JobLocation, EventType } from '../../domain/types/queue';
+import type { EventType, JobLocation } from '../../domain/types/queue';
 import type { Shard } from '../../domain/queue/shard';
 import type { SqliteStorage } from '../../infrastructure/persistence/sqlite';
 import type { WebhookManager } from '../webhookManager';
@@ -14,12 +14,11 @@ import { webhookLog } from '../../shared/logger';
 import { type RWLock, withWriteLock } from '../../shared/lock';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
 import type { ClientJobOwner } from '../clientOwnership';
-import {
-  type DependencyCompletionTracker,
-  releaseDependencyCompletionPins,
-} from '../dependencyCompletions';
+import type { DependencyCompletionTracker } from '../dependencyCompletions';
+import type { CompletedRemovalContext } from './completedRemoval';
 
 export { discardJob, moveJobToDelayed } from './jobMoveOperations';
+export { cancelJob } from './jobCancel';
 
 const FLOW_METADATA_KEYS = [
   '__parentId',
@@ -57,7 +56,7 @@ function updatedJobData(job: Pick<Job, 'data'>, userData: unknown): unknown {
 }
 
 /** Context for job management operations */
-export interface JobManagementContext {
+export interface JobManagementContext extends CompletedRemovalContext {
   storage: SqliteStorage | null;
   shards: Shard[];
   shardLocks: RWLock[];
@@ -74,77 +73,6 @@ export interface JobManagementContext {
   customIdMap: { get(id: string): JobId | undefined; delete(id: string): boolean };
   depCompletions?: DependencyCompletionTracker;
   maxDependencyCompletions: number;
-}
-
-/** Cancel a job (remove from queue) */
-export async function cancelJob(jobId: JobId, ctx: JobManagementContext): Promise<boolean> {
-  const location = ctx.jobIndex.get(jobId);
-  if (!location) return false;
-
-  if (location.type === 'queue') {
-    const result = await withWriteLock(ctx.shardLocks[location.shardIdx], () => {
-      const shard = ctx.shards[location.shardIdx];
-      const job = shard.getQueue(location.queueName).remove(jobId);
-      if (job) {
-        // Update running counters for O(1) stats
-        shard.decrementQueued(jobId);
-        if (job.uniqueKey) {
-          shard.releaseUniqueKeyIfOwned(location.queueName, job.uniqueKey, job.id);
-        }
-        ctx.jobIndex.delete(jobId);
-        ctx.storage?.deleteJob(jobId);
-        ctx.dependencyResults.releaseConsumer(jobId);
-        return { success: true, queueName: location.queueName, released: [] };
-      }
-      // Not in the run queue — it may be parked in waitingChildren (moved via
-      // moveToWaitingChildren, which already released its resources and does not
-      // track it in the queued counter, so do NOT decrement/release here).
-      const parked = shard.waitingChildren.get(jobId);
-      if (parked) {
-        shard.waitingChildren.delete(jobId);
-        ctx.jobIndex.delete(jobId);
-        ctx.storage?.deleteJob(jobId);
-        ctx.dependencyResults.releaseConsumer(jobId);
-        return { success: true, queueName: location.queueName, released: [] };
-      }
-      // Or parked in waitingDeps (flow-chain dependent inserted by push.ts while
-      // its predecessors are unresolved). These are NOT counted in the queued
-      // counter (insertJobToShard skips incrementQueued when needsWaiting), so do
-      // NOT decrement — but they DO hold their uniqueKey reservation and register
-      // entries in the dependency index, both of which must be released here.
-      const waiting = shard.waitingDeps.get(jobId);
-      if (waiting) {
-        shard.waitingDeps.delete(jobId);
-        shard.unregisterDependencies(jobId, waiting.dependsOn);
-        if (waiting.uniqueKey) {
-          shard.releaseUniqueKeyIfOwned(location.queueName, waiting.uniqueKey, waiting.id);
-        }
-        ctx.jobIndex.delete(jobId);
-        ctx.storage?.deleteJob(jobId);
-        ctx.dependencyResults.releaseConsumer(jobId);
-        return {
-          success: true,
-          queueName: location.queueName,
-          released: waiting.dependsOn,
-        };
-      }
-      return { success: false, queueName: location.queueName, released: [] };
-    });
-
-    if (result.success) {
-      releaseDependencyCompletionPins(result.released, ctx);
-      // Emit removed event (BullMQ v5)
-      ctx.eventsManager.broadcast({
-        eventType: EventType.Removed,
-        jobId,
-        queue: result.queueName,
-        timestamp: Date.now(),
-        prev: 'waiting',
-      });
-    }
-    return result.success;
-  }
-  return false;
 }
 
 /** Update job progress */

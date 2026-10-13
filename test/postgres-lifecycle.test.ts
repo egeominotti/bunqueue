@@ -344,9 +344,11 @@ describe('PostgreSQL lifecycle parity', () => {
         const claimed = await manager.pullWithLock('operations', 'worker');
         expect(await manager.updateProgress(completed.id, 25, 'running')).toBe(true);
         await manager.ack(completed.id, 'done', claimed.token!);
-        expect(await manager.cancel(completed.id)).toBe(false);
         expect(await manager.updateJobData(completed.id, { value: 2 })).toBe(false);
         expect(await manager.getJobState(completed.id)).toBe('completed');
+        // Cancel removes a completed job (issue #155); active and failed jobs stay refused.
+        expect(await manager.cancel(completed.id)).toBe(true);
+        expect(await manager.getJobState(completed.id)).toBe('unknown');
 
         const discarded = await manager.push('operations', { data: { discard: true } });
         expect(await manager.discard(discarded.id)).toBe(true);

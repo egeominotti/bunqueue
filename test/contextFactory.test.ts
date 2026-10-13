@@ -735,10 +735,16 @@ describe('ContextFactory', () => {
       expect(ctx.eventsManager).toBe(deps.eventsManager);
     });
 
-    test('should not include completedJobs or jobResults', () => {
+    // Cancel of a completed job (issue #155) drops these projections, so the context
+    // shares the manager's own collections (it used to carry none of them).
+    test('should share the completed, result and log projections Cancel removes', () => {
       const ctx = factory.getJobMgmtContext();
-      expect((ctx as any).completedJobs).toBeUndefined();
-      expect((ctx as any).jobResults).toBeUndefined();
+      expect(ctx.completedJobs).toBe(deps.completedJobs);
+      expect(ctx.completedJobsData).toBe(deps.completedJobsData);
+      expect(ctx.jobResults).toBe(deps.jobResults);
+      expect(ctx.jobResultQueues).toBe(deps.jobResultQueues);
+      expect(ctx.jobLogs).toBe(deps.jobLogs);
+      expect(ctx.jobLogQueues).toBe(deps.jobLogQueues);
     });
   });
 

@@ -60,25 +60,37 @@ export function cleanCompletedJobs(
     : memoryCandidates(queue, completedBefore, normalizedLimit, ctx);
 
   for (const { jobId, queue: ownerQueue } of removals) {
-    const location = ctx.jobIndex.get(jobId);
-    const ownsCurrentCompletion =
-      location?.type === 'completed' && location.queueName === ownerQueue;
-    const hasNoCurrentGeneration = location === undefined;
-    const resultOwner = ctx.jobResultQueues?.get(jobId);
-    if (resultOwner === ownerQueue || (resultOwner === undefined && ownsCurrentCompletion)) {
-      ctx.jobResults?.delete(jobId);
-      ctx.jobResultQueues?.delete(jobId);
-    }
-    const logOwner = ctx.jobLogQueues?.get(jobId);
-    if (logOwner === ownerQueue || (logOwner === undefined && ownsCurrentCompletion)) {
-      ctx.jobLogs?.delete(jobId);
-      ctx.jobLogQueues?.delete(jobId);
-    }
-    if (!hasNoCurrentGeneration && !ownsCurrentCompletion) continue;
-    ctx.completedJobs.delete(jobId);
-    ctx.completedJobsData.delete(jobId);
-    ctx.jobIndex.delete(jobId);
-    ctx.dependencyResults.releaseConsumer(jobId);
+    releaseCompletedProjections(jobId, ownerQueue, ctx);
   }
   return removals.map(({ jobId }) => jobId);
+}
+
+/**
+ * Drop the in-memory projections of a completed generation of `ownerQueue` whose rows
+ * are already gone. Each projection is dropped only when that generation owns it, so a
+ * newer generation reusing the same custom ID is never touched.
+ */
+export function releaseCompletedProjections(
+  jobId: JobId,
+  ownerQueue: string,
+  ctx: Omit<CompletedCleanupContext, 'storage'>
+): void {
+  const location = ctx.jobIndex.get(jobId);
+  const ownsCurrentCompletion = location?.type === 'completed' && location.queueName === ownerQueue;
+  const hasNoCurrentGeneration = location === undefined;
+  const resultOwner = ctx.jobResultQueues?.get(jobId);
+  if (resultOwner === ownerQueue || (resultOwner === undefined && ownsCurrentCompletion)) {
+    ctx.jobResults?.delete(jobId);
+    ctx.jobResultQueues?.delete(jobId);
+  }
+  const logOwner = ctx.jobLogQueues?.get(jobId);
+  if (logOwner === ownerQueue || (logOwner === undefined && ownsCurrentCompletion)) {
+    ctx.jobLogs?.delete(jobId);
+    ctx.jobLogQueues?.delete(jobId);
+  }
+  if (!hasNoCurrentGeneration && !ownsCurrentCompletion) return;
+  ctx.completedJobs.delete(jobId);
+  ctx.completedJobsData.delete(jobId);
+  ctx.jobIndex.delete(jobId);
+  ctx.dependencyResults.releaseConsumer(jobId);
 }

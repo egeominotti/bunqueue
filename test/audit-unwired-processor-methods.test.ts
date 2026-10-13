@@ -33,6 +33,7 @@ describe('Wired Job methods inside Worker processor (Issue #82 follow-up)', () =
     let observedDataBeforeRemove: unknown;
     let removeDedupResult: boolean | undefined;
     let isWaitingChildrenResult: boolean | undefined;
+    let removeError: string | null | undefined;
 
     const worker = new Worker(
       'audit-wired',
@@ -51,8 +52,12 @@ describe('Wired Job methods inside Worker processor (Issue #82 follow-up)', () =
         expect(depsCount).toEqual({ processed: 0, unprocessed: 0 });
         isWaitingChildrenResult = await j.isWaitingChildren();
 
-        // remove() actually cancels the job — after this auto-ACK will fail-soft
-        await j.remove();
+        // remove() reaches the broker, which never removes an active job (issue #155):
+        // the awaited remove() now rejects with the state instead of resolving silently.
+        removeError = await j.remove().then(
+          () => null,
+          (error: Error) => error.message
+        );
         return { ok: true };
       },
       { embedded: true, autorun: true }
@@ -67,20 +72,12 @@ describe('Wired Job methods inside Worker processor (Issue #82 follow-up)', () =
     expect(isWaitingChildrenResult).toBe(false);
     expect(savedId).toBeDefined();
 
-    // After remove() inside the processor, the job must be gone — not resurrected
-    // as completed by the post-processor auto-ACK, not still visible as active.
-    const postState = await queue.getJobState(savedId as string);
-    expect(['unknown', 'completed']).toContain(postState);
-    if (postState === 'completed') {
-      // If ACK won the race, the completed record still exists — but a follow-up
-      // getJob must confirm the data mutation persisted (no regression to raw).
-      const j = await queue.getJob(savedId as string);
-      expect(j?.data).toEqual({ kind: 'mutated' });
-    } else {
-      // If cancel won the race (expected), the job is fully gone.
-      const j = await queue.getJob(savedId as string);
-      expect(j).toBeNull();
-    }
+    // remove() on the job's own active lease was refused with the state, so the
+    // processor's return completed the job with the mutated data.
+    expect(removeError).toMatch(/active/);
+    expect(await queue.getJobState(savedId as string)).toBe('completed');
+    const j = await queue.getJob(savedId as string);
+    expect(j?.data).toEqual({ kind: 'mutated' });
   });
 
   test('changeDelay / changePriority reach the server without throwing', async () => {

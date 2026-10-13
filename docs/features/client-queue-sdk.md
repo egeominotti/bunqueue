@@ -139,6 +139,31 @@ Management (`queue/runtime/control.ts`, `queue/operations/management.ts`):
 `clearJobLogs`, `updateJobData`, `changeJobDelay`, `changeJobPriority`,
 `extendJobLock`.
 
+`removeAsync(id)` and every awaited `job.remove()` (Queue jobs, processor jobs
+through `createRemoveHandler`, sandboxed recovery jobs, FlowProducer jobs) share
+`src/client/jobRemoval.ts`. The broker's Cancel removes a pending or a completed
+job (issue #155: a completed job used to keep its data and result while the call
+resolved). The removal resolves when the job was removed or does not exist
+(idempotent cleanup, BullMQ parity) and rejects when the job exists but cannot be
+removed: an active job (also the processor's own job) or a failed one. Over TCP
+`assertCancelReply` treats `ok: false` with an error matching `/not found/i` as a
+missing job, which also keeps a broker older than this rule (its ambiguous reply
+contains "not found") resolving as before; any other `ok: false` throws the
+broker's message (`Job cannot be cancelled (current state: active)`). Embedded,
+`cancelWithOutcome` reads `getJobState` when `cancel()` returns `false`: `unknown`
+resolves, any other state throws `Job <id> cannot be removed (current state:
+<state>)`. The fire-and-forget `remove(id)` keeps its background reporting
+(only a transport or engine failure is reported). FlowProducer job objects
+(`flowJobCoreMethods.ts`) follow the same rule in both modes: their TCP `remove()`
+used to throw on any refusal, a missing job included, and their embedded fallback
+ignored the outcome; both now call `removeJob`
+(`test/repro-issue-155-flow-remove.test.ts`). On PostgreSQL a pending job that a
+live job depends on is also refused (`current state: waiting`), so the removal
+rejects. A removal deletes the job row, its result and its in-memory projections,
+not events already recorded in the bounded event journal (SQLite `queue_events`,
+PostgreSQL `bunqueue_events`), which keeps them, the `completed` event with the
+return value included, until its retention trims them, as for `removeOnComplete`.
+
 DLQ configuration (`queue/runtime/configuration.ts`) also exposes
 `removeDlqJob(id)` and `removeDlqJobAsync(id)`, both returning
 `Promise<boolean>`. They permanently delete only the selected failed job,
@@ -387,7 +412,7 @@ zero.
 - **In-flight tracking**: `triggerFlush` registers each flush promise in
   `inFlightFlushes`; `disconnect()` in `queue/runtime/connection.ts` calls
   `flush()` then `waitForInFlight()` before closing.
-- **`removeAsync` ordering invariant** (`management.ts:26`): the embedded path *must* `await manager.cancel()` because the removal happens inside an async write-lock; without the await the promise would resolve before the job is gone and cancel errors would be swallowed — divergent from the TCP path.
+- **`removeAsync` ordering invariant** (`management.ts:26`): the embedded path *must* await the cancellation (`removeJob` → `cancelWithOutcome` → `manager.cancel()`) because the removal happens inside an async write-lock; without the await the promise would resolve before the job is gone and cancel errors would be swallowed — divergent from the TCP path.
 
 ## Edge Cases & Failure Modes
 
@@ -492,9 +517,16 @@ zero.
     since `WaitJob` settles only on completion. Meanwhile, with a hold slot, it
     holds `WaitJob` for 1 s, then 2 s, 4 s ... up to 30 s per hold (never past
     the TTL, so always inside the broker's `[0, 600000]` bound) and settles at
-    once on a completion. The broker runs at most 50 commands per connection at
-    once and a hold keeps one of them: uncapped, more than about 50 waits per
-    connection took every slot, other commands queued behind the holds (a
+    once on a completion. A hold registered on the broker when the job
+    completes returns the job's return value, also for a job added with
+    `removeOnComplete`: the broker answers with the result carried by the
+    `completed` event that wakes the hold (`QueueManager.waitForJobResult`).
+    Before, the hold re-read the result after waking, found none for a job
+    removed on completion, and the wait resolved `undefined` (issue #155,
+    `test/repro-issue-155-remove-on-complete.test.ts`). The broker runs at most
+    50 commands per connection at once and a hold keeps one of them: uncapped,
+    more than about 50 waits per connection took every slot, other commands
+    queued behind the holds (a
     `getJobCounts` probe took 5 s and more), and queued holds overran their
     timeout and forced reconnects. Hold slots are therefore leased per
     connection (`TcpConnectionPool.reserveLongPoll`, `tcp/longPollRouter.ts`):
@@ -536,8 +568,9 @@ zero.
   - **A job that no longer exists** settles the wait with `Job <id> not found`
     in every path: removed, drained, obliterated, cleaned, purged from the DLQ,
     or removed on completion or failure (`removeOnComplete`/`removeOnFail`)
-    before the wait saw that event, including a job missing when the wait starts
-    (BullMQ rejects with "Missing key" there). The outcome of such a job is
+    before the wait saw that event (a `WaitJob` hold registered when the job
+    completed sees it, and returns the result), including a job missing when
+    the wait starts (BullMQ rejects with "Missing key" there). The outcome of such a job is
     unknown, so the wait reports neither a result nor a failure reason. Over TCP
     a state read that finds no job first asks the broker's completion lookup
     (`WaitJob` with a 0 ms hold, the lookup a hold uses; `brokerReader` in
@@ -587,7 +620,9 @@ zero.
     backoff (up to 30 s) plus the next scheduled read; in a 40 s outage the job
     acked 3 s after the broker returned resolved its waits 19 s later. A job
     removed on completion whose `completed` event the wait missed (it completed
-    before the wait started, or while a TCP QueueEvents was disconnected)
+    before the wait started, while a TCP QueueEvents was disconnected, or, over
+    TCP without QueueEvents, while no `WaitJob` hold of the wait was registered
+    on the broker: before it got a hold slot, or between two holds)
     reports `Job <id> not found` on memory and SQLite, because its result is not
     retained; over TCP to a PostgreSQL broker it settles on the retained result. A
     `QueueManager` shut down directly (`manager.shutdown()` instead of
@@ -601,8 +636,10 @@ zero.
     but no further hold or read is issued. On the broker side, a `QueueManager`
     shut down while its TCP server still serves connections answers pending
     `WaitJob` holds with `completed: true` and no result
-    (`EventsManager.clear()` resolves its completion waiters,
-    `eventsManager.ts:61`, `handlers/advanced/jobs.ts:127-135`), and the wait
+    (`EventsManager.clear()` resolves its completion waiters without an event,
+    and `QueueManager.waitForJobResult` then reads the stored result, which a
+    job that did not complete does not have; `handleWaitJob` in
+    `handlers/advanced/jobs.ts`), and the wait
     trusts that reply, so it can resolve `undefined` for a job that did not
     complete; this server-side limitation is tracked separately.
   - A job without a runtime (`toPublicJob`/`createPublicJob` without a wait

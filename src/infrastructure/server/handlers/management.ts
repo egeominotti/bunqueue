@@ -11,6 +11,11 @@ import {
   PROGRESS_JOB_NOT_FOUND_ERROR,
   PROGRESS_NOT_ACTIVE_ERROR,
 } from '../../../domain/job/mutations';
+import {
+  CANCEL_JOB_NOT_FOUND_ERROR,
+  cancelRefusedError,
+  cancelWithOutcome,
+} from '../../../domain/job/cancellation';
 import type { HandlerContext } from '../types';
 import { throughputTracker } from '../../../application/throughputTracker';
 import { latencyTracker } from '../../../application/latencyTracker';
@@ -19,16 +24,22 @@ import type { QueueMetrics, QueueMetricType } from '../../../domain/types/metric
 import { clientStorageStatus } from '../../../shared/storageHealth';
 import { sanitizeServerError } from '../errors';
 
-/** Handle Cancel command */
+/**
+ * Handle Cancel command: removes a pending or completed job. When nothing was removed,
+ * a missing job keeps the legacy reply (external SDKs match its "not found") and an
+ * existing one names the state that refused it (active, failed).
+ */
 export async function handleCancel(
   cmd: Extract<Command, { cmd: 'Cancel' }>,
   ctx: HandlerContext,
   reqId?: string
 ): Promise<Response> {
-  const success = await ctx.queueManager.cancel(jobId(cmd.id));
-  return success
-    ? resp.ok(undefined, reqId)
-    : resp.error('Job not found or cannot be cancelled', reqId);
+  const outcome = await cancelWithOutcome(ctx.queueManager, jobId(cmd.id));
+  if (outcome.removed) return resp.ok(undefined, reqId);
+  return resp.error(
+    outcome.state === 'unknown' ? CANCEL_JOB_NOT_FOUND_ERROR : cancelRefusedError(outcome.state),
+    reqId
+  );
 }
 
 /** Handle Progress command */

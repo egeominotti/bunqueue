@@ -1,6 +1,6 @@
 import type { CronJob } from '../../../domain/types/cron';
 import type { JobLogEntry, Worker } from '../../../domain/types/worker';
-import { decodePostgresJob, decodePostgresValue } from './codec';
+import { decodePostgresCompletionResult, decodePostgresJob, decodePostgresValue } from './codec';
 import type { PostgresContext } from './context';
 import { decodePostgresQueueState, type PostgresQueueStateRow } from './control';
 import { decodePostgresCron, type PostgresCronRow } from './crons';
@@ -186,7 +186,7 @@ function decodeCloudReadModel(rows: CloudReadRows): PostgresCloudReadModel {
     results: resultRows.map((row) => ({
       jobId: jobId(row.job_id),
       queue: row.queue,
-      result: decodePostgresValue(row.result, null, `postgresCloudResult:${row.job_id}`),
+      result: decodePostgresCompletionResult(row.result, `postgresCloudResult:${row.job_id}`),
       pinned: false,
     })),
     logs,

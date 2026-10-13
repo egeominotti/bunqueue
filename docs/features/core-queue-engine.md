@@ -84,7 +84,10 @@ DLQ: `getDlq`, `getDlqEntries`, `getDlqCount`, `getDlqStats`, filtered/bounded `
 
 Job management: `cancel`, `updateProgress`, `updateJobData`, `changePriority`,
 `promote`, `moveToDelayed`, `changeDelay`, `moveActiveToWait`,
-`moveToWaitingChildren`, `discard` (`queue-manager/job-management.ts`).
+`moveToWaitingChildren`, `discard` (`queue-manager/job-management.ts`). `cancel`
+removes a pending job or a completed one (the latter with the end state of
+`removeOnComplete`, issue #155) and returns `false` for an active, failed or
+missing job; see [Job Lifecycle](./job-lifecycle.md#removing-a-job-cancel).
 
 Flow/dependencies: `updateJobParent`, `removeChildDependency`,
 `removeUnprocessedChildren`, `getFailedChildrenValues`,
@@ -273,7 +276,9 @@ newer `startedAt`, so a stale token is rejected). See
   pruning, so lowering the cap cannot strand an accepted parent. The memory
   tracker also retains the source queue in a bounded owner map, allowing
   memory-only obliterate to remove the selected queue's hidden proofs without
-  touching another queue.
+  touching another queue. `cancel` of a completed job converges on the same
+  state: the row, result and projections go, the proof is kept with the
+  original completion time.
 - **Repeat-chain leak guard.** `repeatChain` is capped at 10,000 entries; the
   oldest key is evicted past the cap (`queue-manager/context.ts`).
 - **Flow-failure map leak guard.** `failedChildrenValues` /

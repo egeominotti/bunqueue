@@ -2,6 +2,7 @@ import { expect } from 'bun:test';
 import type { AsyncCommand, Arbitrary } from 'fast-check';
 import fc from 'fast-check';
 import { batchCommandArbitraries } from './batch-commands';
+import { cancelCommandArbitraries } from './cancel-commands';
 import { flowCommandArbitraries } from './flow-commands';
 import { invalidCommandArbitraries } from './invalid-commands';
 import { jobManagementCommandArbitraries } from './job-management-commands';
@@ -254,6 +255,7 @@ export function queueCommandArbitraries(): Arbitrary<AsyncCommand<QueueModel, Re
     ...invalidCommandArbitraries(),
     ...schedulingContractArbitraries(),
     ...jobManagementCommandArbitraries(),
+    ...cancelCommandArbitraries(),
     ...queueControlCommandArbitraries(),
   ];
 }

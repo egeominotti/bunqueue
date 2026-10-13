@@ -250,7 +250,8 @@ type-only imports are listed with the module that arms the timer.
   `SafeTimer` handles.
 - `types/config.ts`: the `QueueManager` interval settings are validated with
   `assertDuration` (min 1).
-- `eventsManager.ts`: `waitForJobCompletion` validates its timeout with
+- `completionWaiters.ts`: `awaitCompletion`, behind `EventsManager`'s
+  `waitForJobCompletion` and `waitForJobOutcome`, validates its timeout with
   `assertDuration` and arms it with `safeTimeout`.
 - `postgres-queue-manager/projectionRefreshes.ts`, `queueRefreshes.ts`: retry delays
   validated with `assertDuration`, armed with `safeTimeout`

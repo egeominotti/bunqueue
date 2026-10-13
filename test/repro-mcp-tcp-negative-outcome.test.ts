@@ -18,6 +18,8 @@ describe('isNegativeOutcome', () => {
     for (const message of [
       'Job not found',
       'Job not found or cannot be cancelled',
+      'Job cannot be cancelled (current state: active)',
+      'Job cannot be cancelled (current state: failed)',
       'Job not found or cannot be updated',
       'Job not found or cannot change delay',
       'Job not found or not delayed',
@@ -34,6 +36,7 @@ describe('isNegativeOutcome', () => {
       "Cannot read properties of undefined (reading 'state')",
       "Cannot access 'shard' before initialization",
       'A job cannot be its own parent',
+      'Job cannot be removed while the broker is shutting down',
       'Not authenticated',
       'Unknown command',
     ]) {

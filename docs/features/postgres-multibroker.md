@@ -277,6 +277,16 @@ notification. Memory and SQLite retain the original synchronous lookup.
 TCP `GetResult` and both branches of `WaitJob` use an asynchronous result port.
 The PostgreSQL implementation reads the indexed completion record directly,
 while memory and SQLite delegate to their existing synchronous result lookup.
+A `WaitJob` hold waits through `QueueManager.waitForJobResult`; on memory and
+SQLite it answers with the result carried by the waking `completed` event (a
+job removed on completion keeps no result to read), while the PostgreSQL
+manager overrides it to keep its `waitForJobCompletion` followed by the
+completion-record read, so its behavior is unchanged. The override accepts the
+base's optional `signal` for signature parity and ignores it, as the
+`waitForJobCompletion` override does (WaitJob passes none): the wait ends on
+completion or after `timeoutMs`. WaitJob on the ID of a completed job removed by
+`Cancel` finds no row but finds the tombstone, so it answers `completed: true`
+with no result (memory and SQLite answer `Job not found`).
 For a live PostgreSQL wait, the manager registers its cancellable event waiter
 before rechecking the completion table. This prevents both a result-cache race
 after a remote broker completes the job and the check-before-subscribe gap; the
@@ -590,7 +600,26 @@ without row locks, acquire their dependency-completion advisory locks in sorted
 order, lock candidate and live-consumer rows in sorted order, revalidate the
 command predicate, and delete only producers whose consumers are also deleted
 atomically. Single-job cancel/remove/DLQ removal returns `false` for a protected
-producer; clean, TTL, drain, DLQ limit, and DLQ expiry skip protected rows;
+producer; for `Cancel` of a pending producer that a live job depends on (memory and
+SQLite remove it), `cancelWithOutcome` reads the unchanged pending state, retries
+once, sees the same state and answers `Job cannot be cancelled (current state:
+waiting)` (or the producer's other pending state), so `removeAsync()` and
+`job.remove()` reject with it (`test/postgres-cancel-outcome.test.ts`);
+clean, TTL, drain, DLQ limit, and DLQ expiry skip protected rows;
+cancel of a completed row (issue #155) needs no protection check, because its
+consumers resolve from the completion tombstone it keeps: under the same locks it
+deletes the row, its logs and dependency edges and clears the tombstone's result
+(`NULL`, read back as `undefined` by every completion read, and skipped by
+`getChildrenValues`), leaving payload-free dependency evidence with the original
+completion time, the end state of a removeOnComplete completion without its
+result. Its `removed` event carries no job, only the ID, queue, `state:
+'completed'` and `removed: true`, so the removal writes no new copy of the
+payload; every consumer (snapshot `apply`, which drops the job by ID, terminal
+metrics, the `EventsManager` broadcast and therefore telemetry and Cloud) needs
+nothing more, and a non-null state keeps it from invalidating the whole queue.
+Events recorded before the removal (`pushed`, the `completed` event with the
+return value) stay in `bunqueue_events` until its retention trims them, as for a
+removeOnComplete job. An active or failed row is still refused;
 `obliterate` rejects the transaction if another queue still has a live consumer.
 DLQ limit/expiry deletion runs as its own canonical transaction after the
 terminal transition commits, avoiding a row-lock-to-advisory-lock inversion.

@@ -504,7 +504,7 @@ Results are stored in an LRU cache (max 10,000 entries by default). Oldest resul
 
 ### Cancel a Job
 
-Remove a queued job. Works on `waiting`, `prioritized`, `delayed`, and `waiting-children` jobs. Active jobs cannot be cancelled.
+Remove a job. Works on `waiting`, `prioritized`, `delayed`, and `waiting-children` jobs, and on `completed` jobs: their data and result are deleted (a payload-free completion record stays, so jobs that depend on it still run, exactly as with `removeOnComplete`). `active` and `failed` jobs cannot be cancelled; use the [DLQ endpoints](#dead-letter-queue-dlq) for failed jobs.
 
 ```
 DELETE /jobs/:id
@@ -516,7 +516,12 @@ curl -X DELETE http://localhost:6790/jobs/019ce9d7-...
 
 **Response** (`200`): `{ "ok": true }`
 
-If the job does not exist or is not queued (for example, it is `active` or already finished), the response is still `200` with `{ "ok": false, "error": "Job not found or cannot be cancelled" }`.
+When nothing was removed, the response is still `200`, with `ok: false`:
+
+- the job does not exist: `{ "ok": false, "error": "Job not found or cannot be cancelled" }`;
+- the job exists but cannot be removed: `{ "ok": false, "error": "Job cannot be cancelled (current state: active)" }` (or `failed`; on PostgreSQL also a waiting job that another live job depends on, with `current state: waiting`).
+
+Removing a job deletes its data and result, not the events already recorded about it: the queue's bounded event journal (SQLite `queue_events`, PostgreSQL `bunqueue_events`) keeps them, including the `completed` event with the return value, until its retention trims them, exactly as for `removeOnComplete`.
 
 ---
 

@@ -1,5 +1,5 @@
 import { jobId, type Job, type JobId } from '../../../domain/types/job';
-import { decodePostgresValue } from './codec';
+import { decodePostgresCompletionResult, decodePostgresValue } from './codec';
 import type { PostgresContext } from './context';
 import type { PostgresReadSql } from './context';
 import type { PostgresCompletionResult } from './types';
@@ -30,7 +30,7 @@ export async function getPostgresCompletionResult(
   if (!rows[0]) return { found: false, result: undefined };
   return {
     found: true,
-    result: decodePostgresValue(rows[0].result, null, `postgresCompletion:${String(id)}`),
+    result: decodePostgresCompletionResult(rows[0].result, `postgresCompletion:${String(id)}`),
   };
 }
 
@@ -81,7 +81,7 @@ export async function loadPostgresCompletionResults(
   return rows.map((row) => ({
     jobId: jobId(row.job_id),
     queue: row.queue,
-    result: decodePostgresValue(row.result, null, `postgresCompletion:${row.job_id}`),
+    result: decodePostgresCompletionResult(row.result, `postgresCompletion:${row.job_id}`),
     pinned: row.pinned,
   }));
 }
@@ -108,6 +108,7 @@ export async function getPostgresChildrenValues(
     SELECT job_id, queue, result FROM bunqueue_completions
     WHERE namespace = ${ctx.config.namespace}
       AND job_id = ANY(${ctx.sql.array(childIds, 'TEXT')})
+      AND result IS NOT NULL
     ORDER BY job_id
   `;
   return Object.fromEntries(

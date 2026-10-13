@@ -20,7 +20,7 @@ Part of the [TCP protocol reference](/api/tcp/), which describes the framing, au
 
 ### Cancel
 
-Cancel a waiting or delayed job.
+Remove a job: a `waiting`, `prioritized`, `delayed` or `waiting-children` job, or a `completed` one (its data and result are deleted; a payload-free completion record stays so dependents still run, as with `removeOnComplete`). `active` and `failed` jobs are never removed.
 
 **Request:**
 
@@ -35,6 +35,8 @@ Cancel a waiting or delayed job.
   ok: true;
 }
 ```
+
+When nothing was removed: `{ ok: false, error: 'Job not found or cannot be cancelled' }` if the job does not exist, `{ ok: false, error: 'Job cannot be cancelled (current state: active)' }` (or `failed`) if it exists in a state Cancel does not remove.
 
 ---
 

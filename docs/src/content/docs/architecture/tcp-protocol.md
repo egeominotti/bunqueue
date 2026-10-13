@@ -241,7 +241,7 @@ for exact shapes.
 | `Drain`         | Remove waiting jobs         |
 | `Obliterate`    | Delete queue completely     |
 | `Clean`         | Remove old jobs             |
-| `Cancel`        | Cancel pending job          |
+| `Cancel`        | Remove pending/completed job |
 | `Promote`       | Move delayed job to waiting |
 | `MoveToDelayed` | Move job to delayed state   |
 | `Progress`      | Update job progress         |

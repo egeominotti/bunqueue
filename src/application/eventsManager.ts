@@ -7,23 +7,19 @@ import type { JobId } from '../domain/types/job';
 import { EventType, type JobEvent } from '../domain/types/queue';
 import type { WebhookManager } from './webhookManager';
 import type { WebhookEvent } from '../domain/types/webhook';
-import { assertDuration } from '../shared/durations';
 import { webhookLog } from '../shared/logger';
-import { safeTimeout } from '../shared/timers';
+import {
+  awaitCompletion,
+  completionOutcome,
+  type CompletionWaiterRegistry,
+  type CompletionWaitOutcome,
+} from './completionWaiters';
+
+export type { CompletionWaitOutcome } from './completionWaiters';
 
 /** Event subscriber callback */
 export type EventSubscriber = (event: JobEvent) => void;
 export type EventBatchSubscriber = (events: readonly JobEvent[]) => void;
-
-/** Accepted completion-wait timeouts: finite ms >= 0, any length (`safeTimeout`). */
-const WAIT_TIMEOUT_LIMITS = { min: 0 } as const;
-
-/** Waiter entry with cancellation flag for O(1) cleanup */
-interface CompletionWaiter {
-  resolve: () => void;
-  cancel: () => void;
-  cancelled: boolean;
-}
 
 /** Events manager class */
 export class EventsManager {
@@ -32,7 +28,7 @@ export class EventsManager {
   /** Optional batch path for internal subscribers such as durable telemetry. */
   private readonly batchSubscribers = new Map<EventSubscriber, EventBatchSubscriber>();
   /** Waiters for specific job completions - for efficient WaitJob implementation */
-  private readonly completionWaiters = new Map<string, Set<CompletionWaiter>>();
+  private readonly completionWaiters: CompletionWaiterRegistry = new Map();
 
   constructor(private readonly webhookManager: WebhookManager) {}
 
@@ -60,7 +56,8 @@ export class EventsManager {
   clear(): void {
     this.subscribers.clear();
     this.batchSubscribers.clear();
-    // Clear all waiters
+    // Release every waiter as completed, without an event: a caller that needs the
+    // result reads it itself (QueueManager.waitForJobResult falls back to the store).
     for (const waiters of this.completionWaiters.values()) {
       for (const waiter of waiters) {
         if (!waiter.cancelled) waiter.resolve();
@@ -76,44 +73,28 @@ export class EventsManager {
    * anything else throws a TypeError/RangeError synchronously, before a waiter exists.
    */
   waitForJobCompletion(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
-    assertDuration(timeoutMs, 'QueueManager.waitForJobCompletion: timeoutMs', WAIT_TIMEOUT_LIMITS);
-    const jobKey = String(jobId);
-    if (signal?.aborted) return Promise.resolve(false);
+    return awaitCompletion(
+      this.completionWaiters,
+      { jobId, timeoutMs, signal, caller: 'QueueManager.waitForJobCompletion' },
+      (completed) => completed
+    );
+  }
 
-    return new Promise((resolve) => {
-      let settled = false;
-      const cleanup = () => {
-        timer.clear();
-        signal?.removeEventListener('abort', onAbort);
-        const waiters = this.completionWaiters.get(jobKey);
-        waiters?.delete(waiter);
-        if (waiters?.size === 0) this.completionWaiters.delete(jobKey);
-      };
-      const finish = (completed: boolean) => {
-        if (settled) return;
-        settled = true;
-        waiter.cancelled = !completed;
-        cleanup();
-        resolve(completed);
-      };
-      const onAbort = () => finish(false);
-      const waiter: CompletionWaiter = {
-        resolve: () => finish(true),
-        cancel: () => finish(false),
-        cancelled: false,
-      };
-
-      // Add to waiters
-      let waiters = this.completionWaiters.get(jobKey);
-      if (!waiters) {
-        waiters = new Set();
-        this.completionWaiters.set(jobKey, waiters);
-      }
-      waiters.add(waiter);
-      const timer = safeTimeout(() => finish(false), timeoutMs);
-      signal?.addEventListener('abort', onAbort, { once: true });
-      if (signal?.aborted) onAbort();
-    });
+  /**
+   * Same wait and contract as `waitForJobCompletion`, resolving with how it ended:
+   * a waiter woken by the job's `completed` event carries the event's data (the job's
+   * return value), which a job removed on completion keeps nowhere else.
+   */
+  waitForJobOutcome(
+    jobId: JobId,
+    timeoutMs: number,
+    signal?: AbortSignal
+  ): Promise<CompletionWaitOutcome> {
+    return awaitCompletion(
+      this.completionWaiters,
+      { jobId, timeoutMs, signal, caller: 'QueueManager.waitForJobResult' },
+      completionOutcome
+    );
   }
 
   /** Check if broadcast has any listeners - for batch optimizations */
@@ -203,7 +184,7 @@ export class EventsManager {
     if (!waiters) return;
     this.completionWaiters.delete(jobKey);
     for (const waiter of waiters) {
-      if (!waiter.cancelled) waiter.resolve();
+      if (!waiter.cancelled) waiter.resolve(event);
     }
   }
 

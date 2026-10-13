@@ -3,6 +3,7 @@ import type { ChangePriorityOpts } from './types';
 import { getSharedManager } from './manager';
 import { getFlowDependencies } from './flowJobDependencies';
 import { assertFlowTcpOk, type FlowJobRuntime } from './flowJobTypes';
+import { removeJob } from './jobRemoval';
 import {
   assertDelayChanged,
   assertJobDelay,
@@ -39,11 +40,11 @@ export function buildFlowJobCoreMethods(runtime: FlowJobRuntime) {
       assertFlowTcpOk(await tcp.send({ cmd: 'AddLog', id, message }), 'AddLog');
     },
     getState,
+    // The Queue's removal rule (src/client/jobRemoval.ts): resolves when removed or
+    // missing, rejects naming the state for a job Cancel refuses (active, failed).
     remove: async () => {
       if (callbacks?.remove) return callbacks.remove(id);
-      if (embedded) return void (await getSharedManager().cancel(jobId(id)));
-      if (!tcp) return;
-      assertFlowTcpOk(await tcp.send({ cmd: 'Cancel', id }), 'Cancel');
+      await removeJob(embedded, tcp, id);
     },
     retry: async () => {
       if (callbacks?.retry) return callbacks.retry(id);

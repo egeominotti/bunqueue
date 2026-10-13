@@ -88,7 +88,7 @@ describe('Queue guide snippets', () => {
     }
     expect(groupCount).toBe(33);
     expect(tabFenceCount).toBe(231);
-    expect(standaloneFenceCount).toBe(12);
+    expect(standaloneFenceCount).toBe(13);
   });
 
   test('TypeScript fences do not redeclare block-scoped alternatives', () => {

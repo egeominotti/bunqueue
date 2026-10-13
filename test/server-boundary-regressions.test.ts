@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { QueueManager } from '../src/application/queueManager';
 import { EventsManager } from '../src/application/eventsManager';
+import { QueueManagerServices } from '../src/application/queue-manager/services';
 import { WebhookManager } from '../src/application/webhookManager';
 import { createJob, jobId } from '../src/domain/types/job';
 import { handleCommand } from '../src/infrastructure/server/handler';
@@ -60,30 +61,38 @@ describe('server infrastructure-error boundaries', () => {
   test('reads completed results through the async authoritative transport port', async () => {
     const completed = createJob(jobId('completed-result'), 'results', { data: {} });
     completed.completedAt = Date.now();
+    const id = String(completed.id);
+    const events = new EventsManager(new WebhookManager());
+    const reads: string[] = [];
     const manager = managerWith({
       getJob: async () => completed,
       getResult: () => undefined,
-      getResultAsync: async () => 15,
-      waitForJobCompletion: async () => true,
+      getResultAsync: async (requested: unknown) => {
+        reads.push(String(requested));
+        return 15;
+      },
+      // The real wait port over a real EventsManager: no mock decides the result.
+      eventsManager: events,
+      waitForJobResult: QueueManagerServices.prototype.waitForJobResult,
     });
+    const waitJob = (timeout: number) =>
+      handleCommand({ cmd: 'WaitJob', id, timeout }, context(manager));
+    const answered = { ok: true, completed: true, result: 15 };
 
-    expect(
-      await handleCommand({ cmd: 'GetResult', id: String(completed.id) }, context(manager))
-    ).toMatchObject({ ok: true, result: 15 });
-    expect(
-      await handleCommand(
-        { cmd: 'WaitJob', id: String(completed.id), timeout: 100 },
-        context(manager)
-      )
-    ).toMatchObject({ ok: true, completed: true, result: 15 });
+    expect(await handleCommand({ cmd: 'GetResult', id }, context(manager))).toMatchObject({
+      ok: true,
+      result: 15,
+    });
+    expect(await waitJob(100)).toMatchObject(answered);
 
+    // A held WaitJob released without a `completed` event (shutdown) has no result to
+    // carry, so it reads the result through the async port, never the sync cache.
     completed.completedAt = undefined;
-    expect(
-      await handleCommand(
-        { cmd: 'WaitJob', id: String(completed.id), timeout: 100 },
-        context(manager)
-      )
-    ).toMatchObject({ ok: true, completed: true, result: 15 });
+    const held = waitJob(30_000);
+    while (events.completionWaiterCount === 0) await Bun.sleep(1);
+    events.clear();
+    expect(await held).toMatchObject(answered);
+    expect(reads).toEqual([id, id, id]);
   });
 
   test('recognizes completion-only jobs after removeOnComplete deletes the live row', async () => {

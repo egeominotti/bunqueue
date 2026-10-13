@@ -195,7 +195,10 @@ while [`writeBufferPending.ts`](../src/infrastructure/persistence/writeBufferPen
 owns pending-buffer lookup, removal, and explicit lifecycle-state stamping.
 SQLite-authoritative completed cleanup is split between
 [`application/completedCleanup.ts`](../src/application/completedCleanup.ts) and
-[`persistence/sqlite/completed.ts`](../src/infrastructure/persistence/sqlite/completed.ts),
+[`persistence/sqlite/completed.ts`](../src/infrastructure/persistence/sqlite/completed.ts)
+(`Cancel` of a single completed job, in
+[`application/operations/completedRemoval.ts`](../src/application/operations/completedRemoval.ts),
+reuses its projection release after the `removeOnComplete` proof transaction),
 with exact counters/triggers in
 [`completedJobCountSchema.ts`](../src/infrastructure/persistence/completedJobCountSchema.ts).
 Cold completed-job retry is isolated in

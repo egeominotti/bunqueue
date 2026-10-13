@@ -80,6 +80,12 @@ export class PostgresQueueManagerQueries extends PostgresQueueManagerGroupQuerie
     }
   }
 
+  /** Reads the completion tombstone; `_signal` is ignored, as by `waitForJobCompletion`. */
+  override async waitForJobResult(jobId: JobId, timeoutMs: number, _signal?: AbortSignal) {
+    const completed = await this.waitForJobCompletion(jobId, timeoutMs);
+    return { completed, result: completed ? await this.getResultAsync(jobId) : undefined };
+  }
+
   override async getChildrenValues(parentJobId: JobId): Promise<Record<string, unknown>> {
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;

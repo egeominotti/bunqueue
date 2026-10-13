@@ -6,6 +6,12 @@ import type { CreateWorkerOptions } from '../../domain/types/worker';
 import { shardIndex } from '../../shared/hash';
 import { QueueManagerObservability } from './observability';
 
+/** How `waitForJobResult` ended: completed in time (with its result) or not. */
+export interface JobWaitResult {
+  completed: boolean;
+  result: unknown;
+}
+
 export class QueueManagerServices extends QueueManagerObservability {
   addCron(input: CronJobInput): CronJob {
     assertValidCronInput(input);
@@ -67,6 +73,24 @@ export class QueueManagerServices extends QueueManagerObservability {
 
   waitForJobCompletion(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
     return this.eventsManager.waitForJobCompletion(jobId, timeoutMs, signal);
+  }
+
+  /**
+   * `waitForJobCompletion` that also returns the job's result. A wait woken by the
+   * job's `completed` event answers with the event's data, the worker's return value,
+   * so a job removed on completion (which keeps no result) still returns it to a
+   * waiter registered when it completed. A wait released without an event (shutdown)
+   * reads the result from the store, as before. `result` is undefined on a timeout or
+   * abort. An invalid `timeoutMs` throws synchronously, as `waitForJobCompletion` does.
+   */
+  waitForJobResult(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<JobWaitResult> {
+    return this.eventsManager
+      .waitForJobOutcome(jobId, timeoutMs, signal)
+      .then(async (outcome): Promise<JobWaitResult> => {
+        if (!outcome.completed) return { completed: false, result: undefined };
+        if (outcome.fromEvent) return { completed: true, result: outcome.result };
+        return { completed: true, result: await this.getResultAsync(jobId) };
+      });
   }
 
   registerWorker(

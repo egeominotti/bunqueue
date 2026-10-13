@@ -1,10 +1,10 @@
 # Job Queries & Queue Control
 
-> **Category:** Jobs · **Source:** `src/application/operations/query/`, `src/application/operations/queryOperations.ts`, `src/application/operations/jobManagement.ts`, `src/application/operations/jobMoveOperations.ts`, `src/application/operations/jobClaim.ts`, `src/application/operations/queueControl.ts`, `src/shared/pausedView.ts`
+> **Category:** Jobs · **Source:** `src/application/operations/query/`, `src/application/operations/queryOperations.ts`, `src/application/operations/jobManagement.ts`, `src/application/operations/jobCancel.ts`, `src/application/operations/completedRemoval.ts`, `src/application/operations/jobMoveOperations.ts`, `src/application/operations/jobClaim.ts`, `src/application/operations/queueControl.ts`, `src/shared/pausedView.ts`
 
 ## Purpose
 
-This module is the read/control surface of the `QueueManager`. It answers point and list queries about jobs (by id, by custom id, by state, results, progress, counts), mutates individual jobs that are not yet completed (cancel, promote, discard, re-prioritize, re-delay, update data/progress), and drives queue-wide lifecycle operations (pause, resume, drain, obliterate, clean). It exists to keep all of this logic as pure functions that operate on an explicit context object (`shards`, `jobIndex`, locks, storage) rather than baking it into the manager, so the same code paths serve embedded callers, the TCP server, and the HTTP/MCP backends identically.
+This module is the read/control surface of the `QueueManager`. It answers point and list queries about jobs (by id, by custom id, by state, results, progress, counts), mutates individual jobs (cancel of a pending or completed job, promote, discard, re-prioritize, re-delay, update data/progress), and drives queue-wide lifecycle operations (pause, resume, drain, obliterate, clean). It exists to keep all of this logic as pure functions that operate on an explicit context object (`shards`, `jobIndex`, locks, storage) rather than baking it into the manager, so the same code paths serve embedded callers, the TCP server, and the HTTP/MCP backends identically.
 
 ## Responsibilities & Scope
 
@@ -16,7 +16,7 @@ Owns:
   `undefined`.
 - State resolution including BullMQ v5 distinctions (`waiting` vs `prioritized` by priority, `delayed` by `runAt`, `waiting-children`) and the paused-view derivation (`pausedView.ts`).
 - Paginated, multi-source, state-filtered list queries with offset-correct merging (`getJobs`, `src/application/operations/query/pagination.ts:46-138`).
-- Single-job mutations on non-terminal jobs: `cancelJob`, `updateJobProgress`, `updateJobData`, `changeJobPriority`, `promoteJob` (`jobManagement.ts`), plus `moveJobToDelayed` and `discardJob` (`jobMoveOperations.ts`).
+- Single-job mutations: `cancelJob` (pending or completed jobs; `jobCancel.ts`, completed branch in `completedRemoval.ts`, re-exported by `jobManagement.ts`), and on non-terminal jobs `updateJobProgress`, `updateJobData`, `changeJobPriority`, `promoteJob` (`jobManagement.ts`), plus `moveJobToDelayed` and `discardJob` (`jobMoveOperations.ts`).
 - Queue control: `pauseQueue`, `resumeQueue`, `isQueuePaused`, `drainQueue`, `obliterateQueue`, `cleanQueue`, `getQueueCount`, `listAllQueues` (`queueControl.ts`).
 
 Does NOT own:
@@ -82,10 +82,25 @@ lookup. PostgreSQL overrides the port with one direct completion-table read, so
 `GetResult` and late `WaitJob` requests do not depend on the receiving broker's
 eventually consistent result projection or a live job row.
 
-`jobManagement.ts`:
+`jobCancel.ts` (re-exported by `jobManagement.ts`) and `completedRemoval.ts`:
 
 ```typescript
 function cancelJob(jobId: JobId, ctx: JobManagementContext): Promise<boolean>;
+function removeCompletedJob(jobId: JobId, ctx: CompletedRemovalContext): Promise<boolean>;
+```
+
+`domain/job/cancellation.ts` (shared by the TCP/HTTP handler and both client modes):
+
+```typescript
+const CANCEL_JOB_NOT_FOUND_ERROR = 'Job not found or cannot be cancelled';
+function cancelRefusedError(state: string): string; // `Job cannot be cancelled (current state: <state>)`
+function cancelWithOutcome(port: CancelPort, id: JobId): Promise<CancelOutcome>;
+// CancelOutcome = { removed: true } | { removed: false; state: string }
+```
+
+`jobManagement.ts`:
+
+```typescript
 function updateJobProgress(
   jobId: JobId,
   progress: number,
@@ -136,7 +151,7 @@ function pausedView(waiting: number, prioritized: number, isPaused: boolean): Pa
 
 ### Context types
 
-`QueryContext`/`GetJobsContext` (`src/application/types/query.ts:9-25`), `JobManagementContext` (`src/application/operations/jobManagement.ts:59-74`, optional `repeatChain`), `QueueControlContext` (`queueControl.ts:14-26`). Callers pass these via `QueueManager.contextFactory.get*Context()`.
+`QueryContext`/`GetJobsContext` (`src/application/types/query.ts:9-25`), `JobManagementContext` (`src/application/operations/jobManagement.ts`, optional `repeatChain`; it extends `CompletedRemovalContext` from `completedRemoval.ts` with the completed/result/log projections the completed branch of Cancel drops), `QueueControlContext` (`queueControl.ts:14-26`). Callers pass these via `QueueManager.contextFactory.get*Context()`.
 
 ### TCP commands handled (via `QueueManager` wrappers)
 
@@ -162,7 +177,7 @@ retains the administrative form.
 
 ### Events emitted
 
-- `cancelJob` → `EventType.Removed` with `prev: 'waiting'` (`src/application/operations/jobManagement.ts:77-142`).
+- `cancelJob` → `EventType.Removed` with `prev: 'waiting'` for a pending job (`jobCancel.ts`) and `prev: 'completed'` for a completed one (`completedRemoval.ts`).
 - `updateJobProgress` → `progress` event + `job.progress` webhook (`src/application/operations/jobManagement.ts:148-192`).
 - `moveJobToDelayed` → `EventType.Delayed` (`jobMoveOperations.ts`).
 - `QueueManager.pause`/`resume` wrap `pauseQueue`/`resumeQueue` and emit `EventType.Paused`/`EventType.Resumed` plus dashboard events `queue:paused`/`queue:resumed` (`queue-manager/control.ts`).
@@ -235,15 +250,67 @@ in-memory DLQ, `waiting-children` maps, and the paused view).
 - Paused semantics: `resolveStateNeeds` (`src/application/operations/query/collect.ts:96-109`) suppresses explicit `waiting`/`prioritized` queries on a paused queue; those jobs are returned only under `paused` (`src/application/operations/query/collect.ts:111-149`). An unfiltered query still lists them by their temporal state.
 - In-memory path (embedded, no storage): `collectJobsByState` gathers every matching source before sorting and slicing; it never truncates insertion order before applying descending order.
 
-### cancelJob (`jobManagement.ts:30`)
+### cancelJob (`jobCancel.ts`, `completedRemoval.ts`)
 
-Only acts on `type === 'queue'`. Under a write lock it tries three locations in order, each with different bookkeeping:
+Dispatches on the `jobIndex` location. An active (`processing`) or failed (`dlq`)
+job is never removed: `cancelJob` returns `false`.
 
-1. Run queue (`:37`): `remove`, `decrementQueued`, release `uniqueKey`, delete index + SQLite row.
-2. `waitingChildren` (`:49`): delete map entry + index + row — does NOT decrement (these were never counted as queued).
-3. `waitingDeps` (`:61`, #102 fix): delete, `unregisterDependencies(jobId, dependsOn)`, release `uniqueKey`, delete index + row — no decrement (flow-chain dependents skip `incrementQueued`), but the uniqueKey reservation and dependency-index entries MUST be released here.
+**Pending job (`type === 'queue'`).** Under the shard write lock it tries three
+locations in order, each with different bookkeeping:
 
-On success emits `Removed`. Returns `false` for active/completed/DLQ jobs.
+1. Run queue: `remove`, `decrementQueued`, release `uniqueKey`, delete index + SQLite row.
+2. `waitingChildren`: delete map entry + index + row — does NOT decrement (these were never counted as queued).
+3. `waitingDeps` (#102 fix): delete, `unregisterDependencies(jobId, dependsOn)`, release `uniqueKey`, delete index + row — no decrement (flow-chain dependents skip `incrementQueued`), but the uniqueKey reservation and dependency-index entries MUST be released here.
+
+On success emits `Removed` with `prev: 'waiting'`.
+
+**Completed job (`type === 'completed'`, or no index entry while SQLite still
+holds a `completed` row, issue #155).** The end state is exactly what
+`removeOnComplete` would have produced at completion time:
+
+1. Resolve the current completed generation: the `completed` location (its
+   queue, and `completedAt` from `completedJobsData` or the SQLite row), or, for
+   a generation the bounded `completedJobs` set evicted (or a restart did not
+   load), the SQLite `completed` row when no buffered write and no DLQ entry
+   exists for the ID. Anything else returns `false`.
+2. Take the write lock of that queue's shard (lock order `jobIndex` →
+   `completedJobs` → `shards[N]`) and re-resolve the generation; if it was
+   retried, cleaned or replaced meanwhile, return `false`.
+3. When a live dependency consumer exists and `dependencyResults` does not
+   retain the result yet (the consumer registered after the result left the
+   bounded `jobResults` cache), retain it from the cache or SQLite, so a flow
+   parent keeps reading the child value exactly as for a removeOnComplete child
+   (`getChildrenValues` then keys it by the bare child ID, as it does for a
+   removeOnComplete child).
+4. `commitRemovedCompletion(job, ctx, completedAt)`: one SQLite transaction
+   deletes the `jobs` row, the `job_results` row and parent `flow_failures`
+   values and upserts the payload-free `dependency_completions` proof with the
+   original completion time, pinned when a dependent still waits; only then is
+   the proof published in `depCompletions`. A failed write throws before any
+   memory changes, so the job, its result and its counters stay untouched.
+5. `releaseCompletedProjections` (shared with `cleanCompletedJobs`) drops
+   `jobResults`/`jobResultQueues`, `jobLogs`/`jobLogQueues`, `completedJobs`,
+   `completedJobsData` and the `jobIndex` entry, each only when this generation
+   owns it, so a newer generation under the same custom ID is never touched.
+6. Emits `Removed` with `prev: 'completed'` after the lock is released.
+
+The SQLite `completed_job_counts` triggers decrement the retained-completion
+count when the row is deleted; without persistence, counts derive from
+`completedJobs`. `totalCompleted` stays a lifetime metric. A later dependent
+resolves from the proof, and re-adding the same custom ID retires it like any
+removeOnComplete proof.
+
+**Reply.** `cancelWithOutcome` (`domain/job/cancellation.ts`) wraps the boolean:
+when nothing was removed it reads `getJobState`. Cancel is retried only when that
+state is one Cancel removes and differs from the state read after the previous
+refusal (the job moved between the refusal and the read, an active job that
+completed for instance); a non-removable refusal stops after one attempt, a
+stable refusal of a removable state (a PostgreSQL protected producer) after two,
+and `MAX_CANCEL_ATTEMPTS` (3) bounds every Cancel. Each attempt targets the job ID,
+so a job re-added under the same custom ID while a Cancel is in flight can be the
+one removed, as with a Cancel sent a moment later. The TCP/HTTP handler answers
+`Job not found or cannot be cancelled` for `unknown` and `Job cannot be cancelled
+(current state: <state>)` otherwise.
 
 ### moveJobToDelayed (`jobMoveOperations.ts`)
 
@@ -318,7 +385,7 @@ are PostgreSQL-specific and do not alter the synchronous SQLite implementation.
 - **Pull-transition visibility:** during a pull, the queue pop, the `processingShards` insert, and the `jobIndex` flip happen in one synchronous critical section (`src/application/operations/pullStateTransition.ts:115-135`), and `getJob`/`getJobState` chase a moved location on miss — a poller can no longer observe a transient `null`/`'unknown'` for a job that is being handed to a worker (repro: `test/repro-getjob-false-null-during-pull.test.ts`).
 - **Paused double-count avoidance (#92):** `pausedView` and `resolveStateNeeds` guarantee a single job is reported in exactly one bucket. Verified by the shared `pausedView` helper used across SDK/TCP/dashboard so surfaces cannot drift.
 - **Pagination correctness:** logical-state filtering happens before SQL `LIMIT/OFFSET`; derived sources are merged and deduplicated before one final slice. `(created_at, id)` is the deterministic tie-breaker for both ascending and descending pages.
-- **`cleanQueue` with `state='active'` is intentionally unsupported** (`queueControl.ts:189-216`): cleaning in-flight jobs would race the worker ack path and leak concurrency/uniqueKey/group slots. Use `cancelJob` or `fail` instead. Unknown states also return `[]`.
+- **`cleanQueue` with `state='active'` is intentionally unsupported** (`queueControl.ts:189-216`): cleaning in-flight jobs would race the worker ack path and leak concurrency/uniqueKey/group slots. Use `fail` or `discard` instead (`cancelJob` never removes an active job). Unknown states also return `[]`.
 - **Completed cleanup failure ordering:** SQLite deletion commits before any
   completed cache/index/result/log projection is removed. A storage error is
   propagated with memory unchanged, so retry is safe; protected dependencies
@@ -339,7 +406,7 @@ are PostgreSQL-specific and do not alter the synchronous SQLite implementation.
   ownership after processing extraction and before publishing the terminal
   generation. If obliteration wins that gap, the late transition is ignored
   instead of resurrecting a completed or failed job.
-- **Idempotency / not-found:** all mutations return `false` (or `[]`) when the job is absent or in the wrong location; `cancelJob`/`promoteJob`/`changeJobPriority` only act on queued jobs, and `updateJobProgress` plus the low-level `moveJobToDelayed` claim operation require an active job. The public manager-level `moveToDelayed`/`changeDelay` dispatcher supports both queued and active jobs as described above. `promoteJob` no-ops if `runAt <= now` (already due).
+- **Idempotency / not-found:** all mutations return `false` (or `[]`) when the job is absent or in the wrong location; `promoteJob`/`changeJobPriority` only act on queued jobs, `cancelJob` acts on queued and completed jobs, and `updateJobProgress` plus the low-level `moveJobToDelayed` claim operation require an active job. The public manager-level `moveToDelayed`/`changeDelay` dispatcher supports both queued and active jobs as described above. `promoteJob` no-ops if `runAt <= now` (already due).
 - **Argument validation (2.9.10 results):** `QueueManager.changePriority` accepts any
   finite priority, grouped jobs included (a numeric string is its number), and requires a
   boolean `lifo` when given; `updateProgress` never rejects (`normalizeProgress`: NaN is

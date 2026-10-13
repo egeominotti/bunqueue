@@ -340,9 +340,14 @@ the Job properties and graph structure. Reading that node back through
 `Queue.getJob()` after `updateData()` returns the new caller fields plus the
 preserved engine-owned topology fields; this is intentional and identical in
 embedded and TCP runtimes. Every TCP-backed Job mutation and
-`waitUntilReady()` checks `{ ok: false }` and throws the broker error, with one
-exception shared with embedded mode and BullMQ: `extendLock` resolves `0` when the
-broker has no matching lease (`Lock not found or invalid token`). Embedded flow jobs follow
+`waitUntilReady()` checks `{ ok: false }` and throws the broker error, with two
+exceptions shared with embedded mode and BullMQ: `extendLock` resolves `0` when the
+broker has no matching lease (`Lock not found or invalid token`), and `remove()`
+follows the Queue's removal rule (`src/client/jobRemoval.ts`, issue #155): it
+resolves when the job was removed or does not exist (a `not found` reply) and
+rejects with the broker's message when the job exists in a state Cancel refuses
+(`Job cannot be cancelled (current state: active)`). A job built without transport
+callbacks takes the same rule on its embedded fallback. Embedded flow jobs follow
 the same rules: `changeDelay` and `updateData` on a job they cannot change throw the broker's
 message in both modes, while `promote`, progress and `changePriority` on a job that is no
 longer delayed, active or queued resolve without change (the setter outcome table in

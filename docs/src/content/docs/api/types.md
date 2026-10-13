@@ -178,7 +178,11 @@ interface Job<T = unknown> {
   /** Get the current state of the job */
   getState(): Promise<JobStateType>;
 
-  /** Remove this job from the queue */
+  /**
+   * Remove this job: a waiting, delayed, prioritized or waiting-children job, or a
+   * completed one (its data and result are deleted). Resolves when the job is gone
+   * or does not exist; rejects when it is active or failed.
+   */
   remove(): Promise<void>;
 
   /**

@@ -179,7 +179,8 @@ function cleanFailed(
  * Supported states: waiting/wait, delayed, prioritized, paused, completed, failed.
  * State='active' is intentionally unsupported: cleaning in-flight jobs races with
  * the worker's ack path and would leak concurrency/uniqueKey/groupId slots. Use
- * `fail(jobId)` or `cancelJob(jobId)` to terminate an active job safely.
+ * `fail(jobId)` or `discard(jobId)` to terminate an active job safely (`cancelJob`
+ * never removes an active job).
  * @returns Array of removed JobIds.
  */
 export function cleanQueue(

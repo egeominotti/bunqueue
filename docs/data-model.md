@@ -1143,7 +1143,9 @@ CREATE INDEX idx_dependency_completions_queue
 ```
 
 This table is the payload-free completion proof for a
-`removeOnComplete` job. Inserting the proof and deleting the `jobs`,
+`removeOnComplete` job, and for a completed job later removed by `Cancel`
+(`job.remove()`, issue #155), which writes it with the job's original
+`completed_at`. Inserting the proof and deleting the `jobs`,
 `job_results`, and parent-side `flow_failures` rows is one transaction.
 `sequence` gives deterministic FIFO pruning against `maxCompletedJobs` for
 unreferenced proofs. `pinned=1` means at least one live `waitingDeps` reverse
@@ -1500,7 +1502,7 @@ then `id`; round-robin `last_served` chooses among lane heads. All paths use
 | Table                    | Primary key                          | Purpose / important indexes                                                                                                                                                                 |
 | ------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bunqueue_dependencies`  | `(namespace, job_id, dependency_id)` | Durable unresolved/completed dependency edges; reverse index `(namespace, dependency_id, job_id)`.                                                                                          |
-| `bunqueue_completions`   | `(namespace, job_id)`                | Generation-scoped completion proof and optional result, including removed jobs; queue index `(namespace, queue, job_id)` and retention index `(namespace, completed_at DESC, job_id DESC)`. |
+| `bunqueue_completions`   | `(namespace, job_id)`                | Generation-scoped completion proof and optional result, including removed jobs; a `NULL` `result` marks a completed job removed by `Cancel` (its result is gone and reads as `undefined`); queue index `(namespace, queue, job_id)` and retention index `(namespace, completed_at DESC, job_id DESC)`. |
 | `bunqueue_flow_failures` | `(namespace, parent_id, child_id)`   | Durable child failure policy (`fail`, `remove`, `ignore`, `continue`), error and timestamp; indexed by parent/mode.                                                                         |
 | `bunqueue_repeat_links`  | `(namespace, original_id)`           | Exactly one successor generation per completed repeat job; successor reverse index.                                                                                                         |
 
@@ -1610,7 +1612,10 @@ when their protected lease expires or their broker shuts down.
   PostgreSQL-clock timestamp, optional MessagePack payload, and
   `transaction_id`. Job events can include job/state, result, error/removal, DLQ
   entry, and DLQ retry state so a remote broker can update its compatibility
-  snapshot without a queue scan. The
+  snapshot without a queue scan. The `removed` event of a completed job removed
+  by `Cancel` (issue #155) carries only `state: 'completed'` and `removed: true`,
+  no job, so the removal writes no new copy of the payload; earlier events for the
+  job stay until retention trims them. The
   `(namespace, transaction_id, id)` index joins immutable event rows to their
   commit envelope; physical-ID indexes remain for trimming and diagnostics.
 - `bunqueue_event_retention_state`: one consolidated row per

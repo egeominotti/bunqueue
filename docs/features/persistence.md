@@ -426,7 +426,10 @@ only unpinned rows through the monotonic FIFO boundary, and deletes the job,
 result, and parent-side flow-failure rows. The ACK publishes the matching RAM
 tier, counters, and events only after this transaction succeeds. Single ACK,
 optimized ACKB (with or without results), and the late stall-ACK recovery path
-all use this operation. A parent accepted after the child completed pins any
+all use this operation, and so does `Cancel` of a completed job (issue #155),
+passing the job's original completion time; it publishes the RAM tier and drops
+the in-memory projections only after the transaction succeeds, so a failed write
+leaves the completed job, its result and its counters untouched. A parent accepted after the child completed pins any
 recent proof before registering its wait edges. `obliterate(queue)` removes
 the source queue's hidden proofs; parent removal releases pin ownership.
 

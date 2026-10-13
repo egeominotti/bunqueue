@@ -136,7 +136,7 @@ bunqueue job state <id>      # just the state
 bunqueue job result <id>     # the stored result
 bunqueue job logs <id>       # log entries attached to the job
 
-bunqueue job cancel <id>     # cancel a waiting/delayed job
+bunqueue job cancel <id>     # remove a waiting/delayed or completed job
 bunqueue job promote <id>    # run a delayed job now
 bunqueue job discard <id>    # send a job to the DLQ
 

@@ -186,17 +186,38 @@ Notable management/advanced flows:
   same router remains synchronous for in-memory/SQLite getters.
 - `handleDlq` returns both jobs and full filtered entries; `handleGetDlqStats` returns the authoritative aggregate. Filtered retries and completed retries pass their `count`/`timestamp` selectors to the manager instead of dropping them. `handleRemoveDlqJob` returns `data.removed` from the durable, idempotent selective deletion; thrown persistence errors are converted by the top-level handler into an error response rather than a false miss.
 - `handleProgress` / `handleGetProgress` / `handleMoveToDelayed`: on failure they re-query `getJobState` to disambiguate "Job not found" (state `unknown`) from "not active" (`management.ts:36-42`, `management.ts:61-65`, `src/infrastructure/server/handlers/advanced/jobs.ts:69-85`).
+- `handleCancel` (`management.ts`, also behind HTTP `DELETE /jobs/:id`): removes a
+  pending or a completed job (issue #155) through `cancelWithOutcome`
+  (`domain/job/cancellation.ts`), which re-reads `getJobState` when nothing was
+  removed and retries Cancel only when the job moved into a removable state that
+  differs from the one read after the previous refusal (a stable refusal stops
+  after at most two attempts; three attempts at most in every case). Replies:
+  `{ ok: true }` when removed; `Job not found or cannot be cancelled` for a
+  missing job (legacy text, external SDKs match "not found"); `Job cannot be
+  cancelled (current state: <state>)` for an active, failed or otherwise refused
+  job (on PostgreSQL also a pending producer a live job depends on, for example
+  `current state: waiting`). HTTP keeps status `200` for every reply.
 - `handleWaitJob` (`src/infrastructure/server/handlers/advanced/jobs.ts`): caps
   `timeout` to `[0, 600000]` (default 30s); returns immediately if
-  `job.completedAt` is set, otherwise awaits `waitForJobCompletion`. If a late
+  `job.completedAt` is set, otherwise holds on `QueueManager.waitForJobResult`
+  and answers with the `{ completed, result }` it resolves with. A hold woken by
+  the job's `completed` event answers with that event's data, the worker's
+  return value, so a job added with `removeOnComplete`, which keeps no result,
+  still returns it to a hold registered when it completed (issue #155: the hold
+  used to re-read `completedJobs`/SQLite after waking and answered
+  `completed: true` with `result: undefined`). A hold released without an event
+  (the manager shut down) reads the stored result, as before. If a late
   request arrives after `removeOnComplete` deleted the live row, the handler
   checks the discriminated completion port before reporting `Job not found`.
-  Successful branches use the manager's asynchronous result port. On PostgreSQL
-  this reads the durable completion row instead of an eventually consistent
-  broker projection, and the manager registers a cancellable event waiter
-  before its durable completion recheck so a remote completion cannot be lost
-  between check and subscribe. Memory and SQLite retain their existing
-  in-process result lookup and missing-row behavior.
+  The other successful branches use the manager's asynchronous result port. On
+  PostgreSQL this reads the durable completion row instead of an eventually
+  consistent broker projection; its `waitForJobResult` override keeps waiting
+  through `waitForJobCompletion` and then reads that row, and the manager
+  registers a cancellable event waiter before its durable completion recheck
+  so a remote completion cannot be lost between check and subscribe. Memory and
+  SQLite retain their existing in-process result lookup and missing-row
+  behavior: a completion of a job removed on completion that no hold was
+  waiting for still reads as `Job not found`.
 - `handleIsPaused` prefers the PostgreSQL manager's asynchronous durable point
   read when that optional port exists. A successful `Pause` or `Resume` is
   therefore immediately visible to the requesting or another SDK connection,

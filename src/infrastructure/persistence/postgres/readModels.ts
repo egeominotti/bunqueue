@@ -1,6 +1,6 @@
 import type { CronJob } from '../../../domain/types/cron';
 import type { JobId } from '../../../domain/types/job';
-import { decodePostgresValue } from './codec';
+import { decodePostgresCompletionResult } from './codec';
 import { loadPostgresCompletionResults } from './completionQueries';
 import { getPostgresQueueState } from './control';
 import { listPostgresCrons } from './crons';
@@ -119,9 +119,8 @@ export async function loadPostgresJobProjections(
           ? {
               jobId: id,
               queue: completionRow.queue,
-              result: decodePostgresValue(
+              result: decodePostgresCompletionResult(
                 completionRow.result,
-                null,
                 `postgresCompletion:${String(id)}`
               ),
               pinned: false,

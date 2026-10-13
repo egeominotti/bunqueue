@@ -16,6 +16,7 @@ Owns:
 - Retry decision (`canRetry`), backoff computation (`calculateBackoff`), and the terminal failure → DLQ handoff.
 - `removeOnComplete` / `removeOnFail` cleanup and the `depCompletions` bookkeeping that keeps dependents unblockable after the parent job is dropped.
 - Manual BullMQ-style transitions: `moveActiveToWait`, `changeWaitingDelay`, `moveToWaitingChildren`.
+- The removal contract of `Cancel` (`job.remove()`): pending and completed jobs are removed, active and failed ones never (see "Removing a job" below).
 - Long-poll worker waiting (`WaiterManager`).
 
 Does NOT own:
@@ -324,6 +325,60 @@ from misclassifying the manually requeued job as an interrupted active attempt.
 `shard.waitingChildren`. Every management claim of active work also releases
 the lease and client ownership through `releaseClaimedJobOwnership`.
 
+### Removing a job (`Cancel`)
+
+`Cancel` (embedded `QueueManager.cancel`, TCP `Cancel`, HTTP `DELETE /jobs/:id`,
+`job.remove()`, `queue.removeAsync()`, MCP `cancel_job`, cloud `job:cancel`)
+removes a pending job (`waiting`, `prioritized`, `delayed`, `waiting-children`)
+and, since issue #155, a completed one. An active or a failed job is never removed
+by it: a running processor owns the active lease, and a failed job leaves through
+the DLQ commands.
+
+Removing a completed job produces exactly the state `removeOnComplete` would have
+produced when it completed: the `jobs` row, its `job_results` row and every
+in-memory projection are deleted in one SQLite transaction that also writes the
+payload-free `dependency_completions` proof with the original completion time
+(pinned while a dependent waits), so a crash can neither resurrect the job nor
+lose the proof, and dependents keep resolving. Live dependency consumers keep the
+result through `dependencyResults`, as for a removeOnComplete dependency. A
+`removed` event with `prev: 'completed'` is broadcast. The control flow is in
+[Job Queries & Queue Control](./job-queries-and-control.md#canceljob-jobcancelts-completedremovalts).
+
+When nothing was removed, the reply names why (`domain/job/cancellation.ts`): a
+missing job keeps the legacy `Job not found or cannot be cancelled` (external SDKs
+match its "not found"), an existing one answers `Job cannot be cancelled (current
+state: <state>)`. Awaited client removals resolve for a missing job (idempotent
+cleanup, as in BullMQ) and reject for a refused one; see
+[Client SDK: Queue](./client-queue-sdk.md). `cancelWithOutcome` reads
+`getJobState` after a refusal and retries Cancel only when that state is one Cancel
+removes and differs from the state read after the previous refusal: a job that
+moved between the refusal and the read (an active job that completed) is removed by
+the retry, a non-removable refusal (active, failed) stops after the first attempt,
+a stable refusal of a removable state stops after the second, and no Cancel makes
+more than `MAX_CANCEL_ATTEMPTS` (3) attempts. Every attempt targets the job ID, not
+a generation: if the job leaves (completed with `removeOnComplete`, for instance)
+and a new job is added under the same custom ID while a Cancel is in flight, the
+retry can remove the new job, exactly as a Cancel sent a moment later would.
+
+Removing a job deletes its row, its result and its in-memory projections, not the
+events already recorded about it. The bounded per-queue event journals (SQLite
+`queue_events`, PostgreSQL `bunqueue_events`) keep those entries, for example the
+`completed` event with the return value, until their retention (`maxQueueEvents`,
+`trimEvents`, `obliterate`) trims them, exactly as for a `removeOnComplete` job.
+
+On PostgreSQL, `cancelPostgresJob` removes a completed row the same way, except
+that the result does not survive either: the row, its logs and its dependency
+edges are deleted, and the `bunqueue_completions` tombstone stays with the
+original completion time and a `NULL` result (read back as `undefined`), as
+payload-free dependency evidence. The `removed` event it records carries no job
+(only ID, queue, `state: 'completed'` and the removal flag), so the removal writes no
+new copy of the payload. PostgreSQL also refuses a pending job that a live job
+depends on (a protected producer, see
+[PostgreSQL multi-broker](./postgres-multibroker.md)): memory and SQLite remove it.
+The state read after that refusal is the pending state itself, so the reply is, for
+example, `Job cannot be cancelled (current state: waiting)` after two attempts, and
+an awaited removal rejects with it.
+
 ## Concurrency & Locking
 
 Locks are per-shard `RWLock`s acquired via `withWriteLock` and are **sequential, not nested** within each operation, which avoids deadlock despite differing acquisition orders:
@@ -402,6 +457,12 @@ detached CLI, and durable recovery paths.
   removed, the proof becomes recent and ordinary FIFO pruning applies. Recent
   proof eviction uses a stale-aware explicit order, so sustained completion
   churn remains amortized O(1) after the retention cap is reached.
+- **Cancel of a completed job**: the same proof as `removeOnComplete`, written in
+  the transaction that deletes the row and the result. A failed write throws
+  before memory changes (the job stays completed with its result). A completed
+  generation evicted from the bounded in-memory set is still found through its
+  SQLite row. Removing a job inside its own processor (`job.remove()` on the
+  active lease) is refused with the state, as BullMQ refuses a locked job.
 - **PostgreSQL completion generations:** a `removeOnComplete` proof is tied to
   one custom-ID generation. Reuse retires the old proof only when it has no live
   consumer. Unreferenced tombstones are retained newest-first up to

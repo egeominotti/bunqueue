@@ -215,7 +215,11 @@ Client MUSTs:
   MUST NOT return that as a legitimate `null` result. The reference behavior
   probes `GetState`: `failed` → failure error, otherwise → timeout error.
   Timeouts beyond the server bound MUST be clamped to `[0, 600000]`, not
-  forwarded.
+  forwarded. A `WaitJob` held when the job completes answers
+  `{completed: true, result}` with the job's return value, also for a job
+  added with `removeOnComplete`; a request that arrives after such a job
+  completed answers `Job not found` on memory and SQLite brokers, which retain
+  no result for it (a PostgreSQL broker answers from its completion record).
 - `GetJobs.asc=false` reverses the total createdAt/job-id ordering before
   applying `offset` and `limit`. A paginating client MUST send the same value
   on every page; omitting it preserves ascending order.
@@ -322,6 +326,16 @@ for the tokenless public `retry()`, `changeDelay(delay)`, and synchronous
 `discard()` methods. For a failed job, PostgreSQL `MoveToWait` executes the
 durable DLQ retry transaction; memory/SQLite retains the existing synchronous
 retry path.
+
+`Cancel` removes a pending job (`waiting`, `prioritized`, `delayed`,
+`waiting-children`) or a completed one: its data and result are deleted, and
+only a payload-free completion proof stays so dependents keep resolving (the
+state `removeOnComplete` leaves). It never removes an active or a failed job.
+When nothing was removed, `error` is `Job not found or cannot be cancelled` for a
+job that does not exist (match "not found" to treat the removal as idempotent)
+and `Job cannot be cancelled (current state: <state>)` for an existing job in a
+refusing state; clients SHOULD raise for the latter. Brokers before this rule
+answered the first text for every refusal.
 
 #### Job groups
 

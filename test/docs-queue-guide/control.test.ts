@@ -113,6 +113,27 @@ for (const mode of MODES) {
       expect(await queue.countAsync()).toBe(0);
     });
 
+    test('remove deletes a completed job after its result was read; active jobs refuse', async () => {
+      harness = await startHarness('control', mode);
+      const queue = harness.queue<{ n: number }>('control');
+      const job = await queue.add('done', { n: 1 }, { durable: true });
+      const manager = harness.brokerManager();
+      const pulled = await manager.pull(queue.name);
+      await manager.ack(pulled!.id, { answer: 42 });
+
+      const result = await job.waitUntilFinished(null, 30_000);
+      expect(result).toEqual({ answer: 42 });
+      await job.remove();
+      expect(await queue.getJobState(job.id)).toBe('unknown');
+      expect(await queue.getJob(job.id)).toBeFalsy();
+      await job.remove();
+
+      const active = await queue.add('running', { n: 2 }, { durable: true });
+      expect((await manager.pull(queue.name))?.id).toBe(active.id);
+      await expect(queue.removeAsync(active.id)).rejects.toThrow(/current state: active/);
+      expect(await queue.getJobState(active.id)).toBe('active');
+    });
+
     test('waitUntilReady resolves and close() is safe', async () => {
       harness = await startHarness('control', mode);
       const queue = harness.queue('control');

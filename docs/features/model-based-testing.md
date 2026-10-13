@@ -132,7 +132,11 @@ schema or configuration failures.
 
 Generated commands cover single and batch push/pull/ack, retryable and terminal
 failure, progress, payload update, priority and delay changes, promote,
-`MoveToWait`, cancel/discard, per-job and aggregate DLQ/completed retry, DLQ
+`MoveToWait`, cancel/discard, cancel of a completed job (row, result and
+projections removed, payload-free proof kept, the generation never delivered
+again, `cancel-commands.ts`) and the refused cancel of an active or failed job
+(`Job cannot be cancelled (current state: <state>)`), per-job and aggregate
+DLQ/completed retry, DLQ
 purge, pause/resume, drain/obliterate, concurrency and rate limits, batched lock
 heartbeats, parent/child dependency release and failure policies, and actual
 crash/restart. Focused contract commands also cover FIFO/LIFO priority ties,
