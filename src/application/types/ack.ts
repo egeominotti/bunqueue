@@ -8,6 +8,7 @@ import type { RWLock } from '../../shared/lock';
 import type { MapLike, SetLike } from '../../shared/lru';
 import type { DependencyCompletionTracker } from '../dependencyCompletions';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
+import type { RemovedResults } from '../removedResults';
 
 export interface AckContext {
   storage: SqliteStorage | null;
@@ -23,6 +24,8 @@ export interface AckContext {
   jobResults: MapLike<JobId, unknown>;
   jobResultQueues: Map<JobId, string>;
   dependencyResults: DependencyResultTracker;
+  /** Memory-only results of jobs removed on completion; absent in contexts without one. */
+  removedResults?: RemovedResults;
   jobIndex: Map<JobId, JobLocation>;
   customIdMap?: MapLike<string, JobId>;
   totalCompleted: { value: bigint };
@@ -96,6 +99,7 @@ export interface FinalizeContext {
   jobResults: MapLike<JobId, unknown>;
   jobResultQueues: Map<JobId, string>;
   dependencyResults?: DependencyResultTracker;
+  removedResults?: RemovedResults;
   jobIndex: Map<JobId, JobLocation>;
   customIdMap?: MapLike<string, JobId>;
   totalCompleted: { value: bigint };

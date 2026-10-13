@@ -217,9 +217,15 @@ Client MUSTs:
   Timeouts beyond the server bound MUST be clamped to `[0, 600000]`, not
   forwarded. A `WaitJob` held when the job completes answers
   `{completed: true, result}` with the job's return value, also for a job
-  added with `removeOnComplete`; a request that arrives after such a job
-  completed answers `Job not found` on memory and SQLite brokers, which retain
-  no result for it (a PostgreSQL broker answers from its completion record).
+  added with `removeOnComplete`. A request that arrives after such a job
+  completed answers `{completed: true, result}` from the result the broker
+  retains for it: memory and SQLite brokers keep it in memory only, for
+  `removedResultRetentionMs` (60 s by default) and the last `maxRemovedResults`
+  (1,000) such jobs; a PostgreSQL broker answers from its completion record.
+  After that (or after `Cancel`, `Obliterate`, a new job under the same custom
+  ID, a broker restart) it answers `Job not found`. `GetState` reports
+  `unknown` and `GetResult` no result for such a job; a client SHOULD send a
+  `WaitJob` with `timeout: 0` before it reports a missing job.
 - `GetJobs.asc=false` reverses the total createdAt/job-id ordering before
   applying `offset` and `limit`. A paginating client MUST send the same value
   on every page; omitting it preserves ascending order.
@@ -333,9 +339,14 @@ only a payload-free completion proof stays so dependents keep resolving (the
 state `removeOnComplete` leaves). It never removes an active or a failed job.
 When nothing was removed, `error` is `Job not found or cannot be cancelled` for a
 job that does not exist (match "not found" to treat the removal as idempotent)
-and `Job cannot be cancelled (current state: <state>)` for an existing job in a
-refusing state; clients SHOULD raise for the latter. Brokers before this rule
-answered the first text for every refusal.
+and `Job cannot be cancelled: not in queue (current state: <state>)` for an
+existing job in a refusing state; clients SHOULD raise for the latter. The refusal
+never says "not found", and its "not in queue" keeps bunqueue-mcp 2.9.13 and
+earlier reporting it as a negative outcome. Brokers before this rule (2.9.13 and
+earlier) answered the first text for every refusal, an active, a failed or a
+completed job included: a client that must not take a refused job for a removed
+one reads `GetState` after that text and treats only `unknown` as missing, as the
+TypeScript client does (`src/client/jobRemoval.ts`).
 
 #### Job groups
 

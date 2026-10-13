@@ -1,62 +1,50 @@
 import { describe, test } from 'bun:test';
-import fc from 'fast-check';
 import { runCrossQueueInvariantCampaign } from './cross-queue-invariants';
 import { queueCommandArbitraries } from './queue-commands';
-import { RealQueue, type QueueModel } from './queue-model-harness';
+import {
+  optionalInteger,
+  optionalPath,
+  optionalSize,
+  runQueueModelCampaign,
+} from './queue-model-campaign';
+import { terminalLifecycleArbitraries } from './terminal-lifecycle-commands';
 
 const DEFAULT_RUNS = 150;
 const DEFAULT_COMMANDS = 80;
+const DEFAULT_TERMINAL_RUNS = 30;
+const DEFAULT_TERMINAL_COMMANDS = 40;
 
 describe('Queue state-machine model against the real broker', () => {
   test('generated lifecycle, batch, dependency, control and SIGKILL sequences preserve invariants', async () => {
-    const seed = optionalInteger(Bun.env.BUNQUEUE_MODEL_SEED);
-    const numRuns = optionalInteger(Bun.env.BUNQUEUE_MODEL_RUNS) ?? DEFAULT_RUNS;
-    const maxCommands = optionalInteger(Bun.env.BUNQUEUE_MODEL_COMMANDS) ?? DEFAULT_COMMANDS;
-    let run = 0;
-
-    await fc.assert(
-      fc.asyncProperty(
-        fc.commands(queueCommandArbitraries(), { maxCommands }),
-        async (commands) => {
-          const real = await RealQueue.create(`${seed ?? 'random'}-${run++}`);
-          const model: QueueModel = {
-            accepted: 0,
-            concurrency: null,
-            generations: new Map(),
-            jobs: new Map(),
-            paused: false,
-            rateLimit: null,
-            rateRemaining: 0,
-            removed: 0,
-            terminalGenerations: new Set(),
-          };
-          try {
-            await fc.asyncModelRun(() => ({ model, real }), commands);
-          } finally {
-            await real.dispose();
-          }
-        }
-      ),
-      {
-        endOnFailure: true,
-        interruptAfterTimeLimit: 120000,
-        numRuns,
-        seed,
-        verbose: 2,
-      }
-    );
+    await runQueueModelCampaign({
+      arbitraries: queueCommandArbitraries(),
+      label: 'lifecycle',
+      maxCommands: optionalInteger(Bun.env.BUNQUEUE_MODEL_COMMANDS) ?? DEFAULT_COMMANDS,
+      numRuns: optionalInteger(Bun.env.BUNQUEUE_MODEL_RUNS) ?? DEFAULT_RUNS,
+      path: optionalPath(Bun.env.BUNQUEUE_MODEL_PATH),
+      seed: optionalInteger(Bun.env.BUNQUEUE_MODEL_SEED),
+      size: optionalSize(Bun.env.BUNQUEUE_MODEL_SIZE),
+      timeLimitMs: 120000,
+    });
   }, 130000);
+
+  test('generated completion, failure, retry, cancel and SIGKILL histories preserve invariants', async () => {
+    // `max` makes the command cap the real bound: at fast-check's default size a history
+    // has at most 10 commands whatever the cap.
+    await runQueueModelCampaign({
+      arbitraries: terminalLifecycleArbitraries(),
+      label: 'terminal-lifecycle',
+      maxCommands:
+        optionalInteger(Bun.env.BUNQUEUE_TERMINAL_MODEL_COMMANDS) ?? DEFAULT_TERMINAL_COMMANDS,
+      numRuns: optionalInteger(Bun.env.BUNQUEUE_TERMINAL_MODEL_RUNS) ?? DEFAULT_TERMINAL_RUNS,
+      path: optionalPath(Bun.env.BUNQUEUE_TERMINAL_MODEL_PATH),
+      seed: optionalInteger(Bun.env.BUNQUEUE_MODEL_SEED),
+      size: 'max',
+      timeLimitMs: 60000,
+    });
+  }, 70000);
 
   test('generated multi-queue histories preserve shard isolation and global conservation', async () => {
     await runCrossQueueInvariantCampaign();
   }, 70000);
 });
-
-function optionalInteger(value: string | undefined): number | undefined {
-  if (value === undefined || value === '') return undefined;
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed)) {
-    throw new Error(`expected a signed safe integer, received ${value}`);
-  }
-  return parsed;
-}

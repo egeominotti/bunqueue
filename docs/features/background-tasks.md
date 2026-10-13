@@ -87,6 +87,7 @@ Exported from `cleanupTasks.ts`:
 
 ```typescript
 export async function cleanup(ctx: BackgroundContext): Promise<void>;
+export const ORPHAN_INDEX_CONFIRM_MS = 60_000;
 ```
 
 Exported from `orphanRecovery.ts` (called by `cleanup`):
@@ -198,7 +199,7 @@ phase-progress, and completion diagnostics at debug level on stderr:
    workers ACK during its drain, so neither arrives here as `active`
    ([Webhooks, Events & Job Logs](./webhooks-and-events.md),
    [TCP Server & Handlers](./tcp-server-handlers.md)).
-2. **Phase 2 — pending jobs** (`background/recovery/pending.ts`): paginated by deterministic `priority DESC, run_at ASC, id ASC`. Each page collects only its referenced dependency IDs and asks SQLite which of those IDs are retained completions; it never materializes the full completed table. This phase is the single authoritative enqueue path for both original pending jobs and retries persisted by Phase 1, preventing duplicate heap entries/counter increments. Corrupt-deps are quarantined; unsatisfied dependencies enter `waitingDeps`; dedup mappings are restored.
+2. **Phase 2 — pending jobs** (`background/recovery/pending.ts`): paginated by deterministic `priority DESC, run_at ASC, id ASC`. Each page collects only its referenced dependency IDs and asks SQLite which of those IDs are retained completions; it never materializes the full completed table. This phase is the single authoritative enqueue path for both original pending jobs and retries persisted by Phase 1, preventing duplicate heap entries/counter increments. Corrupt-deps are quarantined; unsatisfied dependencies enter `waitingDeps`; dedup mappings are restored. A parent whose dependencies this recovery finds complete is checkpointed (`checkpointDependencyPromotion`); a row already persisted as `waiting`, `prioritized` or `delayed` is authoritative and is not rewritten. A stall-recovered flow parent therefore keeps Phase 1's retry representation (`jobs.state='waiting'`, future `run_at`, API state `delayed`) exactly like a job that never had dependencies, and a restart with nothing to recover leaves pending rows untouched (`test/repro-model-flow-parent-stall-recovery.test.ts`).
 3. **DLQ restore** (`background/recovery/restore.ts`): `loadDlq()` restores every persisted entry into memory exactly once (this is why `quarantineCorruptDependsOn` deliberately does NOT touch in-memory DLQ — it only persists + drops the job row).
 4. **Queue control-state restore** (`background/recovery/restore.ts`, issue
    #100): the `loadQueueState()` snapshot used before Phase 1 for stall/DLQ
@@ -271,7 +272,11 @@ For each queue in `queueNamesCache`, calls `processAutoRetry` (re-queues entries
 
 ### `cleanup` (`cleanupTasks.ts`)
 
-Runs in order each tick: refresh delayed counters per shard; compact any priority queue with `needsCompaction(0.2)` (>20% tombstones); then `recoverOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, `cleanUniqueKeysAndGroups`, `cleanStalledCandidates`, `cleanOrphanedJobIndex`, `cleanOrphanedJobLocks`, `pruneEndedClientDeliveries`, `cleanEmptyQueues`.
+Runs in order each tick: purge the expired records of `removedResults` (the
+memory-only results of jobs removed on completion, so their TTL bounds how long a
+result is held even when no completion arrives; see
+[Core Queue Engine](./core-queue-engine.md#removed-result-retention)); refresh
+delayed counters per shard; compact any priority queue with `needsCompaction(0.2)` (>20% tombstones); then `recoverOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, `cleanUniqueKeysAndGroups`, `cleanStalledCandidates`, `cleanOrphanedJobIndex`, `cleanOrphanedJobLocks`, `pruneEndedClientDeliveries`, `cleanEmptyQueues`.
 
 `recoverOrphanedProcessingEntries` (`orphanRecovery.ts`) is a backstop for the
 stall checker and does not recover anything the stall checker would keep. One
@@ -347,6 +352,23 @@ was recovered after 30 minutes and could run twice
 (`test/repro-orphan-window-respects-stall-config.test.ts`,
 `test/orphan-window-boundaries.test.ts`).
 
+`cleanOrphanedJobIndex` runs only while `jobIndex` holds more than 100,000
+entries. It deletes a `queue` entry whose job is no longer in that queue's heap
+(under the shard write lock), and a `processing` entry whose job is missing from
+its processing shard only after confirmation: the first sweep records the
+location object and the time; a later sweep deletes the entry when the same
+object is still there, still without its job, at least
+`ORPHAN_INDEX_CONFIRM_MS` (60 s) after it was first seen. The suspects live in a
+module-level `WeakMap` keyed by the job index and are rebuilt on every sweep, so
+a resolved suspect is forgotten. An ACK, ACKB, FAIL or management move takes the
+job out of its processing shard and re-indexes it in a later critical section;
+any transition replaces the location object, and one in flight lasts a few lock
+waits. Before this rule a single sweep deleted the entry of an ACK in flight: the
+ACK found no `processing` location, returned "Job not found" without releasing
+the job's queue concurrency slot (a queue with concurrency 1 stayed blocked) or
+group slot, and the job was neither completed nor indexed anywhere until a
+restart (`test/repro-orphan-index-cleanup-inflight-ack.test.ts`).
+
 `pruneEndedClientDeliveries` runs synchronously after the lock sweep and drops
 every client ownership record whose delivery has ended (its `jobIndex` entry is
 no longer the processing entry the connection registered). Recovery paths
@@ -392,7 +414,7 @@ Returns immediately if `dashboardEmit` is unset. Otherwise runs `checkQueueIdle`
 
 The lock hierarchy is `jobIndex → completedJobs → shards[N] → processingShards[N]` (see [Concurrency & Locking](./concurrency-and-locking.md)). Within this module:
 
-- `recoverOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, and `cleanOrphanedJobIndex` use a **two-phase** pattern: collect candidates lock-free, then mutate under the owning write lock and re-check membership/age inside the lock. For processing entries the second phase is `handleStalledJob`, which holds `shardLocks` then `processingLocks` and re-checks job identity plus the full orphan predicate (stall configuration, grace period, silence window and an unexpired lease of the current generation) before the transition.
+- `recoverOrphanedProcessingEntries`, `cleanStaleWaitingDependencies`, and `cleanOrphanedJobIndex` use a **two-phase** pattern: collect candidates lock-free, then mutate under the owning write lock and re-check membership/age inside the lock. A `processing` index entry without its job additionally needs a second sighting of the same location object `ORPHAN_INDEX_CONFIRM_MS` later, because no lock covers a transition between its processing and shard critical sections. For processing entries the second phase is `handleStalledJob`, which holds `shardLocks` then `processingLocks` and re-checks job identity plus the full orphan predicate (stall configuration, grace period, silence window and an unexpired lease of the current generation) before the transition.
 - `processPendingDependencies` acquires `shardLocks[i]` **before** reading `waitingDeps`, then runs shards in parallel via `Promise.all`.
 - The stall and lock-expiry delegates (`stallDetection.ts`, `lockManager.ts`) acquire `shardLocks` **before** `processingLocks` (hierarchy order). The stall checker re-evaluates its confirmed stall under both locks (`StallRecheck`), so a heartbeat or a new delivery of the same job object that lands while it waits keeps the job. The lock-expiry sweep revalidates the collected job identity, current lease identity, expiry and lease generation (`isLeaseFromEarlierGeneration`) under both locks before consuming either recovery budget; overlapping sweeps, renewal, ACK, and a newer delivery generation therefore cannot reclaim the same lease twice, and an earlier delivery's lease never reclaims a later lockless delivery. Overlapping stall, orphan and lock-expiry recoveries of one delivery transition it at most once (`test/recovery-sweeps-overlap.test.ts`). Events are broadcast only after the winning transition.
 - Timeout entries are registered only after processing ownership (and any lease)
@@ -415,7 +437,7 @@ Stall detection uses two-phase confirmation (a job must be flagged in two consec
 - **Corrupt `depends_on`:** quarantined to DLQ on recovery so a job with unrecoverable dependency metadata is never enqueued as ready (out-of-order execution) nor parked in `waitingDeps` forever (unbounded leak).
 - **Stale `active`/DLQ rows from legacy DBs:** Phase 1 drops orphan rows for jobs already present in the DLQ table so they are not double-counted (predates the `failJob` DLQ-row cleanup fix; issue #97 lineage).
 - **Cron `preventOverlap` jobs:** never re-queued by recovery, stall, or lock-expiry paths — they are deleted and left to the scheduler to recreate (issues #73/#75).
-- **Memory and disk bounds:** cleanup compacts priority queues at >20% tombstones; trims `uniqueKeys`/`activeGroups` by half when a queue exceeds 1000 entries; only walks `jobIndex` when `size > 100_000` (the full scan is expensive); evicts via `BoundedSet`/`LRUMap` caps elsewhere. When `completedRetentionMs` is configured, it also deletes at most 1,000 oldest eligible SQLite completions per tick. Hot-cache eviction alone never deletes durable rows.
+- **Memory and disk bounds:** cleanup compacts priority queues at >20% tombstones; trims `uniqueKeys` by half when a queue exceeds 1000 entries (live `activeGroups` ownership is never trimmed); only walks `jobIndex` when `size > 100_000` (the full scan is expensive); evicts via `BoundedSet`/`LRUMap` caps elsewhere. When `completedRetentionMs` is configured, it also deletes at most 1,000 oldest eligible SQLite completions per tick. Hot-cache eviction alone never deletes durable rows.
 - **`perQueueMetrics` not pruned on empty-queue removal:** intentional — counters are cumulative and must survive a transient drain; growth is bounded by the LRU cap and explicit queue obliteration reclaims it.
 - **Completion-proof pinning:** recent `depCompletions` self-bound to
   `maxCompletedJobs`, but proofs referenced by waiting parents are excluded

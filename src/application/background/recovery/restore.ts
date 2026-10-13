@@ -1,4 +1,5 @@
 import { shardIndex } from '../../../shared/hash';
+import { activeJobIdsOf } from '../../activeJobIds';
 import type { BackgroundContext } from '../../types';
 import { RECOVERY_BATCH_SIZE, type QueueStateRecord } from './shared';
 
@@ -34,7 +35,11 @@ export function restoreQueueState(ctx: BackgroundContext, queueStates: QueueStat
       }
     }
     if (queueState.concurrencyLimit !== null) {
-      shard.setConcurrency(queueState.name, queueState.concurrencyLimit);
+      // Startup recovery has already moved every stored active job back to waiting
+      // or the DLQ, so this seed is empty; it keeps the limit exact regardless.
+      shard.setConcurrency(queueState.name, queueState.concurrencyLimit, () =>
+        activeJobIdsOf(queueState.name, ctx.processingShards, ctx.jobIndex)
+      );
     }
     if (shard.getConfiguredQueueNames().includes(queueState.name)) {
       ctx.registerQueueName(queueState.name);

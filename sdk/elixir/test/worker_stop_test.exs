@@ -121,7 +121,8 @@ defmodule Bunqueue.WorkerStopTest do
     end
   end
 
-  # An unlinked process admitted by the barrier; it leaves only when told to.
+  # An unlinked process admitted by the barrier; it leaves only when told to and
+  # then stays alive (leaving, not dying, is under test), so the test reaps it.
   defp spawn_entrant(lifecycle) do
     parent = self()
 
@@ -137,6 +138,7 @@ defmodule Bunqueue.WorkerStopTest do
         Process.sleep(:infinity)
       end)
 
+    on_exit(fn -> Process.exit(entrant, :kill) end)
     assert_receive {:entered, ^entrant}, @bound
     entrant
   end

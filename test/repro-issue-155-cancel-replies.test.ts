@@ -62,11 +62,11 @@ describe('server Cancel replies', () => {
     expect(await manager.getJobState(ids.completed)).toBe('unknown');
     expect(await handleCancel({ cmd: 'Cancel', id: ids.active }, ctx)).toMatchObject({
       ok: false,
-      error: 'Job cannot be cancelled (current state: active)',
+      error: 'Job cannot be cancelled: not in queue (current state: active)',
     });
     expect(await handleCancel({ cmd: 'Cancel', id: ids.failed }, ctx)).toMatchObject({
       ok: false,
-      error: 'Job cannot be cancelled (current state: failed)',
+      error: 'Job cannot be cancelled: not in queue (current state: failed)',
     });
     expect(await handleCancel({ cmd: 'Cancel', id: 'no-such-job' }, ctx)).toMatchObject({
       ok: false,
@@ -94,7 +94,7 @@ describe('server Cancel replies', () => {
     expect(await remove(ids.completed)).toEqual({ status: 200, body: { ok: true } });
     expect(await remove(ids.active)).toMatchObject({
       status: 200,
-      body: { ok: false, error: 'Job cannot be cancelled (current state: active)' },
+      body: { ok: false, error: 'Job cannot be cancelled: not in queue (current state: active)' },
     });
     expect(await remove('no-such-job')).toMatchObject({
       status: 200,
@@ -104,16 +104,39 @@ describe('server Cancel replies', () => {
 });
 
 describe('TCP Cancel reply mapping', () => {
-  test('ok and "not found" resolve, any other rejection throws the broker message', () => {
-    expect(() => assertCancelReply({ ok: true })).not.toThrow();
-    expect(() => assertCancelReply({ ok: false, error: NOT_FOUND })).not.toThrow();
-    expect(() =>
-      assertCancelReply({ ok: false, error: 'Job cannot be cancelled (current state: active)' })
-    ).toThrow('Job cannot be cancelled (current state: active)');
-    expect(() => assertCancelReply({ ok: false, error: 'Not authenticated' })).toThrow(
-      'Not authenticated'
-    );
-    expect(() => assertCancelReply({ ok: false })).toThrow('Cancel failed');
+  const REFUSED_ACTIVE = 'Job cannot be cancelled: not in queue (current state: active)';
+  /** A transport that only answers GetState, reading the job as `state`. */
+  const reads = (state: string) => {
+    const sent: string[] = [];
+    const send = (command: Record<string, unknown>) => {
+      sent.push(String(command.cmd));
+      return Promise.resolve({ ok: true, id: command.id, state });
+    };
+    return { sent, send };
+  };
+
+  test('ok resolves, any other rejection throws the broker message', async () => {
+    const transport = reads('unknown');
+    await expect(assertCancelReply(transport, 'j', { ok: true })).resolves.toBeUndefined();
+    await expect(
+      assertCancelReply(transport, 'j', { ok: false, error: REFUSED_ACTIVE })
+    ).rejects.toThrow(REFUSED_ACTIVE);
+    await expect(
+      assertCancelReply(transport, 'j', { ok: false, error: 'Not authenticated' })
+    ).rejects.toThrow('Not authenticated');
+    await expect(assertCancelReply(transport, 'j', { ok: false })).rejects.toThrow('Cancel failed');
+    expect(transport.sent).toEqual([]);
+  });
+
+  test('the legacy reply resolves only once a state read finds no such job', async () => {
+    const missing = reads('unknown');
+    await expect(
+      assertCancelReply(missing, 'j', { ok: false, error: NOT_FOUND })
+    ).resolves.toBeUndefined();
+    expect(missing.sent).toEqual(['GetState']);
+    await expect(
+      assertCancelReply(reads('active'), 'j', { ok: false, error: NOT_FOUND })
+    ).rejects.toThrow('Job j cannot be removed (current state: active)');
   });
 });
 

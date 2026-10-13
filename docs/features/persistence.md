@@ -452,7 +452,9 @@ would skip rows. Each interrupted active job increments `attempts` and
 persisted `stall_count`; reaching either bound is terminal. Pending pages use
 deterministic priority/run-at/id ordering. A persisted ready state
 (`waiting`/`prioritized`/`delayed`) is an authoritative dependency checkpoint,
-so bounded-proof eviction cannot regress a promoted parent. Later phases
+so bounded-proof eviction cannot regress a promoted parent, and recovery
+checkpoints only the parents it promotes itself instead of rewriting rows that
+are already ready (a stall-recovered parent keeps `state='waiting'`). Later phases
 restore the DLQ, limiter state, and bounded completed cache.
 
 A pending row already marked `waiting-children` is restored into the parked

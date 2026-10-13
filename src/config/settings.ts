@@ -113,6 +113,24 @@ export const SETTINGS = settings({
     rule: { min: 1 },
     fallback: 50_000,
   }),
+  /**
+   * The memory-only retention of the result of a job removed on completion (0 disables
+   * it). New settings: an invalid value means the default, with a warning.
+   */
+  removedResultRetentionMs: defaulting({
+    env: ['BUNQUEUE_REMOVED_RESULT_RETENTION_MS'],
+    file: 'storage.removedResultRetentionMs',
+    flag: '--removed-result-retention-ms',
+    rule: { unit: MS, min: 0 },
+    fallback: 60_000,
+  }),
+  maxRemovedResults: defaulting({
+    env: ['BUNQUEUE_MAX_REMOVED_RESULTS'],
+    file: 'storage.maxRemovedResults',
+    flag: '--max-removed-results',
+    rule: { min: 0 },
+    fallback: 1_000,
+  }),
   /** Optional (null = off); invalid values mean "off" with a warning (`resolve.ts`). */
   completedRetentionMs: {
     env: ['BUNQUEUE_COMPLETED_RETENTION_MS', 'COMPLETED_RETENTION_MS'],

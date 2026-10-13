@@ -135,7 +135,8 @@ failure, progress, payload update, priority and delay changes, promote,
 `MoveToWait`, cancel/discard, cancel of a completed job (row, result and
 projections removed, payload-free proof kept, the generation never delivered
 again, `cancel-commands.ts`) and the refused cancel of an active or failed job
-(`Job cannot be cancelled (current state: <state>)`), per-job and aggregate
+(`Job cannot be cancelled: not in queue (current state: <state>)`; both run under
+the default settings through the terminal-lifecycle campaign), per-job and aggregate
 DLQ/completed retry, DLQ
 purge, pause/resume, drain/obliterate, concurrency and rate limits, batched lock
 heartbeats, parent/child dependency release and failure policies, and actual
@@ -198,8 +199,10 @@ The generated transitions also assert the following contracts:
 - concurrency and rate tokens remain bounded and are rolled back when a pull
   cannot acquire every required resource;
 - retrying a completed job clears its result and execution metadata in memory
-  and SQLite before the waiting generation becomes visible, and restart cannot
-  restore the retired completed result;
+  and SQLite before the waiting generation becomes visible (attempts, stall
+  count, progress reset to 0 and the progress message to `null`, as
+  [Dead Letter Queue](./dead-letter-queue.md#retrycompleted) specifies; a DLQ
+  retry keeps both), and restart cannot restore the retired completed result;
 - expired jobs are never delivered and are deleted exactly once from memory,
   counters, indexes, the write buffer and SQLite.
 
@@ -224,7 +227,38 @@ enterprise-telemetry models and 40 workflow graphs with up to 12 commands:
 bun run test:model
 ```
 
-It also runs 24 cross-queue histories of up to 30 operations. Tune
+`BUNQUEUE_MODEL_COMMANDS` is only an upper bound: fast-check draws each
+history's length from its `size`, and its default size (`small`) caps a history
+at 10 commands whatever the bound. Most lifecycle commands need an earlier push,
+pull or completion, so under the default size a 150-run campaign executes about
+two commands per history, and completion, failure, progress, retry and cancel
+commands run rarely or never. `BUNQUEUE_MODEL_SIZE`
+(`xsmall`/`small`/`medium`/`large`/`xlarge`/`max`, or a relative `-4`..`+4`/`=`)
+sets that size; `max` makes the command bound the real cap. `BUNQUEUE_MODEL_PATH`
+replays the `path` fast-check prints with a counterexample. Generation depends on
+the command vocabulary, the bound and the size, so replay a counterexample with
+the seed, path and size it was found with, on the same command set:
+
+```bash
+BUNQUEUE_MODEL_SEED=11 \
+BUNQUEUE_MODEL_PATH=67 \
+BUNQUEUE_MODEL_SIZE=medium \
+bun run test:model
+```
+
+A path needs its seed. The broker campaign stops after 120 s
+(`interruptAfterTimeLimit`), and fast-check reports an interrupted campaign as
+passed, so a large size can run fewer histories than requested.
+`BUNQUEUE_MODEL_STATS=1` prints, per campaign, how many runs started and how
+many generated commands of each kind passed their precondition and ran
+(`command-coverage.ts`). It only maps generated values, so draws, shrinking and
+replay are unchanged.
+
+The model has no clock, so every modeled job, flow child and parent included,
+uses a 60 s retry backoff: a crash- or retry-delayed job must not become ready
+while a history is still running.
+
+The command also runs 24 cross-queue histories of up to 30 operations. Tune
 that campaign independently with:
 
 ```bash
@@ -233,7 +267,8 @@ BUNQUEUE_CROSS_QUEUE_COMMANDS=100 \
 bun run test:model
 ```
 
-Tune a focused campaign without editing the test:
+Tune a focused campaign without editing the test (add `BUNQUEUE_MODEL_SIZE`
+for histories longer than 10 commands):
 
 ```bash
 BUNQUEUE_MODEL_RUNS=500 \
@@ -252,13 +287,39 @@ bun run test:model
 ```
 
 `fast-check` prints the seed, counterexample, and replay path for every failure.
-Preserve the minimized history as a deterministic `test/repro-model-*.test.ts`
-regression before changing runtime code. The default unit suite, and therefore
+The broker campaigns run with `endOnFailure`, so fast-check does not shrink the
+counterexample; minimize it by hand to the commands that matter. Preserve the
+minimized history as a deterministic `test/repro-model-*.test.ts` regression
+before changing runtime code. The default unit suite, and therefore
 `bun run test:sandbox`, includes this state machine automatically.
+
+### Terminal-lifecycle campaign
+
+A second broker campaign in `queue-model.test.ts` uses only the commands that
+move a job into, out of and away from a terminal state
+(`terminal-lifecycle-commands.ts`): push, pull/pull batch, ack/ack batch, retry
+and terminal failure, progress, promote, completed and DLQ retry, waiting
+cancel, DLQ removal, a flow with its acknowledgement, `SIGKILL` restart, cancel
+of a completed job and the refused cancel of an active or failed job. Slot
+commands run on the `pick`-th slot whose precondition holds, and the draw is
+weighted towards the steps that reach a terminal state, so these transitions run
+under the default settings: 30 histories of up to 40 commands (size `max`),
+about 6 s. With `BUNQUEUE_MODEL_STATS=1` thirteen seeds executed 3-13 cancels of a
+completed job, 6-17 refused cancels of an active job and 1-4 of a failed job per
+campaign; the lifecycle campaign executed none. It uses the same harness, oracle
+and `BUNQUEUE_MODEL_SEED`, with its own bound, run count and replay path:
+
+```bash
+BUNQUEUE_TERMINAL_MODEL_RUNS=100 \
+BUNQUEUE_TERMINAL_MODEL_COMMANDS=60 \
+BUNQUEUE_TERMINAL_MODEL_PATH=12 \
+BUNQUEUE_MODEL_SEED=424242 \
+bun run test:model
+```
 
 ## Defects found by the model
 
-The expanded campaign and its full-suite gate found eleven classes of lifecycle,
+The expanded campaign and its full-suite gate found thirteen classes of lifecycle,
 durability, recovery, and persistence-boundary defects:
 
 - `Update` changed data only in memory; restart restored the old payload.
@@ -288,6 +349,27 @@ durability, recovery, and persistence-boundary defects:
   explicit `stallCount` fail the SQLite `NOT NULL` constraint. The persistence
   boundary now normalizes only an omitted value to zero for single, buffered,
   batch, retry, and decode paths.
+- startup recovery re-checkpointed every pending job with dependencies, even
+  one already persisted as ready, so a flow parent recovered from `active`
+  was rewritten from the retry representation (`waiting`, future `run_at`) to
+  `delayed`, unlike any other stalled job (seed `278702072` at size `max`;
+  `repro-model-flow-parent-stall-recovery.test.ts`). Recovery now checkpoints
+  only the promotions it decides.
+- a completed retry reset `attempts` but kept the previous generation's
+  `stallCount`, in memory and in SQLite, while a DLQ retry and the PostgreSQL
+  engine's completed retry reset both budgets, so a job that stalled before it
+  completed reached `maxStalls` early in its next execution (terminal-lifecycle
+  seed `1047906753`, path `29`, found by the first default run of that campaign;
+  `repro-model-retry-completed-stall-count.test.ts`).
+- a queue concurrency limit set while jobs of the queue were already active
+  started a fresh limiter at zero, so push, pull, `setConcurrency(2)` and
+  `pullBatch(2)` left three jobs active under a limit of two; a job active
+  before the limit then released a slot it never held, and clear-then-set
+  forgot the running jobs (seed `418721315`, path `108`, size `max`;
+  `repro-model-concurrency-limit-active-jobs.test.ts`). The limiter now holds
+  one slot per active job id and is seeded from the queue's active set when it
+  is created, matching BullMQ, which counts the whole active list toward global
+  concurrency.
 
 The permanent regressions exercise the public TCP and real persistence paths.
 The fixes persist effective mutations, retry/stall metadata and stall policy,
@@ -298,6 +380,15 @@ during obliteration. Terminal-ID reuse locks the target and prior-owner shards
 in deterministic order and exposes exactly one generation. Management commands
 that claim active work now release lease and client ownership through one
 idempotent transition.
+
+Not every divergence is an engine defect. Seed `11`, path `67` at size `medium`
+(push batch, pull, progress, ack batch, `retryCompleted`) expected the progress
+message to survive a completed retry, while the engine resets it to `null`
+together with progress: the documented completed-retry contract, already pinned
+by `repro-model-retry-completed-persistence.test.ts`. The model was corrected.
+BullMQ does not decide the question: its `reprocessJob` script deletes only
+`finishedOn`, `processedOn`, the return value and, on request, the attempt
+counters, keeps `progress`, and has no progress message.
 
 The workflow model additionally found or permanently covers duplicate live
 node execution, independent child recovery causing double compensation,

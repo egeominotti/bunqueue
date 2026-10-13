@@ -1124,39 +1124,73 @@ describe('queue.ts', () => {
   });
 
   describe('ConcurrencyLimiter', () => {
+    let nextHolder = 0;
+    const holder = () => jobId(`holder-${++nextHolder}`);
+
     test('should acquire slots up to limit', () => {
       const cl = new ConcurrencyLimiter(3);
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(false);
+      expect(cl.tryAcquire(holder())).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(false);
     });
 
     test('should release slots', () => {
       const cl = new ConcurrencyLimiter(2);
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(false);
+      const first = holder();
+      expect(cl.tryAcquire(first)).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(false);
 
-      cl.release();
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(false);
+      cl.release(first);
+      expect(cl.tryAcquire(holder())).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(false);
     });
 
     test('should not go below zero on release', () => {
       const cl = new ConcurrencyLimiter(2);
-      cl.release(); // release when active=0
+      cl.release(holder()); // release when active=0
       expect(cl.getActive()).toBe(0);
+    });
+
+    test('releasing a job that holds no slot changes nothing', () => {
+      const cl = new ConcurrencyLimiter(2);
+      const first = holder();
+      cl.tryAcquire(first);
+      cl.release(holder());
+      expect(cl.getActive()).toBe(1);
+      cl.release(first);
+      cl.release(first);
+      expect(cl.getActive()).toBe(0);
+    });
+
+    test('a job that holds a slot re-acquires it without taking another', () => {
+      const cl = new ConcurrencyLimiter(1);
+      const first = holder();
+      expect(cl.tryAcquire(first)).toBe(true);
+      expect(cl.tryAcquire(first)).toBe(true);
+      expect(cl.getActive()).toBe(1);
+      expect(cl.tryAcquire(holder())).toBe(false);
+    });
+
+    test('is seeded with the jobs already active', () => {
+      const [a, b] = [holder(), holder()];
+      const cl = new ConcurrencyLimiter(2, [a, b]);
+      expect(cl.getActive()).toBe(2);
+      expect(cl.tryAcquire(holder())).toBe(false);
+      cl.release(a);
+      expect(cl.tryAcquire(holder())).toBe(true);
     });
 
     test('should track active count', () => {
       const cl = new ConcurrencyLimiter(5);
+      const first = holder();
       expect(cl.getActive()).toBe(0);
-      cl.tryAcquire();
+      cl.tryAcquire(first);
       expect(cl.getActive()).toBe(1);
-      cl.tryAcquire();
+      cl.tryAcquire(holder());
       expect(cl.getActive()).toBe(2);
-      cl.release();
+      cl.release(first);
       expect(cl.getActive()).toBe(1);
     });
 
@@ -1173,35 +1207,36 @@ describe('queue.ts', () => {
 
     test('should allow more acquisitions after limit increase', () => {
       const cl = new ConcurrencyLimiter(1);
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(false);
+      expect(cl.tryAcquire(holder())).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(false);
 
       cl.setLimit(3);
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(true);
-      expect(cl.tryAcquire()).toBe(false);
+      expect(cl.tryAcquire(holder())).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(false);
     });
 
     test('should handle limit decrease with active slots', () => {
       const cl = new ConcurrencyLimiter(5);
-      cl.tryAcquire(); // active = 1
-      cl.tryAcquire(); // active = 2
-      cl.tryAcquire(); // active = 3
+      const [a, b, c] = [holder(), holder(), holder()];
+      cl.tryAcquire(a); // active = 1
+      cl.tryAcquire(b); // active = 2
+      cl.tryAcquire(c); // active = 3
 
       cl.setLimit(2);
       // Active (3) > limit (2), so no new acquisitions
-      expect(cl.tryAcquire()).toBe(false);
+      expect(cl.tryAcquire(holder())).toBe(false);
       expect(cl.getActive()).toBe(3);
 
       // Release one, still at 2 which equals limit
-      cl.release();
+      cl.release(a);
       expect(cl.getActive()).toBe(2);
-      expect(cl.tryAcquire()).toBe(false);
+      expect(cl.tryAcquire(holder())).toBe(false);
 
       // Release one more, now at 1 which is below limit
-      cl.release();
+      cl.release(b);
       expect(cl.getActive()).toBe(1);
-      expect(cl.tryAcquire()).toBe(true);
+      expect(cl.tryAcquire(holder())).toBe(true);
     });
   });
 });

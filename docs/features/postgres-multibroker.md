@@ -602,8 +602,8 @@ command predicate, and delete only producers whose consumers are also deleted
 atomically. Single-job cancel/remove/DLQ removal returns `false` for a protected
 producer; for `Cancel` of a pending producer that a live job depends on (memory and
 SQLite remove it), `cancelWithOutcome` reads the unchanged pending state, retries
-once, sees the same state and answers `Job cannot be cancelled (current state:
-waiting)` (or the producer's other pending state), so `removeAsync()` and
+once, sees the same state and answers `Job cannot be cancelled: not in queue
+(current state: waiting)` (or the producer's other pending state), so `removeAsync()` and
 `job.remove()` reject with it (`test/postgres-cancel-outcome.test.ts`);
 clean, TTL, drain, DLQ limit, and DLQ expiry skip protected rows;
 cancel of a completed row (issue #155) needs no protection check, because its

@@ -220,8 +220,14 @@ SQLite restart.
    discarded exactly once from persistence, the heap, counters, and `jobIndex`.
    Delayed jobs and jobs whose FIFO group is active are moved into a dequeue
    scratch object while the scan looks for eligible work. Capacity is consumed
-   only after an eligible job is found. The queue pop, processing insert, and
-   `jobIndex` flip remain in the same synchronous shard critical section.
+   only after an eligible job is found, under that candidate's id. The queue
+   pop, processing insert, and `jobIndex` flip remain in the same synchronous
+   shard critical section. A guard checks that the popped job is the candidate
+   that took the slots: should they ever differ (peek and pop agree under the
+   lock), the candidate's slots are released, the popped job, never checked for
+   expiry, readiness or limits, goes back to the queue with its counters
+   untouched, the pull stops and the mismatch is logged
+   (`test/pull-dequeue-candidate-guard.test.ts`).
 4. A single pull creates one scratch and restores its parked jobs in `finally`.
    A batch shares one scratch across all requested jobs and restores it once
    after the entire batch. Readiness cannot change inside that synchronous
@@ -272,7 +278,11 @@ the job. Lock order shard → processing matches the documented hierarchy.
    It is marked `pinned` when a reverse waiter exists; otherwise it enters the
    bounded recent FIFO. Only after commit does the matching in-memory marker
    become visible. The job remains absent from Job/state/result/completed
-   queries.
+   queries. Its result is then recorded in memory only (`removedResults`, 60 s
+   and 1,000 records by default), where the completion lookup (WaitJob, the
+   wait readers) finds it until the record expires or is dropped (see
+   [Core Queue Engine](./core-queue-engine.md#removed-result-retention)); the
+   batch ACK and the stall-retried late ACK record it the same way.
 5. Bump counters, broadcast `completed`, call `onJobCompleted` (dependency processing), and re-schedule repeatable jobs via `onRepeat` if under `repeat.limit`.
 
 ### FAIL (`failJob`, `src/application/operations/ack/failure.ts:63-175`)
@@ -344,10 +354,24 @@ result through `dependencyResults`, as for a removeOnComplete dependency. A
 `removed` event with `prev: 'completed'` is broadcast. The control flow is in
 [Job Queries & Queue Control](./job-queries-and-control.md#canceljob-jobcancelts-completedremovalts).
 
+Cancel also drops the memory-only retained result of a job removed on completion
+under that ID (`removedResults`), so `job.remove()` makes such a result gone too;
+the job itself does not exist, so the reply stays the not-found one below and
+clients resolve. The drop happens twice: before the removal (`QueueManager.cancel`)
+and again whenever the outcome reports the job missing (`cancelWithOutcome` calls
+the port's optional `forgetRemovedResult` right after the state read reads
+`unknown`). The second drop covers an active job whose own ACK
+(`removeOnComplete`) lands between the refused Cancel and the state read: that ACK
+records the result again, and a Cancel that answers "not found" must not leave it
+behind (`test/repro-cancel-ack-race-removed-result.test.ts`). A Cancel that names a
+state (active, failed) keeps the result of a later completion.
+
 When nothing was removed, the reply names why (`domain/job/cancellation.ts`): a
 missing job keeps the legacy `Job not found or cannot be cancelled` (external SDKs
-match its "not found"), an existing one answers `Job cannot be cancelled (current
-state: <state>)`. Awaited client removals resolve for a missing job (idempotent
+match its "not found"), an existing one answers `Job cannot be cancelled: not in
+queue (current state: <state>)`: never "not found", so external SDKs keep raising,
+and "not in queue" keeps bunqueue-mcp 2.9.13 reporting `success: false` instead of
+a tool error. Awaited client removals resolve for a missing job (idempotent
 cleanup, as in BullMQ) and reject for a refused one; see
 [Client SDK: Queue](./client-queue-sdk.md). `cancelWithOutcome` reads
 `getJobState` after a refusal and retries Cancel only when that state is one Cancel
@@ -376,8 +400,8 @@ new copy of the payload. PostgreSQL also refuses a pending job that a live job
 depends on (a protected producer, see
 [PostgreSQL multi-broker](./postgres-multibroker.md)): memory and SQLite remove it.
 The state read after that refusal is the pending state itself, so the reply is, for
-example, `Job cannot be cancelled (current state: waiting)` after two attempts, and
-an awaited removal rejects with it.
+example, `Job cannot be cancelled: not in queue (current state: waiting)` after
+two attempts, and an awaited removal rejects with it.
 
 ## Concurrency & Locking
 
@@ -457,6 +481,13 @@ detached CLI, and durable recovery paths.
   removed, the proof becomes recent and ordinary FIFO pruning applies. Recent
   proof eviction uses a stale-aware explicit order, so sustained completion
   churn remains amortized O(1) after the retention cap is reached.
+- **removeOnComplete + waits**: memory and SQLite keep the result in the
+  memory-only `removedResults` record for `removedResultRetentionMs` (60 s) and
+  at most `maxRemovedResults` (1,000) records, so a wait that reaches the engine
+  after the completion settles on it instead of `Job <id> not found` (issue
+  #155 A). `getJobState` still reads `unknown` and `GetResult` stays empty. A
+  new generation under the same custom ID, `Cancel`, `obliterate`, shutdown and
+  a restart drop the record; the periodic cleanup purges expired ones.
 - **Cancel of a completed job**: the same proof as `removeOnComplete`, written in
   the transaction that deletes the row and the result. A failed write throws
   before memory changes (the job stays completed with its result). A completed

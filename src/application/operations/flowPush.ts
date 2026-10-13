@@ -49,6 +49,8 @@ function publishJobs(jobs: Job[], ctx: PushContext): Map<string, number> {
     const idx = shardIndex(job.queue);
     insertJobToShard(job, { queue: job.queue, shard: ctx.shards[idx], shardIdx: idx }, ctx, false);
     if (job.customId) ctx.customIdMap.set(job.customId, job.id);
+    // A new generation under the ID of a job removed on completion: drop its result.
+    ctx.removedResults?.forget(job.id);
     notifications.set(job.queue, (notifications.get(job.queue) ?? 0) + 1);
   }
   return notifications;

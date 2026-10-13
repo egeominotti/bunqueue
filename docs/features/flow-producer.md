@@ -278,7 +278,10 @@ row is still `active`.
 Once a parent has been checkpointed as `waiting`, `prioritized`, or `delayed`,
 that persisted ready state is authoritative on later restarts. Expiring the
 bounded child proof therefore cannot regress an already-promoted parent to
-`waiting-children`. Reusing a normal Queue custom ID first invalidates the old
+`waiting-children`, and recovery does not rewrite it either: only a promotion
+decided by the current recovery is checkpointed. Once promoted, a parent is an
+ordinary job, so a stalled parent is recovered and persisted like any other job
+(`jobs.state='waiting'` with the retry backoff in `run_at`). Reusing a normal Queue custom ID first invalidates the old
 proof; reuse is rejected while an old dependency consumer is still unresolved.
 
 An explicit `moveToWaitingChildren` transition is persisted as
@@ -346,8 +349,13 @@ broker has no matching lease (`Lock not found or invalid token`), and `remove()`
 follows the Queue's removal rule (`src/client/jobRemoval.ts`, issue #155): it
 resolves when the job was removed or does not exist (a `not found` reply) and
 rejects with the broker's message when the job exists in a state Cancel refuses
-(`Job cannot be cancelled (current state: active)`). A job built without transport
-callbacks takes the same rule on its embedded fallback. Embedded flow jobs follow
+(`Job cannot be cancelled: not in queue (current state: active)`). The legacy
+`Job not found or cannot be cancelled` resolves only after a `GetState` reads the
+job as `unknown`: a 2.9.13 broker sends that text for an active, a failed or a
+completed job too, and its 2.9.13 `remove()` rejected on it, so a newer client
+must not resolve without removing anything
+(`test/repro-mixed-version-cancel-legacy-reply.test.ts`). A job built without
+transport callbacks takes the same rule on its embedded fallback. Embedded flow jobs follow
 the same rules: `changeDelay` and `updateData` on a job they cannot change throw the broker's
 message in both modes, while `promote`, progress and `changePriority` on a job that is no
 longer delayed, active or queued resolve without change (the setter outcome table in

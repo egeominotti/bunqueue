@@ -98,9 +98,12 @@ export class EmbeddedJobBackend extends EmbeddedBackendBase {
       abort.abort();
       return true;
     }
-    if (state === 'unknown' && !(await this.manager.getCompletionAsync(jobId)).found) {
+    if (state === 'unknown') {
+      // A job removed on completion may still have its completion retained (WaitJob's
+      // lookup): it has completed. Otherwise it does not exist.
+      const retained = (await this.manager.getCompletionAsync(jobId)).found;
       abort.abort();
-      if (completedMeanwhile) return true;
+      if (retained || completedMeanwhile) return true;
       throw new Error('Job not found');
     }
     return waiting;

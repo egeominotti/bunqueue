@@ -71,7 +71,7 @@ class PushBatchCommand extends QueueCommand {
   }
 }
 
-class PullBatchCommand extends QueueCommand {
+export class PullBatchCommand extends QueueCommand {
   check(model: Readonly<QueueModel>): boolean {
     const active = [...model.jobs.values()].filter((job) => job.state === 'active').length;
     return (
@@ -127,7 +127,7 @@ class PullBatchCommand extends QueueCommand {
   }
 }
 
-class AckBatchCommand extends QueueCommand {
+export class AckBatchCommand extends QueueCommand {
   check(model: Readonly<QueueModel>): boolean {
     return [...model.jobs.values()].some((job) => job.state === 'active');
   }

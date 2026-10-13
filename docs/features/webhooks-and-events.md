@@ -146,7 +146,7 @@ Command shapes: `src/domain/types/commands/monitoring.ts:3-28` (logs and webhook
 ### Events
 
 - **Webhook events** (`WEBHOOK_EVENTS`, `webhook.ts:16`): `job.pushed`, `job.started`, `job.completed`, `job.failed`, `job.progress`. `job.stalled` is a legacy member of the `WebhookEvent` type kept only for backward compatibility with stored webhooks — it is never emitted and is rejected on new webhooks (`webhook.ts:24`).
-- **Internal `EventType`** (`src/domain/types/queue.ts:129-145`): `pushed`, `pulled`, `completed`, `failed`, `progress`, `stalled`, `removed`, `delayed`, `duplicated`, `retried`, `waiting-children`, `drained`, `paused`, `resumed`.
+- **Internal `EventType`** (`src/domain/types/queue.ts:140-156`): `pushed`, `pulled`, `completed`, `failed`, `progress`, `stalled`, `removed`, `delayed`, `duplicated`, `retried`, `waiting-children`, `drained`, `paused`, `resumed`.
 - **TCP event envelope**: `{ type: 'event', event: JobEvent }`, sent only to
   authenticated connections subscribed to `event.queue`.
 - **Dashboard events** emitted via `setDashboardEmit`: `webhook:fired`, `webhook:failed`, `webhook:enabled`, `webhook:disabled` (from `WebhookManager`); `webhook:added` / `webhook:removed` are emitted by the handler through `queueManager.emitDashboardEvent` (`handlers/monitoring/webhooks.ts:31-64`).
@@ -182,7 +182,7 @@ interface WebhookPayload {
 }
 
 interface JobEvent {
-  // src/domain/types/queue.ts:148-162 — internal broadcast shape
+  // src/domain/types/queue.ts:159-173 — internal broadcast shape
   eventType: EventType;
   queue: string;
   jobId: string;
@@ -202,7 +202,7 @@ interface JobLogEntry {
 } // src/domain/types/worker.ts:63-67
 ```
 
-> Note: `src/domain/types/queue.ts:164-170` also declares a second, unused `Webhook` interface (with `EventType[]` events). The authoritative type used by `WebhookManager` is the one in `src/domain/types/webhook.ts`.
+> Note: `src/domain/types/queue.ts:175-181` also declares a second, unused `Webhook` interface (with `EventType[]` events). The authoritative type used by `WebhookManager` is the one in `src/domain/types/webhook.ts`.
 
 ## Business Logic / Control Flow
 

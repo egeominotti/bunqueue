@@ -27,7 +27,7 @@ function pickJob(
  * the payload-free completion proof, as removeOnComplete would have. The generation
  * stays in `terminalGenerations`, so it may never be delivered again, across restarts.
  */
-class CancelCompletedCommand extends QueueCommand {
+export class CancelCompletedCommand extends QueueCommand {
   constructor(private readonly pick: number) {
     super();
   }
@@ -72,7 +72,9 @@ class CancelCompletedCommand extends QueueCommand {
 }
 
 /** Cancel never removes an active or a failed job, and names the state that refused it. */
-class CancelRefusedCommand extends QueueCommand {
+export class CancelRefusedCommand extends QueueCommand {
+  private refused: ModelState | null = null;
+
   constructor(private readonly pick: number) {
     super();
   }
@@ -84,16 +86,17 @@ class CancelRefusedCommand extends QueueCommand {
   async run(model: QueueModel, real: RealQueue): Promise<void> {
     const id = pickJob(model, this.pick, ['active', 'failed'])!;
     const state = model.jobs.get(id)!.state;
+    this.refused = state;
     const response = await real.send({ cmd: 'Cancel', id });
     expect(response, `cancel ${state} ${id}`).toMatchObject({
       ok: false,
-      error: `Job cannot be cancelled (current state: ${state})`,
+      error: `Job cannot be cancelled: not in queue (current state: ${state})`,
     });
     await this.verify(model, real);
   }
 
   toString(): string {
-    return `cancelRefused(#${this.pick})`;
+    return `cancelRefused(#${this.pick}${this.refused ? `,${this.refused}` : ''})`;
   }
 }
 

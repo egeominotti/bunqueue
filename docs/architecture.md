@@ -158,7 +158,9 @@ do not re-poll in a tight loop.
   modules. Pull orchestration, synchronous dequeue mutation, and post-lock
   persistence are split across `pull.ts`, `pullStateTransition.ts`, and
   [`pullFinalization.ts`](../src/application/operations/pullFinalization.ts),
-  respectively. It also owns the
+  respectively. A queue concurrency limiter holds one slot per active job id;
+  [`activeJobIds.ts`](../src/application/activeJobIds.ts) reads a queue's
+  authoritative active set so a limit set while jobs run counts them. It also owns the
   [`DependencyResultTracker`](../src/application/dependencyResultTracker.ts) for
   live flow-result retention, background-task wiring, and the synchronous
   [`emptyQueueCleanup.ts`](../src/application/emptyQueueCleanup.ts) reconciliation
@@ -344,7 +346,7 @@ wrappers select the transport, preventing the two implementations from drifting.
 │   │  └────────────────────────────────────────────────────────────────┘     │   │
 │   │  Global indexes: jobIndex(Map) · completedJobs(BoundedSet) ·             │   │
 │   │  depCompletions(recent FIFO + pinned) · jobResults(LRU) · customIdMap ·  │   │
-│   │  jobLogs(LRU) · jobLocks(Map)                                             │   │
+│   │  jobLogs(LRU) · jobLocks(Map) · removedResults(TTL FIFO, memory only)    │   │
 │   └──────────────────────────────────┬───────────────────────────────────────┘   │
 │                                       ▼                                          │
 │   ┌────────────────────────────────────────────────────────────────────────┐   │
@@ -522,9 +524,10 @@ mutates both sides of the topology.
    job in the meantime. `PULLB` persists all surviving handoffs through one
    `markActiveBatch` transaction; a failed transaction rolls back and retries
    each row through the non-fatal scalar path.
-   A successful grouped claim advances the rotation cursor and consumes exactly
-   one group rate token; every active exit releases its group count and wakes a
-   matching waiter. A lock token is issued when leasing. Long-poll waits in a queue-specific
+   A successful grouped claim advances the rotation cursor, consumes exactly
+   one group rate token and records the job as the holder of one group slot;
+   every active exit releases that job's slot (a job without one releases
+   nothing) and wakes a matching waiter. A lock token is issued when leasing. Long-poll waits in a queue-specific
    `WaiterManager` bucket until a matching queue edge or the timeout; surplus
    notifications coalesce into one retry hint.
 5. The job (and token) is returned; the worker registry counters update.
@@ -542,7 +545,9 @@ mutates both sides of the topology.
    stored in the `jobResults` LRU. A retained `ACKB` with no defined results
    flushes pending inserts and commits all completed states through one
    `markCompletedBatch` transaction. Result-bearing or `removeOnComplete`
-   entries retain their ordered scalar/combined completion paths. A failed
+   entries retain their ordered scalar/combined completion paths; a
+   `removeOnComplete` completion records its result in the memory-only
+   `removedResults` (60 s) for a WaitJob or wait read that arrives later. A failed
    state batch rolls back before scalar retry. Dependents are queued for
    resolution only after the corresponding completion bookkeeping.
 5. `job:completed` is emitted (events/webhooks/SSE/WS); repeat/cron successors and
@@ -1024,6 +1029,7 @@ Memory bounds enforced by the bounded collections (cleanup evicts ~10% when full
 | `completedJobs`              | 50,000 | FIFO batch                                         |
 | `depCompletions` recent tier | 50,000 | Exact FIFO; live-edge pins are released separately |
 | `jobResults`                 | 10,000 | LRU                                                |
+| `removedResults`             | 1,000  | 60 s TTL + FIFO batch (memory only, see below)     |
 | `jobLogs`                    | 10,000 | LRU                                                |
 | `customIdMap`                | 50,000 | LRU                                                |
 
@@ -1032,7 +1038,11 @@ by default and is controlled separately by `completedRetentionMs`; exact
 completed gauges come from `completed_job_counts`, not this 50,000-entry bound.
 `jobResultQueues` and `jobLogQueues` are paired ownership indexes with the same
 LRU eviction lifecycle as their payload caches; they add no independent
-unbounded retention.
+unbounded retention. `removedResults` keeps the result of a job removed on
+completion for `removedResultRetentionMs` (60 s) so a WaitJob or wait read that
+arrives after the completion still settles on it (issue #155 A); it is never
+persisted and is purged by the cleanup task
+([Core Queue Engine](./features/core-queue-engine.md#removed-result-retention)).
 
 See [Background Tasks](./features/background-tasks.md) and
 [Scheduler & Cron](./features/scheduler-and-cron.md).

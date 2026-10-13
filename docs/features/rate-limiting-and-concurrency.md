@@ -1,6 +1,6 @@
 # Rate Limiting & Concurrency Control
 
-> **Category:** Control · **Source:** `src/domain/queue/limiterManager.ts`, `src/domain/queue/groupLimiterManager.ts`, `src/domain/types/queue.ts`, `src/infrastructure/server/rateLimiter.ts`, `src/client/worker/workerRateLimiter.ts`, `src/client/queue/rateLimit.ts`, `src/client/queue/operations/groups.ts`, `src/client/worker/groupConcurrency.ts`
+> **Category:** Control · **Source:** `src/domain/queue/limiterManager.ts`, `src/domain/queue/groupLimiterManager.ts`, `src/domain/types/queue.ts`, `src/application/activeJobIds.ts`, `src/infrastructure/server/rateLimiter.ts`, `src/client/worker/workerRateLimiter.ts`, `src/client/queue/rateLimit.ts`, `src/client/queue/operations/groups.ts`, `src/client/worker/groupConcurrency.ts`
 
 ## Purpose
 
@@ -10,9 +10,9 @@ bunqueue throttles work at four independent layers: (1) **per-queue rate + concu
 
 Owns:
 
-- Per-queue rate limiting (token bucket, jobs per configured window) and concurrency capping, stored per-shard in `LimiterManager` (`src/domain/queue/limiterManager.ts:10`).
-- Token-bucket refill math and concurrency slot accounting (`src/domain/types/queue.ts:33`, `:84`).
-- Broker-authoritative per-group fixed windows, active counts, and stored local overrides (`src/domain/queue/groupLimiterManager.ts`, `src/infrastructure/persistence/postgres/groups.ts`).
+- Per-queue rate limiting (token bucket, jobs per configured window) and concurrency capping, stored per-shard in `LimiterManager` (`src/domain/queue/limiterManager.ts:11`).
+- Token-bucket refill math and per-job concurrency slot ownership (`src/domain/types/queue.ts:35`, `:94`).
+- Broker-authoritative per-group fixed windows, per-job group slot ownership and active counts, and stored local overrides (`src/domain/queue/groupLimiterManager.ts`, `src/domain/queue/shard/keys.ts`, `src/infrastructure/persistence/postgres/groups.ts`).
 - Protocol-level per-client sliding-window request limiting for TCP and HTTP (`src/infrastructure/server/rateLimiter.ts:129`).
 - Worker-local rate limiting and per-group concurrency in the client SDK (`src/client/worker/workerRateLimiter.ts:12`, `src/client/worker/groupConcurrency.ts:11`).
 - Queue and group rate/concurrency TCP commands, plus queue-level HTTP routes and CLI subcommands.
@@ -29,10 +29,12 @@ Does NOT own:
 Internal:
 
 - `QueueState` / `createQueueState` / `RateLimiter` / `ConcurrencyLimiter` from `src/domain/types/queue.ts` — consumed by `LimiterManager`.
-- `Shard` composes one `LimiterManager` per shard and exposes `setRateLimit` / `tryAcquireRateLimit` / `tryAcquireConcurrency` / `releaseConcurrency` through `ShardLimits` (`src/domain/queue/shard/limits.ts:7-35`).
+- `Shard` composes one `LimiterManager` per shard and exposes `setRateLimit` / `tryAcquireRateLimit` / `tryAcquireConcurrency` / `releaseConcurrency` through `ShardLimits` (`src/domain/queue/shard/limits.ts:8`).
 - `QueueManager` routes limit mutations to the owning shard and writes them
-  through to SQLite (`src/application/queue-manager/limits.ts`).
-- Pull operations gate on the limiters (`src/application/operations/pullStateTransition.ts:104-118`); `releaseJobResources` releases the concurrency slot on terminal transitions (`src/domain/queue/shard/limits.ts:49-60`).
+  through to SQLite (`src/application/queue-manager/limits.ts`). A new limiter
+  is seeded from `activeJobIdsOf(queue, processingShards, jobIndex)`
+  (`src/application/activeJobIds.ts`), the queue's authoritative active set.
+- Pull operations gate on the limiters (`src/application/operations/pullStateTransition.ts:106-121`); `releaseJobResources(queue, uniqueKey, groupId, jobId)` releases the concurrency slot and the group slot held by that job on every exit from active (`src/domain/queue/shard/limits.ts`).
 - `RateLimiterOptions` from `src/client/types/worker.ts:3-7` configures the worker-side limiters.
 
 External/runtime:
@@ -43,21 +45,21 @@ External/runtime:
 
 ### Server-side classes
 
-- `class LimiterManager` (`src/domain/queue/limiterManager.ts:10`)
+- `class LimiterManager` (`src/domain/queue/limiterManager.ts:11`)
   - `getState(name): QueueState`, `isPaused(name): boolean`, `pause(name)`, `resume(name)`
   - `setRateLimit(queue, limit, durationMs?, ttlMs?): void` — creates `new RateLimiter(limit, limit / ((duration ?? 1000)/1000))`, so the limit means "`limit` per `duration` ms" (default: per second). `ttlMs` stamps `rateLimitExpiresAt = now + ttl` for broker-side auto-expiry. Non-finite / non-positive `duration`/`ttl` degrade to the defaults (1s window, permanent).
   - `clearRateLimit(queue): void` — also nulls `rateLimitDuration`/`rateLimitExpiresAt`
   - `expireRateLimitIfNeeded(queue): void` — lazy TTL check; called from the acquire path and from limit reads, so no timer exists and an expired limit can never throttle a pull
   - `tryAcquireRateLimit(queue): boolean` — `true` if no limiter is set (runs the TTL check first)
   - `getRateLimit(queue): { max; duration } | null`, `getRateLimitTtl(queue, maxJobs?): number`
-  - `setConcurrency(queue, limit): void` — reuses/updates an existing `ConcurrencyLimiter`
-  - `clearConcurrency(queue): void`
-  - `tryAcquireConcurrency(queue): boolean` — `true` if no limiter is set
-  - `releaseConcurrency(queue): void`
+  - `setConcurrency(queue, limit, activeJobIds?): void` — updates an existing `ConcurrencyLimiter` in place (its holders keep their slots); otherwise creates one seeded with `activeJobIds()`, the ids of the queue's currently active jobs
+  - `clearConcurrency(queue): void` — drops the limiter and its holders; a later set seeds a new one from the active jobs again
+  - `tryAcquireConcurrency(queue, jobId): boolean` — `true` if no limiter is set
+  - `releaseConcurrency(queue, jobId): void` — frees the slot held by `jobId`; no-op when the job holds none
   - `getConcurrency(queue): number | null`, `isConcurrencyMaxed(queue): boolean`
   - `deleteQueue(queue): void`, `getQueueNames(): string[]`, `getStateMap(): Map<string, QueueState>`
-- `class RateLimiter` (`src/domain/types/queue.ts:33-81`) — token bucket. `constructor(capacity, refillRate = capacity)`, `tryAcquire(): boolean`, `getTokens(): number`, `getTtl(maxJobs?)`.
-- `class ConcurrencyLimiter` (`src/domain/types/queue.ts:84-119`) — `constructor(limit)`, `tryAcquire(): boolean`, `release(): void`, `getActive()`, `getLimit()`, `setLimit(limit)`.
+- `class RateLimiter` (`src/domain/types/queue.ts:35-83`) — token bucket. `constructor(capacity, refillRate = capacity)`, `tryAcquire(): boolean`, `getTokens(): number`, `getTtl(maxJobs?)`.
+- `class ConcurrencyLimiter` (`src/domain/types/queue.ts:94-130`) — `constructor(limit, activeJobIds?)`, `tryAcquire(jobId): boolean`, `release(jobId): void`, `getActive()` (number of holders), `getLimit()`, `setLimit(limit)`. It keeps a `Set<JobId>` of slot holders instead of a counter: a job that already holds a slot re-acquires it without taking another, and releasing a job that holds none changes nothing.
 - `class ProtocolRateLimiter` (`src/infrastructure/server/rateLimiter.ts:129`) — `constructor(config?: Partial<RateLimiterConfig>)`, `isAllowed(clientId): boolean`, `getRemaining(clientId): number`, `removeClient(clientId)`, `stop()`. Module helpers `getRateLimiter(config?)` (lazy singleton), `stopRateLimiter()` and `rateLimiterEnvConfig()` (the `RATE_LIMIT_*` defaults, parsed on first use and cached; `createTcpServer`/`createHttpServer` call it first so a malformed value fails startup). Programmatic fields are validated in the constructor (`windowMs` finite ms >= 1, `maxRequests` whole number >= 1, `cleanupIntervalMs` finite ms >= 1 or `0` to disable the sweep, a test-only opt-out); a missing field takes the env default.
 
 ### Client-side classes
@@ -109,14 +111,14 @@ returning, so an elapsed temporary limit is reported as absent.
 
 ### Dashboard events emitted
 
-`ratelimit:set`, `ratelimit:cleared`, `concurrency:set`, `concurrency:cleared` (handlers, `handlers/advanced/queue.ts:69-120`); `ratelimit:rejected`, `concurrency:rejected` (pull gate, `pullStateTransition.ts:104-112`); `ratelimit:hit` (protocol limiter, `tcp.ts:67-69`, `http.ts:141-148`).
+`ratelimit:set`, `ratelimit:cleared`, `concurrency:set`, `concurrency:cleared` (handlers, `handlers/advanced/queue.ts:69-120`); `ratelimit:rejected`, `concurrency:rejected` (pull gate, `pullStateTransition.ts:106-116`); `ratelimit:hit` (protocol limiter, `tcp.ts:67-69`, `http.ts:141-148`).
 
 ## Data Models
 
 See [data-model](../data-model.md) for full definitions. Most relevant shapes:
 
 ```typescript
-// src/domain/types/queue.ts:7 — in-memory per-queue control state
+// src/domain/types/queue.ts:9 — in-memory per-queue control state
 interface QueueState {
   readonly name: string;
   paused: boolean;
@@ -164,13 +166,14 @@ capacity and eligibility state.
    priority/FIFO group head. Its secondary delayed heap and circular group
    rotation avoid scanning or reinserting an ineligible prefix of the
    authoritative heap.
-3. `shard.tryAcquireConcurrency(queue)` atomically reserves the active slot. On miss, emit `concurrency:rejected` and return no job.
-4. `shard.tryAcquireRateLimit(queue)` consumes the token only after the concurrency check; if it rejects, release the just-acquired concurrency slot because rate-limit tokens have no rollback operation.
+3. `shard.tryAcquireConcurrency(queue, job.id)` atomically reserves the active slot for that job. On miss, emit `concurrency:rejected` and return no job.
+4. `shard.tryAcquireRateLimit(queue)` consumes the token only after the concurrency check; if it rejects, release the job's just-acquired concurrency slot because rate-limit tokens have no rollback operation.
 5. Pop the selected job and keep its concurrency slot for the entire active
    lifetime. For grouped work, atomically acquire the effective group budget,
-   increment the active group count, and advance the round-robin cursor.
+   record the job as the holder of one group slot (`acquireGroup(queue, groupId,
+   jobId, options, now)`), and advance the round-robin cursor.
 
-Batch pull repeats the same selection and acquires **one rate token + one concurrency slot per delivered job**. The concurrency slot is released only when the job exits the active state — ack, fail-to-DLQ, stall handling, lock expiry, and the claim operations — all routed through `shard.releaseJobResources` → `releaseConcurrency`. Each release also notifies the same queue, so a long-poll waiter blocked by the cap retries immediately; another queue sharing the shard cannot consume that wake-up.
+Batch pull repeats the same selection and acquires **one rate token + one concurrency slot per delivered job**. The concurrency slot is released only when the job exits the active state — ack, fail-to-DLQ, stall handling, lock expiry, and the claim operations — all routed through `shard.releaseJobResources` → `releaseConcurrency(queue, job.id)`. Each release also notifies the same queue, so a long-poll waiter blocked by the cap retries immediately; another queue sharing the shard cannot consume that wake-up.
 
 Group rate limits use fixed windows rather than the queue token bucket. A Worker
 must provide `group.limit` to enable them; a stored group override replaces that
@@ -180,13 +183,109 @@ defaults are unlimited when omitted. Group rate tokens are consumed only after
 a candidate passes queue-level admission; active capacity is released on every
 active exit while the fixed-window token remains consumed.
 
-**Token bucket math** (`LimiterManager.setRateLimit`, `src/domain/queue/limiterManager.ts:54-62`; `RateLimiter.refill`, `src/domain/types/queue.ts:55-62`): capacity is `limit`, while refill rate is `limit / (durationMs / 1000)` tokens per second. On each `tryAcquire`, elapsed-time tokens are added up to the capacity and one token is consumed when available. The queue can burst up to `limit` jobs and then sustains exactly `limit` starts per configured window (one second when `duration` is omitted). The bucket is consumed at pull time, not at completion.
+**Token bucket math** (`LimiterManager.setRateLimit`, `src/domain/queue/limiterManager.ts:55-63`; `RateLimiter.refill`, `src/domain/types/queue.ts:57-64`): capacity is `limit`, while refill rate is `limit / (durationMs / 1000)` tokens per second. On each `tryAcquire`, elapsed-time tokens are added up to the capacity and one token is consumed when available. The queue can burst up to `limit` jobs and then sustains exactly `limit` starts per configured window (one second when `duration` is omitted). The bucket is consumed at pull time, not at completion.
+
+### Concurrency slot ownership
+
+The global concurrency count is the number of active (processing) jobs of the
+queue, as BullMQ counts the whole active list toward global concurrency:
+
+- **Jobs already active count.** A limiter created while jobs of the queue are
+  active — the first `setConcurrency`, or a `setConcurrency` after
+  `clearConcurrency` — is seeded with their ids. `activeJobIdsOf` selects the
+  jobs present in a processing shard and indexed `processing`; a job a failed
+  handoff has already put back in the queue (indexed `queue`) is excluded. So
+  push → pull → `setConcurrency(2)` → `pullBatch(2)` admits one job, not two.
+- **Per-job release.** Slots are held by job id. A seeded job releases its own
+  slot when it completes, fails, stalls or is moved; it can never release a slot
+  it never held. Releasing twice, or releasing a job that is not active (for
+  example a late ACK that completes a retried job waiting in the queue through
+  `completeStallRetriedJob`), leaves the count unchanged, so no phantom slot
+  admits extra work. A completion that has already taken its job out of
+  processing when a new limiter is seeded is not counted, and its later release
+  is a no-op on the new limiter.
+- **Changing the limit** on an existing limiter keeps every holder; lowering it
+  below the active count blocks new pulls until enough holders release.
+- **Restart.** Startup recovery first moves every stored active job back to
+  waiting or the DLQ, then restores `queue_state`; the restored limiter is seeded
+  through the same helper and therefore starts from the jobs active after
+  recovery (none).
+- **Cost.** A queue without a limit has no limiter, so pull and release pay one
+  map miss, as before. A limited queue pays one `Set.add` per admitted job and
+  one `Set.delete` per release instead of a counter update. Seeding scans the
+  processing shards once, only when a limiter is created, never on the pull or
+  ACK path.
+- **PostgreSQL** derives capacity from the queue's `active` rows with an
+  unexpired lease inside the claim transaction
+  (`src/infrastructure/persistence/postgres/claims.ts`), so it already counts
+  jobs claimed before the limit, by any broker
+  (`test/postgres-concurrency-limit-active-jobs.test.ts`).
+
+Regression coverage: `test/repro-model-concurrency-limit-active-jobs.test.ts`
+(model seed 418721315, path 108) and
+`test/concurrency-limit-slot-ownership.test.ts` (every exit path of a job
+active before the limit, a late completion of a retried job, the seed scope,
+raising the limit, and restart). `test/cron-discard-slot-ownership.test.ts`
+covers the exits that discard a `preventOverlap` cron job (`cron:` unique key)
+instead of requeueing it: client disconnect (`releaseJobToQueue`), stall retry
+and stall to the DLQ (`retryStalliedJob`, `moveStalliedJobToDlq`) and lock
+expiry, for queue and group concurrency. Each frees the job's slot exactly once;
+repeating the release or a late ACK of the discarded job frees nothing.
+
+### Group slot ownership
+
+The group active count follows the same rule: it is the number of active jobs
+of the group, and a slot is held by a job id, never by a bare counter.
+
+- **Holders.** Each shard keeps `activeGroupHolders: Map<queue, Map<JobId,
+  groupId>>` next to the two views it feeds, `activeGroupCounts` (per-group
+  count, read by admission and `getGroupActiveCount`) and `activeGroups` (the
+  set of groups with an active job). `activateGroup(queue, groupId, jobId)`
+  records the holder and increments the count; a job already holding the slot
+  changes nothing. `releaseGroup(queue, groupId, jobId)` decrements the count
+  and wakes the queue's waiters only when that job holds a slot of that group,
+  so a duplicate release, the release of a job that never became active, or the
+  release of a job of another group is a no-op.
+- **Every pull tracks its holder,** whether or not the Worker supplies a group
+  concurrency default, so jobs already active when an override is set, or when
+  a Worker with `group.concurrency` starts, count toward it. No seeding scan is
+  needed.
+- **A late ACK of a retried job** (`completeStallRetriedJob`, the job is waiting
+  in the queue) never releases a group or concurrency slot: the retry already
+  released them, together with the unique key, and the group may have admitted
+  another job since. Its owner-checked unique-key release frees the key only
+  when it was registered for the queued job again (startup recovery, a DLQ
+  retry) and is a no-op otherwise.
+- **Exits.** ACK (single and batch), fail (retry, DLQ, removal, timeout), stall
+  and orphan recovery, lock expiry, client disconnect, `moveToDelayed`,
+  `moveActiveToWait`, `moveToWaitingChildren`, `discard` and a failed handoff
+  (`requeueJob`) each release once through `releaseJobResources` /
+  `releaseGroup`. Obliterate and empty-queue cleanup forget the queue's holders
+  together with the counts, so an outcome that arrives afterwards finds no
+  holder. Restart starts empty: recovery moves stored active jobs back to
+  waiting or the DLQ.
+- **Cost.** One extra map lookup and insert per grouped pull and one lookup and
+  delete per grouped release; ungrouped jobs never touch these maps.
+- **PostgreSQL** has no counter: the claim derives a group's capacity from its
+  `active` rows with an unexpired lease (`claimSelection.ts`), a retry clears
+  the lease, and a completion applies only to the `active` row whose token
+  matches, so a late ACK of a retried attempt is rejected
+  (`test/postgres-group-concurrency-late-ack.test.ts`).
+
+Regression coverage: `test/repro-group-concurrency-late-ack-phantom.test.ts`
+(late ACK through `completeStallRetriedJob`),
+`test/repro-group-slot-phantom-release.test.ts` (duplicate and non-holder
+releases), `test/group-slot-ownership.test.ts` (every exit path, a late
+outcome after each, late ACK through `ackBatch`, an override set while jobs
+run, a failed handoff, obliterate, and restart) and
+`test/cron-discard-slot-ownership.test.ts` (the cron discard exits).
 
 ### Mutation + persistence
 
 `QueueManager.setRateLimit/setConcurrency` (and their clears) route to the
 owning shard's `LimiterManager`, then call `persistQueueState`
-(`application/queue-manager/limits.ts`). The persistence helper upserts the row
+(`application/queue-manager/limits.ts`). `setConcurrency` passes a lazy
+`activeJobIdsOf` supplier, evaluated only when a new limiter is created. The persistence helper upserts the row
 or deletes it when all queue policy has returned to defaults. Startup recovery
 reapplies the state directly to the shard without a write-back loop
 (`application/background/recovery/`).
@@ -255,13 +354,13 @@ Key invariant: **if `limiter.groupKey` is set, the `WorkerRateLimiter` is disabl
 ## Concurrency & Locking
 
 - Server per-queue rate/concurrency checks (`tryAcquireRateLimit`, `tryAcquireConcurrency`, `releaseConcurrency`) run **inside the shard write lock** held during pull (`pull.ts:255`), so check-and-acquire is atomic with respect to other pullers on the same shard. There is no separate limiter lock; the limiter state lives within the shard's lock domain. See the lock hierarchy in [Concurrency & Locking](./concurrency-and-locking.md).
-- `LimiterManager` and its `RateLimiter`/`ConcurrencyLimiter` are single-threaded JS objects with no internal locking; safety comes entirely from the surrounding shard lock.
-- The acquire-at-pull / release-at-terminal pattern means a slot is held for the full active lifetime of a job. Any exit path that forgets to call `releaseJobResources` would leak a concurrency slot; all known paths (ack, fail, stall, lock-expiry, cancel, obliterate-time release, and the management claim ops `moveActiveToWait`/`moveToWaitingChildren`/`moveJobToDelayed`/`discardJob`) route through it (repro: `test/repro-slot-release-claim-paths.test.ts`).
+- `LimiterManager` and its `RateLimiter`/`ConcurrencyLimiter` are single-threaded JS objects with no internal locking; safety comes entirely from the surrounding shard lock. `QueueManager.setConcurrency` is synchronous, so the seed scan and the limiter swap cannot interleave with a pull's synchronous dequeue section.
+- The acquire-at-pull / release-at-terminal pattern means a slot is held for the full active lifetime of a job. Because concurrency and group slots are keyed by job id, a duplicate or late release is harmless; any exit path that forgets to call `releaseJobResources` would still leak that job's slot; all known paths (ack, fail, stall, lock-expiry, cancel, obliterate-time release, and the management claim ops `moveActiveToWait`/`moveToWaitingChildren`/`moveJobToDelayed`/`discardJob`) route through it (repro: `test/repro-slot-release-claim-paths.test.ts`).
 - `ProtocolRateLimiter`, `WorkerRateLimiter`, and `GroupConcurrencyLimiter` are not lock-protected; each is owned by a single connection/worker context.
 
 ## Edge Cases & Failure Modes
 
-- **Default = unlimited per queue.** No `RateLimiter`/`ConcurrencyLimiter` exists until explicitly set; `tryAcquire*` returns `true` when absent (`limiterManager.ts:63`, `:90`). The only always-on throttle is the protocol limiter at 10000 req/60s per client (the known "rate limit defaults to Infinity" caveat refers to per-queue limits being off by default).
+- **Default = unlimited per queue.** No `RateLimiter`/`ConcurrencyLimiter` exists until explicitly set; `tryAcquire*` returns `true` when absent (`limiterManager.ts:90`, `:141`). The only always-on throttle is the protocol limiter at 10000 req/60s per client (the known "rate limit defaults to Infinity" caveat refers to per-queue limits being off by default).
 - **`setGlobalRateLimit(max, duration)` honors `duration` end-to-end** (client → wire `duration` field → `LimiterManager` refill rate), matching BullMQ's `{max per duration}` semantics in both modes. Servers older than 2.8.35 ignore the field and fall back to the 1s bucket. The worker-side `WorkerRateLimiter` independently honors its own `{max, duration}`.
 - The official TypeScript and Python network SDKs forward the same custom
   window as wire `duration`; omitting it preserves the broker's 1,000 ms
@@ -276,8 +375,11 @@ Key invariant: **if `limiter.groupKey` is set, the `WorkerRateLimiter` is disabl
   - `WorkerRateLimiter.evictExpired` advances head and compacts when more than half the token array is dead space (`workerRateLimiter.ts:108`).
   - `GroupConcurrencyLimiter.decrement` deletes a group's map entry once its count hits 0, so idle groups don't accumulate (`groupConcurrency.ts:74`).
 - **Negative/non-positive limits:** CLI rejects `limit <= 0`; TCP handlers only require a finite number, so `RateLimit limit:0` would create a token bucket that never refills enough to grant a token (effectively blocks the queue). `ConcurrencyLimiter` with limit `0` blocks all pulls.
-- **Batch pull partial fill:** if rate or concurrency runs out mid-batch, `tryDequeueNextJob` returns `stop`; the batch loop breaks and returns the jobs gathered so far (`pullStateTransition.ts:104-112`, `pull.ts:268-279`) — never an error.
-- **Slot release on requeue:** a failed processing handoff triggers `requeueJob`, which releases the concurrency slot and group slot before pushing the job back, preventing a permanent slot leak on transient pull failures (`pullStateTransition.ts:139-169`).
+- **Candidate guard:** `tryDequeueNextJob` reserves the concurrency and group slots under the peeked candidate's id and activates the job it pops only when the two ids match. On a mismatch (or an empty pop) it releases the candidate's slots, returns a popped job to the queue unchanged (it was never checked for expiry, readiness or limits, and a re-keyed reservation would admit it unchecked), logs the mismatch and stops the pull, so no slot is ever held under an id that is not active (`test/pull-dequeue-candidate-guard.test.ts`).
+- **Batch pull partial fill:** if rate or concurrency runs out mid-batch, `tryDequeueNextJob` returns `stop`; the batch loop breaks and returns the jobs gathered so far (`pullStateTransition.ts:106-116`, `pull.ts:268-279`) — never an error.
+- **Slot release on requeue:** a failed processing handoff triggers `requeueJob`, which releases the concurrency slot and group slot before pushing the job back, preventing a permanent slot leak on transient pull failures (`pullStateTransition.ts:148-186`). The job stays in its processing shard until a second critical section removes it; an outcome that reaches it in between releases nothing, because the job no longer holds either slot.
+- **ACK in flight during cleanup:** an ACK or fail takes the job out of processing and releases its slots in a later critical section. Cleanup's orphaned-index sweep deletes a `processing` index entry only after a later sweep, at least `ORPHAN_INDEX_CONFIRM_MS` (60 s) on, finds the same location object, so it can no longer make that ACK drop the job and leak its slots (see [Background Tasks](./background-tasks.md)).
+- **Limit set while jobs are active:** they count toward it (see Concurrency slot ownership); `isMaxed()` / `GetQueueLimits.maxed` report saturation from the same holder count.
 - **Worker rate tokens represent starts:** admission consumes exactly one token
   before the processor is invoked. Completion does not release or add a token;
   capacity returns only when the recorded start leaves the rolling window.

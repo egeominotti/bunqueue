@@ -1,5 +1,10 @@
 import { readdir } from 'node:fs/promises';
 import { parseCount, parseFiles, parseSdkCounts, parseTests } from './test-sandbox-log-parser';
+import {
+  quiescentAnomalies,
+  quiescentResidual,
+  type QuiescentResidual,
+} from './test-sandbox-checkpoints';
 
 export interface ResourceSample {
   timestamp: string;
@@ -59,6 +64,8 @@ export interface SuiteTelemetry {
     networkRxBytes: number;
     networkTxBytes: number;
   };
+  /** Idle in-container checkpoints around the suite command (SDK suites); see test-sandbox-checkpoints.ts. */
+  quiescent?: QuiescentResidual;
   anomalies: string[];
 }
 
@@ -195,7 +202,11 @@ export async function createSuiteTelemetry(input: {
   if (limit > 0 && peakMemory / limit >= 0.8) anomalies.push('peak memory reached at least 80%');
   if (Math.max(0, ...samples.map((sample) => sample.pids)) >= 1638)
     anomalies.push('PID usage reached at least 80%');
-  if (memoryDelta >= 128 * 1024 ** 2 && memoryDelta >= (first?.memoryUsedBytes ?? 0) * 0.5)
+  // A multi-step suite's first/last samples land in different phases; when idle
+  // checkpoints exist, growth is judged on those equivalent points instead.
+  const quiescent = quiescentResidual(log);
+  if (quiescent) anomalies.push(...quiescentAnomalies(quiescent));
+  else if (memoryDelta >= 128 * 1024 ** 2 && memoryDelta >= (first?.memoryUsedBytes ?? 0) * 0.5)
     anomalies.push('memory growth signal: end minus start exceeds 128 MiB and 50%');
   if (samples.length === 0) anomalies.push('no resource samples captured');
 
@@ -238,6 +249,7 @@ export async function createSuiteTelemetry(input: {
       networkRxBytes: last?.networkRxBytes ?? 0,
       networkTxBytes: last?.networkTxBytes ?? 0,
     },
+    ...(quiescent && { quiescent }),
     anomalies,
   };
 }

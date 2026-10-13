@@ -2,7 +2,7 @@ import type { UniqueKeyEntry } from '../../types/deduplication';
 import type { JobId } from '../../types/job';
 import { ShardState } from './state';
 
-/** Deduplication keys and FIFO group ownership. */
+/** Deduplication keys and per-job group slot ownership. */
 export class ShardKeys extends ShardState {
   isUniqueAvailable(queue: string, key: string): boolean {
     return this.uniqueKeyManager.isAvailable(queue, key);
@@ -34,7 +34,18 @@ export class ShardKeys extends ShardState {
   isGroupActive(queue: string, groupId: string): boolean {
     return (this.activeGroupCounts.get(queue)?.get(groupId) ?? 0) > 0;
   }
-  activateGroup(queue: string, groupId: string): void {
+  /**
+   * Record that active job `jobId` holds a slot of its group. A job holds at most
+   * one slot: activating a holder again changes nothing.
+   */
+  activateGroup(queue: string, groupId: string, jobId: JobId): void {
+    let holders = this.activeGroupHolders.get(queue);
+    if (!holders) {
+      holders = new Map();
+      this.activeGroupHolders.set(queue, holders);
+    }
+    if (holders.get(jobId) === groupId) return;
+    holders.set(jobId, groupId);
     let groups = this.activeGroups.get(queue);
     if (!groups) {
       groups = new Set();
@@ -48,7 +59,16 @@ export class ShardKeys extends ShardState {
     }
     counts.set(groupId, (counts.get(groupId) ?? 0) + 1);
   }
-  releaseGroup(queue: string, groupId: string): void {
+  /**
+   * Release the group slot held by `jobId`. A job that holds no slot of this group
+   * (already released, never active, or of another group) changes nothing, so a
+   * duplicate or late release can never free a slot another job still holds.
+   */
+  releaseGroup(queue: string, groupId: string, jobId: JobId): void {
+    const holders = this.activeGroupHolders.get(queue);
+    if (holders?.get(jobId) !== groupId) return;
+    holders.delete(jobId);
+    if (holders.size === 0) this.activeGroupHolders.delete(queue);
     const counts = this.activeGroupCounts.get(queue);
     const count = (counts?.get(groupId) ?? 0) - 1;
     if (count > 0) {
@@ -64,5 +84,11 @@ export class ShardKeys extends ShardState {
   }
   getGroupActiveCount(queue: string, groupId: string): number {
     return this.activeGroupCounts.get(queue)?.get(groupId) ?? 0;
+  }
+  /** Forget every active group slot of the queue (obliterate, empty-queue cleanup). */
+  protected clearActiveGroups(queue: string): void {
+    this.activeGroups.delete(queue);
+    this.activeGroupCounts.delete(queue);
+    this.activeGroupHolders.delete(queue);
   }
 }

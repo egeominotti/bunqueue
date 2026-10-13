@@ -188,7 +188,12 @@ export class QueueManagerDelivery extends QueueManagerState {
       job = shard.getQueue(location.queueName).remove(jobId);
       if (job) {
         shard.decrementQueued(jobId);
-        shard.releaseJobResources(location.queueName, job.uniqueKey, job.groupId, job.id);
+        // The retry released everything the late attempt held: group slot, concurrency
+        // slot and unique key. The key is this job's again only if it was registered
+        // for the queued job afterwards (startup recovery and a DLQ retry register the
+        // key of each job they restore); the owner-checked release frees it then, and
+        // is a no-op otherwise, so it never frees a key a newer job holds.
+        if (job.uniqueKey) shard.releaseUniqueKeyIfOwned(location.queueName, job.uniqueKey, jobId);
       }
     });
     if (!job) return false;
@@ -212,6 +217,7 @@ export class QueueManagerDelivery extends QueueManagerState {
       ctx.storage?.markCompleted(jobId, Date.now(), completedJob.timeline);
     } else {
       commitRemovedCompletion(completedJob, ctx);
+      ctx.removedResults?.record(jobId, completedJob.queue, result);
       ctx.jobIndex.delete(jobId);
     }
     if (result !== undefined) ctx.dependencyResults.retain(jobId, result);

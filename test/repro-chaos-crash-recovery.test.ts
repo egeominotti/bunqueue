@@ -22,6 +22,7 @@
  */
 
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
+import { Database } from 'bun:sqlite';
 import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -118,8 +119,20 @@ async function connect(port: number): Promise<TcpClient> {
   return c;
 }
 
-/** SIGKILL the server and wait for the OS to reap it (no graceful shutdown). */
+/**
+ * SIGKILL the server and wait for the OS to reap it (no graceful shutdown).
+ *
+ * The broker dies while the client connection is still open; the client is closed only
+ * afterwards. Closing it first would let the broker run its disconnect release
+ * (`releaseClientJobs` → `markReleased`): a never-renewed lease goes back to its queue
+ * uncharged and its row is stored queued again. That is cleanup, not a crash, and it
+ * raced the signal: whenever the broker handled the FIN first, a job leased at "crash"
+ * time was no longer `active` on disk, so recovery rightly did not charge it (CR6 then
+ * saw attempts 0).
+ */
 async function hardKill(s: Server): Promise<void> {
+  s.proc.kill(9); // SIGKILL — violent, no flush, no cleanup
+  await s.proc.exited;
   if (activeClient) {
     try {
       activeClient.close();
@@ -128,10 +141,56 @@ async function hardKill(s: Server): Promise<void> {
     }
     activeClient = null;
   }
-  s.proc.kill(9); // SIGKILL — violent, no flush, no cleanup
-  await s.proc.exited;
   // Small settle so the OS releases the listening port for the restart.
   await Bun.sleep(200);
+}
+
+interface JobRow {
+  state: string;
+  attempts: number;
+  stall_count: number;
+  started_at: number | null;
+}
+
+/** Read one job row through an independent read-only connection (never the broker's). */
+function readJobRow(db: string, id: string): JobRow | null {
+  const reader = new Database(db, { readonly: true });
+  try {
+    reader.run('PRAGMA busy_timeout = 1000');
+    return reader
+      .query<JobRow, [string]>(
+        'SELECT state, attempts, stall_count, started_at FROM jobs WHERE id = ?'
+      )
+      .get(id);
+  } finally {
+    reader.close();
+  }
+}
+
+/** Poll the on-disk row until `accept` holds; fail with the last row (or error) seen. */
+async function waitForJobRow(
+  db: string,
+  id: string,
+  accept: (row: JobRow) => boolean,
+  timeoutMs = 10000
+): Promise<JobRow> {
+  const deadline = Date.now() + timeoutMs;
+  let last: JobRow | string | null = null;
+  while (true) {
+    try {
+      const row = readJobRow(db, id);
+      if (row && accept(row)) return row;
+      last = row;
+    } catch (error) {
+      last = error instanceof Error ? error.message : String(error);
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `job ${id} never reached the expected row on disk; last: ${JSON.stringify(last)}`
+      );
+    }
+    await Bun.sleep(10);
+  }
 }
 
 function cleanDb(db: string): void {
@@ -445,9 +504,21 @@ describe('CRASH-RECOVERY — control-state & DLQ persist across SIGKILL', () => 
     const pull = await c.send({ cmd: 'PULL', queue: QUEUE, owner: 'w', lockTtl: 30000 });
     expect((pull.job as { id: string; attempts?: number } | null)?.id).toBe(id);
     const attemptsBefore = (pull.job as { attempts?: number }).attempts ?? 0;
-    await Bun.sleep(200); // ensure the active row is on disk
+    // The lease is on disk once the row itself says so (an independent read-only
+    // connection, not a fixed sleep), with the attempt counter the pull reported.
+    const leased = await waitForJobRow(db, id, (row) => row.state === 'active');
+    expect(leased.attempts).toBe(attemptsBefore);
+    expect(leased.started_at).not.toBeNull();
 
     await hardKill(s);
+    // Crash point: the broker died holding the lease, so the row is still 'active' on
+    // disk with no charge yet. A disconnect release before the kill would have stored it
+    // queued and uncharged, and recovery would then rightly leave attempts unchanged.
+    const crashed = readJobRow(db, id);
+    expect(crashed?.state).toBe('active');
+    expect(crashed?.attempts).toBe(attemptsBefore);
+    expect(crashed?.stall_count).toBe(leased.stall_count);
+
     s = await spawnServer(db, port);
     c = await connect(port);
 

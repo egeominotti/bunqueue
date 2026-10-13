@@ -13,7 +13,7 @@ import type { QueueModel } from './queue-model-harness';
 import { isReady, readyState, RealQueue, terminalGeneration } from './queue-model-harness';
 import { schedulingContractArbitraries } from './scheduling-contract-commands';
 
-class PushCommand extends QueueCommand {
+export class PushCommand extends QueueCommand {
   constructor(
     private readonly slot: number,
     private readonly priority: number,
@@ -71,7 +71,7 @@ class PushCommand extends QueueCommand {
   }
 }
 
-class PullCommand extends QueueCommand {
+export class PullCommand extends QueueCommand {
   check(model: Readonly<QueueModel>): boolean {
     const active = [...model.jobs.values()].filter((job) => job.state === 'active').length;
     return (
@@ -114,7 +114,7 @@ class PullCommand extends QueueCommand {
   }
 }
 
-class AckCommand extends QueueCommand {
+export class AckCommand extends QueueCommand {
   constructor(private readonly slot: number) {
     super();
   }
@@ -146,7 +146,7 @@ class AckCommand extends QueueCommand {
   }
 }
 
-class FailCommand extends QueueCommand {
+export class FailCommand extends QueueCommand {
   constructor(
     private readonly slot: number,
     private readonly terminal: boolean
@@ -183,7 +183,7 @@ class FailCommand extends QueueCommand {
   }
 }
 
-class PromoteCommand extends QueueCommand {
+export class PromoteCommand extends QueueCommand {
   constructor(private readonly slot: number) {
     super();
   }
@@ -206,7 +206,7 @@ class PromoteCommand extends QueueCommand {
   }
 }
 
-class CrashRestartCommand extends QueueCommand {
+export class CrashRestartCommand extends QueueCommand {
   check(): boolean {
     return true;
   }

@@ -9,9 +9,11 @@
  * the waiter (`EventsManager.waitForJobOutcome`, `QueueManager.waitForJobResult`) and
  * WaitJob answers with it, on the single ACK, batch ACK and stall-retried ACK paths.
  *
- * Unchanged: a completion the wait missed still reads as `Job not found` for a job
- * removed on completion (no result is retained), a timeout answers `completed: false`,
- * and a waiter released without an event (shutdown) reads the stored result.
+ * A completion the wait missed answers with the result the engine retains for a job
+ * removed on completion (memory only, short-lived: `removedResults`), and still reads
+ * as `Job not found` when that retention is disabled. Unchanged: a timeout answers
+ * `completed: false`, and a waiter released without an event (shutdown) reads the
+ * stored result.
  */
 import { afterEach, describe, expect, test } from 'bun:test';
 import { EventsManager } from '../src/application/eventsManager';
@@ -139,7 +141,18 @@ describe('QueueManager.waitForJobResult', () => {
     await qm.ack(id, { answer: 2 });
 
     expect(await waiting).toEqual({ completed: true, result: { answer: 2 } });
-    // Nothing is retained: only the waiter registered at completion gets the result.
+    // The completion lookup keeps answering with it for a short time (memory only).
+    expect(await qm.getCompletionAsync(id)).toEqual({ found: true, result: { answer: 2 } });
+  });
+
+  test('with the removed-result retention disabled, only the waiter gets the result', async () => {
+    qm = new QueueManager({ removedResultRetentionMs: 0 });
+    const id = await activeRemovedOnComplete(qm, 'wr-ack-off');
+    const waiting = qm.waitForJobResult(id, 5_000);
+
+    await qm.ack(id, { answer: 2 });
+
+    expect(await waiting).toEqual({ completed: true, result: { answer: 2 } });
     expect(await qm.getCompletionAsync(id)).toEqual({ found: false, result: undefined });
   });
 
@@ -217,9 +230,19 @@ describe('WaitJob for a job removed on completion', () => {
     expect(await reply).toMatchObject({ ok: true, completed: true, result: { answer: 4 } });
   });
 
-  test('a completion the hold missed still reads as not found', async () => {
+  test('a completion the hold missed answers with the retained result', async () => {
     qm = new QueueManager();
     const id = await activeRemovedOnComplete(qm, 'wj-missed');
+    await qm.ack(id, { answer: 2 });
+
+    expect(
+      await handleCommand({ cmd: 'WaitJob', id: String(id), timeout: 100 }, context(qm))
+    ).toMatchObject({ ok: true, completed: true, result: { answer: 2 } });
+  });
+
+  test('with the removed-result retention disabled, a missed completion reads as not found', async () => {
+    qm = new QueueManager({ removedResultRetentionMs: 0 });
+    const id = await activeRemovedOnComplete(qm, 'wj-missed-off');
     await qm.ack(id, { answer: 2 });
 
     expect(

@@ -3,6 +3,8 @@
  * Queue state and configuration
  */
 
+import type { JobId } from './job';
+
 /** Queue state configuration */
 export interface QueueState {
   readonly name: string;
@@ -80,31 +82,40 @@ export class RateLimiter {
   }
 }
 
-/** Concurrency limiter */
+/**
+ * Concurrency limiter: admits at most `limit` jobs of a queue at once.
+ *
+ * It records which job ids hold a slot rather than a bare counter, so acquire
+ * and release are symmetric per job: releasing a job that holds no slot (one
+ * that was released already, or that is not active) is a no-op and can never
+ * open a phantom slot. A limiter created while jobs of the queue are already
+ * active is seeded with their ids, so they count toward the new limit.
+ */
 export class ConcurrencyLimiter {
-  private active: number = 0;
+  private readonly holders: Set<JobId>;
 
-  constructor(private limit: number) {}
-
-  /** Try to acquire a slot */
-  tryAcquire(): boolean {
-    if (this.active < this.limit) {
-      this.active += 1;
-      return true;
-    }
-    return false;
+  constructor(
+    private limit: number,
+    activeJobIds?: Iterable<JobId>
+  ) {
+    this.holders = new Set(activeJobIds);
   }
 
-  /** Release a slot */
-  release(): void {
-    if (this.active > 0) {
-      this.active -= 1;
-    }
+  /** Try to acquire a slot for `jobId`; a job that already holds one keeps it. */
+  tryAcquire(jobId: JobId): boolean {
+    if (this.holders.size >= this.limit) return this.holders.has(jobId);
+    this.holders.add(jobId);
+    return true;
+  }
+
+  /** Release the slot held by `jobId`; a job without a slot changes nothing. */
+  release(jobId: JobId): void {
+    this.holders.delete(jobId);
   }
 
   /** Get active count */
   getActive(): number {
-    return this.active;
+    return this.holders.size;
   }
 
   /** Get limit */
@@ -112,7 +123,7 @@ export class ConcurrencyLimiter {
     return this.limit;
   }
 
-  /** Update limit */
+  /** Update limit; the jobs holding a slot keep it. */
   setLimit(limit: number): void {
     this.limit = limit;
   }

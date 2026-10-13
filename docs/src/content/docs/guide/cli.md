@@ -32,7 +32,10 @@ On startup the server prints its ports, data path, and enabled features (TLS, au
 `--max-completed-jobs` bounds only the completed-job hot cache (default
 50,000). `--completed-retention-ms` separately opts SQLite into durable
 age-based cleanup; without it, completed rows remain until an explicit clean or
-obliterate operation.
+obliterate operation. `--removed-result-retention-ms` (default 60,000) and
+`--max-removed-results` (default 1,000) bound how long, and for how many jobs, the
+result of a job removed on completion stays in memory for a late
+`waitUntilFinished()`; `0` turns it off.
 
 The global `--port` / `-p` option takes a whole number from 1 to 65535 for client
 commands (0 to 65535 with `start`); an invalid or missing value stops the command
@@ -48,7 +51,8 @@ and starts on the default port (6789 for `--tcp-port`, 6790 for `--http-port`), 
 `-p abc` with `start` is ignored with a warning. A value earlier releases misread,
 such as `1e4` (read as port 1), stops the server with an error that names the flag:
 `Fatal error: Invalid --tcp-port: "1e4" (expected a whole number between 0 and 65535)`.
-`--max-completed-jobs` (at least `1`) and `--completed-retention-ms` (at least `0`)
+`--max-completed-jobs` (at least `1`), `--completed-retention-ms`,
+`--removed-result-retention-ms` and `--max-removed-results` (at least `0`)
 read their value like a JavaScript number (`1e5` is 100000); an invalid one is
 ignored with a warning, `Warning: Invalid completed-job retention "-1" (...). Ignoring it.`,
 and the config file or environment value applies. An empty value (`--tcp-port=`,

@@ -65,7 +65,12 @@ export function recoverPendingJobs(
         const state = dependencyReadyState(job, now);
         const isDelayed = state === 'delayed';
         shard.incrementQueued(job.id, isDelayed, job.createdAt, job.queue, job.runAt);
-        if (hasDependencies) checkpointDependencyPromotion(job, state, now, ctx.storage);
+        // Checkpoint only a promotion decided by this recovery. An already promoted row is
+        // authoritative as persisted: rewriting it would turn a stall-recovered parent's
+        // retry backoff (`waiting`, future run_at) into `delayed`, unlike any other job.
+        if (hasDependencies && !wasAlreadyPromoted) {
+          checkpointDependencyPromotion(job, state, now, ctx.storage);
+        }
       }
 
       ctx.jobIndex.set(job.id, {

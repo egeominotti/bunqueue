@@ -150,6 +150,11 @@ Options:
   --data-path <path>      SQLite database path (env: BUNQUEUE_DATA_PATH, DATA_PATH)
   --max-completed-jobs <n> Hot completed-job cache (env: BUNQUEUE_MAX_COMPLETED_JOBS)
   --completed-retention-ms <ms> Delete completed rows after this age (disabled by default)
+  --removed-result-retention-ms <ms> Keep a removeOnComplete job's result in memory this long
+                          for late waits (default: 60000, 0 disables,
+                          env: BUNQUEUE_REMOVED_RESULT_RETENTION_MS)
+  --max-removed-results <n> Cap on those retained results (default: 1000, 0 disables,
+                          env: BUNQUEUE_MAX_REMOVED_RESULTS)
   --auth-tokens <list>    Comma-separated auth tokens (env: AUTH_TOKENS)
   --tls-cert <file>       PEM certificate for native TLS (env: TLS_CERT_FILE)
   --tls-key <file>        PEM private key for native TLS (env: TLS_KEY_FILE)

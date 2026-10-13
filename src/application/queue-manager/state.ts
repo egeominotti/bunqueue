@@ -21,6 +21,7 @@ import { workerCleanupIntervalMs, workerTimeoutMs } from '../../shared/workerTim
 import * as bgTasks from '../backgroundTasks';
 import { ContextFactory } from '../contextFactory';
 import { DependencyResultTracker } from '../dependencyResultTracker';
+import { RemovedResults } from '../removedResults';
 import { recoverFlowFailures } from '../flowFailureRecovery';
 import { DependencyCompletionTracker } from '../dependencyCompletions';
 import { JobTimeoutScheduler } from '../background/timeouts';
@@ -50,6 +51,8 @@ export abstract class QueueManagerState {
   protected readonly jobResults: LRUMap<JobId, unknown>;
   protected readonly jobResultQueues = new Map<JobId, string>();
   protected readonly dependencyResults = new DependencyResultTracker();
+  /** Memory-only results of jobs removed on completion (see removedResults.ts). */
+  protected readonly removedResults: RemovedResults;
   protected readonly customIdMap: LRUMap<string, JobId>;
   protected readonly jobLogs: LRUMap<JobId, JobLogEntry[]>;
   protected readonly jobLogQueues = new Map<JobId, string>();
@@ -138,6 +141,10 @@ export abstract class QueueManagerState {
         this.jobResultQueues.delete(id);
       });
       this.customIdMap = new LRUMap(this.config.maxCustomIds);
+      this.removedResults = new RemovedResults({
+        ttlMs: this.config.removedResultRetentionMs,
+        maxEntries: this.config.maxRemovedResults,
+      });
       this.jobLogs = new LRUMap(this.config.maxJobLogs, (id) => {
         this.jobLogQueues.delete(id);
       });

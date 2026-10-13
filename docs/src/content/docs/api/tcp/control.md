@@ -36,7 +36,9 @@ Remove a job: a `waiting`, `prioritized`, `delayed` or `waiting-children` job, o
 }
 ```
 
-When nothing was removed: `{ ok: false, error: 'Job not found or cannot be cancelled' }` if the job does not exist, `{ ok: false, error: 'Job cannot be cancelled (current state: active)' }` (or `failed`) if it exists in a state Cancel does not remove.
+When nothing was removed: `{ ok: false, error: 'Job not found or cannot be cancelled' }` if the job does not exist, `{ ok: false, error: 'Job cannot be cancelled: not in queue (current state: active)' }` (or `failed`) if it exists in a state Cancel does not remove. The second text never contains "not found", so clients that treat "not found" as an idempotent miss keep raising for it.
+
+Brokers up to 2.9.13 answer `Job not found or cannot be cancelled` for every refusal, an active, failed or completed job included. A client that must tell a missing job from a refused one on such a broker sends `GetState` after that reply and treats only `state: 'unknown'` as missing, as the TypeScript client does.
 
 ---
 
@@ -207,7 +209,7 @@ administrative discard.
 
 ### WaitJob
 
-Wait for a job to complete. This is event-driven (no polling). Returns immediately if the job is already completed.
+Wait for a job to complete. This is event-driven (no polling). Returns immediately if the job is already completed, including a job added with `removeOnComplete: true` that completed before the request arrived: the broker keeps its result for a short time (memory and SQLite: in memory only, 60 s and the last 1,000 such jobs by default; PostgreSQL: its completion record). A job that does not exist, or whose retained result is gone, answers `ok: false` with `Job not found`. Send `timeout: 0` for a plain completion lookup.
 
 **Request:**
 
@@ -421,7 +423,7 @@ Remove the rate limit from a queue.
 
 ### SetConcurrency
 
-Set a concurrency limit on a queue (max concurrent active jobs).
+Set a concurrency limit on a queue (max concurrent active jobs). Jobs already active when the limit is set count toward it.
 
 **Request:**
 

@@ -519,7 +519,7 @@ curl -X DELETE http://localhost:6790/jobs/019ce9d7-...
 When nothing was removed, the response is still `200`, with `ok: false`:
 
 - the job does not exist: `{ "ok": false, "error": "Job not found or cannot be cancelled" }`;
-- the job exists but cannot be removed: `{ "ok": false, "error": "Job cannot be cancelled (current state: active)" }` (or `failed`; on PostgreSQL also a waiting job that another live job depends on, with `current state: waiting`).
+- the job exists but cannot be removed: `{ "ok": false, "error": "Job cannot be cancelled: not in queue (current state: active)" }` (or `failed`; on PostgreSQL also a waiting job that another live job depends on, with `current state: waiting`).
 
 Removing a job deletes its data and result, not the events already recorded about it: the queue's bounded event journal (SQLite `queue_events`, PostgreSQL `bunqueue_events`) keeps them, including the `completed` event with the return value, until its retention trims them, exactly as for `removeOnComplete`.
 

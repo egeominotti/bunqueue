@@ -15,7 +15,8 @@ import { CoreE2eHarness } from './core-e2e/support/harness';
 // TCP QueueEvents reconnects all left the wait pending forever. A wait now re-reads the
 // job on hints for it (`stalled`, `removed`, a re-subscribed QueueEvents), falls back to
 // its own transport when its QueueEvents closes, re-reads periodically as a safety net,
-// and settles with `Job <id> not found` once the job no longer exists.
+// and settles with `Job <id> not found` once the job no longer exists (a job removed on
+// completion settles on the result the engine still retains for it, if any).
 
 setDefaultTimeout(30_000);
 
@@ -156,9 +157,12 @@ for (const mode of ['embedded', 'tcp'] as const) {
       const job = await queue.add('gone', {}, { removeOnComplete: true, durable: true });
       await until(async () => (await queue.getJobState(job.id)) === 'unknown');
 
-      const notFound = { error: `Job ${job.id} not found` };
-      expect(await settledWithin(job.waitUntilFinished(events), 2_000)).toEqual(notFound);
-      expect(await settledWithin(job.waitUntilFinished(null, 10_000), 2_000)).toEqual(notFound);
+      // The engine retains the result of a job removed on completion for a short time
+      // (memory only): both waits settle on it instead of `Job <id> not found`.
+      expect(await settledWithin(job.waitUntilFinished(events), 2_000)).toEqual({ value: 'done' });
+      expect(await settledWithin(job.waitUntilFinished(null, 10_000), 2_000)).toEqual({
+        value: 'done',
+      });
     });
   });
 }

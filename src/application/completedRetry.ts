@@ -111,9 +111,11 @@ function requeueCompletedJob(job: Job, ctx: RetryCompletedContext): number {
   const now = Date.now();
   const timeline = [...job.timeline];
   if (timeline.length < MAX_TIMELINE_ENTRIES) timeline.push({ state: 'waiting', timestamp: now });
+  // A retry is a fresh execution: both retry budgets restart, as for a DLQ retry.
   const requeued: Job = {
     ...job,
     attempts: 0,
+    stallCount: 0,
     startedAt: null,
     completedAt: null,
     runAt: now,

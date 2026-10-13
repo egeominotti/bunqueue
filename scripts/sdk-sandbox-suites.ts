@@ -1,4 +1,6 @@
-export const sdkSandboxSuites = [
+import { withQuiescentCheckpoints } from './test-sandbox-checkpoints';
+
+const suiteDefinitions = [
   {
     name: 'typescript',
     command: [
@@ -48,5 +50,12 @@ export const sdkSandboxSuites = [
     ],
   },
 ] as const;
+
+// `command` is what a suite runs and reports. The container runs it inside idle
+// cgroup checkpoints so the memory-growth KPI compares equivalent points.
+export const sdkSandboxSuites = suiteDefinitions.map((suite) => ({
+  ...suite,
+  containerCommand: withQuiescentCheckpoints(suite.command),
+}));
 
 export type SdkSandboxSuite = (typeof sdkSandboxSuites)[number];

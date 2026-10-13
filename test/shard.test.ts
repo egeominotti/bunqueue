@@ -54,10 +54,10 @@ describe('Shard', () => {
 
     expect(shard.isGroupActive('emails', 'group1')).toBe(false);
 
-    shard.activateGroup('emails', 'group1');
+    shard.activateGroup('emails', 'group1', jobId('group-job-1'));
     expect(shard.isGroupActive('emails', 'group1')).toBe(true);
 
-    shard.releaseGroup('emails', 'group1');
+    shard.releaseGroup('emails', 'group1', jobId('group-job-1'));
     expect(shard.isGroupActive('emails', 'group1')).toBe(false);
   });
 
@@ -129,9 +129,9 @@ describe('Shard', () => {
   test('should release job resources', () => {
     const shard = new Shard();
     shard.registerUniqueKey('emails', 'key1', jobId('test-job-4'));
-    shard.activateGroup('emails', 'group1');
+    shard.activateGroup('emails', 'group1', jobId('test-job-4'));
 
-    shard.releaseJobResources('emails', 'key1', 'group1');
+    shard.releaseJobResources('emails', 'key1', 'group1', jobId('test-job-4'));
 
     expect(shard.isUniqueAvailable('emails', 'key1')).toBe(true);
     expect(shard.isGroupActive('emails', 'group1')).toBe(false);

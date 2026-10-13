@@ -8,7 +8,7 @@ import { readyState, terminalGeneration, type RealQueue } from './queue-model-ha
 
 type FailureMode = 'fail' | 'ignore' | 'continue' | 'remove';
 
-class AddFlowCommand extends QueueCommand {
+export class AddFlowCommand extends QueueCommand {
   check(model: Readonly<QueueModel>): boolean {
     return !model.jobs.has(MODEL_FLOW_CHILD_ID) && !model.jobs.has(MODEL_FLOW_PARENT_ID);
   }
@@ -16,7 +16,9 @@ class AddFlowCommand extends QueueCommand {
   async run(model: QueueModel, real: RealQueue): Promise<void> {
     const childGeneration = (model.generations.get(MODEL_FLOW_CHILD_ID) ?? 0) + 1;
     const parentGeneration = (model.generations.get(MODEL_FLOW_PARENT_ID) ?? 0) + 1;
+    // Like every modeled job, retry backoff outlasts a history: the model has no clock.
     const child = await real.send({
+      backoff: 60000,
       cmd: 'PUSH',
       data: { generation: childGeneration },
       durable: true,
@@ -25,6 +27,7 @@ class AddFlowCommand extends QueueCommand {
       queue: real.queue,
     });
     const parent = await real.send({
+      backoff: 60000,
       childrenIds: [MODEL_FLOW_CHILD_ID],
       cmd: 'PUSH',
       data: { generation: parentGeneration },
@@ -69,7 +72,7 @@ class AddFlowCommand extends QueueCommand {
   }
 }
 
-class AckFlowCommand extends QueueCommand {
+export class AckFlowCommand extends QueueCommand {
   check(model: Readonly<QueueModel>): boolean {
     return (
       model.jobs.get(MODEL_FLOW_CHILD_ID)?.state === 'active' ||

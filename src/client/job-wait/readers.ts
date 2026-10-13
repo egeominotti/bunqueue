@@ -16,16 +16,23 @@ const FAILED_FALLBACK = 'Job already failed';
 
 /**
  * The job no longer exists: it was removed (remove, drain, obliterate, clean, DLQ
- * purge), or removed on completion or failure before the wait saw that event. Its
- * outcome is unknown, so the wait reports neither a result nor a failure reason.
- * (Over TCP, a job whose completion the broker retains settles on that result
- * instead: see `brokerReader`.)
+ * purge), or removed on completion or failure before the wait saw that event, and the
+ * engine retains no completion for it. Its outcome is unknown, so the wait reports
+ * neither a result nor a failure reason. (A job removed on completion whose result the
+ * engine still retains settles on that result instead: see `managerReader` and
+ * `brokerReader`.)
  */
 export function missingJob(id: string): Outcome {
   return { error: new Error(`Job ${id} not found`), missing: true };
 }
 
-/** Reads `manager` only while it is the live shared manager; it never creates one. */
+/**
+ * Reads `manager` only while it is the live shared manager; it never creates one.
+ *
+ * A job that reads as `unknown` may have been removed on completion while the engine
+ * still retains its result (memory only, for a short time): before settling as missing
+ * the read asks the engine's completion lookup, as `brokerReader` does over TCP.
+ */
 export function managerReader(manager: SharedManager, id: string): OutcomeReader {
   const key = jobId(id);
   const shutDown = (): Outcome => ({ error: new Error(ENGINE_SHUT_DOWN) });
@@ -38,7 +45,9 @@ export function managerReader(manager: SharedManager, id: string): OutcomeReader
       const job = await manager.getJob(key);
       return { error: new Error((job ? lastFailedReason(job) : undefined) ?? FAILED_FALLBACK) };
     }
-    return state === 'unknown' ? missingJob(id) : null;
+    if (state !== 'unknown') return null;
+    const completion = await manager.getCompletionAsync(key);
+    return completion.found ? { value: completion.result } : missingJob(id);
   }
 
   return {
@@ -64,7 +73,8 @@ export function managerReader(manager: SharedManager, id: string): OutcomeReader
  * that broker returns it, so before settling as missing the read asks the same lookup
  * (WaitJob with a 0 ms hold): the outcome depends on the broker's state only, not on
  * whether a hold or a read reaches it first, nor on when this wait's first read was
- * served. Memory and SQLite retain nothing for such a job, so it stays missing there.
+ * served. Memory and SQLite retain the result for a short, bounded time (memory only,
+ * `removedResults`), after which such a job reads as missing there.
  */
 export function brokerReader(tcp: CommandTransport, id: string): OutcomeReader {
   return {

@@ -100,8 +100,8 @@ Jobs (`routeJobRoutes`, `httpRouteJobs.ts:12-117`) — batch routes matched befo
 
 `DELETE /jobs/:id` returns status `200` for every `Cancel` reply: `{ ok: true }`
 when a pending or completed job was removed, otherwise `ok: false` with `Job not
-found or cannot be cancelled` (missing job) or `Job cannot be cancelled (current
-state: <state>)` (active, failed); see
+found or cannot be cancelled` (missing job) or `Job cannot be cancelled: not in
+queue (current state: <state>)` (active, failed); see
 [TCP Server Command Handlers](./tcp-server-handlers.md).
 
 Queues (`routeQueueRoutes`, `httpRouteQueues.ts:19-143`):

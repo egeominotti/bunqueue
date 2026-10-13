@@ -146,13 +146,21 @@ job (issue #155: a completed job used to keep its data and result while the call
 resolved). The removal resolves when the job was removed or does not exist
 (idempotent cleanup, BullMQ parity) and rejects when the job exists but cannot be
 removed: an active job (also the processor's own job) or a failed one. Over TCP
-`assertCancelReply` treats `ok: false` with an error matching `/not found/i` as a
-missing job, which also keeps a broker older than this rule (its ambiguous reply
-contains "not found") resolving as before; any other `ok: false` throws the
-broker's message (`Job cannot be cancelled (current state: active)`). Embedded,
-`cancelWithOutcome` reads `getJobState` when `cancel()` returns `false`: `unknown`
-resolves, any other state throws `Job <id> cannot be removed (current state:
-<state>)`. The fire-and-forget `remove(id)` keeps its background reporting
+`assertCancelReply(tcp, id, reply)` settles the Cancel reply. The legacy
+`Job not found or cannot be cancelled` is never taken as "missing" on its own: a
+broker of this release sends it only for a missing job, but a 2.9.13 (or older)
+broker sends it for every refusal, an active, a failed or a completed job included,
+so the client sends `GetState` on the same transport and resolves only for
+`unknown`; any other state throws `Job <id> cannot be removed (current state:
+<state>)`, a refused `GetState` throws its error and a reply without a state
+throws the legacy text, as 2.9.13 clients did
+(`test/repro-mixed-version-cancel-legacy-reply.test.ts`). Any other `ok: false`
+matching `/not found/i` resolves without a state read; any other `ok: false`
+throws the broker's message (`Job cannot be cancelled: not in queue (current
+state: active)`). Embedded, `cancelWithOutcome` reads `getJobState` when
+`cancel()` returns `false`: `unknown` resolves, any other state throws the same
+`Job <id> cannot be removed (current state: <state>)`. The fire-and-forget
+`remove(id)` keeps its background reporting
 (only a transport or engine failure is reported). FlowProducer job objects
 (`flowJobCoreMethods.ts`) follow the same rule in both modes: their TCP `remove()`
 used to throw on any refusal, a missing job included, and their embedded fallback
@@ -491,7 +499,11 @@ zero.
     O(1) per event. The job's `completed` and terminal `failed` events settle it;
     `stalled` and `removed` make it re-read the state. It reads the job once right
     after subscribing (the subscription is synchronous, so no transition is
-    missed). Reads use `peekSharedManager()` and never create a manager: a wait
+    missed). A read that finds no job (`unknown`) asks the engine's completion
+    lookup (`QueueManager.getCompletionAsync`, `managerReader` in
+    `job-wait/readers.ts`) before it settles as missing, so a job removed on
+    completion whose result the engine still retains settles on that result (see
+    below). Reads use `peekSharedManager()` and never create a manager: a wait
     started after `shutdownManager()` rejects at once, and `shutdownManager()`
     rejects every pending wait on the stopped manager (`onSharedManagerShutdown`),
     both with `waitUntilFinished: the embedded engine was shut down`. A
@@ -585,8 +597,18 @@ zero.
     wait whose read was served after the removal rejected
     (`postgres-public-api-extreme`, 256 remote waiters, flaked this way under
     load; `test/repro-job-wait-removed-on-complete.test.ts`). Memory and SQLite
-    retain nothing for a job removed on completion, so such a job still settles
-    as not found there. Over TCP with QueueEvents a `Job not found` read is then
+    retain the result of a job removed on completion for a short, bounded time,
+    in memory only (`removedResults`: 60 s and the last 1,000 results by
+    default, `removedResultRetentionMs`/`maxRemovedResults`; see
+    [Core Queue Engine](./core-queue-engine.md#removed-result-retention)), and the
+    same lookup answers from it, so the wait settles on the result there too,
+    whether it started before or after the completion (issue #155 A: in a
+    request/reply loop without QueueEvents about half of the jobs completed before
+    the first hold reached the broker and rejected `Job <id> not found`;
+    `test/repro-issue-155-removed-result-retention.test.ts`). Once the record is
+    gone (TTL, cap, `remove()`, obliterate, a new generation under the same custom
+    ID, a broker restart, or a retention of 0) such a job settles as not found.
+    Over TCP with QueueEvents a `Job not found` read is then
     confirmed through a fresh `waitUntilReady()` round trip on the event
     connection, so a `completed` event already sent for a job removed on
     completion still wins.
@@ -623,8 +645,10 @@ zero.
     before the wait started, while a TCP QueueEvents was disconnected, or, over
     TCP without QueueEvents, while no `WaitJob` hold of the wait was registered
     on the broker: before it got a hold slot, or between two holds)
-    reports `Job <id> not found` on memory and SQLite, because its result is not
-    retained; over TCP to a PostgreSQL broker it settles on the retained result. A
+    settles on the result the engine retains for it: on memory and SQLite for
+    `removedResultRetentionMs` (60 s) and the last `maxRemovedResults` (1,000)
+    such jobs, in memory only; on PostgreSQL its completion record, bounded by
+    `maxCompletedJobs`. After that it reports `Job <id> not found`. A
     `QueueManager` shut down directly (`manager.shutdown()` instead of
     `shutdownManager()`) sends no shutdown signal, so its waits settle from their
     next read. An emitter whose `on()` throws for an event name loses only that
@@ -713,7 +737,25 @@ the transport — see [Client Transport](./client-transport.md).
 
 `AutoBatchOptions`: `enabled` default true for TCP / disabled for embedded (must be a boolean), `maxSize = 50` (a positive integer), `maxDelayMs = 5` (a finite number of ms >= 0).
 
-Embedded data path env precedence (via `getSharedManager`): `BUNQUEUE_DATA_PATH > BQ_DATA_PATH > DATA_PATH > SQLITE_PATH`. The environment is read only when a fresh manager is created; `shutdownManager()` resets both the manager and its path identity. `StallConfig` defaults (TCP cache + fallback): `enabled: true`, `stallInterval: 30000`, `maxStalls: 3`, `gracePeriod: 5000` (`stall.ts:16`).
+Embedded data path env precedence (via `getSharedManager`): `BUNQUEUE_DATA_PATH > BQ_DATA_PATH > DATA_PATH > SQLITE_PATH`. The environment is read only when a fresh manager is created; `shutdownManager()` resets both the manager and its path identity.
+
+The same fresh manager reads the removed-result retention from
+`BUNQUEUE_REMOVED_RESULT_RETENTION_MS` (default 60000) and
+`BUNQUEUE_MAX_REMOVED_RESULTS` (default 1000) through
+`readRemovedResultRetention()` (`src/config/componentEnv.ts`), the server's own
+setting definitions and parser: `0` in either disables the record; a value with no
+number or below 0 means the default with the server's warning (`[Config] Invalid
+BUNQUEUE_MAX_REMOVED_RESULTS: "abc" (expected a whole number >= 0); using 1000`,
+logged once per process); a value `parseInt` misread (`5s`, `1e12`) makes
+`getSharedManager()` throw the `ConfigError` the server stops with, and nothing is
+initialized (`test/repro-embedded-removed-result-env.test.ts`). Before, the shared
+manager was built with `dataPath` only, so embedded applications always had the
+defaults and could not turn the record off. The cap counts jobs, not bytes: the
+record holds up to `maxRemovedResults` return values at once (for example
+1,000 × 256 KB ≈ 256 MB), and `BUNQUEUE_MAX_REMOVED_RESULTS=0` restores the 2.9.13
+footprint. See [Core Queue Engine](./core-queue-engine.md#removed-result-retention).
+
+`StallConfig` defaults (TCP cache + fallback): `enabled: true`, `stallInterval: 30000`, `maxStalls: 3`, `gracePeriod: 5000` (`stall.ts:16`).
 
 ## Related Docs
 

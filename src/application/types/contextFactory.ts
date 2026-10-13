@@ -9,6 +9,7 @@ import type { BoundedMap, BoundedSet, LRUMap, MapLike } from '../../shared/lru';
 import type { RWLock } from '../../shared/lock';
 import type { DependencyCompletionTracker } from '../dependencyCompletions';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
+import type { RemovedResults } from '../removedResults';
 import type { EventsManager } from '../eventsManager';
 import type { MonitoringState } from '../monitoringChecks';
 import type { WebhookManager } from '../webhookManager';
@@ -36,6 +37,7 @@ export interface ContextDependencies {
   jobResults: LRUMap<JobId, unknown>;
   jobResultQueues: Map<JobId, string>;
   dependencyResults: DependencyResultTracker;
+  removedResults: RemovedResults;
   customIdMap: LRUMap<string, JobId>;
   jobLogs: LRUMap<JobId, JobLogEntry[]>;
   jobLogQueues: Map<JobId, string>;

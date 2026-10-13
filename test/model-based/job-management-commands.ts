@@ -138,7 +138,7 @@ class UpdateDataCommand extends QueueCommand {
   }
 }
 
-class ProgressCommand extends QueueCommand {
+export class ProgressCommand extends QueueCommand {
   constructor(
     private readonly slot: number,
     private readonly progress: number
@@ -168,7 +168,7 @@ class ProgressCommand extends QueueCommand {
   }
 }
 
-class RemoveCommand extends QueueCommand {
+export class RemoveCommand extends QueueCommand {
   constructor(
     private readonly slot: number,
     private readonly discard: boolean
@@ -207,7 +207,7 @@ class RemoveCommand extends QueueCommand {
   }
 }
 
-class RetryTerminalCommand extends QueueCommand {
+export class RetryTerminalCommand extends QueueCommand {
   constructor(
     private readonly slot: number,
     private readonly completed: boolean
@@ -234,7 +234,8 @@ class RetryTerminalCommand extends QueueCommand {
     job.diskState = 'waiting';
     job.attempts = 0;
     job.stallCount = 0;
-    if (this.completed) job.progress = 0;
+    // A completed retry is a fresh execution (completedRetry.ts); a DLQ retry keeps progress.
+    if (this.completed) Object.assign(job, { progress: 0, progressMessage: null });
     model.terminalGenerations.delete(terminalGeneration(id, job));
     await this.verify(model, real);
   }
@@ -244,7 +245,7 @@ class RetryTerminalCommand extends QueueCommand {
   }
 }
 
-class RemoveDlqCommand extends QueueCommand {
+export class RemoveDlqCommand extends QueueCommand {
   constructor(private readonly slot: number) {
     super();
   }

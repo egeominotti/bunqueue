@@ -199,6 +199,7 @@ These structures take sizes as constructor arguments; defaults that bind them co
 | `depCompletions` recent tier                                                                                | `DependencyCompletionTracker` | `maxCompletedJobs = 50_000`                    | `dependencyCompletions.ts`    |
 | `depCompletions` pinned tier                                                                                | `Set`                         | Live completed IDs referenced by `waitingDeps` | `dependencyCompletions.ts`    |
 | `jobResults`                                                                                                | `LRUMap`                      | `maxJobResults = 10_000`                       | `application/types/config.ts` |
+| `removedResults` (results of jobs removed on completion, memory only)                                       | `RemovedResults` (ring + TTL) | `maxRemovedResults = 1_000`, 60 s TTL          | `removedResults.ts`           |
 | `jobLogs`                                                                                                   | `LRUMap`                      | `maxJobLogs = 10_000`                          | `application/types/config.ts` |
 | `customIdMap`                                                                                               | `LRUMap`                      | `maxCustomIds = 50_000`                        | `application/types/config.ts` |
 

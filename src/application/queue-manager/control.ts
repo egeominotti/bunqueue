@@ -127,6 +127,7 @@ export class QueueManagerControl extends QueueManagerQueries {
       this.reconcileCompletionPins();
     }
     this.purgeQueueMetadata(queue);
+    this.removedResults.forgetQueue(queue);
     const hasPendingAdmission = (this.pendingQueueAdmissions.get(queue) ?? 0) > 0;
     if (hasPendingAdmission) this.pendingQueueObliterations.add(queue);
     else {

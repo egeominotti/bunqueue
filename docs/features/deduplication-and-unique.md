@@ -105,7 +105,7 @@ class DedupDebounceMerger {
 - `GetDeduplicationJobId { queue, deduplicationId }` returns `{ data: { jobId } }`.
 - `RemoveDeduplicationKey { queue, deduplicationId }` returns `{ data: { count } }`.
 - `RemoveJobDeduplicationKey { id }` returns `{ data: { removed } }` and enforces ownership.
-- Event emitted on suppression: `EventType.Duplicated` = `'duplicated'` (`src/domain/types/queue.ts:139`), broadcast from the default reject path (`src/application/operations/pushDeduplication.ts:96-109`).
+- Event emitted on suppression: `EventType.Duplicated` = `'duplicated'` (`src/domain/types/queue.ts:150`), broadcast from the default reject path (`src/application/operations/pushDeduplication.ts:96-109`).
 - Dashboard-only events: `job:deduplicated` (strategy `extend` / `default`) and `batch:pushed` with a `duplicates` count.
 
 ## Data Models

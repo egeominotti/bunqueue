@@ -166,21 +166,33 @@ end the wait; on `QueueEvents` its `failed` event carries `terminal: false`.
 `null` instead of `QueueEvents`, waiting up to `ttl` (30 seconds by default).
 A `ttl` of `0` means no timeout, with or without `QueueEvents`.
 
-A job that no longer exists (removed, drained, or removed on completion before
-the wait saw it) rejects the wait with `Job <id> not found`: its outcome is
-unknown. A wait survives a `QueueEvents` that closes or reconnects and a broker
+A job that no longer exists (removed, drained, obliterated) rejects the wait with
+`Job <id> not found`: its outcome is unknown. A job removed on completion
+(`removeOnComplete`) is the exception while the broker still keeps its result
+(see below). A wait survives a `QueueEvents` that closes or reconnects and a broker
 outage (rate-limit refusals, timeouts and lost connections are retried, not
 reported); only its `ttl` or a final error such as a refused token ends it early.
 After an outage it settles once the client has reconnected, which can lag by the
 reconnect backoff (up to 30 seconds) plus the next state read.
 
-For request/reply with `removeOnComplete: true` over TCP, pass a `QueueEvents`
-(or use embedded mode). Such a job keeps no result once it completes, so a wait
-without `QueueEvents` gets the result only from a `WaitJob` hold that is already
-on the broker when the job completes; a fast worker often finishes before the
-first hold arrives, and the wait then rejects with `Job <id> not found`. With
-`QueueEvents` the `completed` event delivers the result to every wait started
-before the job completes.
+Request/reply with `removeOnComplete: true` works with or without `QueueEvents`.
+The broker keeps the result of a job removed on completion for a short, bounded
+time, in memory only: 60 seconds and the last 1,000 such jobs by default
+(`removedResultRetentionMs` / `maxRemovedResults`, see
+[Server configuration](/guide/configuration/)). A wait that reaches the broker
+after the job completed, because a fast worker finished before the first
+`WaitJob` hold arrived or because the wait started after the `completed` event,
+settles on that result instead of rejecting with `Job <id> not found`. Read the
+result within that window: after it, after `job.remove()`, after the queue is
+obliterated, once a new job reuses the same custom ID, or after a broker
+restart, the job reads as not found. PostgreSQL keeps its own completion record
+with the result. `getJobState()` still reports `unknown` and the stored-result
+read (`GET /jobs/:id/result`, TCP `GetResult`) stays empty for such a job; only
+the wait reads the retained result.
+
+`QueueEvents` remains the best path for high-concurrency request/response: its
+`completed` event delivers the result to every wait at once, without the
+per-connection limit on `WaitJob` holds described below.
 
 Over TCP without `QueueEvents`, each connection of the pool holds the broker's
 `WaitJob` for at most 40 waits at a time (160 on the default pool of 4), so the

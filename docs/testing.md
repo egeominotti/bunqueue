@@ -264,7 +264,9 @@ and that the committed `apiVersions.json` still matches its generator. See
 
 The SDK gate writes complete `*.build.log` and suite logs plus the same NDJSON,
 per-suite JSON, and aggregate report schema under
-`artifacts/test-sandbox-sdk/<timestamp>/`. A failed image build also produces a
+`artifacts/test-sandbox-sdk/<timestamp>/`, plus the
+[quiescent checkpoints](#quiescent-checkpoints-sdk-suites) taken around each
+suite command. A failed image build also produces a
 failure summary instead of exiting without artifacts. `Dockerfile.sdk-test`
 uses one target per toolchain so SDK dependencies and language versions remain
 isolated; runtime containers have no external network, credentials, home
@@ -363,6 +365,17 @@ BUNQUEUE_MODEL_COMMANDS=150 \
 BUNQUEUE_MODEL_SEED=424242 \
 bun run test:model
 ```
+
+`BUNQUEUE_MODEL_COMMANDS` is an upper bound only: under fast-check's default
+size a history has at most 10 commands. Add `BUNQUEUE_MODEL_SIZE=max` (or
+`medium`, `large`, ...) for longer histories, and replay a counterexample with
+the seed, `BUNQUEUE_MODEL_PATH` and size it was found with.
+`BUNQUEUE_MODEL_STATS=1` prints how many commands of each kind actually ran. A
+second, terminal-lifecycle campaign (30 histories of up to 40 commands by
+default; `BUNQUEUE_TERMINAL_MODEL_RUNS`, `BUNQUEUE_TERMINAL_MODEL_COMMANDS`,
+`BUNQUEUE_TERMINAL_MODEL_PATH`) reaches completion, failure, retry and cancel
+transitions under the default settings. See
+[Model-Based Queue Verification](./features/model-based-testing.md#running-and-replaying).
 
 The workflow campaign closes every `Engine`, shuts down the process-wide
 embedded `QueueManager`, and only then removes its shared temporary SQLite
@@ -634,8 +647,10 @@ authoritative (including failed/skipped fields when present); the legacy
 mixed logs are not double-counted.
 
 The report flags non-zero exits, OOM kills, memory or PID pressure above 80%, a
-strong end-to-start memory-growth signal, and material duration or peak-memory
-regressions against the most recent prior telemetry report. Raw samples remain
+strong end-to-start memory-growth signal (measured at quiescent checkpoints for
+SDK suites, see below), processes that outlive an SDK suite command, and
+material duration or peak-memory regressions against the most recent prior
+telemetry report. Raw samples remain
 in NDJSON so an anomaly can be correlated with timestamps in the suite log.
 
 Memory is measured at container level. Individual unit tests share a process,
@@ -643,6 +658,56 @@ heap, caches, and garbage collector, so assigning heap ownership to one test
 would be misleading. A positive memory slope is a signal to investigate, not
 proof of a leak; confirm it with a focused repeated-process reproduction and
 post-GC measurements before changing runtime code.
+
+### Quiescent checkpoints (SDK suites)
+
+An SDK suite is a chain of different short-lived processes: format and static
+checks, compilation, the native tests, then the conformance runner, its broker
+and the language driver, twice. `docker stats --no-stream` needs about two
+seconds per sample, so the first sample lands somewhere in the first steps and
+the last one in the final conformance run. Their difference compares two
+different workloads: across 21 Elixir runs the last sample stayed between 314
+and 412 MiB while the first ranged from 4 MiB to 269 MiB, so its position alone
+swung the reported delta between +45 MiB and +341 MiB (signal in 20 of 21
+runs).
+
+`scripts/test-sandbox-checkpoints.ts` therefore wraps each SDK suite command.
+Inside the container it reads the container's own cgroup v2 `memory.stat`,
+`memory.current` and `pids.current` once before the command starts and once
+after the command and every process it left behind have exited (up to ten
+seconds of settle polling), and prints both readings as
+`BUNQUEUE_SANDBOX_CHECKPOINT` lines in the suite log. The exit code of the
+suite command is preserved. For these suites:
+
+- **Retained memory** is `anon + shmem` after minus before: process-private
+  memory plus tmpfs files left in `/tmp`. Page cache from build outputs is
+  reclaimable, is reported as context, and is not counted.
+- The **memory-growth signal** uses the same thresholds as before (at least
+  128 MiB and 50%) on the retained memory instead of on the first and last
+  `docker stats` samples. The sample-based RAM delta stays in the tables as
+  context only.
+- **Outlived processes**: any process still alive after the settle window is
+  reported as `processes outlived the suite command: <name> xN`. A process
+  that outlives the command that started it is a leak a container-level
+  sampler can prove.
+
+`summary.md` lists the readings in a "Quiescent checkpoints" table and
+`<suite>.summary.json` stores them under `quiescent`. A log without one valid
+`before` and one valid `after` reading (for example an OOM-killed suite or an
+unreadable cgroup), or with a repeated or malformed marker line, falls back to
+the sample-based rule. `test/test-sandbox-checkpoints.test.ts` covers the
+parsing, the anomaly rules, the report, and the wrapper's exit-code
+preservation; it sets `BUNQUEUE_SANDBOX_SETTLE_POLLS=0` because a shared test
+container always has unrelated processes that would hold the settle window. The
+sandbox never sets it. The core
+`bun run test:sandbox` suites are single long-running processes and keep the
+sample-based rule.
+
+The growth signal that motivated this was not only a measurement artifact.
+Every `mix test` run left six `bun src/main.ts` brokers running (about 136 MiB
+of anonymous memory and 108 tasks in the container, and the same six processes
+on a developer machine): see
+[the Elixir SDK test broker](./features/elixir-sdk.md#test-broker-lifecycle).
 
 The disposable container layer may be writable because a few tests generate
 temporary scripts below the repository path. It cannot write those changes back

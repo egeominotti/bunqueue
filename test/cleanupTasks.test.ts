@@ -240,7 +240,7 @@ describe('CleanupTasks', () => {
 
       // Activate more than 1000 groups
       for (let i = 0; i < 1100; i++) {
-        shard.activateGroup('group-queue', `group-${i}`);
+        shard.activateGroup('group-queue', `group-${i}`, jobId(`group-job-${i}`));
       }
 
       const groups = shard.activeGroups.get('group-queue');
@@ -257,7 +257,7 @@ describe('CleanupTasks', () => {
       const shard = ctx.shards[0];
 
       for (let i = 0; i < 10; i++) {
-        shard.activateGroup('small-group-queue', `group-${i}`);
+        shard.activateGroup('small-group-queue', `group-${i}`, jobId(`small-job-${i}`));
       }
 
       expect(shard.activeGroups.get('small-group-queue')?.size).toBe(10);
@@ -888,7 +888,7 @@ describe('CleanupTasks', () => {
 
       // Add 1500 active groups
       for (let i = 0; i < 1500; i++) {
-        shard.activateGroup('bound-queue', `group-${i}`);
+        shard.activateGroup('bound-queue', `group-${i}`, jobId(`bound-job-${i}`));
       }
 
       await cleanup(ctx);

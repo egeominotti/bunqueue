@@ -5,6 +5,7 @@
 import { realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { QueueManager } from '../application/queueManager';
+import { readRemovedResultRetention } from '../config/componentEnv';
 
 /** Shared manager type export */
 export type SharedManager = QueueManager;
@@ -45,7 +46,8 @@ function displayDataPath(dataPath: string | undefined): string {
 
 /**
  * Get the process-wide QueueManager.
- * A later explicit dataPath must identify the database selected on first use.
+ * A later explicit dataPath must identify the database selected on first use. The first
+ * call also reads `BUNQUEUE_REMOVED_RESULT_RETENTION_MS` and `BUNQUEUE_MAX_REMOVED_RESULTS`.
  */
 export function getSharedManager(dataPath?: string): QueueManager {
   if (shared) {
@@ -63,7 +65,12 @@ export function getSharedManager(dataPath?: string): QueueManager {
   }
 
   const selectedDataPath = normalizeDataPath(dataPath ?? getDataPath());
-  const instance = new QueueManager({ dataPath: selectedDataPath });
+  // The removed-result env settings, parsed as the server parses them: an invalid value
+  // means the default with a warning (logged once), a misread one throws a ConfigError.
+  const instance = new QueueManager({
+    dataPath: selectedDataPath,
+    ...readRemovedResultRetention(),
+  });
   shared = { instance, dataPath: selectedDataPath };
   return instance;
 }

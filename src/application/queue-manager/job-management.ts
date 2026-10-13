@@ -14,10 +14,24 @@ import { QueueManagerConfiguration } from './configuration';
 export class QueueManagerJobManagement extends QueueManagerConfiguration {
   async cancel(jobId: JobId): Promise<boolean> {
     try {
+      // A remove makes the retained result of a job removed on completion gone too. Such
+      // a job does not exist, so the outcome stays "not found" (clients resolve). The
+      // record an ACK writes after this drop (the job was active, so this call refuses)
+      // is dropped by the outcome when it reports the job missing (`forgetRemovedResult`).
+      this.removedResults.forget(jobId);
       return await jobMgmt.cancelJob(jobId, this.contextFactory.getJobMgmtContext());
     } finally {
       this.syncJobTimeout(jobId);
     }
+  }
+
+  /**
+   * Drop the retained result of a job removed on completion (`removedResults`). The
+   * Cancel outcome (`cancelWithOutcome`) calls it when it reports the job missing, so an
+   * ACK that removed the job between the refusal and the state read leaves no result.
+   */
+  forgetRemovedResult(jobId: JobId): void {
+    this.removedResults.forget(jobId);
   }
 
   async updateProgress(jobId: JobId, progress: number, message?: string): Promise<boolean> {

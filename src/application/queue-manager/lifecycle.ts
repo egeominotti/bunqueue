@@ -20,6 +20,7 @@ export class QueueManagerLifecycle extends QueueManagerDependencies {
     this.jobResults.clear();
     this.jobResultQueues.clear();
     this.dependencyResults.clear();
+    this.removedResults.clear();
     this.jobLogs.clear();
     this.jobLogQueues.clear();
     this.customIdMap.clear();
@@ -41,6 +42,8 @@ export class QueueManagerLifecycle extends QueueManagerDependencies {
       shard.waitingChildren.clear();
       shard.uniqueKeys.clear();
       shard.activeGroups.clear();
+      shard.activeGroupCounts.clear();
+      shard.activeGroupHolders.clear();
     }
   }
 }

@@ -155,6 +155,8 @@ defineConfig({
     dataPath: './data/queue.db', // required for explicit SQLite
     maxCompletedJobs: 50_000, // completed-job hot cache/recovery window
     completedRetentionMs: 7 * 24 * 60 * 60 * 1000, // optional durable retention
+    removedResultRetentionMs: 60_000, // memory-only result of a removeOnComplete job
+    maxRemovedResults: 1_000, // cap of those retained results
   },
 });
 ```
@@ -170,8 +172,28 @@ milliseconds and `null` disables retention. A negative, non-finite or
 non-numeric value also disables retention, as in earlier releases, and the server
 logs a warning naming the key.
 
-The server CLI equivalents are `--max-completed-jobs` and
-`--completed-retention-ms`; environment equivalents are documented in the
+`removedResultRetentionMs` (default 60,000 ms) and `maxRemovedResults`
+(default 1,000) apply to memory and SQLite storage. A job added with
+`removeOnComplete: true` leaves nothing behind once it completes, so the broker
+keeps its result in memory only, for that long and for at most that many jobs,
+for a `waitUntilFinished()` that reaches it after the completion (a
+request/reply loop where the worker finishes before the wait arrives). It is
+never written to disk, and `job.remove()`, `obliterate`, a new job under the same
+custom ID or a restart drops it. `0` turns it off (such a late wait then rejects
+with `Job <id> not found`). A value that is not a whole number ≥ 0 means the
+default, with a warning. PostgreSQL ignores both: it keeps its own completion
+record. The cap counts jobs, not bytes: memory use is up to `maxRemovedResults`
+times your result size (1,000 × 256 KB ≈ 256 MB), so lower it for large results;
+`maxRemovedResults: 0` restores the 2.9.13 footprint. The bookkeeping (about 50
+bytes a result) follows the results actually held, not the cap: a high cap costs
+nothing until results fill it, and the memory is released as they expire. Embedded mode has no config
+file: it reads `BUNQUEUE_REMOVED_RESULT_RETENTION_MS` and
+`BUNQUEUE_MAX_REMOVED_RESULTS` with the server's rules (see the
+[environment reference](/guide/env-vars/)).
+
+The server CLI equivalents are `--max-completed-jobs`,
+`--completed-retention-ms`, `--removed-result-retention-ms` and
+`--max-removed-results`; environment equivalents are documented in the
 [environment reference](/guide/env-vars/).
 
 Without `driver`, a PostgreSQL URL selects PostgreSQL, a data path selects

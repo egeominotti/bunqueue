@@ -205,6 +205,9 @@ export function finalizeBatchAck<T>(
     }
   }
 
+  // One clock reading stamps the batch's removed results; no work at all when disabled.
+  const removedResults = ctx.removedResults?.enabled ? ctx.removedResults : undefined;
+  const recordedAt = removedResults ? removedResults.now() : 0;
   // Main loop
   // IMPORTANT: Order of operations matters for race condition prevention.
   // jobResults must be set BEFORE completedJobs.add() so that dependent jobs
@@ -240,6 +243,7 @@ export function finalizeBatchAck<T>(
       ctx.completedJobs.add(jobId);
     } else {
       commitRemovedCompletion(job, ctx, now);
+      removedResults?.record(jobId, job.queue, includeResults ? result : undefined, recordedAt);
       ctx.jobIndex.delete(jobId);
       // The helper publishes payload-free dependency evidence only after its
       // durable job-removal transaction commits.

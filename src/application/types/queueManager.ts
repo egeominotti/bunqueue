@@ -11,6 +11,7 @@ import type { RWLock } from '../../shared/lock';
 import type { BoundedMap, BoundedSet, LRUMap } from '../../shared/lru';
 import type { DependencyCompletionTracker } from '../dependencyCompletions';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
+import type { RemovedResults } from '../removedResults';
 import type { EventsManager } from '../eventsManager';
 import type { OperationalMetrics } from '../metricsExporter';
 import type { MonitoringState } from '../monitoringChecks';
@@ -40,6 +41,7 @@ export interface QueueManagerStateView {
   jobResults: LRUMap<JobId, unknown>;
   jobResultQueues: Map<JobId, string>;
   dependencyResults: DependencyResultTracker;
+  removedResults: RemovedResults;
   customIdMap: LRUMap<string, JobId>;
   jobLogs: LRUMap<JobId, JobLogEntry[]>;
   jobLogQueues: Map<JobId, string>;

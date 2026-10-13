@@ -30,9 +30,10 @@ export function assertOk(command: Record<string, unknown>, reply: WireReply): Wi
  * Rejections that report a negative domain outcome rather than a failure: the target job,
  * lock, cron, webhook or worker does not exist, or is not in a state the operation accepts.
  * Matched phrases: "not found" (also "Job not found or cannot be cancelled / be updated /
- * change delay"), "cannot be cancelled" ("Job cannot be cancelled (current state:
- * active)"), "not active" ("Job is not active (current state: completed)"), "not
- * delayed", "not in queue", "invalid token" ("Lock not found or invalid token") and
+ * change delay"), "cannot be cancelled" ("Job cannot be cancelled: not in queue (current
+ * state: active)", which bunqueue-mcp 2.9.13 matches by its "not in queue"), "not
+ * active" ("Job is not active (current state: completed)"), "not delayed", "not in
+ * queue", "invalid token" ("Lock not found or invalid token") and
  * "Cannot move job from state '<state>' to waiting". A bare "cannot" is deliberately not
  * matched: it also appears in forwarded JavaScript runtime errors ("Cannot read properties
  * of undefined ...") and validation errors ("A job cannot be its own parent").

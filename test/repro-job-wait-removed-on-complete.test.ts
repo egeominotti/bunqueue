@@ -15,9 +15,11 @@
  * A first read can also be served after the completion although the wait was sent
  * while the job ran (256 concurrent reads queue on four connections), so a reader
  * that finds no job now always asks WaitJob with a 0 ms hold, the broker's own
- * completion lookup, before it settles as missing. Memory and SQLite retain nothing
- * for a job removed on completion, so such a job still settles as missing there
- * (repro-wait-real-outcome.test.ts keeps that contract).
+ * completion lookup, before it settles as missing. Memory and SQLite now retain the
+ * result of a job removed on completion too, for a short, bounded time and in memory
+ * only (`removedResults`), so the same lookup answers there; once that record is gone
+ * the job settles as missing (repro-wait-real-outcome.test.ts and
+ * repro-issue-155-removed-result-retention.test.ts cover both engines end to end).
  */
 import { describe, expect, test } from 'bun:test';
 import { waitJobUntilFinished } from '../src/client/jobWait';

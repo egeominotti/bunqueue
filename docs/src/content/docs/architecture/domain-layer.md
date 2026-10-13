@@ -215,18 +215,18 @@ accumulating credits that would cause repeated empty pulls.
 <div class="bq-diag">
   <div class="bq-diag-head"><b>Pull request</b><span>rate and concurrency limiting</span></div>
   <div class="bq-diag-group">
-    <span class="bq-diag-group-label">1. check rate limit, token bucket</span>
+    <span class="bq-diag-group-label">1. check concurrency limit, one slot per active job</span>
     <div class="bq-diag-row">
-      <div class="bq-diag-cell">Tokens available <i>consume 1, proceed</i></div>
-      <div class="bq-diag-cell">No tokens <i>return null</i></div>
+      <div class="bq-diag-cell">active &lt; limit <i>record the job as a slot holder, proceed</i></div>
+      <div class="bq-diag-cell">At limit <i>return null</i></div>
     </div>
   </div>
   <div class="bq-diag-arrow">↓</div>
   <div class="bq-diag-group">
-    <span class="bq-diag-group-label">2. check concurrency limit</span>
+    <span class="bq-diag-group-label">2. check rate limit, token bucket</span>
     <div class="bq-diag-row">
-      <div class="bq-diag-cell">active &lt; limit <i>increment, proceed</i></div>
-      <div class="bq-diag-cell">At limit <i>return null</i></div>
+      <div class="bq-diag-cell">Tokens available <i>consume 1, proceed</i></div>
+      <div class="bq-diag-cell">No tokens <i>release the job's slot, return null</i></div>
     </div>
   </div>
   <div class="bq-diag-arrow">↓</div>
@@ -241,12 +241,23 @@ accumulating credits that would cause repeated empty pulls.
   </div>
 </div>
 
+The concurrency limiter records which jobs hold a slot, and the count is the
+number of active jobs of the queue. Jobs that are already active when a limit is
+set, or set again after a clear, are counted from the start, as in BullMQ: with
+one job running, a limit of 2 admits one more. Each job frees only its own slot
+when it leaves the active state, so a late or repeated release cannot open a
+spare slot.
+
 ## FIFO Groups
 
 Groups preserve claim order within each group without making group execution
-serial by default. Active ownership is counted: `activeGroupCounts` is the
-authoritative per-group count, while `activeGroups` is its set-shaped view for
-telemetry and membership. With no group concurrency option, the limit is
+serial by default. Active ownership is per job: `activeGroupHolders` records
+which active job holds a slot of which group, `activeGroupCounts` is the
+per-group count derived from it, and `activeGroups` is its set-shaped view for
+telemetry and membership. A job frees only the slot it holds, so a late or
+repeated release (for example the late ACK of an attempt that was already
+retried) cannot open a spare slot in the group, and jobs already active when an
+override is set count toward it. With no group concurrency option, the limit is
 unbounded. A Worker can supply a default per-group concurrency cap, and an
 explicit server-side override can replace it for one group. Per-group fixed
 window rate limits are checked by the same eligibility path.

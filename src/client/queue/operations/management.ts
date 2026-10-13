@@ -47,7 +47,9 @@ export async function removeAsync(ctx: ManagementContext, id: string): Promise<v
     await removeJob(true, null, id);
     return;
   }
-  assertCancelReply(await ctx.tcp!.send({ cmd: 'Cancel', id }));
+  // A legacy refusal is settled by a state read on the same pool (src/client/jobRemoval.ts).
+  const tcp = ctx.tcp!;
+  await assertCancelReply(tcp, id, await tcp.send({ cmd: 'Cancel', id }));
 }
 
 // ============ Retry Operations ============

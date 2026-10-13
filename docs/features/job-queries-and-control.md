@@ -76,9 +76,14 @@ QueueManager boundary and is shared by embedded calls, TCP `GetResult`,
 check is allowed because `0`, `false`, and `''` are valid results.
 The transport-facing discriminated `getCompletionAsync` port returns
 `{ found, result }`, so a valid `undefined` result remains distinct from a
-missing completion. `getResultAsync` delegates to it. Memory and SQLite derive
-`found` from the unchanged retained-completion set and keep their synchronous
-lookup. PostgreSQL overrides the port with one direct completion-table read, so
+missing completion. Memory and SQLite derive `found` from the
+retained-completion set, then, for an ID with no current generation in
+`jobIndex`, from the memory-only record of a job removed on completion
+(`removedResults`, see [Core Queue Engine](./core-queue-engine.md#removed-result-retention)).
+Their `getResultAsync` (`GetResult`) reads the retained-completion set only, as
+before, so `GetResult` of a job removed on completion stays empty while WaitJob
+and the wait readers get its result. PostgreSQL overrides the port with one
+direct completion-table read, and its `getResultAsync` delegates to it, so
 `GetResult` and late `WaitJob` requests do not depend on the receiving broker's
 eventually consistent result projection or a live job row.
 
@@ -93,8 +98,10 @@ function removeCompletedJob(jobId: JobId, ctx: CompletedRemovalContext): Promise
 
 ```typescript
 const CANCEL_JOB_NOT_FOUND_ERROR = 'Job not found or cannot be cancelled';
-function cancelRefusedError(state: string): string; // `Job cannot be cancelled (current state: <state>)`
+// `Job cannot be cancelled: not in queue (current state: <state>)`
+function cancelRefusedError(state: string): string;
 function cancelWithOutcome(port: CancelPort, id: JobId): Promise<CancelOutcome>;
+// CancelPort = { cancel; getJobState; forgetRemovedResult?(id): void }
 // CancelOutcome = { removed: true } | { removed: false; state: string }
 ```
 
@@ -202,7 +209,7 @@ recovery.
 
 See [data-model](../data-model.md) for full `Job` and the events shape. Most relevant here:
 
-- `JobLocation` (`src/domain/types/queue.ts:122-126`) — the discriminated union stored in `jobIndex` that drives every dispatch:
+- `JobLocation` (`src/domain/types/queue.ts:133-137`) — the discriminated union stored in `jobIndex` that drives every dispatch:
   ```typescript
   | { type: 'queue'; shardIdx: number; queueName: string }
   | { type: 'processing'; shardIdx: number }
@@ -309,8 +316,18 @@ stable refusal of a removable state (a PostgreSQL protected producer) after two,
 and `MAX_CANCEL_ATTEMPTS` (3) bounds every Cancel. Each attempt targets the job ID,
 so a job re-added under the same custom ID while a Cancel is in flight can be the
 one removed, as with a Cancel sent a moment later. The TCP/HTTP handler answers
-`Job not found or cannot be cancelled` for `unknown` and `Job cannot be cancelled
-(current state: <state>)` otherwise.
+`Job not found or cannot be cancelled` for `unknown` and `Job cannot be cancelled:
+not in queue (current state: <state>)` otherwise. When the final state is
+`unknown`, the outcome also calls the port's optional `forgetRemovedResult(id)`
+synchronously after the read (`QueueManager` drops the ID's `removedResults`
+record; PostgreSQL inherits it and never writes that record), so an ACK with
+`removeOnComplete` that landed between the refusal and the read leaves no result
+behind a Cancel that reports the job missing. Every reporting transport uses this
+outcome: the TCP `Cancel` handler, HTTP `DELETE /jobs/:id` (through the same
+handler) and the embedded `removeAsync()`/`job.remove()` (`removeJob`). The
+boolean callers of `QueueManager.cancel` (embedded fire-and-forget `remove()`, the
+MCP embedded backend, the cloud `job:cancel` command, flow rollback) report no
+missing job, so only the drop before the removal applies to them.
 
 ### moveJobToDelayed (`jobMoveOperations.ts`)
 
@@ -382,7 +399,7 @@ are PostgreSQL-specific and do not alter the synchronous SQLite implementation.
 ## Edge Cases & Failure Modes
 
 - **Post-restart recovery:** `getJob`/`getJobState` fall back to SQLite (jobs table + DLQ + raw state) when `jobIndex` has no entry (`src/application/operations/query/jobLookup.ts:9-16`, `src/application/operations/query/state.ts:6-19`). Without storage (pure embedded) they return `null`/`'unknown'`.
-- **Pull-transition visibility:** during a pull, the queue pop, the `processingShards` insert, and the `jobIndex` flip happen in one synchronous critical section (`src/application/operations/pullStateTransition.ts:115-135`), and `getJob`/`getJobState` chase a moved location on miss — a poller can no longer observe a transient `null`/`'unknown'` for a job that is being handed to a worker (repro: `test/repro-getjob-false-null-during-pull.test.ts`).
+- **Pull-transition visibility:** during a pull, the queue pop, the `processingShards` insert, and the `jobIndex` flip happen in one synchronous critical section (`src/application/operations/pullStateTransition.ts:123-142`), and `getJob`/`getJobState` chase a moved location on miss — a poller can no longer observe a transient `null`/`'unknown'` for a job that is being handed to a worker (repro: `test/repro-getjob-false-null-during-pull.test.ts`).
 - **Paused double-count avoidance (#92):** `pausedView` and `resolveStateNeeds` guarantee a single job is reported in exactly one bucket. Verified by the shared `pausedView` helper used across SDK/TCP/dashboard so surfaces cannot drift.
 - **Pagination correctness:** logical-state filtering happens before SQL `LIMIT/OFFSET`; derived sources are merged and deduplicated before one final slice. `(created_at, id)` is the deterministic tie-breaker for both ascending and descending pages.
 - **`cleanQueue` with `state='active'` is intentionally unsupported** (`queueControl.ts:189-216`): cleaning in-flight jobs would race the worker ack path and leak concurrency/uniqueKey/group slots. Use `fail` or `discard` instead (`cancelJob` never removes an active job). Unknown states also return `[]`.

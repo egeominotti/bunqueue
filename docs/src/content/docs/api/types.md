@@ -368,8 +368,9 @@ interface Job<T = unknown> {
    *   timeout with QueueEvents, 30000 without.
    * @returns The job's return value
    * @throws Error with the last attempt's failure reason; `Job <id> not found` when
-   *   the job no longer exists (removed, or removed on completion before the wait saw
-   *   it), so its outcome is unknown; the timeout error when the TTL elapses first;
+   *   the job no longer exists (removed, or removed on completion with its retained
+   *   result already gone), so its outcome is unknown; the timeout error when the TTL
+   *   elapses first;
    *   `waitUntilFinished: the embedded engine was shut down` after shutdownManager()
    */
   waitUntilFinished(queueEvents: unknown, ttl?: number): Promise<unknown>;

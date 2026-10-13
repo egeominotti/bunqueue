@@ -27,6 +27,8 @@ interface CliFlags {
   tlsKeyFile?: string;
   maxCompletedJobs?: number;
   completedRetentionMs?: number;
+  removedResultRetentionMs?: number;
+  maxRemovedResults?: number;
 }
 
 /**
@@ -49,8 +51,8 @@ function validatePort(
 }
 
 /**
- * `--max-completed-jobs` / `--completed-retention-ms`, read with `Number()` as 2.9.10
- * did (`1e5` is 100000). A value that is not a whole number >= `min` is ignored with
+ * `--max-completed-jobs` / `--completed-retention-ms` (and the removed-result retention
+ * flags), read with `Number()` as 2.9.10 did (`1e5` is 100000). A value that is not a whole number >= `min` is ignored with
  * 2.9.10's warning, and the file or env value applies; a flag without a value (`Number(
  * true)` used to be 1) is an error.
  */
@@ -85,6 +87,8 @@ export function parseCliFlags(args: string[]): CliFlags {
       'tls-key': { type: 'string' },
       'max-completed-jobs': { type: 'string' },
       'completed-retention-ms': { type: 'string' },
+      'removed-result-retention-ms': { type: 'string' },
+      'max-removed-results': { type: 'string' },
       config: { type: 'string', short: 'c' },
     },
     allowPositionals: false,
@@ -139,6 +143,24 @@ export function parseCliFlags(args: string[]): CliFlags {
       min
     );
   }
+  const removedTtl = given('removed-result-retention-ms');
+  if (removedTtl !== undefined) {
+    flags.removedResultRetentionMs = storageFlag(
+      '--removed-result-retention-ms',
+      'removed-result retention',
+      removedTtl,
+      SETTINGS.removedResultRetentionMs.rule.min
+    );
+  }
+  const removedCap = given('max-removed-results');
+  if (removedCap !== undefined) {
+    flags.maxRemovedResults = storageFlag(
+      '--max-removed-results',
+      'removed-result limit',
+      removedCap,
+      SETTINGS.maxRemovedResults.rule.min
+    );
+  }
   const config = given('config');
   if (config !== undefined) flags.configPath = requireFlagValue('--config', config);
   return flags;
@@ -155,6 +177,8 @@ function applyCliFlags(fileConfig: BunqueueConfig | null, flags: CliFlags): Bunq
     flags.authTokens !== undefined ||
     flags.maxCompletedJobs !== undefined ||
     flags.completedRetentionMs !== undefined ||
+    flags.removedResultRetentionMs !== undefined ||
+    flags.maxRemovedResults !== undefined ||
     flags.tlsCertFile !== undefined ||
     flags.tlsKeyFile !== undefined;
   if (!hasFlags && !fileConfig) return null;
@@ -178,6 +202,12 @@ function applyCliFlags(fileConfig: BunqueueConfig | null, flags: CliFlags): Bunq
       }),
       ...(flags.completedRetentionMs !== undefined && {
         completedRetentionMs: flags.completedRetentionMs,
+      }),
+      ...(flags.removedResultRetentionMs !== undefined && {
+        removedResultRetentionMs: flags.removedResultRetentionMs,
+      }),
+      ...(flags.maxRemovedResults !== undefined && {
+        maxRemovedResults: flags.maxRemovedResults,
       }),
     },
     auth: {

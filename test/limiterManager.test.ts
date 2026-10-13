@@ -5,6 +5,13 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { LimiterManager } from '../src/domain/queue/limiterManager';
+import { jobId, type JobId } from '../src/domain/types/job';
+
+let nextJob = 0;
+/** A fresh job id: concurrency slots are held per job. */
+function anyJob(): JobId {
+  return jobId(`job-${++nextJob}`);
+}
 
 describe('LimiterManager', () => {
   let manager: LimiterManager;
@@ -153,23 +160,66 @@ describe('LimiterManager', () => {
       manager.setConcurrency('emails', 5);
 
       // Acquire 3 slots
-      manager.tryAcquireConcurrency('emails');
-      manager.tryAcquireConcurrency('emails');
-      manager.tryAcquireConcurrency('emails');
+      const [a, b, c] = [anyJob(), anyJob(), anyJob()];
+      manager.tryAcquireConcurrency('emails', a);
+      manager.tryAcquireConcurrency('emails', b);
+      manager.tryAcquireConcurrency('emails', c);
 
       // Reduce limit to 2 (active is already 3, above new limit)
       manager.setConcurrency('emails', 2);
 
       // Should not be able to acquire more since active (3) >= limit (2)
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
 
       // After releasing one, active = 2, still >= limit (2)
-      manager.releaseConcurrency('emails');
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      manager.releaseConcurrency('emails', a);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
 
       // After releasing another, active = 1, now < limit (2)
-      manager.releaseConcurrency('emails');
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
+      manager.releaseConcurrency('emails', b);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+    });
+
+    test('a new limiter counts the jobs that were already active', () => {
+      const [a, b] = [anyJob(), anyJob()];
+      manager.setConcurrency('emails', 2, () => [a]);
+
+      expect(manager.isConcurrencyMaxed('emails')).toBe(false);
+      expect(manager.tryAcquireConcurrency('emails', b)).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
+
+      // The pre-existing job holds a real slot: its release frees exactly one.
+      manager.releaseConcurrency('emails', a);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
+    });
+
+    test('updating an existing limit keeps its holders and ignores a new seed', () => {
+      const a = anyJob();
+      manager.setConcurrency('emails', 1);
+      expect(manager.tryAcquireConcurrency('emails', a)).toBe(true);
+
+      let seeded = false;
+      manager.setConcurrency('emails', 2, () => {
+        seeded = true;
+        return [];
+      });
+
+      expect(seeded).toBe(false);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
+    });
+
+    test('clear then set seeds the new limiter from the active jobs again', () => {
+      const a = anyJob();
+      manager.setConcurrency('emails', 1);
+      expect(manager.tryAcquireConcurrency('emails', a)).toBe(true);
+
+      manager.clearConcurrency('emails');
+      manager.setConcurrency('emails', 1, () => [a]);
+
+      expect(manager.isConcurrencyMaxed('emails')).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
     });
   });
 
@@ -184,13 +234,13 @@ describe('LimiterManager', () => {
     test('should allow unlimited concurrency after clearing', () => {
       manager.setConcurrency('emails', 1);
 
-      manager.tryAcquireConcurrency('emails');
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      manager.tryAcquireConcurrency('emails', anyJob());
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
 
       manager.clearConcurrency('emails');
 
       // Now should be unlimited
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
     });
 
     test('should not throw when clearing non-existent concurrency limit', () => {
@@ -210,32 +260,32 @@ describe('LimiterManager', () => {
 
   describe('tryAcquireConcurrency', () => {
     test('should return true when no concurrency limit is set', () => {
-      expect(manager.tryAcquireConcurrency('unlimited')).toBe(true);
+      expect(manager.tryAcquireConcurrency('unlimited', anyJob())).toBe(true);
     });
 
     test('should allow acquiring up to the limit', () => {
       manager.setConcurrency('emails', 3);
 
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
     });
 
     test('should reject when limit is reached', () => {
       manager.setConcurrency('emails', 3);
 
-      manager.tryAcquireConcurrency('emails');
-      manager.tryAcquireConcurrency('emails');
-      manager.tryAcquireConcurrency('emails');
+      manager.tryAcquireConcurrency('emails', anyJob());
+      manager.tryAcquireConcurrency('emails', anyJob());
+      manager.tryAcquireConcurrency('emails', anyJob());
 
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
     });
 
     test('should handle limit of 1', () => {
       manager.setConcurrency('singleton', 1);
 
-      expect(manager.tryAcquireConcurrency('singleton')).toBe(true);
-      expect(manager.tryAcquireConcurrency('singleton')).toBe(false);
+      expect(manager.tryAcquireConcurrency('singleton', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('singleton', anyJob())).toBe(false);
     });
   });
 
@@ -243,44 +293,71 @@ describe('LimiterManager', () => {
     test('should allow re-acquiring after release', () => {
       manager.setConcurrency('emails', 1);
 
-      manager.tryAcquireConcurrency('emails');
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      const a = anyJob();
+      manager.tryAcquireConcurrency('emails', a);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
 
-      manager.releaseConcurrency('emails');
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
+      manager.releaseConcurrency('emails', a);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
     });
 
     test('should not go below zero active count', () => {
       manager.setConcurrency('emails', 2);
 
       // Release without acquiring should not cause negative active count
-      manager.releaseConcurrency('emails');
-      manager.releaseConcurrency('emails');
+      manager.releaseConcurrency('emails', anyJob());
+      manager.releaseConcurrency('emails', anyJob());
 
       // Should still be able to acquire the full limit
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
+    });
+
+    test('a job without a slot or a second release never frees another job slot', () => {
+      manager.setConcurrency('emails', 1);
+      const a = anyJob();
+      expect(manager.tryAcquireConcurrency('emails', a)).toBe(true);
+
+      manager.releaseConcurrency('emails', anyJob());
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
+
+      manager.releaseConcurrency('emails', a);
+      const b = anyJob();
+      expect(manager.tryAcquireConcurrency('emails', b)).toBe(true);
+      manager.releaseConcurrency('emails', a);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
+    });
+
+    test('a job that already holds a slot re-acquires without taking another', () => {
+      manager.setConcurrency('emails', 2);
+      const a = anyJob();
+      expect(manager.tryAcquireConcurrency('emails', a)).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', a)).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', a)).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
     });
 
     test('should not throw when releasing non-existent queue', () => {
-      expect(() => manager.releaseConcurrency('nonexistent')).not.toThrow();
+      expect(() => manager.releaseConcurrency('nonexistent', anyJob())).not.toThrow();
     });
 
     test('should handle multiple acquire-release cycles', () => {
       manager.setConcurrency('emails', 2);
 
       // Cycle 1
-      manager.tryAcquireConcurrency('emails');
-      manager.tryAcquireConcurrency('emails');
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
-      manager.releaseConcurrency('emails');
-      manager.releaseConcurrency('emails');
+      const [a, b] = [anyJob(), anyJob()];
+      manager.tryAcquireConcurrency('emails', a);
+      manager.tryAcquireConcurrency('emails', b);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
+      manager.releaseConcurrency('emails', a);
+      manager.releaseConcurrency('emails', b);
 
       // Cycle 2
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
     });
   });
 
@@ -297,7 +374,7 @@ describe('LimiterManager', () => {
       // Rate limit should be gone (returns true = no limiter)
       expect(manager.tryAcquireRateLimit('emails')).toBe(true);
       // Concurrency limit should be gone (returns true = no limiter)
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
       // Queue state should be recreated as fresh (not paused)
       expect(manager.isPaused('emails')).toBe(false);
     });
@@ -419,13 +496,13 @@ describe('LimiterManager', () => {
       manager.setConcurrency('notifications', 2);
 
       // Fill emails
-      manager.tryAcquireConcurrency('emails');
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      manager.tryAcquireConcurrency('emails', anyJob());
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
 
       // Notifications should still have capacity
-      expect(manager.tryAcquireConcurrency('notifications')).toBe(true);
-      expect(manager.tryAcquireConcurrency('notifications')).toBe(true);
-      expect(manager.tryAcquireConcurrency('notifications')).toBe(false);
+      expect(manager.tryAcquireConcurrency('notifications', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('notifications', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('notifications', anyJob())).toBe(false);
     });
 
     test('should allow different limit types on same queue', () => {
@@ -448,7 +525,7 @@ describe('LimiterManager', () => {
 
     test('concurrency limit of 0 should reject all requests', () => {
       manager.setConcurrency('blocked', 0);
-      expect(manager.tryAcquireConcurrency('blocked')).toBe(false);
+      expect(manager.tryAcquireConcurrency('blocked', anyJob())).toBe(false);
     });
 
     test('very large rate limit should allow many requests', () => {
@@ -461,7 +538,7 @@ describe('LimiterManager', () => {
     test('very large concurrency limit should allow many acquires', () => {
       manager.setConcurrency('bulk', 100000);
       for (let i = 0; i < 1000; i++) {
-        expect(manager.tryAcquireConcurrency('bulk')).toBe(true);
+        expect(manager.tryAcquireConcurrency('bulk', anyJob())).toBe(true);
       }
     });
 
@@ -477,22 +554,22 @@ describe('LimiterManager', () => {
 
     test('setting concurrency limit after acquiring preserves a fresh limiter', () => {
       manager.setConcurrency('emails', 2);
-      manager.tryAcquireConcurrency('emails');
-      manager.tryAcquireConcurrency('emails');
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      manager.tryAcquireConcurrency('emails', anyJob());
+      manager.tryAcquireConcurrency('emails', anyJob());
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
 
       // Updating the limit on existing limiter (uses setLimit)
       manager.setConcurrency('emails', 3);
       // Active count is still 2, limit is now 3, so one more should succeed
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
     });
 
     test('deleting a queue then re-creating limits works cleanly', () => {
       manager.setRateLimit('emails', 2);
       manager.setConcurrency('emails', 1);
       manager.tryAcquireRateLimit('emails');
-      manager.tryAcquireConcurrency('emails');
+      manager.tryAcquireConcurrency('emails', anyJob());
 
       manager.deleteQueue('emails');
 
@@ -511,9 +588,9 @@ describe('LimiterManager', () => {
       expect(manager.tryAcquireRateLimit('emails')).toBe(false);
 
       for (let i = 0; i < 3; i++) {
-        expect(manager.tryAcquireConcurrency('emails')).toBe(true);
+        expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
       }
-      expect(manager.tryAcquireConcurrency('emails')).toBe(false);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(false);
     });
 
     test('pausing a queue does not affect rate or concurrency limits', () => {
@@ -523,17 +600,17 @@ describe('LimiterManager', () => {
 
       // Limits still function even when paused
       expect(manager.tryAcquireRateLimit('emails')).toBe(true);
-      expect(manager.tryAcquireConcurrency('emails')).toBe(true);
+      expect(manager.tryAcquireConcurrency('emails', anyJob())).toBe(true);
       expect(manager.isPaused('emails')).toBe(true);
     });
 
     test('release concurrency on queue with cleared limiter is no-op', () => {
       manager.setConcurrency('emails', 2);
-      manager.tryAcquireConcurrency('emails');
+      manager.tryAcquireConcurrency('emails', anyJob());
       manager.clearConcurrency('emails');
 
       // Should not throw
-      expect(() => manager.releaseConcurrency('emails')).not.toThrow();
+      expect(() => manager.releaseConcurrency('emails', anyJob())).not.toThrow();
     });
 
     test('queue state survives rate limit clear and concurrency clear', () => {

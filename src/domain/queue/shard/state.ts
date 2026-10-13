@@ -1,3 +1,4 @@
+import type { JobId } from '../../types/job';
 import type { QueueState } from '../../types/queue';
 import type { ShardOptions } from '../../types/shard';
 import { DependencyTracker } from '../dependencyTracker';
@@ -16,6 +17,8 @@ export class ShardState {
   readonly queues = new Map<string, IndexedPriorityQueue>();
   readonly activeGroups = new Map<string, Set<string>>();
   readonly activeGroupCounts = new Map<string, Map<string, number>>();
+  /** Per queue: active job id -> the group whose slot it holds (source of the counts). */
+  readonly activeGroupHolders = new Map<string, Map<JobId, string>>();
   protected readonly uniqueKeyManager = new UniqueKeyManager();
   protected readonly dlqManager: DlqShard;
   protected readonly limiterManager = new LimiterManager();

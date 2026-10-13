@@ -54,6 +54,9 @@ export interface ResolvedConfig {
   postgresMaxSnapshotPayloadBytes: number;
   maxCompletedJobs: number;
   completedRetentionMs: number | null;
+  /** Memory/SQLite only: retention of a removed-on-completion job's result (0 = off). */
+  removedResultRetentionMs: number;
+  maxRemovedResults: number;
   corsOrigins: string[];
   requireAuthForMetrics: boolean;
   maxPrometheusQueues: number;
@@ -155,6 +158,11 @@ export function resolveServerConfig(
     ),
     maxCompletedJobs: num(SETTINGS.maxCompletedJobs, storage?.maxCompletedJobs),
     completedRetentionMs: normalizeCompletedRetentionMs(completedRetentionMs),
+    removedResultRetentionMs: num(
+      SETTINGS.removedResultRetentionMs,
+      storage?.removedResultRetentionMs
+    ),
+    maxRemovedResults: num(SETTINGS.maxRemovedResults, storage?.maxRemovedResults),
     corsOrigins: fc?.cors?.origins ?? env.CORS_ALLOW_ORIGIN?.split(',').filter(Boolean) ?? [],
     requireAuthForMetrics:
       fc?.auth?.requireAuthForMetrics ?? envBoolean('METRICS_AUTH', env, false, issues),

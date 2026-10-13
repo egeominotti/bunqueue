@@ -8,6 +8,7 @@ import type { RWLock } from '../../shared/lock';
 import type { MapLike, SetLike } from '../../shared/lru';
 import type { DependencyCompletionTracker } from '../dependencyCompletions';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
+import type { RemovedResults } from '../removedResults';
 import type { RetiredTimeoutGeneration } from '../types/background';
 
 /** Shared mutable state required by queue and flow insertion operations. */
@@ -30,6 +31,8 @@ export interface PushContext {
   dependencyResults: DependencyResultTracker;
   customIdMap: MapLike<string, JobId>;
   jobIndex: Map<JobId, JobLocation>;
+  /** Memory-only results of jobs removed on completion; a new generation drops its ID's. */
+  removedResults?: RemovedResults;
   pendingQueueAdmissions: Map<string, number>;
   totalPushed: { value: bigint };
   broadcast: (event: {

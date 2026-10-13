@@ -127,9 +127,20 @@ active group counts before a claim, consumes a rate token only for a job that is
 actually admitted, and returns the next window timestamp to long polling. Every
 policy mutation and active-group release wakes matching queue waiters. Periodic
 cleanup prunes expired runtime windows; explicit overrides remain until removed
-or the queue is obliterated. Cleanup never trims live `activeGroups` membership:
-the set remains an exact view of the keys in authoritative `activeGroupCounts`,
-including queues with more than 1,000 concurrently active groups.
+or the queue is obliterated.
+
+Active group slots are owned per job. The shard records every admitted grouped
+job in `activeGroupHolders` (per queue, job id to group id) and derives
+`activeGroupCounts` (per-group count) and `activeGroups` (groups with an active
+job) from it. A release frees a slot only when that job holds one of that group,
+so a duplicate release, a late ACK of a retried job that waits in the queue, or
+an outcome arriving after obliterate can never free a slot another active job
+holds. Every grouped pull records its holder, so jobs active before an override
+is set count toward it. See
+[Group slot ownership](./rate-limiting-and-concurrency.md#group-slot-ownership).
+Cleanup never trims live `activeGroups` membership: the set remains an exact
+view of the keys in `activeGroupCounts`, including queues with more than 1,000
+concurrently active groups.
 
 SQLite schema v36 stores durable overrides and pause state in `group_state(queue,
 group_id, rate_limit, rate_duration, concurrency_limit, paused)`. Runtime rate-window
@@ -217,9 +228,16 @@ workloads, p95 results, method, and qualification.
   window unchanged across embedded, TCP, and PostgreSQL paths, including an
   injected failure after SQLite has reset the policy columns but before it can
   delete the now-empty row.
-- `activeGroups` and `activeGroupCounts` remain exact set/count views; periodic
-  cleanup never evicts live group ownership to enforce an arbitrary size cap.
+- `activeGroups` and `activeGroupCounts` remain exact set/count views of
+  `activeGroupHolders`; a release by a job that holds no slot of the group is a
+  no-op, and periodic cleanup never evicts live group ownership to enforce an
+  arbitrary size cap.
 - `test/groups-bullmq-pro.test.ts` covers embedded scheduling and limits;
+  `test/group-slot-ownership.test.ts`,
+  `test/repro-group-concurrency-late-ack-phantom.test.ts` and
+  `test/repro-group-slot-phantom-release.test.ts` cover per-job slot ownership
+  on every exit path, late outcomes, overrides set while jobs run, obliterate
+  and restart;
   `test/groups-bullmq-pro-e2e.test.ts` covers public Queue/Worker APIs over a
   real TCP broker plus SQLite recovery;
 - `test/bullmq-pro-advanced.test.ts` covers max-size admission, group pause,
@@ -227,6 +245,7 @@ workloads, p95 results, method, and qualification.
 - `test/docs-queue-guide/job-groups.test.ts` and the shared functional contract
   run the documented behavior in both embedded and real TCP modes; and
 - `test/postgres-groups-bullmq-pro.test.ts`,
+  `test/postgres-group-concurrency-late-ack.test.ts`,
   `test/postgres-group-order-retention.test.ts`, and
   `test/postgres-schema-guard.test.ts` cover database-authoritative rotation,
   FIFO/restart/batch order, safe retention, and schema drift repair.

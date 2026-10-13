@@ -61,8 +61,10 @@ Owns:
   vars: `S3BackupManager.fromEnv`/`configFromEnv` (the `bunqueue backup` CLI) and
   `loadCloudConfig` (`CloudAgent.create`, used by the MCP server) delegate to them.
 - The env readers of components that also run embedded (`src/config/componentEnv.ts`):
-  `readWebhookDelivery` (`WEBHOOK_*`) and `readMonitoringThresholds`
-  (`QUEUE_IDLE_THRESHOLD_MS` and the other monitoring thresholds).
+  `readWebhookDelivery` (`WEBHOOK_*`), `readMonitoringThresholds`
+  (`QUEUE_IDLE_THRESHOLD_MS` and the other monitoring thresholds) and
+  `readRemovedResultRetention` (`BUNQUEUE_REMOVED_RESULT_RETENTION_MS`,
+  `BUNQUEUE_MAX_REMOVED_RESULTS`, for the embedded shared manager).
 - `bunqueue start` numeric flag parsing (`parseNumericFlag`, `requireFlagValue`,
   `src/config/cliFlags.ts`), called by `src/cli/commands/server.ts`.
 - Storage-driver Strategy registration, validation, manager construction, startup
@@ -98,8 +100,9 @@ Internal:
   (`src/infrastructure/backup/s3BackupDefaults.ts`).
 - `src/config/backup.ts`, `cloud.ts` → `schema.ts`, `settings.ts`; types from
   `src/infrastructure/backup/s3BackupConfig` and `src/infrastructure/cloud/types`.
-- Reverse edges (consumers): `src/application/webhookManager.ts` and
-  `src/application/monitoringChecks.ts` → `componentEnv.ts`;
+- Reverse edges (consumers): `src/application/webhookManager.ts`,
+  `src/application/monitoringChecks.ts` and `src/client/manager.ts` →
+  `componentEnv.ts`;
   `src/infrastructure/backup/s3BackupConfig.ts` → `backup.ts`;
   `src/infrastructure/cloud/config.ts` → `cloud.ts`;
   `src/cli/commands/server.ts` → `cliFlags.ts`, `settings.ts`, `auth.ts`.
@@ -136,11 +139,15 @@ one startup reports every invalid setting at once. Tolerated values are returned
 problem: the result carries it in `configErrors` (see [S3 Backup](./backup-s3.md)).
 
 Component readers (`src/config/componentEnv.ts`), used by the webhook manager and
-the monitoring state when they are created and by `resolveServerConfig`:
+the monitoring state when they are created and by `resolveServerConfig`, and, for
+the removed-result retention, by the embedded shared manager when it is created
+(the server reads those two settings with the same `envNumber` calls in
+`resolveServerConfig`, after the config file):
 
 ```typescript
 function readWebhookDelivery(env?: Env, issues?: ConfigIssues): WebhookDelivery; // { maxRetries, retryDelayMs }
 function readMonitoringThresholds(env?: Env, issues?: ConfigIssues): MonitoringThresholds;
+function readRemovedResultRetention(env?: Env, issues?: ConfigIssues): RemovedResultRetention; // { removedResultRetentionMs, maxRemovedResults }
 ```
 
 Re-exported from the package root (`src/main.ts:29-30`), so user config files can `import { defineConfig } from 'bunqueue'`:
@@ -199,6 +206,8 @@ interface ResolvedConfig {
   postgresMaxSnapshotPayloadBytes: number;
   maxCompletedJobs: number;
   completedRetentionMs: number | null;
+  removedResultRetentionMs: number; // memory/SQLite: removed-on-complete result TTL, 0 = off
+  maxRemovedResults: number; // cap of those retained results, 0 = off
   corsOrigins: string[];
   requireAuthForMetrics: boolean;
   maxPrometheusQueues: number;
@@ -391,6 +400,30 @@ ranges are listed in the [Configuration](#configuration) table. Key cases:
   `parseInt` misread (`1e12`, read as 1 ms) is an error. Direct `QueueManagerConfig`
   construction keeps its normalizer (invalid values become `null`), so an
   invalid programmatic value still cannot turn into destructive immediate expiry.
+- `removedResultRetentionMs` / `maxRemovedResults` resolve from
+  `storage.removedResultRetentionMs` / `storage.maxRemovedResults`, then
+  `BUNQUEUE_REMOVED_RESULT_RETENTION_MS` / `BUNQUEUE_MAX_REMOVED_RESULTS`, then
+  `60000` / `1000` (flags `--removed-result-retention-ms` /
+  `--max-removed-results`). They bound the memory-only result of a job removed on
+  completion that the completion lookup (WaitJob, `waitUntilFinished`) answers
+  with ([Core Queue Engine](./core-queue-engine.md#removed-result-retention));
+  `0` disables it. Like `maxCompletedJobs` they are tolerant (`defaulting`): a
+  value below 0 or holding no number means the default, with a warning; a value
+  `parseInt` misread (`1e12`) is an error; an invalid flag value (not a whole
+  number of at least 0) is ignored with a warning. Direct `QueueManagerConfig`
+  construction normalizes them (`normalizeRemovedResultSetting`: a finite number
+  of at least 0 is floored, anything else is the default) and never throws.
+  PostgreSQL ignores them (it keeps its own completion record). The embedded
+  shared manager (`getSharedManager`, `src/client/manager.ts`) reads the two env
+  vars when it is created through `readRemovedResultRetention()`
+  (`src/config/componentEnv.ts`), the same `envNumber(SETTINGS.*)` path as the
+  server, so it tolerates and rejects exactly the same values (a tolerated value
+  is logged once through `warnConfigOnce`; a misread one throws the server's
+  `ConfigError` from `getSharedManager`). The cap counts jobs, not bytes: up to
+  `maxRemovedResults` × result size (1,000 × 256 KB ≈ 256 MB);
+  `BUNQUEUE_MAX_REMOVED_RESULTS=0` restores the 2.9.13 footprint. The ring's
+  slot arrays follow the records held, not the cap (see
+  [Core Queue Engine](./core-queue-engine.md#removed-result-retention)).
 - `workerTimeoutMs` / `lockTimeoutMs` resolve from `WORKER_TIMEOUT_MS` /
   `LOCK_TIMEOUT_MS`, then `30000` / `5000` (whole ms >= 1); the file's
   `timeouts.worker` / `timeouts.lock` are ignored with a warning, as they always
@@ -543,6 +576,8 @@ var, the config-file key and the flag alike (a file fraction is rounded down).
 | `BUNQUEUE_DATA_PATH` > `BQ_DATA_PATH` > `DATA_PATH` > `SQLITE_PATH`                  | `storage.dataPath`                                          | `undefined` (in-memory)      | string                               |
 | `BUNQUEUE_MAX_COMPLETED_JOBS` / `MAX_COMPLETED_JOBS`                                 | `storage.maxCompletedJobs` / `--max-completed-jobs`         | `50000`                      | >= 1                                 |
 | `BUNQUEUE_COMPLETED_RETENTION_MS` / `COMPLETED_RETENTION_MS`                         | `storage.completedRetentionMs` / `--completed-retention-ms` | `null` (disabled)            | ms >= 0 (file: or `null`)            |
+| `BUNQUEUE_REMOVED_RESULT_RETENTION_MS`                                               | `storage.removedResultRetentionMs` (flag: see below)        | `60000`                      | ms >= 0 (0 off; invalid = default)   |
+| `BUNQUEUE_MAX_REMOVED_RESULTS`                                                       | `storage.maxRemovedResults` / `--max-removed-results`       | `1000`                       | >= 0 (0 off; invalid = default)      |
 | `BUNQUEUE_POSTGRES_URL`                                                              | `storage.url`                                               | `undefined`                  | string                               |
 | `BUNQUEUE_POSTGRES_NAMESPACE`                                                        | `storage.namespace`                                         | `default`                    | string                               |
 | `BUNQUEUE_BROKER_ID`                                                                 | `storage.brokerId`                                          | generated host/PID/random ID | string                               |

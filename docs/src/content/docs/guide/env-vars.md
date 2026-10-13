@@ -37,6 +37,8 @@ A typed `bunqueue.config.ts` can replace most of these, with IntelliSense and ev
 | `BUNQUEUE_DATA_PATH`                            | string               | (in-memory) | SQLite database path. Without it or a PostgreSQL URL, jobs are lost on restart |
 | `BUNQUEUE_MAX_COMPLETED_JOBS`                   | positive integer     | `50000`     | Completed-job hot cache/recovery window; does not delete durable rows          |
 | `BUNQUEUE_COMPLETED_RETENTION_MS`               | non-negative integer | disabled    | Age after which the background cleanup may delete completed SQLite rows        |
+| `BUNQUEUE_REMOVED_RESULT_RETENTION_MS`          | non-negative integer | `60000`     | Memory-only retention of a `removeOnComplete` job's result (`0` off)           |
+| `BUNQUEUE_MAX_REMOVED_RESULTS`                  | non-negative integer | `1000`      | Maximum number of those retained results (`0` off)                             |
 | `BUNQUEUE_POSTGRES_URL`                         | string               | (none)      | PostgreSQL connection URL; implies the `postgres` driver when no driver is set |
 | `BUNQUEUE_POSTGRES_NAMESPACE`                   | string               | `default`   | Isolates independent bunqueue installations in one PostgreSQL database         |
 | `BUNQUEUE_BROKER_ID`                            | string               | generated   | Stable unique ID for this PostgreSQL broker process                            |
@@ -71,6 +73,26 @@ value disables retention, as in earlier releases, with a warning; a misread valu
 such as `1e12` (read as 1 ms by earlier releases) stops startup. An empty
 `BUNQUEUE_COMPLETED_RETENTION_MS` disables retention even when the legacy alias
 is set.
+
+**Results of jobs removed on completion.** A job added with `removeOnComplete:
+true` is deleted when it completes; memory and SQLite brokers keep its result in
+memory only, for `BUNQUEUE_REMOVED_RESULT_RETENTION_MS` (default 60 seconds) and
+for at most `BUNQUEUE_MAX_REMOVED_RESULTS` (default 1,000) jobs, so a
+`waitUntilFinished()` that reaches the broker after the completion still gets the
+result. `0` turns it off. A negative or non-numeric value means the default, with
+a warning; a misread value such as `1e12` stops startup. PostgreSQL ignores both.
+Embedded mode (`embedded: true`) reads both variables too, with the same rules,
+when its engine starts: the first embedded `Queue` or `Worker` of the process. A
+misread value makes that constructor throw the same error the server stops with.
+
+The cap counts jobs, not bytes: the broker holds up to
+`BUNQUEUE_MAX_REMOVED_RESULTS` results at once, so its memory is up to that cap
+times your result size. With the default cap and 256 KB results that is
+1,000 × 256 KB ≈ 256 MB. Lower the cap for large results, or set
+`BUNQUEUE_MAX_REMOVED_RESULTS=0` to keep nothing, the memory footprint of 2.9.13.
+The bookkeeping (about 50 bytes a result) follows the results actually held, not
+the cap: a high cap costs nothing until results fill it, and the memory is
+released as they expire.
 
 **Storage selection.** An explicit driver wins. Otherwise a PostgreSQL URL
 selects PostgreSQL, a data path selects SQLite, and neither selects memory.

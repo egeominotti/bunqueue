@@ -15,8 +15,10 @@ Owns:
   `completedJobsData` (BoundedMap), `depCompletions`
   (`DependencyCompletionTracker`: exact recent FIFO plus live pins),
   `timedOutJobs` / `retiredTimeoutLeaseTokens` (BoundedMap generation proofs),
-  `retiredCronLeaseTokens` (BoundedMap), and
-  `jobResults`/`customIdMap`/`jobLogs` (LRUMap).
+  `retiredCronLeaseTokens` (BoundedMap),
+  `jobResults`/`customIdMap`/`jobLogs` (LRUMap), and `removedResults`
+  (`RemovedResults`: memory-only results of jobs removed on completion, see
+  [Removed-result retention](#removed-result-retention)).
 - Lock ownership and flow state in `queue-manager/state.ts`; ACK/lease recovery in `queue-manager/ack.ts`, `delivery.ts` and `locks.ts`; flow propagation in `flow-failures.ts`, `flow-options.ts` and `dependency-runtime.ts`.
 - Shard selection and routing of every operation to the owning shard.
 - Lifecycle: recovery from storage at construction, background-task startup, and `shutdown()` teardown of all collections.
@@ -87,7 +89,9 @@ Job management: `cancel`, `updateProgress`, `updateJobData`, `changePriority`,
 `moveToWaitingChildren`, `discard` (`queue-manager/job-management.ts`). `cancel`
 removes a pending job or a completed one (the latter with the end state of
 `removeOnComplete`, issue #155) and returns `false` for an active, failed or
-missing job; see [Job Lifecycle](./job-lifecycle.md#removing-a-job-cancel).
+missing job; it also drops the retained result of a job removed on completion
+under that ID (still `false`: such a job does not exist); see
+[Job Lifecycle](./job-lifecycle.md#removing-a-job-cancel).
 
 Flow/dependencies: `updateJobParent`, `removeChildDependency`,
 `removeUnprocessedChildren`, `getFailedChildrenValues`,
@@ -132,7 +136,7 @@ See [data-model](../data-model.md) for full definitions. Most relevant here:
   - `{ type: 'processing'; shardIdx: number; queueName: string }`
   - `{ type: 'completed'; queueName: string }`
   - `{ type: 'dlq'; queueName: string }`
-- `QueueState` (`src/domain/types/queue.ts:7-17`) — `{ name; paused; rateLimit; rateLimitDuration; rateLimitExpiresAt; concurrencyLimit; activeCount }`, per-queue control state held in the shard's `LimiterManager`.
+- `QueueState` (`src/domain/types/queue.ts:9-19`) — `{ name; paused; rateLimit; rateLimitDuration; rateLimitExpiresAt; concurrencyLimit; activeCount }`, per-queue control state held in the shard's `LimiterManager`.
 - `ShardStats` (`shardCounters.ts:10-17`) — `{ queuedJobs; delayedJobs; dlqJobs }`, O(1) running counters.
 - `QueueManagerConfig` / `DEFAULT_CONFIG` (`src/application/types/config.ts`) — see [Configuration](#configuration).
 - `EventType` enum and `JobEvent` (`src/domain/types/queue.ts`) — events broadcast via `EventsManager` on push/pull/complete/fail/pause/resume/etc.
@@ -192,12 +196,20 @@ FAIL for that retired generation becomes the explicit successful no-op
 applies and a wrong or missing token still fails. Batch ACKs report exact
 `ignoredIndices` (plus diagnostic `ignoredIds`), so duplicate IDs remain
 positionally unambiguous. A requeued non-timeout stall generation can still use
-`completeStallRetriedJob` to prevent duplicate execution (Issue #33). The
+`completeStallRetriedJob` to prevent duplicate execution (Issue #33). That
+completion takes the job out of the queue and releases no group or concurrency
+slot: the retry already released them and its unique key, and the group may
+already run another job. The key is released again owner-checked, which frees
+it only when it was registered for this queued job afterwards (startup recovery
+and a DLQ retry register the key of each job they restore) and is a no-op
+otherwise. The
 retired-generation check is repeated after the processing claim to close the
 validation-to-claim race. ACK, ACKB, and FAIL also revalidate the queue-bearing
 processing location after extraction and before terminal publication; an
 obliterate that wins this gap cannot be followed by a resurrected completion,
-retry, or DLQ entry.
+retry, or DLQ entry. Cleanup's orphaned-index sweep cannot win it: it deletes a
+`processing` location only when a later sweep, at least 60 s on, finds the same
+location object, so an ACK in flight keeps its job and releases its slots.
 
 **Dependency flush (`queue-manager/dependency-runtime.ts`):** On job completion,
 IDs accumulate in `pendingDepChecks`. `scheduleDependencyFlush` coalesces
@@ -211,7 +223,8 @@ telemetry, and queue/group state, then removes buffered inserts without
 materializing all historical job IDs. It then clears the shard's waiting/delayed queue and DLQ and
 explicitly sweeps every global index (`jobIndex`,
 `completedJobs`, `completedJobsData`, `jobResults`, `jobLogs`, `jobLocks`, flow
-maps, `repeatChain`, `customIdMap`), purges per-queue metrics + persisted
+maps, `repeatChain`, `customIdMap`, the queue's `removedResults` records), purges
+per-queue metrics + persisted
 queue/group-state rows, and deletes processing-shard entries for the queue.
 Result/log ownership indexes expose cold LRU entries without an unbounded scan.
 A failure at any durable deletion step leaves all runtime state intact and a
@@ -256,7 +269,10 @@ newer `startedAt`, so a stale token is rejected). See
   rows; the last consumer release moves a pin into the recent FIFO and
   re-applies the cap. `jobResults`, `customIdMap`, `jobLogs`, and
   `perQueueMetrics` use `LRUMap`, which evicts **one** tail entry per insert at
-  capacity. `jobResultQueues` and `jobLogQueues` mirror their corresponding LRU
+  capacity. `removedResults` holds at most `maxRemovedResults` (1k) records for
+  at most `removedResultRetentionMs` (60 s), freeing 10% of its ring slots,
+  oldest first, at the cap; its size is `getMemoryStats().removedResults`.
+  `jobResultQueues` and `jobLogQueues` mirror their corresponding LRU
   insertion, deletion, and eviction lifecycle, so queue ownership stays bounded
   and cold auxiliary entries can be purged safely. `jobIndex` is a plain `Map`, kept bounded indirectly: the
   `completedJobs` eviction callback deletes the corresponding `jobIndex` and
@@ -278,7 +294,100 @@ newer `startedAt`, so a stale token is rejected). See
   memory-only obliterate to remove the selected queue's hidden proofs without
   touching another queue. `cancel` of a completed job converges on the same
   state: the row, result and projections go, the proof is kept with the
-  original completion time.
+  original completion time. The job's result is kept only in the memory-only
+  `removedResults` record below, never persisted.
+
+### Removed-result retention
+
+`removedResults` (`src/application/removedResults.ts`, issue #155 A) keeps the
+result of each job removed on completion for a short, bounded time so the
+completion lookup still answers after the job is gone. A WaitJob or an embedded
+`waitUntilFinished` that reaches the engine after the completion (a
+request/reply loop without QueueEvents, where about half of the jobs completed
+before the first hold arrived, or a wait started after its `completed` event)
+used to reject `Job <id> not found`.
+
+- **Writers.** Every `removeOnComplete` completion branch records its queue,
+  result and expiry right after `commitRemovedCompletion` and before
+  `jobIndex.delete`: `ackJob` (`operations/ack/completion.ts`), the batch
+  `finalizeBatchAck` (`operations/ackHelpers.ts`; `ACKB` without results records
+  `undefined`) and `completeStallRetriedJob` (`queue-manager/delivery.ts`).
+  Presence means "completed", so an `undefined` result is recorded too.
+- **Reader.** `getCompletionAsync` answers `{ found: true, result }` from an
+  unexpired record when the ID is not in `completedJobs` and `jobIndex` holds no
+  current generation for it. `getJobState` keeps answering `unknown`, `getJob`
+  `null`, and `getResultAsync` (GetResult) reads completed jobs only, as before.
+  WaitJob (`handleWaitJob`), the embedded wait reader (`managerReader`) and the
+  embedded MCP wait (`waitForJobCompletion`) use the lookup.
+- **Bounds.** A ring of at most `maxRemovedResults` slots (parallel arrays of
+  ID, queue, result and expiry); a single TTL and a monotonic clock
+  (`performance.now`) make insertion order expiry order. The ring's capacity
+  follows its occupied slots, not the cap: it starts empty, doubles when full
+  (16 slots first, never past `maxRemovedResults`) and, after an eviction that
+  leaves it at most a quarter full, halves down to 16. A resize copies the
+  occupied slots in order to fresh arrays from slot 0 and moves each indexed
+  slot by its distance from the head (amortized O(1) per record; none at a
+  steady load). A completion otherwise only writes its slot: no hashing, no
+  allocation. The `jobId -> slot` index is
+  built lazily by the first read after it (lookup, forget, `size`, the purge),
+  so each record is indexed at most once and a workload that never reads pays
+  nothing for it. An insert frees slots from the head while records are expired
+  (one comparison while the head expiry is in the future) and, at the cap, 10%
+  of the slots at once. No per-entry timers. Defaults: 60 s
+  (`removedResultRetentionMs`) and 1,000 records (`maxRemovedResults`); either
+  at 0 disables the record. The batch ACK (`finalizeBatchAck`) checks
+  `enabled` once and stamps all of its records with one clock reading
+  (`RemovedResults.now()`, taken right before them, so a record expires at most
+  that batch's duration early, never late); disabled, it does no record work at
+  all. Single ACKs read the clock per record, or return after one branch when
+  disabled.
+- **Precision.** A lookup never answers a record at or past its expiry, nor
+  one that was dropped. A dropped record (forgotten, expired on read, or
+  superseded by a later record of the same ID, which the next index build
+  detects before anything can read it) releases its result at once but keeps
+  its slot until the head passes it, so the cap counts slots: at most
+  `maxRemovedResults` records are ever held, and a record is evicted by the cap
+  only once at least `maxRemovedResults` minus 10% records came after it. An
+  expired record holds its result until the next insert or the periodic purge
+  (at most `cleanupIntervalMs` past its expiry), as before.
+- **Invalidation.** A new generation admitted under the same ID drops the
+  record (`commitCustomIdAdmission` for PUSH/PUSHB, `publishJobs` for flows);
+  the read-side `jobIndex` check guards it as well. `obliterate` drops the
+  queue's records, `cancel` (`job.remove()`, `DELETE /jobs/:id`) drops the ID's
+  record and keeps the legacy not-found reply, and a Cancel outcome that reports
+  the job missing drops it again right after its state read
+  (`forgetRemovedResult`, called by `cancelWithOutcome`), so the job's own ACK
+  landing between a refused Cancel and that read leaves nothing behind.
+  `shutdown()` clears all, and the
+  periodic cleanup (`cleanupTasks.ts`, every `cleanupIntervalMs`) purges expired
+  records even when no completion arrives, so the TTL also bounds how long a
+  result is held. Nothing is persisted: a restart drops every record.
+- **Configuration.** The server takes `storage.removedResultRetentionMs` /
+  `storage.maxRemovedResults` from the config file, then the
+  `--removed-result-retention-ms` / `--max-removed-results` flags, then
+  `BUNQUEUE_REMOVED_RESULT_RETENTION_MS` / `BUNQUEUE_MAX_REMOVED_RESULTS`. The
+  embedded shared manager (`getSharedManager`, `src/client/manager.ts`) reads the
+  two env vars when it is created, through `readRemovedResultRetention()`
+  (`src/config/componentEnv.ts`): the same setting definitions and parser, so a
+  value with no number or below 0 means the default with the server's warning
+  (logged once) and a misread value (`5s`, `1e12`) throws the server's
+  `ConfigError`. A `QueueManager` built directly takes the two options
+  (`normalizeRemovedResultSetting`: anything but a finite number >= 0 means the
+  default).
+- **Memory.** The cap counts jobs, not bytes: the record holds at most
+  `maxRemovedResults` return values, so its footprint is up to the cap times the
+  result size (1,000 × 256 KB ≈ 256 MB). The slot arrays add about 40 to 50
+  bytes per slot and hold between one and four slots per occupied slot (16 at
+  least once a record was written), so a large cap costs nothing until records
+  fill it, and the slots go again when they expire. Before, the arrays grew to
+  the highest slot ever written and never shrank until restart: each record
+  takes the slot after the newest one, so once `maxRemovedResults` records had
+  been written they held the cap's size (about 48 MB at 1,000,000) with
+  any number of live records (`test/removed-results-capacity.test.ts`). `BUNQUEUE_MAX_REMOVED_RESULTS=0` (or a
+  retention of 0) restores the 2.9.13 footprint, in which nothing outlived a job
+  removed on completion.
+- **PostgreSQL** is unchanged: it keeps its own completion record with the
+  result, bounded by `maxCompletedJobs`.
 - **Repeat-chain leak guard.** `repeatChain` is capped at 10,000 entries; the
   oldest key is evicted past the cap (`queue-manager/context.ts`).
 - **Flow-failure map leak guard.** `failedChildrenValues` /
@@ -317,6 +426,11 @@ newer `startedAt`, so a stale token is rejected). See
 | `stallCheckMs`         | `5_000`   | Stall-detection cadence                                                                                                                                                                                                                                 |
 | `dlqMaintenanceMs`     | `60_000`  | DLQ auto-retry / expiry cadence                                                                                                                                                                                                                         |
 | `validateWebhookUrls`  | _(unset)_ | Passed to `WebhookManager`                                                                                                                                                                                                                              |
+
+`removedResultRetentionMs` (default `60_000`) and `maxRemovedResults` (default
+`1_000`) bound the memory-only result of a job removed on completion (see
+[Removed-result retention](#removed-result-retention)); `0` disables it, and a
+value that is not a finite number of at least 0 normalizes to the default.
 
 `SHARD_COUNT` is not configurable at runtime — it is derived once from `navigator.hardwareConcurrency` (power of two, capped at 64) at module load (`hash.ts:28-44`). Server-level env vars (`BUNQUEUE_DATA_PATH`, etc.) are resolved by the entrypoint and surface here as `config.dataPath`; see [Configuration & Entrypoint](./configuration.md).
 

@@ -3,6 +3,7 @@ import type { DlqEntry, DlqFilter, DlqStats } from '../../domain/types/dlq';
 import { DEFAULT_DLQ_CONFIG } from '../../domain/types/dlq';
 import { DEFAULT_STALL_CONFIG } from '../../domain/types/stall';
 import { shardIndex, SHARD_COUNT } from '../../shared/hash';
+import { activeJobIdsOf } from '../activeJobIds';
 import * as dlqOps from '../dlqManager';
 import * as queryOps from '../operations/queryOperations';
 import { QueueManagerControl } from './control';
@@ -199,7 +200,10 @@ export class QueueManagerLimits extends QueueManagerControl {
   }
 
   setConcurrency(queue: string, limit: number): void {
-    this.shards[shardIndex(queue)].setConcurrency(queue, limit);
+    // Jobs already active count toward a new limit (BullMQ global concurrency).
+    this.shards[shardIndex(queue)].setConcurrency(queue, limit, () =>
+      activeJobIdsOf(queue, this.processingShards, this.jobIndex)
+    );
     this.registerQueueName(queue);
     this.persistQueueState(queue);
   }

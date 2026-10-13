@@ -124,6 +124,7 @@ queue.clear_rate_limit()?;
 - `getGlobalConcurrency()` and `getGlobalRateLimit()` return the live configured values in embedded and TCP modes.
 - `getRateLimitTtl(maxJobs?)` returns `-2` when no rate limit exists (the PostgreSQL multi-broker backend returns `0` instead and ignores `maxJobs`); otherwise it reports the temporary-limit lifetime or token wait.
 - `isMaxed()` reports whether the queue's global concurrency slots are all occupied.
+- Jobs already active when you set the global concurrency (or set it again after removing it) count toward it, as in BullMQ, and `isMaxed()` counts them too.
 :::
 
 See [Rate Limiting](/guide/rate-limiting/) for worker-side limiting too.

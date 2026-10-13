@@ -6,7 +6,9 @@
  * outcome: its result once it completes, or its last failure once no retry is
  * left. A failed attempt that will be retried (a `failed` event with
  * `terminal: false`) does not settle it. A job that no longer exists settles it
- * with `Job <id> not found`.
+ * with `Job <id> not found`, except a job removed on completion whose result the
+ * engine still retains (memory/SQLite: `removedResults`, short-lived; PostgreSQL:
+ * its completion record): that wait settles on the result.
  *
  * Embedded: the job's events from the shared manager (one subscription per
  * manager, `job-wait/managerDispatch.ts`), state reads that never create a

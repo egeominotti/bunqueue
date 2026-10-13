@@ -189,6 +189,8 @@ bunqueue concurrency clear emails
 
 *The PHP, Go, and Rust SDKs do not expose the global concurrency helpers yet. The cap lives server-side per queue, so set it with `bunqueue concurrency set` or from any other client and it applies to workers in every language.*
 
+Jobs that are already running when you set the limit count toward it, as in BullMQ. If 3 jobs of `emails` are active and you set the limit to 5, only 2 more start until running jobs finish. The same holds when you clear the limit and set it again. Lowering the limit below the number of running jobs never interrupts them; new jobs start only once the active count drops below the new limit.
+
 This is a *queue-level* cap. Each worker also has its own `concurrency` option that limits how many jobs that one worker runs in parallel:
 
 <Tabs syncKey="lang">

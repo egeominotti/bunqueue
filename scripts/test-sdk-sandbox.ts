@@ -213,7 +213,7 @@ async function runSuite(suite: SdkSandboxSuite): Promise<SuiteTelemetry> {
     '--env',
     `BUNQUEUE_CONFORMANCE_POSTGRES_URL=${postgres.url}`,
     `bunqueue-sdk-test:${suite.name}`,
-    ...suite.command,
+    ...suite.containerCommand,
   ];
   const exitCode = await logged(command, logPath);
   complete = true;

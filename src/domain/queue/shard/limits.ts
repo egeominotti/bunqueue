@@ -30,7 +30,14 @@ export class ShardLimits extends ShardKeys {
       options?.affinity
     );
   }
-  acquireGroup(queue: string, groupId: string, options?: GroupPullOptions, now?: number): boolean {
+  /** Admit job `jobId` into its group; on success the job holds one group slot. */
+  acquireGroup(
+    queue: string,
+    groupId: string,
+    jobId: JobId,
+    options?: GroupPullOptions,
+    now?: number
+  ): boolean {
     const acquired = this.groupLimiterManager.acquire(
       queue,
       groupId,
@@ -38,7 +45,7 @@ export class ShardLimits extends ShardKeys {
       this.getGroupActiveCount(queue, groupId),
       now
     );
-    if (acquired) this.activateGroup(queue, groupId);
+    if (acquired) this.activateGroup(queue, groupId, jobId);
     return acquired;
   }
   advanceGroup(queue: string, groupId: string): void {
@@ -55,8 +62,7 @@ export class ShardLimits extends ShardKeys {
   }
   clearEmptyGroupRuntime(queue: string): void {
     this.groupScheduler.clearQueue(queue);
-    this.activeGroups.delete(queue);
-    this.activeGroupCounts.delete(queue);
+    this.clearActiveGroups(queue);
   }
   setGroupRateLimit(queue: string, groupId: string, max: number, duration: number): void {
     this.groupLimiterManager.setRateLimit(queue, groupId, max, duration);
@@ -109,17 +115,17 @@ export class ShardLimits extends ShardKeys {
   getRateLimitTtl(queue: string, maxJobs?: number): number {
     return this.limiterManager.getRateLimitTtl(queue, maxJobs);
   }
-  setConcurrency(queue: string, limit: number): void {
-    this.limiterManager.setConcurrency(queue, limit);
+  setConcurrency(queue: string, limit: number, activeJobIds?: () => Iterable<JobId>): void {
+    this.limiterManager.setConcurrency(queue, limit, activeJobIds);
   }
   clearConcurrency(queue: string): void {
     this.limiterManager.clearConcurrency(queue);
   }
-  tryAcquireConcurrency(queue: string): boolean {
-    return this.limiterManager.tryAcquireConcurrency(queue);
+  tryAcquireConcurrency(queue: string, jobId: JobId): boolean {
+    return this.limiterManager.tryAcquireConcurrency(queue, jobId);
   }
-  releaseConcurrency(queue: string): void {
-    this.limiterManager.releaseConcurrency(queue);
+  releaseConcurrency(queue: string, jobId: JobId): void {
+    this.limiterManager.releaseConcurrency(queue, jobId);
   }
   getConcurrency(queue: string): number | null {
     return this.limiterManager.getConcurrency(queue);
@@ -133,17 +139,18 @@ export class ShardLimits extends ShardKeys {
   clearQueueLimiters(queue: string): void {
     this.limiterManager.deleteQueue(queue);
   }
+  /**
+   * Release what the job `ownerId` held while active: unique key, group and concurrency
+   * slot. Every release is owner-checked, so a duplicate or late call is a no-op.
+   */
   releaseJobResources(
     queue: string,
     uniqueKey: string | null,
     groupId: string | null,
-    ownerId?: JobId
+    ownerId: JobId
   ): void {
-    if (uniqueKey) {
-      if (ownerId) this.releaseUniqueKeyIfOwned(queue, uniqueKey, ownerId);
-      else this.releaseUniqueKey(queue, uniqueKey);
-    }
-    if (groupId) this.releaseGroup(queue, groupId);
-    this.releaseConcurrency(queue);
+    if (uniqueKey) this.releaseUniqueKeyIfOwned(queue, uniqueKey, ownerId);
+    if (groupId) this.releaseGroup(queue, groupId, ownerId);
+    this.releaseConcurrency(queue, ownerId);
   }
 }

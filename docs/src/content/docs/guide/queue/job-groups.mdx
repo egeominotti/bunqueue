@@ -84,6 +84,12 @@ const worker = new Worker('webhooks', deliverWebhook, {
 Use `concurrency: 1` for strictly serial execution per group. The ordinary
 Worker `concurrency` still caps total parallel work in this process.
 
+The broker counts the active jobs of each group. Jobs that are already running
+when you set an override count toward it, and each job frees its slot once,
+when it completes, fails, is retried or moved, or is recovered after a stall or
+an expired lock. A late completion from a worker whose attempt was already
+retried never frees the slot of another job that is running in the group.
+
 ## Per-group rate limits
 
 `group.limit` gives every group its own fixed window, enforced when the broker

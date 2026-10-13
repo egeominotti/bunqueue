@@ -26,15 +26,25 @@ export class QueueManagerQueries extends QueueManagerLocks {
     return queryOps.getJobResult(jobId, this.contextFactory.getQueryContext());
   }
 
-  /** Distinguish a completed generation from a valid undefined result. */
+  /**
+   * The completion lookup (WaitJob, the embedded wait reader): distinguishes a completed
+   * generation from a valid undefined result. A job removed on completion answers from
+   * its retained result (`removedResults`, memory only, short-lived) while no current
+   * generation holds the ID; `getJobState` still reads `unknown` for it.
+   */
   async getCompletionAsync(jobId: JobId): Promise<{ found: boolean; result: unknown }> {
-    const found = this.completedJobs.has(jobId);
-    return { found, result: found ? this.getResult(jobId) : undefined };
+    if (this.completedJobs.has(jobId)) return { found: true, result: this.getResult(jobId) };
+    const removed = this.jobIndex.has(jobId) ? undefined : this.removedResults.lookup(jobId);
+    return removed ? { found: true, result: removed.result } : { found: false, result: undefined };
   }
 
-  /** Async result port used by transports; memory and SQLite remain synchronous internally. */
+  /**
+   * Async result port used by transports (GetResult); memory and SQLite remain
+   * synchronous internally. It reads completed jobs only, as before: the retained result
+   * of a job removed on completion answers the completion lookup, not GetResult.
+   */
   async getResultAsync(jobId: JobId): Promise<unknown> {
-    return (await this.getCompletionAsync(jobId)).result;
+    return this.completedJobs.has(jobId) ? this.getResult(jobId) : undefined;
   }
 
   async getChildrenValues(parentJobId: JobId): Promise<Record<string, unknown>> {

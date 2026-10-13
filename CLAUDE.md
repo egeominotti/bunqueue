@@ -48,12 +48,17 @@ counter/index coherence, idempotent recovery, and DLQ exactly-once.
 On failure, retain the seed, minimized command history, and replay path. If the
 engine is wrong, add a deterministic `test/repro-model-*.test.ts` that fails
 before changing runtime code; if the specification is wrong, correct the model
-with evidence. Never weaken an invariant to make a campaign green. Deeper replay:
+with evidence. Never weaken an invariant to make a campaign green. Deeper replay
+(`BUNQUEUE_MODEL_COMMANDS` is only the real bound with `BUNQUEUE_MODEL_SIZE=max`;
+at fast-check's default size a history has at most 10 commands):
 
 ```bash
-BUNQUEUE_MODEL_RUNS=500 BUNQUEUE_MODEL_COMMANDS=150 \
+BUNQUEUE_MODEL_RUNS=500 BUNQUEUE_MODEL_COMMANDS=150 BUNQUEUE_MODEL_SIZE=max \
 BUNQUEUE_MODEL_SEED=-1959189325 bun run test:model
 ```
+
+Replay one failure exactly with the seed, path and size fast-check prints:
+`BUNQUEUE_MODEL_SEED=<seed> BUNQUEUE_MODEL_PATH=<path> BUNQUEUE_MODEL_SIZE=<size> bun run test:model`.
 
 This targeted command does not replace `bun run test:sandbox`; the full
 `bun test --parallel=4` unit command inside the sandbox runs the model again.
@@ -246,14 +251,15 @@ try {
 
 ## Memory Bounds
 
-| Collection    | Max Size | Eviction   |
-| ------------- | -------- | ---------- |
-| completedJobs | 50,000   | FIFO batch |
-| jobResults    | 10,000   | LRU        |
-| jobLogs       | 10,000   | LRU        |
-| customIdMap   | 50,000   | LRU        |
+| Collection     | Max Size          | Eviction                                     |
+| -------------- | ----------------- | -------------------------------------------- |
+| completedJobs  | 50,000            | FIFO batch                                   |
+| jobResults     | 10,000            | LRU                                          |
+| jobLogs        | 10,000            | LRU                                          |
+| customIdMap    | 50,000            | LRU                                          |
+| removedResults | 1,000 (60 s TTL)  | Expired first; 10% batch at cap; memory only |
 
-Cleanup runs every 10s. Evicts 10% when full.
+Cleanup runs every 10s (it also purges expired `removedResults`). Evicts 10% when full.
 
 ## Environment Variables
 
@@ -268,6 +274,9 @@ TCP_SOCKET_PATH=           # RESERVED, not wired: TCP always binds HOST:TCP_PORT
 HTTP_SOCKET_PATH=          # Unix socket for HTTP (works)
 TLS_CERT_FILE=             # PEM cert — native TLS on TCP+HTTP (with TLS_KEY_FILE)
 TLS_KEY_FILE=              # PEM private key (both or neither; partial = startup error)
+
+# Memory-only result of removeOnComplete jobs for late waits (memory/SQLite; 0 = off)
+BUNQUEUE_REMOVED_RESULT_RETENTION_MS=60000  BUNQUEUE_MAX_REMOVED_RESULTS=1000
 
 # Data path (priority: BUNQUEUE_DATA_PATH > BQ_DATA_PATH > DATA_PATH > SQLITE_PATH)
 # Or set programmatically: new Queue('q', { embedded: true, dataPath: './data/q.db' })

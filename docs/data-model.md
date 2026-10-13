@@ -352,7 +352,7 @@ Defined in `src/domain/types/queue.ts`.
 
 ```typescript
 export interface QueueState {
-  // src/domain/types/queue.ts:7-17
+  // src/domain/types/queue.ts:9-19
   readonly name: string;
   paused: boolean;
   rateLimit: number | null; // token-bucket capacity
@@ -374,14 +374,24 @@ remaining TTL).
 
 Two runtime limiter classes back the config:
 
-- `RateLimiter` (`src/domain/types/queue.ts:33-81`) — token-bucket; `tryAcquire()`, `refill()`
+- `RateLimiter` (`src/domain/types/queue.ts:35-83`) — token-bucket; `tryAcquire()`, `refill()`
   based on elapsed seconds × `refillRate` (defaults to `capacity`).
-- `ConcurrencyLimiter` (`src/domain/types/queue.ts:84-119`) — counter with `tryAcquire`,
-  `release`, `setLimit`.
+- `ConcurrencyLimiter` (`src/domain/types/queue.ts:94-130`) — `holders: Set<JobId>` of the
+  jobs holding a slot (the active count is its size), with `tryAcquire(jobId)`,
+  `release(jobId)`, `setLimit`. `constructor(limit, activeJobIds?)` seeds the holders with the
+  queue's jobs already active, so a limit set or re-set while jobs run counts them (BullMQ
+  global-concurrency parity). Releasing a job that holds no slot is a no-op. Exists only while
+  the queue has a concurrency limit; `setLimit` keeps the holders, `clearConcurrency` drops them.
+
+Group concurrency slots use the same ownership rule on the shard
+(`src/domain/queue/shard/keys.ts`): `activeGroupHolders: Map<queue, Map<JobId,
+groupId>>` records every admitted grouped job, `activeGroupCounts` is the
+per-group count derived from it, and `releaseGroup(queue, groupId, jobId)`
+changes the count only when that job holds a slot of that group.
 
 Supporting enums/types:
 
-- `JobLocation` (`src/domain/types/queue.ts:121-126`) — the jobIndex value:
+- `JobLocation` (`src/domain/types/queue.ts:132-137`) — the jobIndex value:
   `{type:'queue',shardIdx,queueName}` | `{type:'processing',shardIdx,queueName}` |
   `{type:'completed',queueName}` | `{type:'dlq',queueName}`. Only a pull installs a
   `processing` entry and each pull installs a fresh object, so that object identifies one
@@ -389,10 +399,10 @@ Supporting enums/types:
 - `ClientJobOwner` (`src/application/clientOwnership.ts`) — `{ clientId, delivery }`: the TCP/WS/SSE
   connection that registered a job and the `jobIndex` entry current at registration. Disconnect
   release acts on a job only while `jobIndex.get(id)` is still that `processing` object.
-- `EventType` (`src/domain/types/queue.ts:129-145`) — 14 event types: `pushed`, `pulled`,
+- `EventType` (`src/domain/types/queue.ts:140-156`) — 14 event types: `pushed`, `pulled`,
   `completed`, `failed`, `progress`, `stalled`, `removed`, `delayed`,
   `duplicated`, `retried`, `waiting-children`, `drained`, `paused`, `resumed`.
-- `JobEvent` (`src/domain/types/queue.ts:148-162`) — broadcast shape for subscribers.
+- `JobEvent` (`src/domain/types/queue.ts:159-173`) — broadcast shape for subscribers.
 
 See [Rate Limiting & Concurrency](./features/rate-limiting-and-concurrency.md),
 [Concurrency & Locking](./features/concurrency-and-locking.md).
@@ -716,6 +726,11 @@ interface ResolvedConfig {
   logLevel: 'debug' | 'info' | 'warn' | 'error' | undefined; // logging.level > LOG_LEVEL > info
   logFormat: 'text' | 'json'; // logging.format > LOG_FORMAT > text
   configWarnings: string[]; // unknown config-file keys, tolerated values
+  // Memory/SQLite only: result retention of jobs removed on completion (0 = off).
+  // storage.* > BUNQUEUE_REMOVED_RESULT_RETENTION_MS / BUNQUEUE_MAX_REMOVED_RESULTS
+  // (flags --removed-result-retention-ms / --max-removed-results); invalid = default.
+  removedResultRetentionMs: number; // ms >= 0, default 60000
+  maxRemovedResults: number; // >= 0, default 1000
 }
 
 // src/infrastructure/backup/s3BackupConfig.ts
@@ -1734,11 +1749,13 @@ QueueManager is constructed (see [Background Tasks](./features/background-tasks.
 | `completedJobs`             | `BoundedSet<JobId>`                            | 50,000                    | FIFO, **10% batch**                           |
 | `depCompletions`            | `DependencyCompletionTracker`                  | 50,000 recent + live pins | exact FIFO; pins released with reverse edges  |
 | `jobResults`                | `LRUMap<JobId, unknown>`                       | 10,000                    | LRU (1 entry on overflow)                     |
+| `removedResults`            | `RemovedResults` (slot ring + lazy index)     | 1,000 records, 60 s each  | expired head first; 10% oldest slots at cap    |
 | `jobLogs`                   | `LRUMap<JobId, JobLogEntry[]>`                 | 10,000                    | LRU                                           |
 | `customIdMap`               | `LRUMap<string, JobId>`                        | 50,000                    | LRU                                           |
 | `timedOutJobs`              | `BoundedMap<JobId, RetiredTimeoutGeneration>`  | 50,000                    | FIFO batch                                    |
 | `retiredTimeoutLeaseTokens` | `BoundedMap<string, RetiredTimeoutGeneration>` | 50,000                    | FIFO batch                                    |
 | `waitingDeps`               | per-shard map                                  | unbounded*                | follows live dependency waiters               |
+| `activeGroupHolders`        | per-shard `Map<queue, Map<JobId, groupId>>`    | live grouped deliveries*  | owner-checked release on every active exit    |
 | `pendingQueueAdmissions`    | `Map<string, number>`                          | transient*                | reference-counted `finally` release           |
 | `clientJobs`                | `Map<clientId, Set<JobId>>`                    | live deliveries*          | detach on delivery end; dropped on disconnect |
 | `clientJobOwners`           | `Map<JobId, ClientJobOwner>`                   | live deliveries*          | same records as `clientJobs`; cleanup prune   |
@@ -1747,6 +1764,10 @@ QueueManager is constructed (see [Background Tasks](./features/background-tasks.
 
 \* `jobIndex` and `waitingDeps` are keyed by live jobs; entries are removed with
 their lifecycle or dependency edges rather than capped by size.
+`activeGroupHolders` holds one entry per active grouped job; its derived views
+`activeGroupCounts` (`Map<queue, Map<groupId, number>>`) and `activeGroups`
+(`Map<queue, Set<groupId>>`) shrink with it, and obliterate or empty-queue
+cleanup drops all three for the queue.
 `pendingQueueAdmissions` contains only queue names currently crossing an
 asynchronous single, batch, or flow admission boundary; concurrent operations
 share a count and each releases exactly once. `clientJobs` and its reverse index
@@ -1782,6 +1803,31 @@ source defaults in `src/application/types/config.ts` (for example
   `moveToFront`. On `set` over capacity it evicts the single tail (least
   recently used) node and fires the optional `onEvict` callback
   (`lruMap.ts:85-106`). Used by `jobResults`, `jobLogs`, `customIdMap`.
+- `RemovedResults` (`src/application/removedResults.ts`) — the memory-only
+  result of each job removed on completion, as queue, result and expiry in a
+  ring of at most `maxRemovedResults` slots (parallel arrays; a single TTL and
+  the monotonic `performance.now` clock make insertion order expiry order; the
+  capacity doubles when full and halves, down to 16 slots, when an eviction
+  leaves it a quarter full, so slot memory follows the records held), with a
+  `Map<JobId, slot>` index built lazily by the first read after an insert, so a
+  completion writes one slot and never hashes or allocates. An insert frees
+  expired head slots (one comparison while the head expiry lies ahead) and, at
+  `maxRemovedResults`, the oldest 10% of the slots at once; the periodic cleanup
+  purges expired records. A dropped record (forgotten, expired on read,
+  superseded by a later record of its ID) releases its result at once and its
+  slot when the head passes it. The batch ACK stamps its records with one clock
+  reading (`now()`), so a record may expire up to that batch's duration early,
+  never late. `removedResultRetentionMs` (default
+  60,000) and `maxRemovedResults` (default 1,000) are `QueueManagerConfig`
+  options normalized like `completedRetentionMs` (a finite number >= 0 is
+  floored, anything else is the default; 0 disables the record); the server
+  and the embedded shared manager also read them from
+  `BUNQUEUE_REMOVED_RESULT_RETENTION_MS` / `BUNQUEUE_MAX_REMOVED_RESULTS`
+  (`readRemovedResultRetention`, `src/config/componentEnv.ts`). The cap counts
+  records, not bytes: up to `maxRemovedResults` × result size. Only
+  `getCompletionAsync` (WaitJob, the wait readers) reads it, for an ID with no
+  current generation in `jobIndex`; nothing is persisted, and PostgreSQL does not
+  use it. Its size is `getMemoryStats().removedResults`.
 
 See [Data Structures](./features/data-structures.md),
 [Core Queue Engine](./features/core-queue-engine.md).

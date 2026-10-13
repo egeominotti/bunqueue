@@ -313,7 +313,7 @@ Two processes are writing to the same SQLite file. Run exactly one embedded inst
 
 ### "Job not found"
 
-The job was already removed: it completed with `removeOnComplete: true`, failed with `removeOnFail: true`, or was deleted manually. Completed-job records are also bounded in memory, so very old results eventually age out.
+The job was already removed: it completed with `removeOnComplete: true`, failed with `removeOnFail: true`, or was deleted manually. Completed-job records are also bounded in memory, so very old results eventually age out. For a job removed on completion, `waitUntilFinished()` still gets the result for a short time after the job completed (60 seconds and the last 1,000 such jobs by default, kept in memory only; see `removedResultRetentionMs` in [Server configuration](/guide/configuration/)); `getJob()` and `getJobState()` already report it as gone.
 
 ### High memory usage
 

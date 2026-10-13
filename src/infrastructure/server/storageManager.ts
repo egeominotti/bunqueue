@@ -20,6 +20,8 @@ function localAdapter(driver: 'memory' | 'sqlite'): ServerStorageAdapter {
           ...(driver === 'sqlite' && { dataPath: config.dataPath }),
           maxCompletedJobs: config.maxCompletedJobs,
           completedRetentionMs: config.completedRetentionMs,
+          removedResultRetentionMs: config.removedResultRetentionMs,
+          maxRemovedResults: config.maxRemovedResults,
           maxPrometheusQueues: config.maxPrometheusQueues,
         })
       ),

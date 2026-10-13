@@ -85,3 +85,21 @@ bun runner.ts --driver \
 The authoritative repository gate is `bun run test:sandbox:sdk`, which runs
 these checks in a disposable Elixir/OTP image without external networking or
 host mounts.
+
+### Test broker lifecycle
+
+`Bunqueue.TestBroker` (`test/support/broker.ex`) starts a real broker as an OS
+process (`bun src/main.ts`) through an Erlang port held by an owner process
+linked to the caller. Closing a port does not stop the OS process, so the owner
+traps exits and, when its caller exits for any reason, sends `SIGTERM` (then
+`SIGKILL` after 500 ms) before exiting itself. This matters because ExUnit ends
+a test process with `exit(:shutdown)`, kills a timed-out one, and only then
+runs its `on_exit/1` callbacks: a `stop/1` registered there used to find the
+owner already dead, and every `mix test` run left six brokers running (three
+per-test brokers in `deduplication_options_test.exs`, three in
+`connection_test.exs`), about 136 MiB of anonymous memory and 108 tasks in the
+sandbox container. `setup_all` brokers were not affected because that process
+exits normally. `test/test_broker_test.exs` covers the `:shutdown`, `:kill`,
+and `:normal` exit paths. Repeating the whole suite six times in one VM now
+keeps `:erlang.memory(:total)` at about 54 MiB, 116 BEAM processes, 3 ports,
+42 ETS tables, and no broker OS process after each run.

@@ -51,6 +51,10 @@ export interface BunqueueConfig {
     maxCompletedJobs?: number;
     /** Automatic age-based completed-job retention in milliseconds; null disables it. */
     completedRetentionMs?: number | null;
+    /** Memory-only retention of a removed-on-completion job's result, in ms; 0 disables it. */
+    removedResultRetentionMs?: number;
+    /** Maximum retained removed-on-completion results; 0 disables the retention. */
+    maxRemovedResults?: number;
   };
   telemetry?: {
     /** Maximum queue label values exposed to Prometheus; zero disables per-queue series. */

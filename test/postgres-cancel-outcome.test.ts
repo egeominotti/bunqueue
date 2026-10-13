@@ -21,7 +21,7 @@ import { cleanupPostgresNamespace } from './support/postgres-event-race';
 
 const postgresUrl = Bun.env.BUNQUEUE_TEST_POSTGRES_URL;
 const namespaces: string[] = [];
-const REFUSED_WAITING = 'Job cannot be cancelled (current state: waiting)';
+const REFUSED_WAITING = 'Job cannot be cancelled: not in queue (current state: waiting)';
 
 function broker(label: string): PostgresQueueManager {
   const namespace = `test-cancel-outcome-${label}-${Date.now()}-${crypto.randomUUID()}`;

@@ -194,9 +194,13 @@ Notable management/advanced flows:
   after at most two attempts; three attempts at most in every case). Replies:
   `{ ok: true }` when removed; `Job not found or cannot be cancelled` for a
   missing job (legacy text, external SDKs match "not found"); `Job cannot be
-  cancelled (current state: <state>)` for an active, failed or otherwise refused
-  job (on PostgreSQL also a pending producer a live job depends on, for example
-  `current state: waiting`). HTTP keeps status `200` for every reply.
+  cancelled: not in queue (current state: <state>)` for an active, failed or
+  otherwise refused job (on PostgreSQL also a pending producer a live job depends
+  on, for example `current state: waiting`). The refusal avoids "not found" (the
+  external SDKs keep raising for it) and says "not in queue" because bunqueue-mcp
+  2.9.13 matches that phrase, not "cannot be cancelled", to report
+  `success: false` (`test/repro-mcp-tcp-negative-outcome.test.ts`). HTTP keeps
+  status `200` for every reply.
 - `handleWaitJob` (`src/infrastructure/server/handlers/advanced/jobs.ts`): caps
   `timeout` to `[0, 600000]` (default 30s); returns immediately if
   `job.completedAt` is set, otherwise holds on `QueueManager.waitForJobResult`
@@ -214,10 +218,15 @@ Notable management/advanced flows:
   consistent broker projection; its `waitForJobResult` override keeps waiting
   through `waitForJobCompletion` and then reads that row, and the manager
   registers a cancellable event waiter before its durable completion recheck
-  so a remote completion cannot be lost between check and subscribe. Memory and
-  SQLite retain their existing in-process result lookup and missing-row
-  behavior: a completion of a job removed on completion that no hold was
-  waiting for still reads as `Job not found`.
+  so a remote completion cannot be lost between check and subscribe. On memory
+  and SQLite the completion port also answers from the memory-only record of a
+  job removed on completion (`removedResults`, 60 s and 1,000 records by
+  default, see [Core Queue Engine](./core-queue-engine.md#removed-result-retention)):
+  a completion that no hold was waiting for answers `completed: true` with its
+  result while the record lives, and `Job not found` after that (TTL, cap,
+  `Cancel`, `Obliterate`, a new generation under the same ID, a restart, or a
+  retention of 0). The client's state reader asks this lookup with a 0 ms hold
+  before it settles a wait as missing (issue #155 A).
 - `handleIsPaused` prefers the PostgreSQL manager's asynchronous durable point
   read when that optional port exists. A successful `Pause` or `Resume` is
   therefore immediately visible to the requesting or another SDK connection,

@@ -200,9 +200,11 @@ and assert both the returned result and any affected counters/state.
   gates. A host-native run is diagnostic only. Never run one container per
   individual unit test.
 - Model campaigns can be deepened without editing source:
-  `BUNQUEUE_MODEL_RUNS=500 BUNQUEUE_MODEL_COMMANDS=150
-  BUNQUEUE_MODEL_SEED=<signed-seed> bun run test:model`. Preserve the sign
-  printed by `fast-check`. Never remove or weaken an invariant merely to make a
+  `BUNQUEUE_MODEL_RUNS=500 BUNQUEUE_MODEL_COMMANDS=150 BUNQUEUE_MODEL_SIZE=max
+  BUNQUEUE_MODEL_SEED=<signed-seed> bun run test:model` (the command cap is the
+  real bound only with `BUNQUEUE_MODEL_SIZE=max`). Replay one failure with
+  `BUNQUEUE_MODEL_SEED`, `BUNQUEUE_MODEL_PATH` and `BUNQUEUE_MODEL_SIZE` as
+  printed. Preserve the sign printed by `fast-check`. Never remove or weaken an invariant merely to make a
   generated history pass.
 - The three top-level suites run concurrently by default. Use
   `BUNQUEUE_TEST_SEQUENTIAL=1` only to diagnose possible resource contention;

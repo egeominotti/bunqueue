@@ -16,6 +16,7 @@ import type { SqliteStorage } from '../../infrastructure/persistence/sqlite';
 import { processingShardIndex } from '../../shared/hash';
 import type { RWLock } from '../../shared/lock';
 import { withWriteLock } from '../../shared/lock';
+import { queueLog } from '../../shared/logger';
 import { persistRelease } from './releasePersistence';
 
 /** Dependencies shared by the single and batch pull paths. */
@@ -103,26 +104,41 @@ export function tryDequeueNextJob(
       continue;
     }
 
-    // Capacity is consumed only after an eligible job has been found.
-    if (!shard.tryAcquireConcurrency(queue)) {
+    // Capacity is consumed only after an eligible job has been found. The slot is
+    // held by this job id: the job's release frees exactly this slot.
+    if (!shard.tryAcquireConcurrency(queue, job.id)) {
       ctx.dashboardEmit?.('concurrency:rejected', { queue });
       return { status: 'stop' };
     }
     if (!shard.tryAcquireRateLimit(queue)) {
-      shard.releaseConcurrency(queue);
+      shard.releaseConcurrency(queue, job.id);
       ctx.dashboardEmit?.('ratelimit:rejected', { queue });
       return { status: 'stop' };
     }
 
-    if (job.groupId && !shard.acquireGroup(queue, job.groupId, scan.groupOptions, now)) {
-      shard.releaseConcurrency(queue);
+    if (job.groupId && !shard.acquireGroup(queue, job.groupId, job.id, scan.groupOptions, now)) {
+      shard.releaseConcurrency(queue, job.id);
       return { status: 'stop' };
     }
 
     const dequeued = grouped ? priorityQueue.remove(job.id) : priorityQueue.pop();
-    if (!dequeued) {
-      if (job.groupId) shard.releaseGroup(queue, job.groupId);
-      shard.releaseConcurrency(queue);
+    if (dequeued?.id !== job.id) {
+      // The slots above are held under the candidate's id, so they go back with it.
+      // peek() and pop() agree while the shard lock is held; should they ever differ,
+      // the popped job was never checked (expiry, readiness, group, limits), so it is
+      // neither activated nor re-keyed onto the candidate's slots: it returns to the
+      // queue unchanged (its queued counters were never decremented) and this pull
+      // stops, loudly, rather than strand a slot or run an unchecked job.
+      if (job.groupId) shard.releaseGroup(queue, job.groupId, job.id);
+      shard.releaseConcurrency(queue, job.id);
+      if (dequeued) {
+        priorityQueue.push(dequeued);
+        queueLog.error('Pull candidate and dequeued job differ; job returned to the queue', {
+          queue,
+          candidate: String(job.id),
+          dequeued: String(dequeued.id),
+        });
+      }
       return { status: 'stop' };
     }
     shard.decrementQueued(dequeued.id);
@@ -157,8 +173,8 @@ export async function requeueJob(
   await withWriteLock(ctx.shardLocks[idx], () => {
     if (!ctx.processingShards[procIdx].has(job.id)) return;
     const shard = ctx.shards[idx];
-    if (job.groupId) shard.releaseGroup(queue, job.groupId);
-    shard.releaseConcurrency(queue);
+    if (job.groupId) shard.releaseGroup(queue, job.groupId, job.id);
+    shard.releaseConcurrency(queue, job.id);
     // The job never reached a worker: drop the `active` entry this dequeue appended
     // (same timestamp as `startedAt`; none is appended once the timeline is full).
     const last = job.timeline.at(-1);

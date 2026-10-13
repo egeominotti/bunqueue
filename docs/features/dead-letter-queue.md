@@ -245,7 +245,9 @@ retry keyset-pages SQLite in bounded 500-row `(completed timestamp,id)` order,
 oldest first, so completions evicted from the hot cache remain reachable without
 materializing the full table. Memory-only mode scans the bounded map. It creates
 a fresh waiting-generation snapshot, resets
-attempts, progress/message, processing/completion timestamps, and the heartbeat,
+attempts and `stallCount` (both retry budgets, as a DLQ retry and the PostgreSQL
+engine's `retryPostgresTerminalJob` do), progress/message,
+processing/completion timestamps, and the heartbeat,
 while preserving the diagnostic stacktrace and bounded timeline before appending
 the new `waiting` entry. `SqliteStorage.requeueCompletedJob` changes the durable
 state and deletes the prior `job_results` row in one synchronous transaction;

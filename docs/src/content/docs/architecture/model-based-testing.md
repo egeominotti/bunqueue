@@ -143,6 +143,12 @@ BUNQUEUE_MODEL_SEED=424242 \
 bun run test:model
 ```
 
+`BUNQUEUE_MODEL_COMMANDS` is only an upper bound: at fast-check's default size
+a history has at most 10 commands. Set `BUNQUEUE_MODEL_SIZE` (for example
+`medium` or `max`) for longer histories, and replay a counterexample with the
+seed, the printed `BUNQUEUE_MODEL_PATH` and the size it was found with.
+`BUNQUEUE_MODEL_STATS=1` prints how many commands of each kind actually ran.
+
 First decide whether the model or engine is wrong. A confirmed engine bug must
 be preserved as a deterministic `test/repro-model-*.test.ts` regression that
 fails before the fix. This process has already exposed payload and priority
@@ -161,6 +167,13 @@ An expanded progress/persistence oracle later found an eleventh defect:
 `active`. Restart recovery therefore treated a manual requeue as interrupted
 work. The transition now persists `state`, `run_at`, and `started_at` through
 the same `updateRunAt` boundary used by delayed moves.
+
+Longer histories later found a twelfth: startup recovery rewrote an already
+promoted flow parent recovered from `active` to `delayed` instead of keeping the
+retry representation every other stalled job keeps. Recovery now checkpoints
+only the parents it promotes itself. A focused terminal-lifecycle campaign then
+found a thirteenth: retrying a completed job reset its attempts but kept its old
+stall count, unlike a DLQ retry; both budgets now restart.
 
 For the complete engineering procedure, see the repository's
 [`docs/features/model-based-testing.md`](https://github.com/egeominotti/bunqueue/blob/main/docs/features/model-based-testing.md)

@@ -16,6 +16,14 @@ export interface QueueManagerConfig {
   maxQueueEvents?: number;
   /** Maximum retained one-minute metric buckets per queue and terminal state. */
   maxMetricDataPoints?: number;
+  /**
+   * How long the result of a job removed on completion stays readable by the completion
+   * lookup (WaitJob, `waitUntilFinished`), in ms (default 60000). Memory only; 0 disables
+   * it. A value that is not a finite number >= 0 means the default.
+   */
+  removedResultRetentionMs?: number;
+  /** Maximum retained removed-job results (default 1000); 0 disables the retention. */
+  maxRemovedResults?: number;
   // The five background periods below must each be a finite number of milliseconds
   // >= 1 (undefined keeps the default); anything else throws a RangeError or TypeError
   // from the constructor. Periods above 2^31 - 1 ms are honoured, not shortened.
@@ -42,6 +50,8 @@ export const DEFAULT_CONFIG = {
   maxPrometheusQueues: 100,
   maxQueueEvents: 10_000,
   maxMetricDataPoints: 20_160,
+  removedResultRetentionMs: 60_000,
+  maxRemovedResults: 1_000,
   cleanupIntervalMs: 10_000,
   jobTimeoutCheckMs: 5_000,
   dependencyCheckMs: 30_000,
@@ -53,6 +63,16 @@ export function normalizeCompletedRetentionMs(value: number | null | undefined):
   if (value === null || value === undefined || !Number.isFinite(value) || value < 0) return null;
   const normalized = Math.floor(value);
   return Number.isSafeInteger(normalized) ? normalized : null;
+}
+
+/**
+ * A removed-result retention setting: a finite number >= 0, rounded down (0 disables the
+ * retention). Anything else (undefined, NaN, a negative, Infinity, a non-number) means
+ * `fallback`: the setting is new, so no value is refused, as the release rule requires.
+ */
+export function normalizeRemovedResultSetting(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return fallback;
+  return Math.min(Math.floor(value), Number.MAX_SAFE_INTEGER);
 }
 
 /** The config fields that are timer periods or retry delays. */
@@ -78,6 +98,14 @@ export function resolveQueueManagerConfig(
     ...DEFAULT_CONFIG,
     ...config,
     completedRetentionMs: normalizeCompletedRetentionMs(config.completedRetentionMs),
+    removedResultRetentionMs: normalizeRemovedResultSetting(
+      config.removedResultRetentionMs,
+      DEFAULT_CONFIG.removedResultRetentionMs
+    ),
+    maxRemovedResults: normalizeRemovedResultSetting(
+      config.maxRemovedResults,
+      DEFAULT_CONFIG.maxRemovedResults
+    ),
   };
   for (const field of BACKGROUND_PERIODS) {
     const value = config[field];

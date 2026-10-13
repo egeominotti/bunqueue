@@ -1,3 +1,4 @@
+import { summarizeProcesses } from './test-sandbox-checkpoints';
 import type { ResourceSample, SuiteTelemetry, TestMetric } from './test-sandbox-telemetry';
 
 interface RunReport {
@@ -104,6 +105,27 @@ function resourceTable(suites: SuiteTelemetry[]): string[] {
   return rows;
 }
 
+function quiescentTable(suites: SuiteTelemetry[]): string[] {
+  const measured = suites.flatMap((suite) =>
+    suite.quiescent ? [{ suite: suite.suite, ...suite.quiescent }] : []
+  );
+  if (measured.length === 0) return [];
+  const rows = [
+    '## Quiescent checkpoints',
+    '',
+    'Idle cgroup readings taken inside the container before the suite command starts and after it and every descendant exit. Retained = anon+shmem after minus before; page cache is reclaimable and not counted. These, not the first/last samples above, drive the memory-growth signal of these suites.',
+    '',
+    '| Suite | anon+shmem before / after | Retained | Page cache after | Tasks before / after | Survivors |',
+    '|---|---:|---:|---:|---:|---|',
+  ];
+  for (const { suite, before, after, retainedBytes, survivors } of measured) {
+    rows.push(
+      `| ${suite} | ${formatBytes(before.anonBytes + before.shmemBytes)} / ${formatBytes(after.anonBytes + after.shmemBytes)} | ${formatBytes(retainedBytes)} | ${formatBytes(after.fileBytes)} | ${before.pids} / ${after.pids} | ${summarizeProcesses(survivors) || 'none'} |`
+    );
+  }
+  return [...rows, ''];
+}
+
 function integrationTable(suites: SuiteTelemetry[]): string[] {
   const files = suites
     .flatMap((suite) => suite.files.map((file) => ({ suite: suite.suite, ...file })))
@@ -143,6 +165,7 @@ function markdown(report: RunReport): string {
     '',
     ...resourceTable(report.suites),
     '',
+    ...quiescentTable(report.suites),
     '## Slowest unit tests',
     '',
     '| File | Test | Status | Duration |',
@@ -157,6 +180,7 @@ function markdown(report: RunReport): string {
     '',
     '- OOM, non-zero exits, memory pressure, PID pressure, strong end-to-start growth, and material baseline regressions are reported as anomalies.',
     '- A memory-growth signal is evidence to investigate, not proof of a leak; mixed suites intentionally populate caches and exercise different workloads.',
+    '- Suites with quiescent checkpoints are chains of different processes, so their first and last samples belong to different phases and their RAM delta is context only; the growth signal and outlived-process check use the checkpoints.',
     '- Use the NDJSON samples to correlate changes with timestamps in the complete suite log.',
     '',
   ];
@@ -233,8 +257,10 @@ export function suitePassed(suite: {
   return suite.tests.passed + suite.tests.failed + suite.tests.skipped > 0;
 }
 
-function suiteVerdict(suite: { exitCode: number; tests: { passed: number; failed: number; skipped: number } }): string {
+function suiteVerdict(suite: {
+  exitCode: number;
+  tests: { passed: number; failed: number; skipped: number };
+}): string {
   if (suite.exitCode !== 0) return 'FAIL';
   return suitePassed(suite) ? 'PASS' : 'FAIL (no results)';
 }
-

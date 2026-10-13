@@ -9,6 +9,7 @@ import type { RWLock } from '../../shared/lock';
 import type { BoundedMap, BoundedSet, LRUMap, MapLike, SetLike } from '../../shared/lru';
 import type { DependencyCompletionTracker } from '../dependencyCompletions';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
+import type { RemovedResults } from '../removedResults';
 import type { EventsManager } from '../eventsManager';
 import type { MonitoringState } from '../monitoringChecks';
 import type { WebhookManager } from '../webhookManager';
@@ -85,6 +86,8 @@ export interface BackgroundContext extends QueueManagerState {
   maxDependencyCompletions: number;
   timedOutJobs: BoundedMap<JobId, RetiredTimeoutGeneration>;
   retiredTimeoutLeaseTokens: BoundedMap<string, RetiredTimeoutGeneration>;
+  /** Memory-only results of jobs removed on completion; cleanup purges expired ones. */
+  removedResults?: RemovedResults;
 }
 
 export interface StatsContext {
@@ -94,6 +97,7 @@ export interface StatsContext {
   completedJobs: SetLike<JobId>;
   jobIndex: Map<JobId, JobLocation>;
   jobResults: LRUMap<JobId, unknown>;
+  removedResults?: RemovedResults;
   jobLogs: LRUMap<JobId, JobLogEntry[]>;
   customIdMap: LRUMap<string, JobId>;
   jobLocks: Map<JobId, JobLock>;

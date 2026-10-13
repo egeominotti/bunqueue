@@ -188,4 +188,8 @@ is shown in [`README.md`](README.md).
   both reports. A survivor requires a stronger assertion or explicit,
   justified equivalence.
 - Every E2E test uses `Bunqueue.TestBroker`: a linked owner process, dynamic
-  ports, an isolated temporary SQLite path, and cleanup through `stop/1`.
+  ports, an isolated temporary SQLite path, and cleanup through `stop/1`. The
+  owner traps exits and terminates the OS broker on every exit path of the
+  process that started it (`:shutdown`, `:kill`, `:normal`), because ExUnit
+  runs `on_exit/1` only after the test process is gone. No broker OS process
+  may outlive `mix test`.

@@ -8,20 +8,7 @@ defmodule Bunqueue.TestBroker do
     data_dir = Path.join(System.tmp_dir!(), "bunqueue-elixir-#{unique_id()}")
     File.mkdir_p!(data_dir)
     tls = if Keyword.get(options, :tls, false), do: tls_files(data_dir), else: nil
-    parent = self()
-
-    owner =
-      spawn_link(fn ->
-        port = open_broker(tcp_port, http_port, data_dir, token, tls)
-        send(parent, {:broker_opened, self()})
-        owner_loop(port)
-      end)
-
-    receive do
-      {:broker_opened, ^owner} -> :ok
-    after
-      2_000 -> raise "broker process did not open"
-    end
+    owner = spawn_owner(fn -> open_broker(tcp_port, http_port, data_dir, token, tls) end)
 
     broker =
       %{
@@ -66,28 +53,10 @@ defmodule Bunqueue.TestBroker do
   end
 
   def restart(broker) do
-    parent = self()
-
     owner =
-      spawn_link(fn ->
-        port =
-          open_broker(
-            broker.port,
-            broker.http_port,
-            broker.data_dir,
-            broker.token,
-            broker.tls
-          )
-
-        send(parent, {:broker_reopened, self()})
-        owner_loop(port)
+      spawn_owner(fn ->
+        open_broker(broker.port, broker.http_port, broker.data_dir, broker.token, broker.tls)
       end)
-
-    receive do
-      {:broker_reopened, ^owner} -> :ok
-    after
-      2_000 -> raise "broker process did not reopen"
-    end
 
     restarted = %{broker | owner: owner}
     wait_ready!(restarted, broker.token)
@@ -121,7 +90,31 @@ defmodule Bunqueue.TestBroker do
     )
   end
 
-  defp owner_loop(port) do
+  # The broker is an OS process: closing its port does not stop it. The owner is
+  # linked to the caller and traps exits, so the broker is terminated on every
+  # exit path of the process that started it. ExUnit ends a test process with
+  # `:shutdown` (and kills a timed-out one) before running `on_exit/1`, so a
+  # `stop/1` registered there would otherwise find the owner already dead and
+  # leave the broker running after the suite.
+  defp spawn_owner(open) do
+    parent = self()
+
+    owner =
+      spawn_link(fn ->
+        Process.flag(:trap_exit, true)
+        port = open.()
+        send(parent, {:broker_opened, self()})
+        owner_loop(port, parent)
+      end)
+
+    receive do
+      {:broker_opened, ^owner} -> owner
+    after
+      2_000 -> raise "broker process did not open"
+    end
+  end
+
+  defp owner_loop(port, parent) do
     receive do
       :stop ->
         terminate_port(port)
@@ -130,10 +123,17 @@ defmodule Bunqueue.TestBroker do
         kill_port(port)
 
       {^port, {:data, _output}} ->
-        owner_loop(port)
+        owner_loop(port, parent)
 
       {^port, {:exit_status, status}} ->
         exit({:broker_exit, status})
+
+      {:EXIT, ^parent, reason} ->
+        terminate_port(port)
+        exit(reason)
+
+      {:EXIT, _port_or_other, _reason} ->
+        owner_loop(port, parent)
     end
   end
 

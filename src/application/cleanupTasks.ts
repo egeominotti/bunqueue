@@ -4,6 +4,7 @@
  */
 
 import type { JobId } from '../domain/types/job';
+import type { JobLocation } from '../domain/types/queue';
 import { processingShardIndex, SHARD_COUNT } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
 import type { BackgroundContext } from './types';
@@ -19,6 +20,8 @@ import { cleanEmptyQueues } from './emptyQueueCleanup';
  */
 export async function cleanup(ctx: BackgroundContext): Promise<void> {
   const now = Date.now();
+  // The TTL also bounds how long a result is held when no completion evicts it.
+  ctx.removedResults?.purgeExpired();
 
   const retention = ctx.config.completedRetentionMs;
   if (retention !== null && retention !== undefined) {
@@ -47,7 +50,7 @@ export async function cleanup(ctx: BackgroundContext): Promise<void> {
   await cleanStaleWaitingDependencies(ctx, now);
   cleanUniqueKeysAndGroups(ctx, now);
   cleanStalledCandidates(ctx);
-  await cleanOrphanedJobIndex(ctx);
+  await cleanOrphanedJobIndex(ctx, now);
   cleanOrphanedJobLocks(ctx);
   pruneEndedClientDeliveries(ctx);
   cleanEmptyQueues(ctx);
@@ -136,9 +139,30 @@ function cleanStalledCandidates(ctx: BackgroundContext): void {
   }
 }
 
-async function cleanOrphanedJobIndex(ctx: BackgroundContext): Promise<void> {
+/**
+ * How long a `processing` index entry must stay without its processing-shard
+ * entry before cleanup deletes it. An ACK, fail or move takes the job out of
+ * its processing shard under the processing lock and re-indexes it later under
+ * the queue shard lock; in between, the entry looks orphaned. Deleting it then
+ * made that ACK drop the job and leak its concurrency slot, group slot and
+ * unique key. A transition in flight lasts at most a few lock waits.
+ */
+export const ORPHAN_INDEX_CONFIRM_MS = 60_000;
+
+interface IndexSuspect {
+  location: JobLocation;
+  since: number;
+}
+
+/** Entries seen without a processing-shard entry, per job index, at the last sweep. */
+const indexSuspects = new WeakMap<Map<JobId, JobLocation>, Map<JobId, IndexSuspect>>();
+
+async function cleanOrphanedJobIndex(ctx: BackgroundContext, now: number): Promise<void> {
   // Expensive operation - only run when index is large
-  if (ctx.jobIndex.size <= 100_000) return;
+  if (ctx.jobIndex.size <= 100_000) {
+    indexSuspects.delete(ctx.jobIndex);
+    return;
+  }
 
   // Phase 1: Collect candidates grouped by shard (read-only)
   const processingCandidates = new Map<number, JobId[]>();
@@ -163,16 +187,25 @@ async function cleanOrphanedJobIndex(ctx: BackgroundContext): Promise<void> {
     }
   }
 
-  // Phase 2: Check and delete processing entries with locks
+  // Phase 2: a processing entry without its job is deleted only when a later
+  // sweep finds the very same location object, at least ORPHAN_INDEX_CONFIRM_MS
+  // after it was first seen. Any transition re-indexes the job with a new object.
+  const previous = indexSuspects.get(ctx.jobIndex);
+  const suspects = new Map<JobId, IndexSuspect>();
   for (const [procIdx, candidates] of processingCandidates) {
     await withWriteLock(ctx.processingLocks[procIdx], () => {
       for (const jobId of candidates) {
-        if (!ctx.processingShards[procIdx].has(jobId)) {
-          ctx.jobIndex.delete(jobId);
-        }
+        if (ctx.processingShards[procIdx].has(jobId)) continue;
+        const location = ctx.jobIndex.get(jobId);
+        if (location?.type !== 'processing') continue;
+        const seen = previous?.get(jobId);
+        if (seen?.location !== location) suspects.set(jobId, { location, since: now });
+        else if (now - seen.since >= ORPHAN_INDEX_CONFIRM_MS) ctx.jobIndex.delete(jobId);
+        else suspects.set(jobId, seen);
       }
     });
   }
+  indexSuspects.set(ctx.jobIndex, suspects);
 
   // Phase 3: Check and delete queue entries with locks
   for (const [shardIdx, candidates] of queueCandidates) {

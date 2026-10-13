@@ -30,6 +30,8 @@ export interface MemoryStats {
   jobIndex: number;
   completedJobs: number;
   jobResults: number;
+  /** Retained results of jobs removed on completion (memory only, short-lived). */
+  removedResults: number;
   jobLogs: number;
   customIdMap: number;
   jobLocks: number;
@@ -130,6 +132,7 @@ export function getMemoryStats(ctx: StatsContext): MemoryStats {
     jobIndex: ctx.jobIndex.size,
     completedJobs: ctx.completedJobs.size,
     jobResults: ctx.jobResults.size,
+    removedResults: ctx.removedResults?.size ?? 0,
     jobLogs: ctx.jobLogs.size,
     customIdMap: ctx.customIdMap.size,
     jobLocks: ctx.jobLocks.size,

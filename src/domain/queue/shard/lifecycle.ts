@@ -43,8 +43,7 @@ export class ShardLifecycle extends ShardMetrics {
     this.limiterManager.deleteQueue(queue);
     this.groupScheduler.clearQueue(queue);
     this.groupLimiterManager.clearQueue(queue);
-    this.activeGroups.delete(queue);
-    this.activeGroupCounts.delete(queue);
+    this.clearActiveGroups(queue);
     return Array.from(removed);
   }
 }

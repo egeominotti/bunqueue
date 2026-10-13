@@ -567,6 +567,10 @@ Docker sockets. Each suite runs conformance first with SQLite and then with its
 isolated PostgreSQL namespace. The gate emits complete logs, container resource
 samples, per-suite JSON, and aggregate
 `summary.json`/`summary.md` under `artifacts/test-sandbox-sdk/<timestamp>/`.
+Each suite command runs between two idle in-container cgroup checkpoints; the
+memory-growth signal uses the memory retained between them, and any process
+that outlives the suite command is reported (see
+[Quiescent checkpoints](../testing.md#quiescent-checkpoints-sdk-suites)).
 
 Any change below `sdk/` must pass this gate in addition to the core
 `bun run test:sandbox` gate.

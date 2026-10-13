@@ -26,6 +26,7 @@ export function createContextDependencies(state: QueueManagerStateView): Context
     jobResults: state.jobResults,
     jobResultQueues: state.jobResultQueues,
     dependencyResults: state.dependencyResults,
+    removedResults: state.removedResults,
     customIdMap: state.customIdMap,
     jobLogs: state.jobLogs,
     jobLogQueues: state.jobLogQueues,

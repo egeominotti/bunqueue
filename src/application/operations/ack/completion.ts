@@ -60,6 +60,8 @@ export async function ackJob(
     ctx.storage?.markCompleted(jobId, now, job.timeline);
   } else {
     commitRemovedCompletion(job, ctx);
+    // Memory only and short-lived: a wait that reaches the broker later still gets it.
+    ctx.removedResults?.record(jobId, job.queue, result);
     ctx.jobIndex.delete(jobId);
   }
 

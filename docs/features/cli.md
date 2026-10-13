@@ -273,10 +273,12 @@ Server-start flags (`bunqueue start`, merged over `bunqueue.config.ts`, CLI
 wins): `--tcp-port` (6789; 0-65535, 0 lets the OS pick), `--http-port` (6790;
 same rule), `--host` (0.0.0.0), `--data-path`, `--max-completed-jobs` (whole
 number >= 1, hot-cache bound), `--completed-retention-ms` (whole ms >= 0, opt-in
-durable SQLite retention), `--auth-tokens`, `--tls-cert`, `--tls-key`,
-`--config`/`-c`. Port values follow the env grammar (`6789.5`, `+6789`); a value
+durable SQLite retention), `--removed-result-retention-ms` (whole ms >= 0, default
+60000, 0 disables: how long the memory-only result of a job removed on completion
+answers a late wait) and `--max-removed-results` (whole number >= 0, default 1000,
+0 disables), `--auth-tokens`, `--tls-cert`, `--tls-key`, `--config`/`-c`. Port values follow the env grammar (`6789.5`, `+6789`); a value
 that is not a port warns and uses the default port, as in 2.9.10, and a misread
-(`1e12`, `5s`) stops startup with an error naming the flag; the two storage flags
+(`1e12`, `5s`) stops startup with an error naming the flag; the storage flags
 warn and ignore an invalid value, as in 2.9.10, and an empty value means "not given"
 (see above). `--auth-tokens` follows the `AUTH_TOKENS` rule (`parseTokenList`,
 `src/config/auth.ts`): split on commas, each entry trimmed, empty entries dropped

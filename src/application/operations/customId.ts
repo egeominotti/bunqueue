@@ -13,6 +13,7 @@ import type { SqliteStorage } from '../../infrastructure/persistence/sqlite';
 import { shardIndex } from '../../shared/hash';
 import type { MapLike, SetLike } from '../../shared/lru';
 import type { DependencyCompletionTracker } from '../dependencyCompletions';
+import type { RemovedResults } from '../removedResults';
 import type { RetiredTimeoutGeneration } from '../types/background';
 
 export interface CustomIdContext {
@@ -31,6 +32,7 @@ export interface CustomIdContext {
   jobLogQueues: Map<JobId, string>;
   customIdMap: MapLike<string, JobId>;
   jobIndex: Map<JobId, JobLocation>;
+  removedResults?: RemovedResults;
 }
 
 export type CustomIdResult =
@@ -141,6 +143,8 @@ export function commitCustomIdAdmission(
     ctx.jobResultQueues.delete(id);
     ctx.jobLogs.delete(id);
     ctx.jobLogQueues.delete(id);
+    // Nor the retained result of an earlier generation removed on completion.
+    ctx.removedResults?.forget(id);
   }
 
   // A recycled deterministic ID starts with no timeout or retired-lease state.

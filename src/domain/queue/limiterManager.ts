@@ -2,6 +2,7 @@
  * LimiterManager - Rate limiting and concurrency control
  */
 
+import type { JobId } from '../types/job';
 import { type QueueState, createQueueState, RateLimiter, ConcurrencyLimiter } from '../types/queue';
 
 /**
@@ -113,14 +114,18 @@ export class LimiterManager {
 
   // ============ Concurrency Limiting ============
 
-  /** Set concurrency limit for queue */
-  setConcurrency(queue: string, limit: number): void {
-    let limiter = this.concurrencyLimiters.get(queue);
+  /**
+   * Set concurrency limit for queue. Changing an existing limit keeps the jobs
+   * that hold a slot. A new limiter (first limit, or after a clear) is seeded
+   * from `activeJobIds`, the jobs of the queue that are active right now, so
+   * they count toward the limit and release their slot when they finish.
+   */
+  setConcurrency(queue: string, limit: number, activeJobIds?: () => Iterable<JobId>): void {
+    const limiter = this.concurrencyLimiters.get(queue);
     if (limiter) {
       limiter.setLimit(limit);
     } else {
-      limiter = new ConcurrencyLimiter(limit);
-      this.concurrencyLimiters.set(queue, limiter);
+      this.concurrencyLimiters.set(queue, new ConcurrencyLimiter(limit, activeJobIds?.()));
     }
     this.getState(queue).concurrencyLimit = limit;
   }
@@ -132,15 +137,15 @@ export class LimiterManager {
     if (state) state.concurrencyLimit = null;
   }
 
-  /** Try to acquire concurrency slot */
-  tryAcquireConcurrency(queue: string): boolean {
+  /** Try to acquire a concurrency slot for the job about to become active. */
+  tryAcquireConcurrency(queue: string, jobId: JobId): boolean {
     const limiter = this.concurrencyLimiters.get(queue);
-    return !limiter || limiter.tryAcquire();
+    return !limiter || limiter.tryAcquire(jobId);
   }
 
-  /** Release concurrency slot */
-  releaseConcurrency(queue: string): void {
-    this.concurrencyLimiters.get(queue)?.release();
+  /** Release the concurrency slot held by the job (no-op when it holds none). */
+  releaseConcurrency(queue: string, jobId: JobId): void {
+    this.concurrencyLimiters.get(queue)?.release(jobId);
   }
 
   /** Read the configured global concurrency limit. */

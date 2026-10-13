@@ -1,8 +1,10 @@
 /**
- * Env settings read by components that also run in embedded mode: webhook delivery
- * and the monitoring thresholds. The components read them when they are created
+ * Env settings read by components that also run in embedded mode: webhook delivery,
+ * the monitoring thresholds and the removed-result retention of the embedded
+ * QueueManager (`src/client/manager.ts`). The components read them when they are created
  * (not at module load), and `resolveServerConfig` reads them through the same
- * functions, so a server with an invalid value stops at startup and an embedded
+ * functions (the removed-result settings through the same `envNumber` calls, after the
+ * config file), so a server with an invalid value stops at startup and an embedded
  * QueueManager throws when it is constructed, both with an error naming the variable.
  * A tolerated value (a negative threshold, read as 0 = disabled, as 2.9.10 skipped
  * `<= 0`) is a warning: in the server's startup list, or logged once by the component.
@@ -18,6 +20,14 @@ export interface WebhookDelivery {
   readonly maxRetries: number;
   /** Base delay; the wait before attempt n + 1 is `retryDelayMs * n` (>= 0). */
   readonly retryDelayMs: number;
+}
+
+/** The removed-result retention of a QueueManager (see `src/application/removedResults.ts`). */
+export interface RemovedResultRetention {
+  /** How long a record answers, in ms (default 60000); 0 disables the record. */
+  readonly removedResultRetentionMs: number;
+  /** Maximum records, counted in jobs, not bytes (default 1000); 0 disables the record. */
+  readonly maxRemovedResults: number;
 }
 
 /** Thresholds of the dashboard monitoring events; 0 disables each one (-1 reads as 0). */
@@ -62,5 +72,21 @@ export function readMonitoringThresholds(
     workerOverloadMs: envNumber(SETTINGS.workerOverloadThresholdMs, env, target),
     memoryWarningMb: envNumber(SETTINGS.memoryWarningMb, env, target),
     storageWarningMb: envNumber(SETTINGS.storageWarningMb, env, target),
+  }));
+}
+
+/**
+ * `BUNQUEUE_REMOVED_RESULT_RETENTION_MS` and `BUNQUEUE_MAX_REMOVED_RESULTS`, or their
+ * defaults (60000, 1000), parsed exactly as the server parses them (`resolveServerConfig`,
+ * where a config-file value wins): a value with no number or below 0 means the default,
+ * with a warning; a value `parseInt` misread (`1e12`, `5s`) is an error.
+ */
+export function readRemovedResultRetention(
+  env: Env = Bun.env,
+  issues?: ConfigIssues
+): RemovedResultRetention {
+  return collect(issues, (target) => ({
+    removedResultRetentionMs: envNumber(SETTINGS.removedResultRetentionMs, env, target),
+    maxRemovedResults: envNumber(SETTINGS.maxRemovedResults, env, target),
   }));
 }
