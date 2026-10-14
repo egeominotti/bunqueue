@@ -278,6 +278,14 @@ newer `startedAt`, so a stale token is rejected). See
   `completedJobs` eviction callback deletes the corresponding `jobIndex` and
   `completedJobsData` entries. This is hot-cache eviction only: exact SQLite
   counts and completed cleanup remain database-authoritative for cold rows.
+  `getCompletionAsync` (WaitJob and embedded waits) and `getResultAsync`
+  (GetResult) also resolve cold SQLite completed rows after eviction or
+  restart, including completions with an `undefined` result. They read the
+  current in-memory location first, then the completed cache, then SQLite's
+  buffered or persisted state with DLQ precedence. State and result lookup run
+  synchronously together, so a reused ID cannot change generation between
+  them. Cached or persisted results alone never prove completion, and reads
+  do not repopulate the bounded caches.
 - **Stale-token / duplicate execution.** Issue #33 (lock removed but job still
   present), #75 (lock expired + requeued), and #101 (expired-but-owned grace)
   are handled in `queue-manager/ack.ts` and `delivery.ts`. Exact retired
@@ -314,8 +322,8 @@ used to reject `Job <id> not found`.
   `undefined`) and `completeStallRetriedJob` (`queue-manager/delivery.ts`).
   Presence means "completed", so an `undefined` result is recorded too.
 - **Reader.** `getCompletionAsync` answers `{ found: true, result }` from an
-  unexpired record when the ID is not in `completedJobs` and `jobIndex` holds no
-  current generation for it. `getJobState` keeps answering `unknown`, `getJob`
+  unexpired record when neither the memory indexes nor SQLite holds a current
+  generation for the ID. `getJobState` keeps answering `unknown`, `getJob`
   `null`, and `getResultAsync` (GetResult) reads completed jobs only, as before.
   WaitJob (`handleWaitJob`), the embedded wait reader (`managerReader`) and the
   embedded MCP wait (`waitForJobCompletion`) use the lookup.

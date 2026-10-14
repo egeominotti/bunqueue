@@ -18,7 +18,7 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## Unreleased
+## [2.9.14] - 2026-10-14
 
 ### Fixed
 
@@ -56,6 +56,24 @@ head:
   event carries no job data. `removeAsync()` and every `job.remove()`,
   FlowProducer jobs included, now reject when the job exists but was not
   removed, and still resolve when the job does not exist.
+- **`WaitJob` could miss a completion during its initial asynchronous job
+  read**, before its completion waiter was registered
+  ([#155](https://github.com/egeominotti/bunqueue/issues/155)). The wait now
+  captures the matching completion event before the first read and passes
+  its result to the caller, including when removed-result retention is
+  disabled. It registers the normal waiter before releasing that temporary
+  subscription, and every return or error releases its subscriptions and timers.
+- **`WaitJob` and `GetResult` lost completed SQLite results after the
+  completed-job cache evicted the job**, even though the completed row and
+  result remained on disk. Completion queries now read SQLite's current
+  state after a cache miss, including after a broker restart and for valid
+  `undefined` results. A cached result alone never proves completion, and a
+  waiting, active or failed generation under the same ID suppresses stale results.
+- **`WaitJob` could report a new waiting custom-ID generation as completed
+  with an `undefined` result.** An asynchronous job read could return a
+  completed snapshot after another request reused its ID. The handler now
+  confirms completion against the current generation and waits for the new
+  job instead of trusting the old snapshot.
 - **A queue concurrency limit ignored the jobs already running when it was
   set.** `setConcurrency(2)` with one active job let two more start (three
   active), a job that was active before the limit freed a slot it never held
@@ -135,6 +153,12 @@ head:
 
 ### Testing
 
+- **Issue #155 request/reply regressions** exercise real Queue and Worker
+  instances in embedded and TCP modes, including object, `null`, `false`,
+  `0` and `undefined` results, payload and result deletion, explicit removal
+  of retained results, and removal durability across a broker restart.
+  Deterministic tests also cover completion-registration races, reused IDs,
+  cold SQLite completions and waiter cleanup on failures.
 - **Model campaigns.** `BUNQUEUE_MODEL_SIZE` and `BUNQUEUE_MODEL_PATH` replay
   one generated history exactly; the command cap is the real bound only with
   `BUNQUEUE_MODEL_SIZE=max` (at the default size a history has at most 10

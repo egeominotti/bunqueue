@@ -28,13 +28,14 @@ export class QueueManagerQueries extends QueueManagerLocks {
 
   /**
    * The completion lookup (WaitJob, the embedded wait reader): distinguishes a completed
-   * generation from a valid undefined result. A job removed on completion answers from
-   * its retained result (`removedResults`, memory only, short-lived) while no current
-   * generation holds the ID; `getJobState` still reads `unknown` for it.
+   * generation from a valid undefined result, including cold SQLite completions. A job
+   * removed on completion answers from its retained result (`removedResults`, memory
+   * only, short-lived) while no current generation holds the ID.
    */
   async getCompletionAsync(jobId: JobId): Promise<{ found: boolean; result: unknown }> {
-    if (this.completedJobs.has(jobId)) return { found: true, result: this.getResult(jobId) };
-    const removed = this.jobIndex.has(jobId) ? undefined : this.removedResults.lookup(jobId);
+    const state = this.completionState(jobId);
+    if (state === 'completed') return { found: true, result: this.getResult(jobId) };
+    const removed = state === null ? this.removedResults.lookup(jobId) : undefined;
     return removed ? { found: true, result: removed.result } : { found: false, result: undefined };
   }
 
@@ -44,7 +45,17 @@ export class QueueManagerQueries extends QueueManagerLocks {
    * of a job removed on completion answers the completion lookup, not GetResult.
    */
   async getResultAsync(jobId: JobId): Promise<unknown> {
-    return this.completedJobs.has(jobId) ? this.getResult(jobId) : undefined;
+    return this.completionState(jobId) === 'completed' ? this.getResult(jobId) : undefined;
+  }
+
+  private completionState(jobId: JobId): string | null {
+    const location = this.jobIndex.get(jobId);
+    if (location) return location.type;
+    if (this.completedJobs.has(jobId)) return 'completed';
+    if (!this.storage) return null;
+    if (this.storage.hasDlqEntry(jobId)) return 'dlq';
+    // Keep the state and result reads synchronous so ID reuse cannot interleave.
+    return this.storage.getBufferedJobState(jobId) ?? this.storage.getJobStateRaw(jobId);
   }
 
   async getChildrenValues(parentJobId: JobId): Promise<Record<string, unknown>> {

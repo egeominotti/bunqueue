@@ -79,9 +79,10 @@ export class QueueManagerServices extends QueueManagerObservability {
    * `waitForJobCompletion` that also returns the job's result. A wait woken by the
    * job's `completed` event answers with the event's data, the worker's return value,
    * so a job removed on completion (which keeps no result) still returns it to a
-   * waiter registered when it completed. A wait released without an event (shutdown)
-   * reads the result from the store, as before. `result` is undefined on a timeout or
-   * abort. An invalid `timeoutMs` throws synchronously, as `waitForJobCompletion` does.
+   * waiter registered when it completed. A wait released without an event reads the
+   * store only while its completion is cached; shutdown clears that cache before the
+   * callback runs. `result` is undefined on a timeout or abort. An invalid `timeoutMs`
+   * throws synchronously, as `waitForJobCompletion` does.
    */
   waitForJobResult(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<JobWaitResult> {
     return this.eventsManager
@@ -89,6 +90,7 @@ export class QueueManagerServices extends QueueManagerObservability {
       .then(async (outcome): Promise<JobWaitResult> => {
         if (!outcome.completed) return { completed: false, result: undefined };
         if (outcome.fromEvent) return { completed: true, result: outcome.result };
+        if (!this.completedJobs.has(jobId)) return { completed: true, result: undefined };
         return { completed: true, result: await this.getResultAsync(jobId) };
       });
   }

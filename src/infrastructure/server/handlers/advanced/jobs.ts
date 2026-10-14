@@ -1,5 +1,6 @@
 import type { Command } from '../../../../domain/types/command';
 import { jobId } from '../../../../domain/types/job';
+import { EventType } from '../../../../domain/types/queue';
 import type { Response } from '../../../../domain/types/response';
 import * as response from '../../../../domain/types/response';
 import {
@@ -113,33 +114,51 @@ export async function handleWaitJob(
   });
   if (timeoutError) return response.error(timeoutError, requestId);
   const timeout = command.timeout ?? 30000;
-  const job = await context.queueManager.getJob(id);
-  if (!job) {
-    const completion = await context.queueManager.getCompletionAsync(id);
-    if (!completion.found) return response.error('Job not found', requestId);
-    return {
-      ok: true,
-      completed: true,
-      result: completion.result,
-      reqId: requestId,
-    } as Response;
-  }
-  if (job.completedAt) {
-    return {
-      ok: true,
-      completed: true,
-      result: await context.queueManager.getResultAsync(id),
-      reqId: requestId,
-    } as Response;
-  }
+  const completed = (result: unknown): Response =>
+    ({ ok: true, completed: true, result, reqId: requestId }) as Response;
+  const captured = { found: false, result: undefined as unknown };
+  // Capture before the first async read: a removed job can complete during that
+  // read even when removed-result retention is disabled. The normal waiter takes
+  // over synchronously once the read confirms that the job still needs a hold.
+  const unsubscribe = context.queueManager.subscribe((event) => {
+    if (!captured.found && event.eventType === EventType.Completed && event.jobId === id) {
+      captured.found = true;
+      captured.result = event.data;
+    }
+  });
+  let controller: AbortController | undefined;
+  try {
+    const job = await context.queueManager.getJob(id);
+    if (captured.found) return completed(captured.result);
+    if (!job) {
+      const completion = await context.queueManager.getCompletionAsync(id);
+      if (captured.found) return completed(captured.result);
+      return completion.found
+        ? completed(completion.result)
+        : response.error('Job not found', requestId);
+    }
+    if (job.completedAt) {
+      // The async read can return an old completed generation after its custom ID
+      // has been reused. Only the current completion lookup can confirm success.
+      const completion = await context.queueManager.getCompletionAsync(id);
+      if (captured.found) return completed(captured.result);
+      if (completion.found) return completed(completion.result);
+      const currentJob = await context.queueManager.getJob(id);
+      if (captured.found) return completed(captured.result);
+      if (!currentJob) return response.error('Job not found', requestId);
+    }
 
-  // The completion that wakes this hold carries the result, which a job removed on
-  // completion keeps nowhere a later read could find it.
-  const outcome = await context.queueManager.waitForJobResult(id, timeout);
-  if (outcome.completed) {
-    return { ok: true, completed: true, result: outcome.result, reqId: requestId } as Response;
+    controller = new AbortController();
+    const waiting = context.queueManager.waitForJobResult(id, timeout, controller.signal);
+    unsubscribe();
+    const outcome = await waiting;
+    return outcome.completed
+      ? completed(outcome.result)
+      : ({ ok: true, completed: false, reqId: requestId } as Response);
+  } finally {
+    unsubscribe();
+    controller?.abort();
   }
-  return { ok: true, completed: false, reqId: requestId } as Response;
 }
 
 export async function handleChangeDelay(

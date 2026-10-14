@@ -28,6 +28,8 @@ function context(manager: QueueManager): HandlerContext {
 function managerWith(methods: Record<string, unknown>): QueueManager {
   return {
     emitDashboardEvent: () => undefined,
+    eventsManager: new EventsManager(new WebhookManager()),
+    subscribe: QueueManagerServices.prototype.subscribe,
     ...methods,
   } as unknown as QueueManager;
 }
@@ -58,7 +60,7 @@ describe('server infrastructure-error boundaries', () => {
     expect(events.needsBroadcast()).toBe(false);
   });
 
-  test('reads completed results through the async authoritative transport port', async () => {
+  test('reads completed results through the async authoritative transport ports', async () => {
     const completed = createJob(jobId('completed-result'), 'results', { data: {} });
     completed.completedAt = Date.now();
     const id = String(completed.id);
@@ -71,8 +73,13 @@ describe('server infrastructure-error boundaries', () => {
         reads.push(String(requested));
         return 15;
       },
+      getCompletionAsync: async (requested: unknown) => {
+        reads.push(String(requested));
+        return { found: true, result: 15 };
+      },
       // The real wait port over a real EventsManager: no mock decides the result.
       eventsManager: events,
+      completedJobs: new Set([completed.id]),
       waitForJobResult: QueueManagerServices.prototype.waitForJobResult,
     });
     const waitJob = (timeout: number) =>
