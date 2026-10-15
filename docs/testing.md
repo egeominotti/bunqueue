@@ -849,6 +849,14 @@ Normal pushes skip already released versions. A manual CI run on main with
 `rebuild_docker=true` repeats the quality and binary gates and republishes Docker
 images for the current package version without editing its GitHub release/tag.
 
+For a patch-version update, change the root `package.json`, promote the pending
+changelog entry, and synchronize current Docker image pins in the README and
+installation, deployment, server, and environment guides. Runtime version reports
+derive from `src/shared/version.ts`; the lockfile has no separate root version.
+Keep historical audit notes and minor-version API snapshots unchanged. A release
+branch and pull request run validation without activating the main-only version
+gate; merging a new version into main starts image and GitHub release publication.
+
 Every published artifact of a run comes from one commit. The version gate
 outputs `source_sha`: the pushed commit for a new version, or, when the tag
 `v<version>` already exists (rebuild or npm publication), that tag's commit,
