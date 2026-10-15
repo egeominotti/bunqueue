@@ -40,7 +40,7 @@ export class TcpMonitoringBackend extends TcpQueueBackend {
   async getPerQueueStats(): Promise<Record<string, unknown>> {
     const response = await this.send({ cmd: 'DashboardQueues' });
     const queues = replyData(response).queues as Array<Record<string, unknown>> | undefined;
-    const result: Record<string, unknown> = {};
+    const result: Record<string, unknown> = Object.create(null);
     for (const queue of queues ?? []) {
       const name = queue.name;
       if (typeof name !== 'string') continue;

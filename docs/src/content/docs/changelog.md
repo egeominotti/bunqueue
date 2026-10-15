@@ -18,6 +18,31 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## [Unreleased]
+
+### Fixed
+
+- MCP bulk retry confirmation cannot be bypassed with an empty job ID. ACK,
+  failure and batch tools preserve ignored broker outcomes, and monitoring keeps
+  valid prototype-like queue names.
+- CLI boolean flags preserve explicit `false`, argument terminators protect
+  literal values, and job listing accepts every public state. DLQ output uses
+  authoritative errors and timestamps; default waits allow the broker to finish.
+- Health checks produce structured JSON on success and failure, diagnostic URLs
+  support IPv6, and progress aliases and worker guidance match supported APIs.
+- Standalone MCP verification uses the maintained assertion suites with bounded
+  subprocesses and isolated configuration instead of misclassifying tool outcomes.
+- S3 retention preserves the newest timestamped backup when modification times
+  tie. Retry decisions honor service error codes, and local deadlines cannot
+  start overlapping uncancellable operations.
+- SQLite restore makes committed WAL data recoverable before detaching sidecars,
+  preserving the original state if the process is interrupted before installation.
+  Busy or unsafe recovery refuses the replacement; corruption tests now reach the
+  intended SQLite integrity check.
+- Pull-cadence regressions check repeated scheduling decisions instead of assuming
+  a fixed number of timer deliveries within a short wall-clock window. Changed
+  test fixtures and their shared stream helper are checked against the actual API types.
+
 ## [2.9.15] - 2026-10-15
 
 ### Added

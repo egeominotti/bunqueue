@@ -4,40 +4,46 @@
  */
 
 import { parseArgs } from 'node:util';
-import { CommandError, requireArg, parseNumberArg } from './types';
+import {
+  CommandError,
+  requireArg,
+  parseNumberArg,
+  withoutOptionTerminator,
+  splitSubcommand,
+} from './types';
 
 /** Valid job states */
 const VALID_STATES = ['waiting', 'delayed', 'active', 'completed', 'failed'];
+const LIST_STATES = [...VALID_STATES, 'prioritized', 'paused', 'waiting-children'];
 
 /** Build a queue subcommand */
 export function buildQueueCommand(args: string[]): Record<string, unknown> {
-  const subcommand = args[0];
+  const { subcommand, subArgs } = splitSubcommand(args);
   if (!subcommand) {
     throw new CommandError(
       'Missing subcommand. Use: list, pause, resume, drain, obliterate, clean, count, jobs, paused'
     );
   }
-  const subArgs = args.slice(1);
 
   switch (subcommand) {
     case 'list':
       return { cmd: 'ListQueues' };
     case 'pause':
-      return buildPause(subArgs);
+      return buildPause(withoutOptionTerminator(subArgs));
     case 'resume':
-      return buildResume(subArgs);
+      return buildResume(withoutOptionTerminator(subArgs));
     case 'drain':
-      return buildDrain(subArgs);
+      return buildDrain(withoutOptionTerminator(subArgs));
     case 'obliterate':
-      return buildObliterate(subArgs);
+      return buildObliterate(withoutOptionTerminator(subArgs));
     case 'clean':
       return buildClean(subArgs);
     case 'count':
-      return buildCount(subArgs);
+      return buildCount(withoutOptionTerminator(subArgs));
     case 'jobs':
       return buildGetJobs(subArgs);
     case 'paused':
-      return buildIsPaused(subArgs);
+      return buildIsPaused(withoutOptionTerminator(subArgs));
     default:
       throw new CommandError(
         `Unknown queue subcommand: ${subcommand}. Use: list, pause, resume, drain, obliterate, clean, count, jobs, paused`
@@ -126,8 +132,8 @@ function buildGetJobs(args: string[]): Record<string, unknown> {
   const queue = requireArg(positionals, 0, 'queue');
 
   const state = values.state as string | undefined;
-  if (state && !VALID_STATES.includes(state)) {
-    throw new CommandError(`Invalid state: ${state}. Must be one of: ${VALID_STATES.join(', ')}`);
+  if (state && !LIST_STATES.includes(state)) {
+    throw new CommandError(`Invalid state: ${state}. Must be one of: ${LIST_STATES.join(', ')}`);
   }
 
   const cmd: Record<string, unknown> = {

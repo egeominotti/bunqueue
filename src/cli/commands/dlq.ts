@@ -4,15 +4,20 @@
  */
 
 import { parseArgs } from 'node:util';
-import { CommandError, requireArg, parseNumberArg } from './types';
+import {
+  CommandError,
+  requireArg,
+  parseNumberArg,
+  withoutOptionTerminator,
+  splitSubcommand,
+} from './types';
 
 /** Build a DLQ subcommand */
 export function buildDlqCommand(args: string[]): Record<string, unknown> {
-  const subcommand = args[0];
+  const { subcommand, subArgs } = splitSubcommand(args);
   if (!subcommand) {
     throw new CommandError('Missing subcommand. Use: list, retry, purge');
   }
-  const subArgs = args.slice(1);
 
   switch (subcommand) {
     case 'list':
@@ -20,7 +25,7 @@ export function buildDlqCommand(args: string[]): Record<string, unknown> {
     case 'retry':
       return buildDlqRetry(subArgs);
     case 'purge':
-      return buildDlqPurge(subArgs);
+      return buildDlqPurge(withoutOptionTerminator(subArgs));
     default:
       throw new CommandError(`Unknown dlq subcommand: ${subcommand}. Use: list, retry, purge`);
   }

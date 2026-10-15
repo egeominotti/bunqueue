@@ -1,5 +1,7 @@
 import { ConfigError, parseWholeEnv } from '../../config/numbers';
 import { SETTINGS } from '../../config/settings';
+import { emitLocalOutput } from '../localOutput';
+import { withoutOptionTerminator } from './types';
 
 /**
  * The port the server's HTTP_PORT selects, read with the server's own setting (name,
@@ -17,8 +19,9 @@ function probePort(): number {
 }
 
 /** Shell-free HTTP probe for container health checks. Never starts a broker. */
-export async function runHealthcheck(args: string[]): Promise<number> {
+export async function runHealthcheck(args: string[], json = false): Promise<number> {
   try {
+    args = withoutOptionTerminator(args);
     if (args.length > 1) throw new Error('Expected at most one health URL');
     const url = new URL(args[0] ?? `http://127.0.0.1:${probePort()}/health`);
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Expected HTTP or HTTPS');
@@ -36,13 +39,22 @@ export async function runHealthcheck(args: string[]): Promise<number> {
     ) {
       throw new Error('Unhealthy response');
     }
-    console.log('healthy');
+    emitLocalOutput({ exitCode: 0, json: { ok: true, status: 'healthy' }, text: 'healthy' }, json);
     return 0;
   } catch (error) {
     // Avoid putting credentials or response payloads in Docker health logs; only a
     // configuration error (the operator's own setting) is worth naming.
-    console.error(
-      error instanceof ConfigError ? `Health check failed: ${error.message}` : 'Health check failed'
+    emitLocalOutput(
+      {
+        exitCode: 1,
+        json: { ok: false, error: 'Health check failed' },
+        text:
+          error instanceof ConfigError
+            ? `Health check failed: ${error.message}`
+            : 'Health check failed',
+        stream: 'stderr',
+      },
+      json
     );
     return 1;
   }

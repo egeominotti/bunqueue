@@ -57,3 +57,44 @@ Run `bun scripts/mcp-eval/task-eval.ts` and
 Regression coverage: `test/mcp-task-eval.test.ts` and
 `test/mcp-catalog-measurement.test.ts`. Final product suites remain mandatory;
 these focused offline checks supplement them.
+
+## Standalone MCP regression command
+
+`bun scripts/test-mcp-all.ts` runs the maintained MCP Bun test files under
+`test/`, including the real embedded/TCP tool contracts, transport tests,
+confirmation controls, and state/counter assertions. It forwards optional Bun
+test arguments such as `-t <test-name-pattern>` and propagates the test process's
+exit status. SIGINT and SIGTERM are forwarded to that child process.
+The child receives only basic OS/terminal settings, plus embedded test mode;
+application database paths, broker endpoints, tokens, cloud/provider settings,
+and other caller configuration are excluded. Automatic `.env` loading is
+disabled for the test process and inherited Bun descendants through the explicit
+runtime flag and `BUN_OPTIONS=--no-env-file`, so a caller's persistence aliases
+cannot direct these tests into the caller's database. The doctor test helper
+reconstructs its child environment and explicitly passes `--no-env-file` to
+that real executable as well; it cannot reload broker targets from a caller's
+dotenv file after dropping inherited `BUN_OPTIONS`. Run the command inside the isolated
+development Machine as required by the repository testing policy.
+
+This command does not infer application success from the absence of an MCP
+protocol error. Expected missing-target errors and rejected/ignored transitions
+are assertions in their owning suites, with the actual backend state checked
+independently. In particular, retired ACK/FAIL attempts must not claim success,
+and an explicitly empty retry target must not bypass a declined confirmation.
+The command makes no blanket claim that every registered tool has full control
+of the broker; discovery counts and the tests actually executed remain visible
+in the ordinary test output.
+
+`test/standalone-protocol-runner.test.ts` exercises the executable with a focused
+contract selection. Its filename is outside the MCP discovery pattern to avoid
+recursively invoking the wrapper from itself. Disposable fixtures and database
+cleanup are owned by the maintained tests instead of a shared hard-coded `/tmp`
+database.
+`test/standalone-protocol-isolation.test.ts` checks all four persistence aliases
+against disposable sentinel paths and asserts that the caller files remain
+absent after the executable completes. A separate synthetic `.env` fixture runs
+the maintained real-bin test and asserts that a nested MCP process also leaves
+the caller's sentinel database absent. The doctor fixture selects the maintained
+workflow-store inspection test with a synthetic TCP dotenv target, requiring
+both a passing real executable check and zero connections to a disposable
+loopback sentinel.

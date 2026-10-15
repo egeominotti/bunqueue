@@ -1,5 +1,6 @@
 import { stdoutColorEnabled } from '../../shared/colorSupport';
 import { VERSION } from '../../shared/version';
+import { healthEndpoint } from '../healthEndpoint';
 
 const ANSI = {
   green: '\x1b[32m',
@@ -47,7 +48,7 @@ export interface DoctorReport {
 }
 
 export async function fetchDoctorHealth(host: string, httpPort: number): Promise<DoctorInput> {
-  const endpoint = `${host}:${httpPort}`;
+  const endpoint = healthEndpoint(host, httpPort);
   try {
     const response = await fetch(`http://${endpoint}/health`, {
       signal: AbortSignal.timeout(5000),

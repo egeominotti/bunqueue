@@ -18,12 +18,15 @@ function temporary() {
 }
 async function doctor(settings: Record<string, string>) {
   const env = { PATH: process.env.PATH, HOME: process.env.HOME, ...settings };
-  const proc = Bun.spawn([process.execPath, 'src/mcp/index.ts', '--doctor', '--json'], {
-    env,
-    stdout: 'pipe',
-    stderr: 'pipe',
-    timeout: 10000,
-  });
+  const proc = Bun.spawn(
+    [process.execPath, '--no-env-file', 'src/mcp/index.ts', '--doctor', '--json'],
+    {
+      env,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: 10000,
+    }
+  );
   const [stdout, stderr, exit] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
@@ -61,11 +64,12 @@ test('embedded doctor checks readiness without creating the queue database or bi
 
 test('doctor rejects invalid profiles and missing workflow stores with nonzero status', async () => {
   const dir = temporary();
-  for (const env of [
+  const cases: Record<string, string>[] = [
     { BUNQUEUE_MCP_PROFILE: 'secret-invalid-profile' },
     { BUNQUEUE_MCP_WORKFLOW_DB: join(dir, 'missing.db') },
     { BUNQUEUE_MODE: 'wrong' },
-  ]) {
+  ];
+  for (const env of cases) {
     const result = await doctor(env);
     expect(result.exit).toBe(1);
     expect(result.report.ok).toBe(false);
@@ -134,7 +138,7 @@ test('TCP doctor reads a fresh broker and closes without consuming queued work',
     tcp.stop();
     manager.shutdown();
   });
-  await manager.push('doctor-queued', { task: 'untouched' });
+  const queued = await manager.push('doctor-queued', { data: { task: 'untouched' } });
   const result = await doctor({
     BUNQUEUE_MODE: 'tcp',
     BUNQUEUE_HOST: '127.0.0.1',
@@ -148,6 +152,7 @@ test('TCP doctor reads a fresh broker and closes without consuming queued work',
   });
   expect(manager.getQueueJobCounts('doctor-queued').waiting).toBe(1);
   expect(manager.getQueueJobCounts('doctor-queued').active).toBe(0);
+  expect((await manager.getJob(queued.id))?.data).toEqual({ task: 'untouched' });
 });
 
 test('doctor never echoes a raw invalid pool setting through stderr warnings', async () => {

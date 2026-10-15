@@ -21,12 +21,14 @@ import { PullRefusedError } from '../src/client/worker/workerPull';
 import { closeHarness, startHarness, waitUntil, type CoreE2eHarness } from './docs-guide-support';
 import { SandboxedProbe, fakeBroker, until } from './sandboxed-timers-support';
 import { cleanup, closedPort } from './tcp-client-support';
+import { installFakeTimers, restoreTimers } from './shared-timers-support';
 
 const workers: Worker[] = [];
 const probes: SandboxedProbe[] = [];
 let harness: CoreE2eHarness | null = null;
 
 afterEach(async () => {
+  restoreTimers();
   for (const worker of workers.splice(0)) await worker.close(true);
   for (const probe of probes.splice(0)) await probe.stop(true);
   await closeHarness(harness);
@@ -36,6 +38,30 @@ afterEach(async () => {
 
 type Options = ConstructorParameters<typeof Worker>[2];
 type PullError = Error & { context?: string; consecutiveErrors?: number };
+
+/** Observe real loop decisions, advancing only after a pull has armed its wait. */
+async function expectCadence(
+  timers: ReturnType<typeof installFakeTimers>,
+  pulls: () => number,
+  delays: number[],
+  firstPull = 1,
+  lateness = 0
+) {
+  for (const [index, delay] of delays.entries()) {
+    await until(() => timers.armed.length > index, `pull ${firstPull + index} to arm its wait`);
+    expect(timers.delays()).toEqual(delays.slice(0, index + 1));
+    expect(pulls()).toBe(firstPull + index);
+    expect(timers.pending.size).toBe(1);
+    // No early pull, even after all promise continuations have had a turn.
+    timers.advance(delay - 1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(pulls()).toBe(firstPull + index);
+    if (index + 1 < delays.length) {
+      timers.runNext({ mono: timers.clock.mono + 1 + lateness });
+    }
+  }
+  expect(timers.invalid).toEqual([]);
+}
 
 /** A TCP Worker whose nth PULL/PULLB is answered by `reply(n)`; other commands succeed. */
 function stubbedWorker(reply: (n: number) => string, options: Options = {}) {
@@ -60,39 +86,43 @@ function stubbedWorker(reply: (n: number) => string, options: Options = {}) {
   return { worker, errors, pulls: () => pulls };
 }
 
-describe('Worker: a transient refusal re-polls on the empty-pull cadence', () => {
+describe.each([0, 50])('Worker pull cadence with %i ms callback lateness', (lateness) => {
   test('drainDelay (50 ms by default) without a long-poll, as on 2.9.10', async () => {
     const { worker, errors, pulls } = stubbedWorker(() => 'Rate limit exceeded');
+    const timers = installFakeTimers();
     worker.run();
-    await Bun.sleep(450);
-    // Pulls at about 0, 50, ..., 400 ms; a 100 ms..30 s backoff makes 3.
-    expect(pulls()).toBeGreaterThanOrEqual(7);
+    await expectCadence(timers, pulls, Array(8).fill(50), 1, lateness);
     expect(errors).toEqual([]);
   });
 
   test('10 ms with a long-poll (pollTimeout > 0), as on 2.9.10', async () => {
-    const { worker, pulls } = stubbedWorker(() => 'Lock acquisition timed out', {
+    const { worker, errors, pulls } = stubbedWorker(() => 'Lock acquisition timed out', {
       pollTimeout: 1_000,
     });
+    const timers = installFakeTimers();
     worker.run();
-    await Bun.sleep(300);
-    expect(pulls()).toBeGreaterThanOrEqual(12);
+    await expectCadence(timers, pulls, Array(12).fill(10), 1, lateness);
+    expect(errors).toEqual([]);
   });
 
   test('transient refusals do not escalate the backoff of a later permanent one', async () => {
-    const { worker, errors } = stubbedWorker((n) =>
+    const { worker, errors, pulls } = stubbedWorker((n) =>
       n <= 4 ? 'Internal server error' : 'Not authenticated'
     );
+    const timers = installFakeTimers();
     worker.run();
-    await waitUntil(() => errors.length >= 1, 'the permanent refusal', 3_000);
+    await expectCadence(timers, pulls, [50, 50, 50, 50, 100, 200], 1, lateness);
+    expect(errors).toHaveLength(2);
     expect(errors[0].consecutiveErrors).toBe(1);
+    expect(errors[1].consecutiveErrors).toBe(2);
   });
 
   test('a permanent refusal still backs off from 100 ms', async () => {
-    const { worker, pulls } = stubbedWorker(() => 'Not authenticated');
+    const { worker, errors, pulls } = stubbedWorker(() => 'Not authenticated');
+    const timers = installFakeTimers();
     worker.run();
-    await Bun.sleep(450);
-    expect(pulls()).toBeLessThanOrEqual(4);
+    await expectCadence(timers, pulls, [100, 200, 400, 800], 1, lateness);
+    expect(errors.map((error) => error.consecutiveErrors)).toEqual([1, 2, 3, 4]);
   });
 
   test('a native batch refill retries a transient refusal on its 10 ms refill timer', async () => {
@@ -109,23 +139,30 @@ describe('Worker: a transient refusal re-polls on the empty-pull cadence', () =>
       })
     );
     harness.addCleanup(() => worker.close(true));
-    const pool = worker as unknown as { tcp: { send: (...args: unknown[]) => unknown } };
+    const pool = worker as unknown as {
+      tcp: { send: (command: { cmd?: string }, ...args: unknown[]) => unknown };
+    };
     const send = pool.tcp.send.bind(pool.tcp);
     let pulls = 0;
+    let timers: ReturnType<typeof installFakeTimers> | undefined;
+    const errors: Error[] = [];
+    worker.on('error', (error) => errors.push(error));
     pool.tcp.send = (command: { cmd?: string }, ...rest: unknown[]) => {
       if (command.cmd === 'PULL' || command.cmd === 'PULLB') {
         pulls++;
-        if (pulls > 1) return Promise.resolve({ ok: false, error: 'Rate limit exceeded' });
+        if (pulls > 1) {
+          timers ??= installFakeTimers();
+          return Promise.resolve({ ok: false, error: 'Rate limit exceeded' });
+        }
       }
       return send(command, ...rest);
     };
     await queue.add('job', {});
     worker.run();
     await waitUntil(() => pulls >= 2, 'the first refill', 2_000);
-    const before = pulls;
-    await Bun.sleep(300);
-    // About one refill every 10 ms; a 100 ms..30 s backoff makes 2 or 3.
-    expect(pulls - before).toBeGreaterThanOrEqual(10);
+    expect(timers).toBeDefined();
+    await expectCadence(timers!, () => pulls, Array(12).fill(10), 2, lateness);
+    expect(errors).toEqual([]);
   });
 });
 
@@ -136,7 +173,7 @@ describe('SandboxedWorker: a transient refusal is an empty pull', () => {
       () => new PullRefusedError('PULL', { ok: false, error: 'Rate limit exceeded' })
     );
 
-  test('the next pull follows after pollInterval, not after a growing backoff', async () => {
+  test.each([0, 50])('pollInterval stays 10 ms with %i ms callback lateness', async (lateness) => {
     const { calls, manager } = fakeBroker();
     calls.script.push(...refusals(100));
     const probe = new SandboxedProbe({ manager, pollInterval: 10 });
@@ -144,10 +181,9 @@ describe('SandboxedWorker: a transient refusal is an empty pull', () => {
     const errors: Error[] = [];
     probe.on('error', (error) => errors.push(error));
     probe.addThread(false);
+    const timers = installFakeTimers();
     probe.runPullLoop();
-    await Bun.sleep(300);
-    // About one pull every 15 ms (5 ms broker + 10 ms); a backoff makes 3.
-    expect(calls.pulls).toBeGreaterThanOrEqual(10);
+    await expectCadence(timers, () => calls.pulls, Array(12).fill(10), 1, lateness);
     expect(errors).toEqual([]);
   });
 
@@ -156,9 +192,11 @@ describe('SandboxedWorker: a transient refusal is an empty pull', () => {
     calls.script.push(...refusals(1));
     const probe = new SandboxedProbe({ manager, idleTimeout: 1 });
     probes.push(probe);
+    const timers = installFakeTimers();
     probe.runPullLoopIdle();
-    // The idle stop follows the refused pull itself, not a pull after a 100 ms backoff.
-    await until(() => !probe.isRunning(), 'the idle stop', 60);
+    // No retry timer may fire: the refused pull itself must take the idle-stop path.
+    await until(() => !probe.isRunning(), 'the idle stop');
     expect(calls.pulls).toBe(1);
+    expect(timers.delays()).toEqual([]);
   });
 });

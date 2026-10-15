@@ -12,6 +12,13 @@ and credentials (an invalid `HTTP_PORT` is named: `Health check failed: Invalid
 HTTP_PORT: "abc" (...)`). It never opens a database or starts a broker. The command
 does not resolve server config files or start flags; pass an explicit URL when
 those override the listener. TLS certificate verification remains enabled.
+With `--json`, the same probe emits one JSON document: `{ "ok": true,
+"status": "healthy" }` on stdout for success, or an `ok: false` error on stderr
+for failure. Probe URLs, credentials, and response payloads are not included in
+failure diagnostics.
+Because this probe uses HTTP only, global TCP host/port/token/TLS settings and
+their parser warnings are ignored for `healthcheck`, including malformed unused
+TCP environment values. They cannot precede or contaminate its JSON result.
 See [Docker images](./docker-images.md) for the packaging and publication gates.
 
 > **Category:** Interface · **Source:** `src/cli/index.ts`, `src/cli/globalOptions.ts`, `src/cli/localOutput.ts`, `src/cli/client.ts`, `src/cli/commandRegistry.ts`, `src/cli/commandRouter.ts`, `src/cli/output.ts`, `src/cli/help.ts`, `src/cli/commands/*.ts`
@@ -70,6 +77,9 @@ External / runtime:
 - Pure `renderHelp`/`renderServerHelp`/`renderPushHelp`/`renderCronAddHelp`/`renderVersion` plus compatible `print*` wrappers (`src/cli/help.ts`).
 - Command builders: `buildCoreCommand`, `buildJobCommand`, `buildQueueCommand`, `buildDlqCommand`, `buildCronCommand`, `buildWorkerCommand`, `buildWebhookCommand`, `buildRateLimitCommand`, `buildMonitorCommand`, and the backup runners `isBackupCommand` / `executeBackupCommand` / `runDoctor` / `runServer`.
 - Shared helpers + `CommandError` in `src/cli/commands/types.ts`: `requireArg`, `parseJsonArg`, `parseNumberArg`, `parseBigIntArg`.
+- Input-boundary helpers in the same module: `parseBooleanArg` and
+  `withoutOptionTerminator` and `splitSubcommand`; `healthEndpoint(host, port)` in
+  `src/cli/healthEndpoint.ts` builds the authority shared by HTTP diagnostics.
 - `CLI_COMMAND_SURFACE`, `CLI_LOCAL_COMMAND_SURFACE`, `CLI_NETWORK_COMMANDS`,
   and `buildCommand()` (`src/cli/commandRegistry.ts`,
   `src/cli/commandRouter.ts`).
@@ -122,20 +132,28 @@ Job fields the formatter reads (`src/cli/output/jobs.ts`): `id`, `queue`, `state
 
 Done by hand (not `parseArgs`) so unknown/subcommand flags survive into `commandArgs`. Notable rules:
 
-- `--` ends global parsing; everything after is opaque (`:227`).
+- `--` ends global parsing and is preserved until the command's parser consumes
+  it. A leading marker extracts the top-level command and carries protection
+  into its arguments, so `-- job log <id> --json` writes the literal `--json`,
+  and `-- backup restore <key> --force` cannot confirm a restore.
+  Option-looking literals remain positional through the
+  complete pipeline, including `job log <id> -- --json`. Direct positional
+  builders remove only the first terminator, preserving a later literal `--`.
+  A terminator before a family subcommand is carried into that subcommand's
+  arguments, so `job -- log <id> --json` still writes the literal `--json` text.
 - `-t`/`--token` is global **except** after `pull` and `job wait`, where `-t` is that subcommand's `--timeout` and is passed through (`commandOwnsShortT`, `:120`, `:136`).
 - TLS flags: `--tls`, `--tls-no-verify`, `--tls-ca <file>` / `--tls-ca=<file>`; `--tls-cert`/`--tls-key` are server flags and pass through (`applyTlsFlag`, `:65`). `--tls-no-verify` or `--tls-ca` imply TLS (`buildTlsOption`, `:104`).
 - Attached short flags that shadow a global letter (e.g. `-p10`, `-Hfoo`) are warned about because `strict:false` downstream would silently mis-parse them (`warnAmbiguousAttachedShort`, `:195`).
 - Flag-consumers refuse to swallow a following `-flag` as their value (host/token/ca warn instead; `-p`/`--port` reports a missing value, see below).
 - **Port:** `-p`/`--port <n>` and `--port=<n>` are parsed after the loop with the rule of the mode: a client command needs 1-65535, server mode follows `--tcp-port` (0-65535, 0 = OS-assigned) because the value is re-injected as `--tcp-port`. The env grammar applies (`6789.5` and `+6789` are 6789). On a client command `1e4`, `-1`, `abc`, `99999` and a missing value (`--port` at the end, `-p --json`) throw a `ConfigError` naming the flag as typed (`Invalid -p: "abc" (expected a whole number between 1 and 65535)`), printed as one `Fatal error:` line; before, each warned and connected to 6789, which may be a different server. On `start`, a value that is not a port (`abc`, `70000`, missing) is dropped with a warning, as in 2.9.10, and the server port (TCP_PORT or 6789) applies; a misread (`1e4`) is an error. An empty value (`--port=`, `-p ''`) means "not given", as in 2.9.10: the env or default port applies; `--host=` likewise.
 - Port/host fall back to env when not explicit: a client command's port comes from `TCP_PORT ?? BUNQUEUE_TCP_PORT ?? BQ_TCP_PORT` (`resolveEnvPort`; an empty `TCP_PORT` means 6789 and hides the aliases). A value that is not a port warns and uses 6789, as in 2.9.10 (`Warning: Invalid env port "tcp://10.96.0.12:6789" (BUNQUEUE_TCP_PORT: expected a whole number between 1 and 65535). Using 6789.`): Kubernetes injects `BUNQUEUE_TCP_PORT=tcp://<ip>:<port>` for a Service named `bunqueue-tcp`, which must not break every client command. In server mode the env port is the server's and is validated by `resolveServerConfig` instead. Host via `HOST`→`BUNQUEUE_HOST`→`BQ_HOST`. Token via `resolveToken` (`--token`→`BQ_TOKEN`→`BUNQUEUE_TOKEN`).
-- **Server mode** is detected when the first positional is `start`, absent, or starts with `-`. In that case explicit `--host`/`--port` are re-injected into `commandArgs` as `--host`/`--tcp-port` so they reach `parseServerArgs`.
+- **Server mode** is detected when the first positional is `start`, absent, or starts with `-`. In that case explicit `--host`/`--port` are re-injected into `commandArgs` as `--host`/`--tcp-port` before any preserved terminator so they reach `parseServerArgs`. A trailing marker therefore preserves pre-marker bindings, including `start --host 127.0.0.1 --port 0 --`.
 
 ### 2. Dispatch (`main`, `src/cli/index.ts`)
 
 `--version`/`--help` short-circuit first. Then: server mode → `runServer`; `version`/`doctor`/`backup` → local handlers; otherwise → `executeCommand`. Command-specific help is printed for `push`/`cron` when `--help` follows the verb (`:351`). Top-level `try/catch` prints `Error: <msg>` and exits 1.
 
-With `--json`, global/command help, both version forms, doctor, backup, and
+With `--json`, global/command help, both version forms, doctor, healthcheck, backup, and
 fatal local errors all pass through `emitLocalOutput`: one ANSI-free JSON
 document on exactly one stream, with the historical exit code preserved.
 
@@ -144,14 +162,14 @@ document on exactly one stream, with the historical exit code preserved.
 1. **Build first, connect second** — `buildCommand` runs before any socket is opened, so unknown commands and parse errors are reported without a reachable server (`:190`). Unknown command → exit 1.
 2. `connect()` opens `Bun.connect` (TLS wrapped if `buildClientTls` returns a value), with a 5s connection timeout (`:171`).
 3. If a token is present, send `{ cmd:'Auth', token }`; non-`ok` → "Authentication failed" exit 1 (`:199`).
-4. Send the command with a deadline from `clientTimeoutFor` (base 30s; only `PULL`/`WaitJob` add the server-side `timeout` + 10s network buffer, `:47`). The deadline is armed with `safeTimeout` (`:54`), so a long-poll `--timeout` above 2^31 - 1 ms reaches the server and the CLI prints the server's own range error (for example `timeout must be at most 60000`); a native timer used to overflow and report `Command timeout` after about 1 ms (`test/repro-server-runtime-cli-timeout.test.ts`). One in-flight request per socket: `socket.data.resolve/reject` is set, the framed msgpack is written, the `data` handler unpacks the first frame and resolves.
+4. Send the command with a deadline from `clientTimeoutFor` (base 30s; only `PULL`/`WaitJob` add the server-side `timeout` + 10s network buffer). An omitted `WaitJob` timeout uses the broker's 30s default, giving the client 40s; an explicit 30s timeout receives the same allowance. The deadline is armed with `safeTimeout`, so a long-poll `--timeout` above 2^31 - 1 ms reaches the server and the CLI prints the server's own range error (for example `timeout must be at most 60000`); a native timer used to overflow and report `Command timeout` after about 1 ms (`test/repro-server-runtime-cli-timeout.test.ts`). One in-flight request per socket: `socket.data.resolve/reject` is a single slot, set before the framed msgpack is written and cleared when the response or error settles.
 5. Response handling: `!ok` → `formatOutput` to stderr, exit 1. Two false-success guards: `WaitJob` + `completed:false` → "Job not completed within timeout" exit 1 (`:228`); `GetState` + `state:'unknown'` → "Job not found" exit 1 (`:234`). Otherwise print formatted output to stdout.
 6. `RegisterWorker` prints a stderr warning that the registration is transient and dies with the CLI process (`:245`).
 7. `finally` closes the socket.
 
 ### 4. Output (`formatOutput` → `formatSuccess`, `src/cli/output.ts:6`, `src/cli/output/success.ts:65`)
 
-`--json` returns `JSON.stringify(response, null, 2)` of the raw response (pretty-printed, no unwrapping). Otherwise `unwrap` flattens a `{ data: {...} }` envelope (`src/cli/output/success.ts:14-24`), then `formatSuccess` checks `id`→"Job created" (only for `push`) and `ids`→verb chosen by command+subcommand first, then a collection cascade picks a renderer: job / jobs-table (DLQ-aware) / workers / webhooks / crons / dlqJobs / logs / stats / counts / queues, then the remaining scalar shapes (`workerId`, `webhookId`, `cron`, `state`, `result`, `progress`, `paused`, `count`, `metrics`), falling back to `OK` (`src/cli/output/success.ts:65-120`). The subcommand (first positional) is forwarded so batch responses read "Drained"/"Cleaned"/"Retried"/"Purged" correctly (`src/cli/client.ts:216-220`).
+`--json` returns `JSON.stringify(response, null, 2)` of the raw response (pretty-printed, no unwrapping). Otherwise `unwrap` flattens a `{ data: {...} }` envelope (`src/cli/output/success.ts:14-24`), then `formatSuccess` checks `id`→"Job created" (only for `push`) and `ids`→verb chosen by command+subcommand first, then a collection cascade picks a renderer: job / jobs-table (DLQ-aware) / workers / webhooks / crons / dlqJobs / logs / stats / counts / queues, then the remaining scalar shapes (`workerId`, `webhookId`, `cron`, `state`, `result`, `progress`, `paused`, `count`, `metrics`), falling back to `OK` (`src/cli/output/success.ts:65-120`). The subcommand is extracted with the same marker-aware helper used for dispatch, so legacy batch-ID replies retain "Drained"/"Cleaned"/"Retried"/"Purged" labels even after a family marker (`queue -- drain <queue>` or `dlq -- retry <queue>`).
 
 ### 5. Server mode (`runServer`, `src/cli/commands/server.ts:138`)
 
@@ -163,6 +181,9 @@ Parse CLI flags (`parseCliFlags`) → `loadConfigFile(configPath)` → `applyCli
 business logic, and `formatDoctorText` owns the ANSI view. The report covers
 reachability, version mismatch, status, uptime, connections, DLQ, and RSS; the
 dispatcher chooses text or JSON and applies its exit code.
+Doctor and version health URLs bracket a bare IPv6 host such as `::1`; already
+bracketed literals remain usable. Endpoint display and transport URL construction
+are separate, so a healthy IPv6 listener is not misreported as unreachable.
 
 ### 7. Backup (`executeBackupCommand`, `src/cli/commands/backup.ts:21`)
 
@@ -174,6 +195,14 @@ fails. It accepts temporary S3 credentials (`S3_SESSION_TOKEN` /
 `S3BackupManager.validate()`. `restore` refuses without `--force` (`-f`) and
 warns to stop the server first; stopping is required so no open SQLite handle
 can continue using the replaced file.
+An explicit `--force=false` cannot authorize a restore. Boolean options accept
+the normal bare switch and explicit lowercase `=true`/`=false`; other explicit
+values are rejected. Surplus positionals are rejected rather than silently
+turning a trailing `false` into an enabled destructive switch.
+Restore also rejects unsupported short-option clusters before argument parsing;
+an embedded `f` in a token such as `-xf=false` cannot authorize the destructive
+boundary. A key literally named `false` can be written before `--force` or after
+the explicit positional terminator.
 
 ## Executable CLI invariant register
 
@@ -242,6 +271,18 @@ handoff so a later one-shot CLI invocation can `ack`/`fail` that delivered job.
 
 ## Edge Cases & Failure Modes
 
+- **Queue listing states**: `queue jobs --state` accepts `waiting`, `prioritized`,
+  `delayed`, `active`, `completed`, `failed`, `paused`, and `waiting-children`,
+  matching broker/MCP inspection. The destructive `queue clean` allowlist remains
+  separate from listing support.
+- **Boolean payloads versus switches**: `push q --lifo false` retains `false` as
+  its required JSON payload. Use `--lifo=false` to explicitly disable LIFO; do not
+  append a second payload after an existing JSON argument.
+- **Progress messages**: `job progress <id> <n> --message <text>` and `-m` are the
+  canonical forms; the previously documented `--msg` alias is also accepted.
+- **DLQ metadata**: text listing prefers each authoritative DLQ entry's `error`
+  and `enteredAt` over the raw job's fields, keeping the original failure and its
+  timestamp visible. Legacy jobs-only replies retain their existing fallback.
 - **Exit codes**: `0` success; `1` generic failure (unknown command, `!ok`, auth fail, timeout, `WaitJob` not completed, `GetState` unknown); `2` when a `CommandError` (bad arguments/JSON) escapes (`src/cli/client.ts:254`). Doctor/backup compute their own codes.
 - **TLS mismatch hint**: a plaintext client reading a TLS handshake parses garbage as an absurd frame size; `FrameSizeError` is caught and rephrased to suggest `--tls`/`--tls-ca`/`--tls-no-verify` (`src/cli/client.ts:96`).
 - **Connect rejection path**: `Bun.connect` may reject directly (TLS handshake refused) instead of firing `connectError`; that promise rejection is surfaced rather than waiting out the 5s timeout (`:163`).
@@ -251,7 +292,7 @@ handoff so a later one-shot CLI invocation can `ack`/`fail` that delivered job.
 - **JSON positional data**: negative JSON primitives are protected from `parseArgs` option tokenization, so flag order around queue/data does not change meaning.
 - **Object-key safety**: `__proto__`, `__proto_`, `constructor`, and `prototype` remain distinct own properties through TCP and SQLite. The rare safe decode path uses `Object.defineProperty`, so decoding cannot mutate `Object.prototype`.
 - **Job IDs are passed as strings** (`parseBigIntArg`) so UUIDs, numeric, and custom IDs all work; the server parses them (`src/cli/commands/types.ts:46-52`).
-- **Transient worker registration**: `worker register` over the CLI is gone the instant the process exits (TCP close auto-unregisters); a stderr warning points users to the SDK `Worker` or `bunqueue start --processor` (`src/cli/client.ts:241-250`).
+- **Transient worker registration**: `worker register` over the CLI is gone the instant the process exits (TCP close auto-unregisters); its stderr warning directs users to a long-lived process using the SDK `Worker` class. The broker's `start` command does not load a processor.
 - **Invalid server response**: a frame that fails `unpack` rejects with "Invalid response from server" (`:121`).
 - **Color policy** (`colorEnabled`, `src/shared/colorSupport.ts`), shared by CLI results (`style.ts`), `--help`, `doctor` and the server startup banner: a non-empty `FORCE_COLOR` wins (`0`/`false` force color off, anything else on, even on a pipe and over `NO_COLOR`, as Node.js resolves the two); otherwise any non-empty `NO_COLOR` (https://no-color.org) or `TERM=dumb` disables color; otherwise color only on a TTY. Before, CLI results honoured only `NO_COLOR=1`, and help, doctor and the banner always wrote ANSI, into pipes and log files too. `--json` output never contains color.
 - **No retry/reconnect**: unlike the SDK pool, the one-shot CLI does not retry a failed connection or resend on a dropped socket.

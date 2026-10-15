@@ -108,15 +108,18 @@ export function formatWebhooks(webhooks: Record<string, unknown>[]): string {
 export function formatDlqJobs(jobs: Record<string, unknown>[]): string {
   if (jobs.length === 0) return color('DLQ is empty', colors.green);
   return jobs
-    .map((job) => {
+    .map((entry) => {
+      const job =
+        typeof entry.job === 'object' && entry.job !== null
+          ? (entry.job as Record<string, unknown>)
+          : entry;
       const id = str(job.jobId ?? job.id);
+      const failureTime = entry.enteredAt ?? job.failedAt ?? job.createdAt;
       const failedAt =
-        job.failedAt !== null && job.failedAt !== undefined
-          ? new Date(job.failedAt as number).toISOString()
-          : job.createdAt
-            ? new Date(job.createdAt as number).toISOString()
-            : 'unknown';
-      return `  ${color(id, colors.bold)}\n    Queue: ${str(job.queue)}\n    Error: ${color(str(job.error, 'Unknown'), colors.red)}\n    Failed: ${failedAt}`;
+        failureTime !== null && failureTime !== undefined
+          ? new Date(failureTime as number).toISOString()
+          : 'unknown';
+      return `  ${color(id, colors.bold)}\n    Queue: ${str(job.queue)}\n    Error: ${color(str(entry.error, 'Unknown'), colors.red)}\n    Failed: ${failedAt}`;
     })
     .join('\n\n');
 }

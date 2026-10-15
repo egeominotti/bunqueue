@@ -14,7 +14,7 @@ export async function readStreamUntil(
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   const deadline = Date.now() + timeoutMs;
-  let pending: Promise<ReadableStreamReadResult<Uint8Array>> | null = null;
+  let pending: ReturnType<typeof reader.read> | null = null;
   let output = '';
   try {
     while (!output.includes(needle) && Date.now() < deadline) {

@@ -30,6 +30,7 @@ const DEFAULT_CLIENT_PORT = 6789;
 /** A client connects to a real port: 0 (OS-assigned) only makes sense for a server. */
 const CLIENT_PORT: WholeRule = { min: 1, max: 65_535 };
 const ENV_PORTS = ['TCP_PORT', 'BUNQUEUE_TCP_PORT', 'BQ_TCP_PORT'] as const;
+type Warn = (message: string) => void;
 
 /**
  * The client port from the env, resolved as `TCP_PORT ?? BUNQUEUE_TCP_PORT ?? BQ_TCP_PORT`
@@ -84,12 +85,13 @@ function resolveEnvHost(currentHost: string): string {
 }
 
 function applyTlsFlag(
-  arg: string,
   allArgs: string[],
   index: number,
   state: TlsFlagState,
-  commandArgs: string[]
+  commandArgs: string[],
+  warn: Warn
 ): number {
+  const arg = allArgs[index];
   if (arg === '--tls') {
     state.enabled = true;
     return index;
@@ -101,7 +103,7 @@ function applyTlsFlag(
   if (arg === '--tls-ca') {
     const value = allArgs[index + 1];
     if (value === undefined || value.startsWith('-')) {
-      console.warn('Warning: --tls-ca requires a file path. Option ignored.');
+      warn('Warning: --tls-ca requires a file path. Option ignored.');
       return index;
     }
     state.caFile = value;
@@ -110,7 +112,7 @@ function applyTlsFlag(
   if (arg.startsWith('--tls-ca=')) {
     const value = arg.slice(9);
     if (value) state.caFile = value;
-    else console.warn('Warning: --tls-ca= requires a file path. Option ignored.');
+    else warn('Warning: --tls-ca= requires a file path. Option ignored.');
     return index;
   }
   commandArgs.push(arg);
@@ -132,29 +134,30 @@ function commandOwnsShortT(commandArgs: string[]): boolean {
 }
 
 function applyTokenFlag(
-  arg: string,
   allArgs: string[],
   index: number,
   state: { token?: string },
-  commandArgs: string[]
+  commandArgs: string[],
+  warn: Warn
 ): number {
+  const arg = allArgs[index];
   if (arg === '-t' && commandOwnsShortT(commandArgs)) {
     commandArgs.push(arg);
     return index;
   }
   const value = allArgs[index + 1];
   if (value === undefined || value.startsWith('-')) {
-    console.warn('Warning: --token requires a value. Token not set.');
+    warn('Warning: --token requires a value. Token not set.');
     return index;
   }
   state.token = value;
   return index + 1;
 }
 
-function applyHostFlag(allArgs: string[], index: number, state: HostPortState): number {
+function applyHostFlag(allArgs: string[], index: number, state: HostPortState, warn: Warn): number {
   const value = allArgs[index + 1];
   if (value === undefined || value.startsWith('-')) {
-    console.warn('Warning: --host requires a value. Using localhost.');
+    warn('Warning: --host requires a value. Using localhost.');
     return index;
   }
   state.host = value;
@@ -178,10 +181,10 @@ function applyPortFlag(
   return index + 1;
 }
 
-function warnAmbiguousAttachedShort(arg: string, commandArgs: string[]): void {
+function warnAmbiguousAttachedShort(arg: string, commandArgs: string[], warn: Warn): void {
   if (!/^-[Hpthv][^-\s]/.test(arg)) return;
   if (arg.startsWith('-t') && commandOwnsShortT(commandArgs)) return;
-  console.warn(
+  warn(
     `Warning: "${arg}" looks like a short flag with an attached value; ` +
       `use the separated form ("${arg.slice(0, 2)} ${arg.slice(2)}") or the long form.`
   );
@@ -195,6 +198,10 @@ export function parseGlobalOptions(allArgs = process.argv.slice(2)): {
   const tokenState: { token?: string } = {};
   const tlsState: TlsFlagState = { enabled: false, noVerify: false };
   const commandArgs: string[] = [];
+  const warnings: string[] = [];
+  const warn: Warn = (message) => {
+    warnings.push(message);
+  };
   let json = false;
   let help = false;
   let version = false;
@@ -202,17 +209,21 @@ export function parseGlobalOptions(allArgs = process.argv.slice(2)): {
   for (let index = 0; index < allArgs.length; index++) {
     const arg = allArgs[index];
     if (arg === '--') {
-      commandArgs.push(...allArgs.slice(index + 1));
+      // Extract a protected top-level command while retaining protection for its arguments.
+      if (commandArgs.length === 0 && index + 1 < allArgs.length) {
+        commandArgs.push(allArgs[++index]);
+      }
+      commandArgs.push('--', ...allArgs.slice(index + 1));
       break;
     }
     if (arg === '--host' || arg === '-H') {
-      index = applyHostFlag(allArgs, index, hp);
+      index = applyHostFlag(allArgs, index, hp, warn);
     } else if (arg === '--port' || arg === '-p') {
       index = applyPortFlag(arg, allArgs, index, hp);
     } else if (arg === '--token' || arg === '-t') {
-      index = applyTokenFlag(arg, allArgs, index, tokenState, commandArgs);
+      index = applyTokenFlag(allArgs, index, tokenState, commandArgs, warn);
     } else if (arg.startsWith('--tls')) {
-      index = applyTlsFlag(arg, allArgs, index, tlsState, commandArgs);
+      index = applyTlsFlag(allArgs, index, tlsState, commandArgs, warn);
     } else if (arg === '--json') {
       json = true;
     } else if (arg === '--help' || (arg === '-h' && commandArgs.length === 0)) {
@@ -230,19 +241,31 @@ export function parseGlobalOptions(allArgs = process.argv.slice(2)): {
     } else if (arg.startsWith('--token=')) {
       const value = arg.slice(8);
       if (value) tokenState.token = value;
-      else console.warn('Warning: --token= requires a value. Token not set.');
+      else warn('Warning: --token= requires a value. Token not set.');
     } else {
-      warnAmbiguousAttachedShort(arg, commandArgs);
+      warnAmbiguousAttachedShort(arg, commandArgs, warn);
       commandArgs.push(arg);
     }
   }
+
+  // The HTTP-only probe never uses TCP settings or their diagnostics.
+  if (commandArgs[0] === 'healthcheck') {
+    return {
+      options: { host: 'localhost', port: DEFAULT_CLIENT_PORT, json, help, version },
+      commandArgs,
+    };
+  }
+  for (const message of warnings) console.warn(message);
 
   const serverMode =
     commandArgs[0] === 'start' || commandArgs.length === 0 || commandArgs[0]?.startsWith('-');
   const explicitPort = hp.portFlag ? parsePortFlag(hp.portFlag, serverMode) : undefined;
   if (serverMode) {
-    if (hp.hostExplicit) commandArgs.push('--host', hp.host);
-    if (explicitPort !== undefined) commandArgs.push('--tcp-port', String(explicitPort));
+    const serverFlags: string[] = [];
+    if (hp.hostExplicit) serverFlags.push('--host', hp.host);
+    if (explicitPort !== undefined) serverFlags.push('--tcp-port', String(explicitPort));
+    const terminator = commandArgs.indexOf('--');
+    commandArgs.splice(terminator < 0 ? commandArgs.length : terminator, 0, ...serverFlags);
   }
 
   return {

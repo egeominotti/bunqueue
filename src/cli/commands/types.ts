@@ -11,6 +11,26 @@ export class CommandError extends Error {
   }
 }
 
+/** Direct positional builders remove the parser marker, preserving later literal `--` values. */
+export function withoutOptionTerminator(args: string[]): string[] {
+  const index = args.indexOf('--');
+  return index < 0 ? args : [...args.slice(0, index), ...args.slice(index + 1)];
+}
+
+/** A family-level terminator protects subcommand arguments after dispatch as well. */
+export function splitSubcommand(args: string[]): { subcommand?: string; subArgs: string[] } {
+  return args[0] === '--'
+    ? { subcommand: args[1], subArgs: ['--', ...args.slice(2)] }
+    : { subcommand: args[0], subArgs: args.slice(1) };
+}
+
+/** Bun's permissive argument parser returns strings for explicit boolean assignments. */
+export function parseBooleanArg(value: unknown, name: string): boolean {
+  if (value === undefined || value === false || value === 'false') return false;
+  if (value === true || value === 'true') return true;
+  throw new CommandError(`Invalid boolean for --${name}: use --${name}=true or --${name}=false`);
+}
+
 /** Require a positional argument */
 export function requireArg(args: string[], index: number, name: string): string {
   const value = args[index];

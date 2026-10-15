@@ -83,16 +83,42 @@ export async function createConsistentSnapshot(databasePath: string): Promise<st
   }
 }
 
+/** Make the stopped database recoverable without its WAL or rollback journal. */
+async function recoverOriginalDatabase(databasePath: string): Promise<void> {
+  if (!(await Bun.file(databasePath).exists())) return;
+  const sidecars = await Promise.all(
+    ['-wal', '-journal'].map((suffix) => Bun.file(`${databasePath}${suffix}`).exists())
+  );
+  if (!sidecars.some(Boolean)) return;
+
+  const db = new Database(databasePath, { readwrite: true, create: false });
+  try {
+    db.exec('PRAGMA busy_timeout = 0');
+    // Reading the schema triggers recovery of a hot rollback journal.
+    db.query('SELECT name FROM sqlite_schema LIMIT 1').get();
+    const checkpoint = db.query('PRAGMA wal_checkpoint(TRUNCATE)').get() as {
+      busy: number;
+      log: number;
+      checkpointed: number;
+    } | null;
+    if (checkpoint?.busy !== 0 || checkpoint.log !== checkpoint.checkpointed) {
+      throw new Error('Restore refused: original database WAL checkpoint is busy or incomplete');
+    }
+  } finally {
+    db.close();
+  }
+}
+
 /**
  * Install an already validated candidate while quarantining stale sidecars.
- *
- * The live main database is not touched until all sidecars have moved. If a
- * pre-swap operation fails, moved sidecars are restored before returning.
+ * Recover the original first so a process exit before the swap leaves its
+ * committed state in the main file. Ordinary pre-swap failures roll moves back.
  */
 export async function installDatabaseCandidate(
   candidatePath: string,
   databasePath: string
 ): Promise<void> {
+  await recoverOriginalDatabase(databasePath);
   const quarantineId = `${Date.now()}-${crypto.randomUUID()}`;
   const movedSidecars: Array<{ live: string; quarantine: string }> = [];
 

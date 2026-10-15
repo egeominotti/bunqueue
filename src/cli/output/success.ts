@@ -24,6 +24,9 @@ function unwrap(response: Record<string, unknown>): Record<string, unknown> {
 }
 
 function formatCollection(response: Record<string, unknown>, command: string): string | null {
+  if (command === 'dlq' && Array.isArray(response.entries)) {
+    return formatDlqJobs(response.entries as Record<string, unknown>[]);
+  }
   if ('job' in response) {
     return response.job === null
       ? color('No job available', colors.yellow)

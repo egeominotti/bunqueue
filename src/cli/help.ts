@@ -43,7 +43,7 @@ JOB COMMANDS:
   job state <id>                  Get job state
   job result <id>                 Get job result
   job cancel <id>                 Cancel a job
-  job progress <id> <n> [--msg]   Update job progress (0-100)
+  job progress <id> <n> [--message <text>]  Update progress (alias: --msg, -m)
   job update <id> <data>          Update job data
   job priority <id> <n>           Change job priority
   job promote <id>                Promote delayed job to waiting

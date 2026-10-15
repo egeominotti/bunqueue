@@ -118,6 +118,18 @@ export interface FlowNodeResult {
   children?: FlowNodeResult[];
 }
 
+/** A legacy undefined result means applied; retired executions are explicitly ignored. */
+// oxlint-disable-next-line typescript/no-invalid-void-type -- Keep existing Promise<void> adapter implementations assignable.
+export type McpAckOutcome = void | {
+  readonly applied: false;
+  readonly reason: 'already-finalized';
+};
+// oxlint-disable-next-line typescript/no-invalid-void-type -- Keep existing Promise<void> adapter implementations assignable.
+export type McpAckBatchOutcome = void | {
+  readonly ignoredIds: string[];
+  readonly ignoredIndices: number[];
+};
+
 /** Common backend contract; all methods are async for TCP compatibility. */
 export interface McpBackend {
   addJob(
@@ -150,10 +162,10 @@ export interface McpBackend {
     timeoutMs?: number,
     lock?: PullLockOptions
   ): Promise<PulledJob[]>;
-  ackJob(jobId: string, result?: unknown, token?: string): Promise<void>;
+  ackJob(jobId: string, result?: unknown, token?: string): Promise<McpAckOutcome>;
   /** `tokens` is aligned with `jobIds`; an empty entry means "no token". */
-  ackJobBatch(jobIds: string[], tokens?: string[]): Promise<void>;
-  failJob(jobId: string, error?: string, opts?: FailJobOptions): Promise<void>;
+  ackJobBatch(jobIds: string[], tokens?: string[]): Promise<McpAckBatchOutcome>;
+  failJob(jobId: string, error?: string, opts?: FailJobOptions): Promise<McpAckOutcome>;
   jobHeartbeat(jobId: string, token?: string): Promise<boolean>;
   jobHeartbeatBatch(jobIds: string[], tokens?: string[]): Promise<number>;
   extendLock(jobId: string, token: string, duration: number): Promise<boolean>;

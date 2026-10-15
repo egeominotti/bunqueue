@@ -4,41 +4,48 @@
  */
 
 import { parseArgs } from 'node:util';
-import { CommandError, requireArg, parseJsonArg, parseNumberArg, parseBigIntArg } from './types';
+import {
+  CommandError,
+  requireArg,
+  parseJsonArg,
+  parseNumberArg,
+  parseBigIntArg,
+  withoutOptionTerminator,
+  splitSubcommand,
+} from './types';
 
 /** Build a job subcommand */
 export function buildJobCommand(args: string[]): Record<string, unknown> {
-  const subcommand = args[0];
+  const { subcommand, subArgs } = splitSubcommand(args);
   if (!subcommand) {
     throw new CommandError(
       'Missing subcommand. Use: get, state, result, cancel, progress, update, priority, promote, delay, discard, logs, log, wait'
     );
   }
-  const subArgs = args.slice(1);
 
   switch (subcommand) {
     case 'get':
-      return buildGetJob(subArgs);
+      return buildGetJob(withoutOptionTerminator(subArgs));
     case 'state':
-      return buildGetState(subArgs);
+      return buildGetState(withoutOptionTerminator(subArgs));
     case 'result':
-      return buildGetResult(subArgs);
+      return buildGetResult(withoutOptionTerminator(subArgs));
     case 'cancel':
-      return buildCancel(subArgs);
+      return buildCancel(withoutOptionTerminator(subArgs));
     case 'progress':
       return buildProgress(subArgs);
     case 'update':
-      return buildUpdate(subArgs);
+      return buildUpdate(withoutOptionTerminator(subArgs));
     case 'priority':
-      return buildChangePriority(subArgs);
+      return buildChangePriority(withoutOptionTerminator(subArgs));
     case 'promote':
-      return buildPromote(subArgs);
+      return buildPromote(withoutOptionTerminator(subArgs));
     case 'delay':
-      return buildMoveToDelayed(subArgs);
+      return buildMoveToDelayed(withoutOptionTerminator(subArgs));
     case 'discard':
-      return buildDiscard(subArgs);
+      return buildDiscard(withoutOptionTerminator(subArgs));
     case 'logs':
-      return buildGetLogs(subArgs);
+      return buildGetLogs(withoutOptionTerminator(subArgs));
     case 'log':
       return buildAddLog(subArgs);
     case 'wait':
@@ -75,6 +82,7 @@ function buildProgress(args: string[]): Record<string, unknown> {
     args,
     options: {
       message: { type: 'string', short: 'm' },
+      msg: { type: 'string' },
     },
     allowPositionals: true,
     strict: false,
@@ -93,7 +101,8 @@ function buildProgress(args: string[]): Record<string, unknown> {
     progress,
   };
 
-  if (values.message) cmd.message = values.message;
+  const message = values.message ?? values.msg;
+  if (message) cmd.message = message;
 
   return cmd;
 }

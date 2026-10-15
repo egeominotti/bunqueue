@@ -23,6 +23,14 @@ export const DLQ_FAILURE_REASONS = [
 
 const MAX_DLQ_PAGE = 100;
 
+/** A provided target must never be interpreted as an omitted bulk target. */
+function retryJobId() {
+  return z
+    .string()
+    .refine((id) => id.trim().length > 0, 'jobId must not be empty or blank')
+    .optional();
+}
+
 export function registerDlqTools(server: McpServer, backend: McpBackend) {
   server.tool(
     'bunqueue_get_dlq',
@@ -80,7 +88,7 @@ export function registerDlqTools(server: McpServer, backend: McpBackend) {
     'Retry jobs from the Dead Letter Queue. Moves them back to waiting state.',
     {
       queue: queueField(),
-      jobId: z.string().optional().describe('Specific job ID to retry (omit to retry all)'),
+      jobId: retryJobId().describe('Specific job ID to retry (omit to retry all)'),
     },
     withErrorHandler('bunqueue_retry_dlq', async ({ queue, jobId }) => {
       const retried = await backend.retryDlq(queue, jobId);
@@ -113,10 +121,7 @@ export function registerDlqTools(server: McpServer, backend: McpBackend) {
     'Retry completed jobs - move them back to waiting state for reprocessing.',
     {
       queue: queueField(),
-      jobId: z
-        .string()
-        .optional()
-        .describe('Specific job ID to retry (omit to retry all completed)'),
+      jobId: retryJobId().describe('Specific job ID to retry (omit to retry all completed)'),
     },
     withErrorHandler('bunqueue_retry_completed', async ({ queue, jobId }) => {
       const retried = await backend.retryCompleted(queue, jobId);

@@ -3,15 +3,21 @@
  * Rate limiting and concurrency control operations
  */
 
-import { CommandError, requireArg, parseNumberArg } from './types';
+import {
+  CommandError,
+  requireArg,
+  parseNumberArg,
+  withoutOptionTerminator,
+  splitSubcommand,
+} from './types';
 
 /** Build a rate-limit or concurrency command */
 export function buildRateLimitCommand(command: string, args: string[]): Record<string, unknown> {
-  const subcommand = args[0];
+  const { subcommand, subArgs: protectedArgs } = splitSubcommand(args);
   if (!subcommand) {
     throw new CommandError(`Missing subcommand for ${command}. Use: set, clear`);
   }
-  const subArgs = args.slice(1);
+  const subArgs = withoutOptionTerminator(protectedArgs);
 
   if (command === 'rate-limit') {
     switch (subcommand) {

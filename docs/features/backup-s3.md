@@ -229,27 +229,52 @@ Restore then:
    authenticated.
 4. Checks the `SQLite format 3` header, writes a unique temporary candidate,
    and runs `PRAGMA integrity_check`.
-5. Quarantines live `-wal`, `-shm`, and `-journal` sidecars before the swap.
+5. If the original main database exists and has a WAL or rollback journal, opens
+   it read/write without creating it, reads its schema to recover any hot journal,
+   and runs `PRAGMA wal_checkpoint(TRUNCATE)`. A busy or incomplete checkpoint,
+   or an unreadable original, aborts before any sidecar is detached. This step
+   places the original committed state in the main file so an interrupted restore
+   cannot lose committed WAL rows or expose uncommitted journaled changes.
+6. Quarantines remaining live `-wal`, `-shm`, and `-journal` sidecars before the swap.
    A failure before the swap rolls those moves back.
-6. Atomically renames the validated candidate over the main database and then
+7. Atomically renames the validated candidate over the main database and then
    removes quarantined sidecars. Stale WAL frames can therefore never replay
    over the restored database.
 
-Until the candidate rename succeeds, the live main file is untouched. Invalid
+Until the candidate rename succeeds, the original logical contents are preserved;
+recovery can change its main-file bytes and remove or truncate its sidecars. Invalid
 metadata, checksum mismatch, corrupt gzip, bad SQLite header, failed integrity
-check, or a pre-swap filesystem error returns a failed `BackupResult`.
+check, failed original recovery, or a pre-swap filesystem error returns a failed
+`BackupResult`. Candidate validation precedes original recovery, so invalid backup
+content leaves the original files untouched. Restore still requires a stopped
+server; the recovery check does not prevent another process from opening the file
+afterward. These process-interruption guarantees do not promise power-loss durability.
 
 ## S3 Reliability Semantics
 
 Every list, existence check, download, upload and delete uses a per-attempt
-timeout (30 seconds by default). Network errors, timeouts and retryable 5xx
-conditions receive up to three retries with 500/1000/2000 ms backoff. Timeout
-handles are always cleared.
+timeout (30 seconds by default). Bun identifies service failures as an `Error`
+named `S3Error`; its non-empty `code` takes precedence over message text.
+`SlowDown`, `InternalError`, `ServiceUnavailable` and `RequestTimeout` receive up
+to three retries with 500/1000/2000 ms backoff. Other service codes, including
+permission/signature failures and unknown provider codes, are terminal even if
+their messages mention a network error or 5xx status. This follows
+[Bun's service-error contract](https://bun.sh/docs/runtime/s3#error-codes),
+[AWS's S3 error definitions](https://docs.aws.amazon.com/AmazonS3/latest/API/API_Error.html)
+and [AWS's retry classification](https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html).
+Errors without a service code keep the existing message-based network, transport
+timeout and 5xx fallback. A local `withTimeout` deadline (`timed out after`) is
+terminal: the underlying S3 operation cannot be cancelled, so retrying could
+overlap it. In particular, a timed-out PUT retains metadata for a possible late
+payload completion. Timeout handles are always cleared.
 
 `listBackups` follows continuation tokens, rejects missing/repeated continuation
-tokens, sorts newest first, and throws a contextual error instead of converting
-an S3 failure into an indistinguishable empty bucket. Retention cleanup logs and
-continues after an individual pair deletion failure.
+tokens, and sorts by S3 `LastModified` descending, then by object key descending
+for ties. Timestamped backup keys therefore retain the newest millisecond when
+S3 timestamps have lower precision, regardless of listing order. Listing throws
+a contextual error instead of converting an S3 failure into an indistinguishable
+empty bucket. Retention uses this order and logs and continues after an individual
+pair deletion failure.
 
 The overlap flag is process-local. Operators must not run scheduled and manual
 backups from different processes against the same file at the same time. Unique
@@ -263,6 +288,10 @@ The deterministic regressions cover:
 - a WAL reader that blocks checkpointing while committed rows still appear in
   the snapshot;
 - stale live WAL/SHM sidecars that must not alter restored content;
+- process termination before replacement with committed WAL rows or a hot rollback
+  journal, and safe refusal when a reader blocks checkpointing or recovery fails;
+- corrupt SQLite pages with valid checksum and size metadata that reach the
+  integrity check and leave the original database unchanged;
 - checksum, metadata, legacy-format and listing failure behavior.
 
 `test/model-based/backup-model.test.ts` generates command histories over

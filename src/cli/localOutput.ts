@@ -1,4 +1,5 @@
 import { VERSION } from '../shared/version';
+import { healthEndpoint } from './healthEndpoint';
 
 export interface LocalOutput {
   exitCode: number;
@@ -26,7 +27,7 @@ export function emitLocalOutput(output: LocalOutput, json: boolean): void {
 
 export async function collectVersionInfo(host: string, httpPort: number): Promise<VersionInfo> {
   const server: VersionInfo['server'] = {
-    endpoint: `${host}:${httpPort}`,
+    endpoint: healthEndpoint(host, httpPort),
     reachable: false,
   };
   try {

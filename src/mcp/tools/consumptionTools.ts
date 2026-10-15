@@ -90,33 +90,52 @@ export function registerConsumptionTools(server: McpServer, backend: McpBackend)
 
   server.tool(
     'bunqueue_ack_job',
-    'Acknowledge an active job as completed with an optional result. A locked job (pulled with an owner) needs its token; a missing or wrong token is an error and the job stays active.',
+    'Acknowledge an active job as completed with an optional result. A locked job (pulled with an owner) needs its token; a missing or wrong token is an error and the job stays active. An already finalized execution returns success false with its reason.',
     {
       jobId: z.string().describe('Job ID to acknowledge'),
       result: z.unknown().optional().describe('Optional result data'),
       token: lockTokenField(TOKEN_FOR_LOCKED_JOB).optional(),
     },
     withErrorHandler('bunqueue_ack_job', async ({ jobId, result, token }) => {
-      await backend.ackJob(jobId, result, token);
+      const outcome = await backend.ackJob(jobId, result, token);
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ success: true, jobId }) }],
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              success: outcome?.applied !== false,
+              jobId,
+              ...(outcome ? { reason: outcome.reason } : {}),
+            }),
+          },
+        ],
       };
     })
   );
 
   server.tool(
     'bunqueue_ack_job_batch',
-    'Acknowledge multiple active jobs as completed in one operation. Locked jobs need their tokens; if any token is missing or wrong, nothing is acknowledged.',
+    'Acknowledge multiple active jobs as completed in one operation. Locked jobs need their tokens; if any token is missing or wrong, nothing is acknowledged. count reports applied input positions; any already finalized executions are listed in ignoredIds and ignoredIndices and make success false, even when other items were completed.',
     {
       jobIds: z.array(z.string()).min(1).describe('Array of job IDs to acknowledge'),
       tokens: tokensField(),
     },
     withErrorHandler('bunqueue_ack_job_batch', async ({ jobIds, tokens }) => {
       assertAligned(jobIds, tokens);
-      await backend.ackJobBatch(jobIds, tokens);
+      const outcome = await backend.ackJobBatch(jobIds, tokens);
+      const ignored = outcome?.ignoredIndices.length ?? 0;
       return {
         content: [
-          { type: 'text' as const, text: JSON.stringify({ success: true, count: jobIds.length }) },
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              success: ignored === 0,
+              count: jobIds.length - ignored,
+              ...(outcome
+                ? { ignoredIds: outcome.ignoredIds, ignoredIndices: outcome.ignoredIndices }
+                : {}),
+            }),
+          },
         ],
       };
     })
@@ -135,9 +154,18 @@ export function registerConsumptionTools(server: McpServer, backend: McpBackend)
         .describe('Skip the remaining attempts: the job goes straight to the DLQ (default: false)'),
     },
     withErrorHandler('bunqueue_fail_job', async ({ jobId, error, token, unrecoverable }) => {
-      await backend.failJob(jobId, error, { token, unrecoverable });
+      const outcome = await backend.failJob(jobId, error, { token, unrecoverable });
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ success: true, jobId }) }],
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              success: outcome?.applied !== false,
+              jobId,
+              ...(outcome ? { reason: outcome.reason } : {}),
+            }),
+          },
+        ],
       };
     })
   );

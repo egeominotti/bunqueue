@@ -4,7 +4,14 @@
  */
 
 import { parseArgs } from 'node:util';
-import { CommandError, requireArg, parseJsonArg, parseNumberArg, parseBigIntArg } from './types';
+import {
+  CommandError,
+  requireArg,
+  parseJsonArg,
+  parseNumberArg,
+  parseBigIntArg,
+  parseBooleanArg,
+} from './types';
 
 const PUSH_VALUE_FLAGS = new Set([
   '--priority',
@@ -102,6 +109,11 @@ function buildPush(args: string[]): Record<string, unknown> {
   const queue = requireArg(positionals, 0, 'queue');
   const protectedData = requireArg(positionals, 1, 'data');
   const data = parseJsonArg(protectedInput.restore.get(protectedData) ?? protectedData, 'data');
+  if (positionals.length > 2) {
+    throw new CommandError(
+      'Unexpected push arguments. Use --flag=true or --flag=false for booleans.'
+    );
+  }
 
   const cmd: Record<string, unknown> = {
     cmd: 'PUSH',
@@ -150,9 +162,10 @@ function buildPush(args: string[]): Record<string, unknown> {
   }
 
   if (values['group-id']) cmd.groupId = values['group-id'];
-  if (values.lifo) cmd.lifo = true;
-  if (values['remove-on-complete']) cmd.removeOnComplete = true;
-  if (values['remove-on-fail']) cmd.removeOnFail = true;
+  if (parseBooleanArg(values.lifo, 'lifo')) cmd.lifo = true;
+  if (parseBooleanArg(values['remove-on-complete'], 'remove-on-complete'))
+    cmd.removeOnComplete = true;
+  if (parseBooleanArg(values['remove-on-fail'], 'remove-on-fail')) cmd.removeOnFail = true;
 
   return cmd;
 }

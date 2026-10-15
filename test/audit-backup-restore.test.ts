@@ -142,9 +142,21 @@ async function buildCorruptButHeaderValidPayload(): Promise<Uint8Array> {
 describe('AUDIT M3: restore must be atomic (live DB unchanged on failed restore)', () => {
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
-      try { await unlink(f + '-wal'); } catch { /* ok */ }
-      try { await unlink(f + '-shm'); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
+      try {
+        await unlink(f + '-wal');
+      } catch {
+        /* ok */
+      }
+      try {
+        await unlink(f + '-shm');
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -173,24 +185,26 @@ describe('AUDIT M3: restore must be atomic (live DB unchanged on failed restore)
     expect(header.startsWith('SQLite format 3')).toBe(true);
 
     const key = `${DEFAULTS.prefix}bunqueue-corrupt.db`;
-    await (client.file(key) as any).write(await gzip(corruptPayload));
+    const compressedPayload = await gzip(corruptPayload);
+    await client.file(key).write(compressedPayload);
 
     // metadata checksum MATCHES the payload -> checksum guard passes
     const meta: BackupMetadata = {
       timestamp: new Date().toISOString(),
       version: 'test',
       size: corruptPayload.byteLength,
-      compressedSize: 0,
+      compressedSize: compressedPayload.byteLength,
       checksum: sha256(corruptPayload),
       compressed: true,
     };
-    await (client.file(`${key}.meta.json`) as any).write(JSON.stringify(meta));
+    await client.file(`${key}.meta.json`).write(JSON.stringify(meta));
 
     // 3) Attempt restore onto the live DB path.
     const result = await restoreBackup(key, cfg({ databasePath: dbPath }), client);
 
     // Restore must NOT succeed (payload is corrupt).
     expect(result.success).toBe(false);
+    expect(result.error).toContain('integrity check failed');
 
     // 4) THE CORE ASSERTION: the original live DB file must be intact.
     //    (Atomic restore = write to temp, swap only on success.)
@@ -207,9 +221,9 @@ describe('AUDIT M3: restore must be atomic (live DB unchanged on failed restore)
 
     // And it must still be a readable DB with the original row.
     const reopened = new Database(dbPath);
-    const row = reopened.query('SELECT data FROM original WHERE id = 1').get() as
-      | { data: string }
-      | null;
+    const row = reopened.query('SELECT data FROM original WHERE id = 1').get() as {
+      data: string;
+    } | null;
     reopened.close();
     expect(row?.data).toBe('must-survive');
   });

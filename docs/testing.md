@@ -7,6 +7,13 @@ state. Performance benchmarks use a different isolation model; see
 
 ## Validation layers
 
+The normal project typecheck excludes test files. When auditing changed tests,
+also run `bun x --no-install tsc --noEmit -p .changed-audit-tsconfig.json` in the
+isolated Machine with an explicit configuration including every changed
+TypeScript file and its imports. Keep fixtures faithful to the actual APIs:
+provide cron next-run timestamps, wrap job payloads in `data`, narrow nullable
+command results, and derive stream read types from the reader itself.
+
 Development uses complementary layers so feedback remains fast without
 weakening the release gate:
 
@@ -37,6 +44,22 @@ The unit suite uses Bun 1.4's process-level file parallelism with four workers.
 serial unless they opt into `test.concurrent`. The explicit worker count keeps
 local, sandbox, and CI behavior consistent instead of scaling unexpectedly with
 the host's CPU count.
+
+`bun scripts/test-mcp-all.ts` is a focused wrapper around the maintained MCP
+assertion suites, not a separate response grader. It covers expected negative
+responses as well as applied outcomes and independent state/counter checks.
+Real Bun descendants must also disable dotenv loading: preserving the wrapper's
+controlled `BUN_OPTIONS=--no-env-file` is sufficient when inheriting its environment;
+helpers that rebuild the environment, such as `mcp-doctor.test.ts`, pass the
+explicit `--no-env-file` runtime flag. The standalone isolation regressions
+exercise both the transport and doctor descendants with synthetic dotenv files;
+doctor must pass its selected workflow-store test without connecting to a
+disposable loopback TCP sentinel.
+`test/repro-mcp-audit-contract.test.ts`, `test/repro-cli-audit-inputs.test.ts`,
+and `test/repro-cli-audit-runtime.test.ts` preserve the 2.9.15 audit boundaries.
+The CLI default-wait regression deliberately waits for the broker's real
+30-second default timeout and has its own 50-second test deadline; ordinary
+per-command watchdogs elsewhere remain unchanged.
 
 `test/cli-invariants-e2e.test.ts` runs four campaigns that each start multiple
 real CLI processes sequentially. Their 20-second aggregate test deadline is
@@ -734,6 +757,20 @@ Functional tests that depend on background timers must poll the observable state
 with a generous deadline. A fixed sleep proves only that a minimum duration
 elapsed; it does not bound when a timer callback runs under parallel CPU or I/O
 contention.
+
+`test/repro-compat-client-pull-cadence.test.ts` uses the manual clock in
+`test/shared-timers-support.ts` to check actual Worker and SandboxedWorker pull-loop
+timer requests across repeated cycles, including callbacks delivered 50 ms late.
+It asserts exact empty-pull, native batch refill, and permanent-error backoff
+delays, prevents early pulls, and checks that transient refusals remain quiet and
+do not grow the failure streak. The native batch case still obtains its initial
+job from a fresh TCP broker before the manual clock takes over. Idle-stop coverage
+requires the first refused pull to stop the loop without firing any retry timer.
+These checks measure scheduler decisions, not wall-clock throughput under load.
+The transient Worker cases in `test/repro-compat-client-pull-quiet.test.ts` use the
+same manual clock to verify that rate limits, lock timeouts, and internal-error
+refusals stay silent across eight actual pull cycles each, with exact 50 ms waits,
+no early polls, and callbacks delivered on time or 50 ms late.
 
 ## TCP suite isolation
 

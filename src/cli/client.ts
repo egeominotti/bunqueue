@@ -6,7 +6,7 @@
 import type { Socket } from 'bun';
 import { formatOutput, formatError } from './output';
 import { FrameParser, FrameSizeError } from '../infrastructure/server/protocol';
-import { CommandError } from './commands/types';
+import { CommandError, splitSubcommand } from './commands/types';
 import { buildClientTls } from '../client/tcp/connection';
 import type { ClientTlsOptions } from '../client/tcp/types';
 import { buildCommand } from './commandRouter';
@@ -46,7 +46,12 @@ interface SocketData {
  */
 export function clientTimeoutFor(cmd: Record<string, unknown>): number {
   const isLongPoll = cmd.cmd === 'PULL' || cmd.cmd === 'WaitJob';
-  const cmdTimeout = isLongPoll && typeof cmd.timeout === 'number' ? cmd.timeout : 0;
+  const defaultTimeout = cmd.cmd === 'WaitJob' ? 30000 : 0;
+  const cmdTimeout = isLongPoll
+    ? typeof cmd.timeout === 'number'
+      ? cmd.timeout
+      : defaultTimeout
+    : 0;
   return Math.max(30000, cmdTimeout + 10000);
 }
 
@@ -216,11 +221,10 @@ export async function executeCommand(
     // Execute command
     const response = await sendCommand(connection.socket, cmd, clientTimeoutFor(cmd));
 
-    // Extract subcommand (first positional arg) so the formatter can pick the
+    // Extract the marker-aware subcommand so the formatter can pick the
     // right verb for batch-id responses (queue drain → "Drained", dlq retry
     // → "Retried", etc.). Falls back to undefined when not applicable.
-    const subcommand =
-      typeof args[0] === 'string' && !args[0].startsWith('-') ? args[0] : undefined;
+    const { subcommand } = splitSubcommand(args);
 
     if (!response.ok) {
       console.error(formatOutput(response, command, options.json, subcommand));
@@ -249,7 +253,7 @@ export async function executeCommand(
     if (cmd.cmd === 'RegisterWorker' && !options.json && response.ok) {
       process.stderr.write(
         'Warning: worker registration is transient and expires when this CLI process exits. ' +
-          'For persistent workers, run a long-lived process via the SDK (Worker class) or `bunqueue start` with --processor.\n'
+          'For persistent workers, run a long-lived process via the SDK (Worker class).\n'
       );
     }
   } catch (err) {

@@ -140,15 +140,15 @@ export class EmbeddedJobBackend extends EmbeddedBackendBase {
   }
 
   async ackJob(id: string, result?: unknown, token?: string) {
-    await this.manager.ack(toJobId(id), result, token);
+    return this.manager.ack(toJobId(id), result, token);
   }
 
   async ackJobBatch(ids: string[], tokens?: string[]) {
-    await this.manager.ackBatch(ids.map(toJobId), tokens);
+    return this.manager.ackBatch(ids.map(toJobId), tokens);
   }
 
   async failJob(id: string, error?: string, opts?: FailJobOptions) {
-    await this.manager.fail(toJobId(id), error, opts?.token, opts?.unrecoverable ?? false);
+    return this.manager.fail(toJobId(id), error, opts?.token, opts?.unrecoverable ?? false);
   }
 
   jobHeartbeat(id: string, token?: string) {

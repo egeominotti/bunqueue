@@ -44,7 +44,7 @@ async function executeLocalCommand(
   json: boolean
 ): Promise<boolean> {
   if (command === 'healthcheck') {
-    process.exit(await runHealthcheck(args));
+    process.exit(await runHealthcheck(args, json));
   }
 
   if (command === 'version') {

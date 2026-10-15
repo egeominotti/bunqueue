@@ -110,9 +110,7 @@ export class EmbeddedServiceBackend extends EmbeddedQueueBackend {
 
   getPerQueueStats(): Promise<Record<string, unknown>> {
     const stats = this.manager.getPerQueueStats();
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of stats) result[key] = value;
-    return Promise.resolve(result);
+    return Promise.resolve(Object.fromEntries(stats));
   }
 
   getMemoryStats(): Promise<Record<string, unknown>> {

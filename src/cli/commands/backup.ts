@@ -10,7 +10,7 @@ import { loadConfigFile } from '../../config';
 import { resolveBackupCommandConfig } from '../../config/backup';
 import { requireFlagValue } from '../../config/cliFlags';
 import { S3BackupManager } from '../../infrastructure/backup';
-import { CommandError, requireArg } from './types';
+import { CommandError, requireArg, parseBooleanArg, splitSubcommand } from './types';
 
 /** Backup command result */
 export interface BackupCommandResult {
@@ -25,8 +25,7 @@ export interface BackupCommandResult {
  */
 export async function executeBackupCommand(args: string[]): Promise<BackupCommandResult> {
   const { configPath, rest } = takeConfigFlag(args);
-  const subcommand = rest[0];
-  const subArgs = rest.slice(1);
+  const { subcommand, subArgs } = splitSubcommand(rest);
 
   // The server's own resolution: storage.dataPath > BUNQUEUE_DATA_PATH > BQ_DATA_PATH >
   // DATA_PATH > SQLITE_PATH, and the backup section > S3_* env > defaults.
@@ -127,8 +126,20 @@ async function executeBackupRestore(
   manager: S3BackupManager,
   args: string[]
 ): Promise<BackupCommandResult> {
+  const terminator = args.indexOf('--');
   const { values, positionals } = parseArgs({
-    args,
+    args: args.map((arg, index) => {
+      if (terminator >= 0 && index >= terminator) return arg;
+      if (arg.startsWith('-f=')) return `--force=${arg.slice(3)}`;
+      const adjacentBoolean = args[index + 1] === 'true' || args[index + 1] === 'false';
+      if (
+        ((arg === '--force' || arg === '-f') && adjacentBoolean) ||
+        (arg.startsWith('-') && !arg.startsWith('--') && arg !== '-f')
+      ) {
+        throw new CommandError('Invalid boolean for --force: use --force=true or --force=false.');
+      }
+      return arg;
+    }),
     options: {
       force: { type: 'boolean', short: 'f', default: false },
     },
@@ -137,8 +148,11 @@ async function executeBackupRestore(
   });
 
   const key = requireArg(positionals, 0, 'backup-key');
+  if (positionals.length > 1) {
+    throw new CommandError('Unexpected restore arguments. Use --force=true or --force=false.');
+  }
 
-  if (!values.force) {
+  if (!parseBooleanArg(values.force, 'force')) {
     return {
       success: false,
       message:
@@ -189,6 +203,10 @@ function takeConfigFlag(args: string[]): { configPath: string | undefined; rest:
   let configPath: string | undefined;
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
+    if (arg === '--') {
+      rest.push(...args.slice(index));
+      break;
+    }
     if (arg === '--config' || arg === '-c') {
       const value = args[index + 1];
       configPath = requireFlagValue(arg, value?.startsWith('-') ? true : (value ?? true));

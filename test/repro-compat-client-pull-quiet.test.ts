@@ -23,6 +23,7 @@ import { resolveAutoBatchConfig } from '../src/client/queue/addBatcher';
 import { PullRefusedError } from '../src/client/worker/workerPull';
 import { SandboxedProbe, fakeBroker, until } from './sandboxed-timers-support';
 import { cleanup, closedPort } from './tcp-client-support';
+import { installFakeTimers, restoreTimers } from './shared-timers-support';
 
 const ROOT = join(import.meta.dir, '..');
 const TRANSIENT = ['Rate limit exceeded', 'Internal server error', 'Lock acquisition timed out'];
@@ -30,6 +31,7 @@ const workers: Worker[] = [];
 const probes: SandboxedProbe[] = [];
 
 afterEach(async () => {
+  restoreTimers();
   for (const worker of workers.splice(0)) await worker.close(true);
   for (const probe of probes.splice(0)) await probe.stop(true);
   cleanup();
@@ -56,16 +58,28 @@ function refusedWorker(refusal: string): { worker: Worker; pulls: () => number }
 }
 
 describe('transient pull refusals stay silent, as on 2.9.10', () => {
-  test.each(TRANSIENT)('a Worker with an error listener hears nothing for %p', async (reason) => {
-    const { worker, pulls } = refusedWorker(reason);
-    const errors: Error[] = [];
-    worker.on('error', (error) => errors.push(error));
-    worker.run();
-    await Bun.sleep(450);
-    expect(errors).toEqual([]);
-    // Re-polled on the 50 ms empty-pull cadence, as on 2.9.10
-    // (test/repro-compat-client-pull-cadence.test.ts).
-    expect(pulls()).toBeGreaterThanOrEqual(7);
+  describe.each([0, 50])('with %i ms callback lateness', (lateness) => {
+    test.each(TRANSIENT)('a Worker with an error listener hears nothing for %p', async (reason) => {
+      const { worker, pulls } = refusedWorker(reason);
+      const errors: Error[] = [];
+      worker.on('error', (error) => errors.push(error));
+      const timers = installFakeTimers();
+      worker.run();
+      // Exercise the real loop for repeated refused pulls, independently of CPU load.
+      for (let cycle = 1; cycle <= 8; cycle++) {
+        await until(() => timers.armed.length >= cycle, `refused pull ${cycle} to arm its wait`);
+        expect(timers.delays()).toEqual(Array(cycle).fill(50));
+        expect(timers.pending.size).toBe(1);
+        expect(pulls()).toBe(cycle);
+        expect(errors).toEqual([]);
+        timers.advance(49);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(pulls()).toBe(cycle);
+        expect(errors).toEqual([]);
+        if (cycle < 8) timers.runNext({ mono: timers.clock.mono + 1 + lateness });
+      }
+      expect(timers.invalid).toEqual([]);
+    });
   });
 
   test('a permanent refusal still reaches the listener', async () => {

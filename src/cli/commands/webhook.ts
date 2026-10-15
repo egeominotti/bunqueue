@@ -4,7 +4,7 @@
  */
 
 import { parseArgs } from 'node:util';
-import { CommandError, requireArg } from './types';
+import { CommandError, requireArg, withoutOptionTerminator, splitSubcommand } from './types';
 import { WEBHOOK_EVENTS } from '../../domain/types/webhook';
 
 /** Valid webhook events — canonical list shared with server/MCP validation */
@@ -12,11 +12,10 @@ const VALID_EVENTS: readonly string[] = WEBHOOK_EVENTS;
 
 /** Build a webhook subcommand */
 export function buildWebhookCommand(args: string[]): Record<string, unknown> {
-  const subcommand = args[0];
+  const { subcommand, subArgs } = splitSubcommand(args);
   if (!subcommand) {
     throw new CommandError('Missing subcommand. Use: list, add, remove');
   }
-  const subArgs = args.slice(1);
 
   switch (subcommand) {
     case 'list':
@@ -24,7 +23,7 @@ export function buildWebhookCommand(args: string[]): Record<string, unknown> {
     case 'add':
       return buildAddWebhook(subArgs);
     case 'remove':
-      return buildRemoveWebhook(subArgs);
+      return buildRemoveWebhook(withoutOptionTerminator(subArgs));
     default:
       throw new CommandError(`Unknown webhook subcommand: ${subcommand}. Use: list, add, remove`);
   }

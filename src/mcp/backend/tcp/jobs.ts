@@ -1,10 +1,13 @@
 import type {
   FailJobOptions,
+  McpAckBatchOutcome,
+  McpAckOutcome,
   McpBulkJob,
   McpJobOptions,
   PulledJob,
   PullLockOptions,
 } from '../../types/adapter';
+import { ignoredAckIndices, outcomeWasApplied } from '../../../client/worker/ackOutcome';
 import { toBulkJobInput, toPushFields } from '../jobOptions';
 import { TcpBackendBase } from './base';
 import { isNegativeOutcome, numberField, replyData } from './wire';
@@ -161,22 +164,46 @@ export class TcpJobBackend extends TcpBackendBase {
     );
   }
 
-  async ackJob(id: string, result?: unknown, token?: string) {
-    await this.send({ cmd: 'ACK', id, result, ...(token === undefined ? {} : { token }) });
+  async ackJob(id: string, result?: unknown, token?: string): Promise<McpAckOutcome> {
+    const response = await this.send({
+      cmd: 'ACK',
+      id,
+      result,
+      ...(token === undefined ? {} : { token }),
+    });
+    return outcomeWasApplied(response.data)
+      ? undefined
+      : { applied: false, reason: 'already-finalized' };
   }
 
-  async ackJobBatch(ids: string[], tokens?: string[]) {
-    await this.send({ cmd: 'ACKB', ids, ...(tokens === undefined ? {} : { tokens }) });
+  async ackJobBatch(ids: string[], tokens?: string[]): Promise<McpAckBatchOutcome> {
+    const response = await this.send({
+      cmd: 'ACKB',
+      ids,
+      ...(tokens === undefined ? {} : { tokens }),
+    });
+    const ignoredIndices = [
+      ...ignoredAckIndices(
+        response.data,
+        ids.map((id) => ({ id }))
+      ),
+    ];
+    return ignoredIndices.length > 0
+      ? { ignoredIndices, ignoredIds: ignoredIndices.map((index) => ids[index]) }
+      : undefined;
   }
 
-  async failJob(id: string, error?: string, opts?: FailJobOptions) {
-    await this.send({
+  async failJob(id: string, error?: string, opts?: FailJobOptions): Promise<McpAckOutcome> {
+    const response = await this.send({
       cmd: 'FAIL',
       id,
       error,
       ...(opts?.token === undefined ? {} : { token: opts.token }),
       ...(opts?.unrecoverable === undefined ? {} : { unrecoverable: opts.unrecoverable }),
     });
+    return outcomeWasApplied(response.data)
+      ? undefined
+      : { applied: false, reason: 'already-finalized' };
   }
 
   jobHeartbeat(id: string, token?: string) {

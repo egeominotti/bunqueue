@@ -4,15 +4,21 @@
  */
 
 import { parseArgs } from 'node:util';
-import { CommandError, requireArg, parseJsonArg, parseNumberArg } from './types';
+import {
+  CommandError,
+  requireArg,
+  parseJsonArg,
+  parseNumberArg,
+  withoutOptionTerminator,
+  splitSubcommand,
+} from './types';
 
 /** Build a cron subcommand */
 export function buildCronCommand(args: string[]): Record<string, unknown> {
-  const subcommand = args[0];
+  const { subcommand, subArgs } = splitSubcommand(args);
   if (!subcommand) {
     throw new CommandError('Missing subcommand. Use: list, add, delete');
   }
-  const subArgs = args.slice(1);
 
   switch (subcommand) {
     case 'list':
@@ -20,7 +26,7 @@ export function buildCronCommand(args: string[]): Record<string, unknown> {
     case 'add':
       return buildCronAdd(subArgs);
     case 'delete':
-      return buildCronDelete(subArgs);
+      return buildCronDelete(withoutOptionTerminator(subArgs));
     default:
       throw new CommandError(`Unknown cron subcommand: ${subcommand}. Use: list, add, delete`);
   }

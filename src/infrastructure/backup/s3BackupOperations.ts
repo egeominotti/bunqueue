@@ -1,6 +1,4 @@
-/**
- * S3 backup, restore, listing, and retention operations.
- */
+/** S3 backup, restore, listing, and retention operations. */
 
 import type { S3Client } from 'bun';
 import { backupLog } from '../../shared/logger';
@@ -178,7 +176,11 @@ export async function listBackups(config: S3BackupConfig, client: S3Client): Pro
         size: item.size ?? 0,
         lastModified: item.lastModified ? new Date(item.lastModified) : new Date(),
       }))
-      .sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+      .sort(
+        (a, b) =>
+          b.lastModified.getTime() - a.lastModified.getTime() ||
+          (a.key < b.key ? 1 : a.key > b.key ? -1 : 0)
+      );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     backupLog.error('Failed to list backups', { error: message });

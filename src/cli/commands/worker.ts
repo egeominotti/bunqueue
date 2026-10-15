@@ -4,15 +4,14 @@
  */
 
 import { parseArgs } from 'node:util';
-import { CommandError, requireArg } from './types';
+import { CommandError, requireArg, withoutOptionTerminator, splitSubcommand } from './types';
 
 /** Build a worker subcommand */
 export function buildWorkerCommand(args: string[]): Record<string, unknown> {
-  const subcommand = args[0];
+  const { subcommand, subArgs } = splitSubcommand(args);
   if (!subcommand) {
     throw new CommandError('Missing subcommand. Use: list, register, unregister');
   }
-  const subArgs = args.slice(1);
 
   switch (subcommand) {
     case 'list':
@@ -20,7 +19,7 @@ export function buildWorkerCommand(args: string[]): Record<string, unknown> {
     case 'register':
       return buildRegisterWorker(subArgs);
     case 'unregister':
-      return buildUnregisterWorker(subArgs);
+      return buildUnregisterWorker(withoutOptionTerminator(subArgs));
     default:
       throw new CommandError(
         `Unknown worker subcommand: ${subcommand}. Use: list, register, unregister`

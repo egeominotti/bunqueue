@@ -8,6 +8,13 @@ import { safeTimeout, type SafeTimer } from '../../shared/timers';
 
 export const DEFAULT_S3_TIMEOUT_MS = 30_000;
 
+const RETRYABLE_S3_CODES = new Set([
+  'SlowDown',
+  'InternalError',
+  'ServiceUnavailable',
+  'RequestTimeout',
+]);
+
 /** Race a promise against a timeout and always release the timeout handle. */
 export async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: SafeTimer | undefined;
@@ -26,8 +33,17 @@ export async function withTimeout<T>(promise: Promise<T>, ms: number, label: str
 
 /** Check if an error is transient and worth retrying. */
 function isTransientError(error: unknown): boolean {
+  // Bun identifies service responses as Error instances named S3Error.
+  // Their codes are authoritative; permanent/unknown codes must not use message hints.
+  if (error instanceof Error && error.name === 'S3Error' && 'code' in error) {
+    if (typeof error.code === 'string' && error.code.length > 0) {
+      return RETRYABLE_S3_CODES.has(error.code);
+    }
+  }
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
+  // Our deadline cannot cancel the original operation, so never overlap it with a retry.
+  if (lower.includes('timed out after')) return false;
   return (
     lower.includes('connection reset') ||
     lower.includes('econnreset') ||

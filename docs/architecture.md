@@ -272,7 +272,10 @@ do not re-poll in a tight loop.
   formatter `describeValue`), used by server and client alike.
   → [Shared Timers & Durations](./features/shared-timers.md).
 - **`cli/`** — `bunqueue` executable: server boot detection + thin TCP client that
-  maps verbs to protocol commands.
+  maps verbs to protocol commands. `commands/types.ts` owns safe boolean values
+  and direct-positional terminator handling; `healthEndpoint.ts` formats shared
+  IPv4/IPv6 health probe authorities for doctor and version.
+  → [CLI](./features/cli.md).
 - **`mcp/`** — `bunqueue-mcp` binary exposing the queue to AI agents over MCP:
   stdio by default, or the opt-in Streamable HTTP transport with one `McpServer`
   per session. `server.ts` owns startup and shutdown and `serverFactory.ts` builds
@@ -1252,7 +1255,7 @@ against on-disk SQLite) and asserts hard invariants — not just "it ran".
 - [Webhooks, Events & Job Logs](./features/webhooks-and-events.md) — Server-side observability: outbound HTTP webhooks, in-process event pub/sub, bounded per-job logs, and client-job ownership/disconnect release.
 - [Worker Registry & Management](./features/workers-management.md) — Server-side in-memory registry of connected workers tracking liveness, queues, concurrency, and per-worker job counters; backs skipIfNoWorker crons and dashboard/HTTP/CLI worker visibility.
 - [Stats, Metrics & Monitoring](./features/stats-and-monitoring.md) — Read-only aggregation of queue depth counts, cumulative counters, bounded per-queue labels, standard process/build/connection collectors, S3 backup outcomes and latency histograms, exposed via TCP Stats/Metrics/Prometheus/Ping, HTTP /stats /metrics /prometheus /health /dashboard, and the periodic stats log.
-- [S3 Backup](./features/backup-s3.md) — Periodic gzip-compressed, SHA-256-checksummed SQLite snapshots to S3-compatible storage with retention pruning and validate-before-replace restore.
+- [S3 Backup](./features/backup-s3.md) — Periodic gzip-compressed, SHA-256-checksummed SQLite snapshots to S3-compatible storage with deterministic retention. Offline restore validates its candidate, recovers the original WAL/journal, then atomically replaces the database.
 - [bunqueue Cloud Dashboard Integration](./features/cloud-integration.md) — Opt-in agent that pushes full server telemetry snapshots to the bunqueue.io dashboard over HTTP and receives whitelisted remote commands over WebSocket.
 
 ### Interfaces & configuration

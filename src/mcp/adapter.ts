@@ -12,6 +12,8 @@ export type {
   FlowNodeResult,
   FlowStepInput,
   JobCounts,
+  McpAckBatchOutcome,
+  McpAckOutcome,
   McpBackend,
   PulledJob,
   SerializedCron,
