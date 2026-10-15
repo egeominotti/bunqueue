@@ -112,7 +112,10 @@ const curatedInternalUrls = [...curated.matchAll(/https:\/\/bunqueue\.dev(?:\/[^
 );
 const indexableUrlSet = new Set(indexableUrls);
 for (const url of new Set(curatedInternalUrls)) {
-  if (!indexableUrlSet.has(url)) failures.push(`llms.txt links to non-canonical page ${url}`);
+  // The full-text resource is validated above; all other links need canonical HTML.
+  if (url !== `${SITE}/llms-full.txt` && !indexableUrlSet.has(url)) {
+    failures.push(`llms.txt links to non-canonical page ${url}`);
+  }
 }
 if (!curated.includes(`[PostgreSQL Multi-Broker Example](${multiBrokerUrls[0]})`)) {
   failures.push('llms.txt does not link the PostgreSQL multi-broker example hub');

@@ -1,5 +1,38 @@
 # Data Model
 
+## Independent agent journal
+
+The optional [`bunqueue/agents`](./features/agent-integrations.md) module uses a
+dedicated SQLite file with application ID `0x4251414a`, user version `1`. Header
+and committed WAL metadata are checked before SQLite opens existing files. It
+adds no queue/workflow tables, transport commands or endpoints.
+
+| Table | Durable identity and fields |
+| --- | --- |
+| `sessions` | `(execution_id, step_id)` primary key; session_id |
+| `events` | cursor INTEGER PRIMARY KEY AUTOINCREMENT, execution_id, step_id, normalized JSON payload; `(execution_id, cursor)` index |
+| `retention` | execution_id primary key; actual per-run eviction cursor dropped_through |
+| `effects` | `(execution_id, step_id, call_id)` primary key; compare-and-set token, status constrained to pending/completed, JSON result |
+
+Identity strings are nonempty and capped at 4096 UTF-8 bytes. Event defaults are
+1000 records per run and 16384 bytes; maxima are 100000 records and 1048576 bytes.
+Replay defaults to 100 and caps at 1000 records, with nonnegative safe-integer
+after cursors and explicit per-run gaps. Effect results share the payload cap
+and require JSON-compatible values. Prompts, raw provider messages, tool arguments
+and successful outputs are excluded from progress. Durable business effect
+results are caller-controlled. Sessions/effects/run count have no retention bound.
+
+Public AgentEvent, AgentRunIdentity, AgentReplay, AgentTurnOptions,
+AgentEffectOptions and EffectReconciliation types describe this optional boundary.
+AgentTurnError distinguishes interrupted/failure/cancelled/needs_input/invalid_output.
+Its optional recordingError exposes a secondary failure-event persistence error
+while preserving the original terminal code and cause. Reconciliation objects
+must match exact runtime shapes: not_applied/unknown contain only status;
+completed also requires an explicit own result (undefined is supported).
+AgentEffectUncertainError prevents repeating pending external work without caller
+reconciliation. No remote exactly-once or automatic failed-step compensation
+guarantee is introduced.
+
 This document is the authoritative reference for how bunqueue represents data
 across its three boundaries:
 
@@ -1979,7 +2012,40 @@ the same msgpack-encoded `Command`/`Response` objects.
 
 ### JSON (MCP tool output)
 
-`bunqueue-mcp` returns every tool result as JSON text. The embedded and TCP
+`bunqueue-mcp` preserves legacy JSON text (Prometheus is plain text) and adds
+`structuredContent: { outcome, data, error?, suggestedAction? }`. `outcome` is
+`success`, `not_applied`, `confirmation_required` or `error`. `data` is the
+unchanged JSON payload, or `{ text }` for plain text. `error` carries a stable
+`code`, `message`, conservative `retryable` boolean and optional
+`outcomeUncertain`. Codes distinguish missing targets, invalid input, rejected
+transitions, cancellation, unavailable backend/provider, confirmation and unknown
+errors. False `success`/`executed` never becomes success; uncertain writes require
+state inspection/reconciliation. Every tool advertises the envelope schema,
+including dynamic discovery; dispatcher calls forward the target envelope once.
+SDK failures before invoking a handler retain the SDK protocol error response.
+Policy annotations are always present, independently of confirmation.
+
+Dispatcher refusal/validation producers explicitly mark target non-execution,
+represented by `error.outcomeUncertain: false`. This internal provenance does
+not alter legacy text. Malformed backend replies are protocol failures even when
+their message starts with "Invalid"; after a write they carry uncertainty and
+reconciliation guidance rather than an invalid-caller-input classification.
+
+`BUNQUEUE_MCP_PROFILE=agent` defaults only absent discovery/confirmation settings;
+`bunqueue_get_capabilities` reports safe effective configuration and optional
+workflow capabilities. `bunqueue-mcp --doctor --json` emits a readiness report
+with `ok`, mode/profile/transport, persistence and workflow configuration, available
+toolsets and backend checks, or a sanitized configuration error, and exits 0/1.
+The doctor never creates an embedded manager or queue database, starts consumers,
+or opens a serving transport. Embedded checks are filesystem/configuration checks;
+TCP checks read broker statistics and close their pool. Workflow checks return
+`configured`, `inspectionConfigured`, and `schemaChecked: false`; filesystem
+readiness does not validate a workflow schema or signal registration. No SQLite
+connection is opened, including for workflows, so dormant WAL stores gain no
+sidecars. Startup performs the actual workflow schema validation. No schema or
+scheduling semantics change.
+
+The embedded and TCP
 backends share one projection per shape, so both modes emit identical JSON
 (contracts in `src/mcp/types/adapter.ts`, `types/jobOptions.ts`,
 `types/inspection.ts`):
@@ -2003,11 +2069,40 @@ attempts, maxAttempts, createdAt, startedAt? }` (string id, ISO times) plus
   as `{ rateLimit: { max, durationMs } | null, rateLimitTtlMs (null for the -2
 sentinel), rateLimited, concurrencyLimit, concurrencyMaxed }` plus `queue`,
   `paused` and the active count.
+- Agent inspection (`src/mcp/inspectionPage.ts`, `diagnostics.ts`,
+  `jobObservation.ts`) uses these same read APIs without adding engine/wire
+  fields. Pages return live `offset`/`limit`, `count`, `hasMore`, `nextOffset`,
+  `projection` and explicit truncation metadata. Default summaries omit data,
+  tags, deduplication keys and progress messages. Diagnosis sums all eight
+  mutually exclusive state buckets and reports observed limits/blockers with
+  bounded samples; it cannot establish a root cause. Job observation reports
+  `state`, `terminal`, `timedOut`, `cancelled`, `progress` and `nextPollMs`;
+  completed results add `resultAvailable`/`resultTruncated`, while failure
+  details are explicitly unavailable through the existing exact-job API.
+  Unknown or removed jobs are not success. Projection values are bounded to
+  4 KiB, serialized page data objects/prompt text to 64 KiB, with additional
+  string/tree traversal limits. Page budgets cover the complete page data object
+  including escaped queue/continuation metadata (`maxBytes:65536`). The full MCP
+  CallToolResult adds legacy text, structured-result wrapping and JSON-RPC
+  protocol overhead, so its finite wire size can exceed the page-data budget.
+  Job IDs remain exact usable keys; summaries disclose
+  byte-budget omissions through `omittedFields`/`omittedIdentifiers` rather
+  than returning shortened identifiers. No SQLite table, lifecycle transition
+  or lease changes.
 - Workflow executions (`src/mcp/workflow/views.ts`, `jsonSafe.ts`) — the
   decoded `Execution` with BigInt as strings, Date as ISO strings, Map/Set/bytes/
   Error as `$type`-tagged objects and cycles as `"[Circular]"`.
 
 See [Native MCP Server](./features/mcp-server.md) for the per-tool fields.
+
+The offline evaluation result (`scripts/mcp-eval/task-types.ts`) is separate
+from product storage/wire models: scenario, backend mode, driver, passed checks,
+tool-call count, elapsedMs and UTF-8 responseBytes, optional supplied usage and
+an error. Aggregation fails for any failed scenario or an empty evaluation.
+Catalog measurements serialize complete tools/list descriptors and actual
+disclosure results, including annotations and input/output schemas. Bytes are
+direct measurements; ceil(bytes/4) tokens are explicitly approximate. No queue
+schema, command, endpoint or runtime default is changed by the evaluator.
 
 See [Persistence](./features/persistence.md),
 [TCP Protocol](./features/tcp-protocol.md).

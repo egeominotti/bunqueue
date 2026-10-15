@@ -1,7 +1,7 @@
 /**
  * MCP tool policy invariants and the default (no opt-in) contract:
- * every tool is classified, toolsets partition the 75 tools, and without opt-in
- * env vars the tool list carries no annotations and no confirmation parameters.
+ * every tool is classified, toolsets partition the 79 tools, and without opt-in
+ * env vars the tool list carries metadata but no confirmation parameters.
  */
 
 import { afterEach, describe, expect, test } from 'bun:test';
@@ -50,7 +50,7 @@ describe('MCP tool policy', () => {
       env: {},
     });
     try {
-      expect(tools.size).toBe(75);
+      expect(tools.size).toBe(79);
       expect(() => assertPolicyCoverage(tools)).not.toThrow();
       expect(alwaysOn().sort()).toEqual([...tools.keys()].sort());
     } finally {
@@ -60,12 +60,12 @@ describe('MCP tool policy', () => {
     }
   });
 
-  test('toolsets partition all 75 tools with no empty toolset', () => {
+  test('toolsets partition all 79 tools with no empty toolset', () => {
     const sizes = TOOLSET_IDS.map(
       (id) => Object.values(TOOL_POLICIES).filter((p) => p.toolset === id).length
     );
     expect(sizes.every((n) => n > 0)).toBe(true);
-    expect(alwaysOn()).toHaveLength(75);
+    expect(alwaysOn()).toHaveLength(79);
   });
 
   test('only irreversible or bulk re-execution tools are guarded', () => {
@@ -91,13 +91,14 @@ describe('MCP tool policy', () => {
 });
 
 describe('MCP default contract (no opt-in)', () => {
-  test('lists the 75 tools without annotations or confirmation parameters', async () => {
+  test('lists the 79 tools with annotations and output schemas but no confirmation parameters', async () => {
     const mcp = await startMcp();
     close = mcp.close;
     const { tools } = await mcp.client.listTools();
-    expect(tools).toHaveLength(75);
+    expect(tools).toHaveLength(79);
     for (const tool of tools) {
-      expect(tool.annotations).toBeUndefined();
+      expect(tool.annotations).toMatchObject(annotationsFor(TOOL_POLICIES[tool.name]));
+      expect(tool.outputSchema?.type).toBe('object');
       const props = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
       expect('confirm' in props).toBe(false);
       expect('userRequest' in props).toBe(false);

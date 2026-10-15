@@ -18,6 +18,7 @@ import {
 } from '@modelcontextprotocol/sdk/server/zod-compat.js';
 import { toJsonSchemaCompat } from '@modelcontextprotocol/sdk/server/zod-json-schema-compat.js';
 import type { DecisionModel } from './decisionModel';
+import { markToolNotExecuted } from './toolResults';
 import { TOOLSETS, TOOLSET_IDS, TOOL_POLICIES, type ToolsetId } from './toolPolicy';
 
 export type ToolsetMode =
@@ -89,13 +90,23 @@ function availableToolsets(tools: Map<string, RegisteredTool>): ToolsetId[] {
 }
 
 function enable(tools: Map<string, RegisteredTool>, toolsets: ToolsetId[]) {
-  const loaded: Array<{ name: string; description?: string; inputSchema: unknown }> = [];
+  const loaded: Array<{
+    name: string;
+    description?: string;
+    inputSchema: unknown;
+    annotations: unknown;
+    outputSchema: unknown;
+  }> = [];
   for (const toolset of toolsets) {
     for (const [name, tool] of toolsOf(tools, toolset)) {
       if (!tool.enabled) tool.enable();
       loaded.push({
         name,
         description: tool.description,
+        annotations: tool.annotations,
+        outputSchema: tool.outputSchema
+          ? toJsonSchemaCompat(tool.outputSchema as AnyObjectSchema)
+          : {},
         inputSchema: tool.inputSchema
           ? toJsonSchemaCompat(tool.inputSchema as AnyObjectSchema)
           : {},
@@ -139,8 +150,8 @@ export function applyToolsets(
         .min(1)
         .describe('Toolsets to load'),
     },
-    { readOnlyHint: true, openWorldHint: false },
-    async ({ toolsets }) => text(enable(tools, toolsets))
+    { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    ({ toolsets }) => text(enable(tools, toolsets))
   );
 
   server.tool(
@@ -150,23 +161,31 @@ export function applyToolsets(
       name: z.string().describe('Tool name, e.g. bunqueue_get_job_counts'),
       arguments: z.record(z.string(), z.unknown()).optional().describe('Tool arguments'),
     },
+    { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     async ({ name, arguments: args }, extra) => {
       const tool = tools.get(name);
-      if (!tool) return text({ error: `Unknown tool ${name}` }, true);
+      if (!tool)
+        return markToolNotExecuted(text({ error: `Unknown tool ${name}` }, true), 'not_found');
       if (!tool.enabled) {
         const toolset = TOOL_POLICIES[name].toolset;
-        return text(
-          {
-            error: `${name} is not loaded; call bunqueue_enable_toolsets with ["${toolset}"] first`,
-          },
-          true
+        return markToolNotExecuted(
+          text(
+            {
+              error: `${name} is not loaded; call bunqueue_enable_toolsets with ["${toolset}"] first`,
+            },
+            true
+          ),
+          'rejected_transition'
         );
       }
       const parsed = tool.inputSchema
         ? await safeParseAsync(tool.inputSchema as AnyObjectSchema, args ?? {})
         : { success: true as const, data: args ?? {} };
       if (!parsed.success) {
-        return text({ error: `Invalid arguments for ${name}`, issues: String(parsed.error) }, true);
+        return markToolNotExecuted(
+          text({ error: `Invalid arguments for ${name}`, issues: String(parsed.error) }, true),
+          'invalid_input'
+        );
       }
       const handler = tool.handler as unknown as (a: unknown, e: unknown) => Promise<unknown>;
       return (await handler(parsed.data, extra)) as ReturnType<typeof text>;
@@ -178,7 +197,7 @@ export function applyToolsets(
     'bunqueue_find_tools',
     'Describe what you need in plain language; a decision model picks and loads the matching bunqueue toolset.',
     { request: z.string().min(1).describe('What you want to do, in plain language') },
-    { readOnlyHint: true, openWorldHint: true },
+    { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async ({ request }) => {
       try {
         const answer = await decision.choice(

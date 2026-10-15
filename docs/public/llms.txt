@@ -20,6 +20,13 @@ Key facts:
 
 ## Client SDK
 
+- [Workflow Quickstart](https://bunqueue.dev/guide/workflow/quickstart/): register definitions, recover, start, inspect terminal state and close
+- [Workflow Approval](https://bunqueue.dev/guide/workflow/approval/): waitFor, validated decisions, first-wins signals and MCP topology
+- [Workflow Durability](https://bunqueue.dev/guide/workflow/durability/): restart, recovery, stable identities and unknown effects
+- [AI Agent Workflows](https://bunqueue.dev/guide/workflow/ai-agents/): durable orchestration and compensation boundaries
+- [Agent SDK Integrations](https://bunqueue.dev/guide/workflow/agent-sdks/): optional bunqueue/agents journal, terminal validation, cancellation, sessions, business effects and bounded replay
+- [Workflow API](https://bunqueue.dev/guide/workflow/api/): Engine/Workflow signatures and lifecycle
+
 - [Queue API](https://bunqueue.dev/guide/queue/): add/addBulk, priorities, delays, retries, deduplication, durable writes
 - [Worker API](https://bunqueue.dev/guide/worker/): Concurrency, heartbeats, batch pulling, lock-based ownership, sandboxed workers
 - [Simple Mode (Bunqueue class)](https://bunqueue.dev/guide/simple-mode/): Queue + Worker in one object with routes, middleware, and cron
@@ -39,7 +46,7 @@ Key facts:
 - [TCP Protocol](https://bunqueue.dev/api/tcp/): MessagePack wire format, length-prefixed framing, and a linked summary of every command; the full command reference is split by family (jobs, queries, control and limits, DLQ, cron, flows, monitoring, workers and webhooks)
 - [TypeScript Types](https://bunqueue.dev/api/types/): Job, Queue, Worker, DLQ, and connection interfaces
 - [Native TLS](https://bunqueue.dev/guide/tls/): Encrypt TCP and HTTP traffic without a reverse proxy
-- [MCP Server for AI Agents](https://bunqueue.dev/guide/mcp/): 75 MCP tools for Claude Desktop, Claude Code, Cursor, Windsurf over stdio or Streamable HTTP; opt-in toolsets, destructive-call confirmation, decision models (Jev, Clef, Clef-flash, Kev 9B, Laya) and workflow approval tools
+- [MCP Server for AI Agents](https://bunqueue.dev/guide/mcp/): 79 primary MCP tools for Claude Desktop, Claude Code, Cursor, Windsurf over stdio or Streamable HTTP; opt-in toolsets, destructive-call confirmation, decision models (Jev, Clef, Clef-flash, Kev 9B, Laya) and workflow approval tools
 
 ## Operations & Production
 
@@ -127,6 +134,9 @@ worker.on('completed', (job, result) => console.log(job.id, result));
 ```
 
 ## Links
+
+- [Full documentation text](https://bunqueue.dev/llms-full.txt): Complete guides, APIs and examples in one text resource
+- [Repository skill](https://github.com/egeominotti/bunqueue/blob/main/skills/bunqueue/SKILL.md): Progressive queue, MCP, workflow and agent references
 
 - GitHub: https://github.com/egeominotti/bunqueue
 - npm: https://www.npmjs.com/package/bunqueue

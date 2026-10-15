@@ -11,7 +11,7 @@
 <li><a href="../modules/application_queueManager.html">application/queueManager</a></li>
 <li><a href="" aria-current="page">QueueManager</a></li></ul>
 <h1>Class QueueManager</h1></div>
-<section class="tsd-panel tsd-hierarchy" data-refl="5">
+<section class="tsd-panel tsd-hierarchy" data-refl="67">
 <h4>Hierarchy</h4>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><span class="tsd-signature-type">QueueManagerLifecycle</span>
@@ -57,8 +57,10 @@
 <a href="#extendlock" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>extend<wbr/>Lock</span></a>
 <a href="#fail" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>fail</span></a>
 <a href="#failwithreason" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>fail<wbr/>With<wbr/>Reason</span></a>
+<a href="#flushpendingwrites" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>flush<wbr/>Pending<wbr/>Writes</span></a>
 <a href="#flushpersistence" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>flush<wbr/>Persistence</span></a>
 <a href="#forcereleaseclientjobs" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>force<wbr/>Release<wbr/>Client<wbr/>Jobs</span></a>
+<a href="#forgetremovedresult" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>forget<wbr/>Removed<wbr/>Result</span></a>
 <a href="#getalljoblocks" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Locks</span></a>
 <a href="#getalljoblogs" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Logs</span></a>
 <a href="#getalljobresults" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Results</span></a>
@@ -169,6 +171,7 @@
 <a href="#updateprogress" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>update<wbr/>Progress</span></a>
 <a href="#verifylock" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>verify<wbr/>Lock</span></a>
 <a href="#waitforjobcompletion" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>wait<wbr/>For<wbr/>Job<wbr/>Completion</span></a>
+<a href="#waitforjobresult" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>wait<wbr/>For<wbr/>Job<wbr/>Result</span></a>
 </div></section></div></details></section></section>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="constructors-1">Constructors<a href="#constructors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
@@ -186,7 +189,7 @@
 <h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">QueueManager</a></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.constructor</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/state.ts#L103">application/queue-manager/state.ts:103</a></li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/state.ts#L110">application/queue-manager/state.ts:110</a></li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="properties-1">Properties<a href="#properties-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -195,13 +198,13 @@
 <div class="tsd-signature"><span class="tsd-kind-property">webhookManager</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">WebhookManager</span></div><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.webhookManager</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/state.ts#L65">application/queue-manager/state.ts:65</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/state.ts#L72">application/queue-manager/state.ts:72</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="workermanager"><code class="tsd-tag">Readonly</code><span>worker<wbr/>Manager</span><a href="#workermanager" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">workerManager</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">WorkerManager</span></div><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.workerManager</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/state.ts#L66">application/queue-manager/state.ts:66</a></li></ul></aside></section></section></details>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/state.ts#L73">application/queue-manager/state.ts:73</a></li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -221,7 +224,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">AckOutcome</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.ack</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L9">application/queue-manager/ack.ts:9</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L10">application/queue-manager/ack.ts:10</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="ackbatch"><span>ack<wbr/>Batch</span><a href="#ackbatch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -236,7 +239,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">AckBatchOutcome</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.ackBatch</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L52">application/queue-manager/ack.ts:52</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L53">application/queue-manager/ack.ts:53</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="ackbatchwithresults"><span>ack<wbr/>Batch<wbr/>With<wbr/>Results</span><a href="#ackbatchwithresults" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -250,7 +253,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">AckBatchOutcome</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.ackBatchWithResults</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L96">application/queue-manager/ack.ts:96</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L97">application/queue-manager/ack.ts:97</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="addcron"><span>add<wbr/>Cron</span><a href="#addcron" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -264,7 +267,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_cron.CronJob.html" class="tsd-signature-type tsd-kind-interface">CronJob</a></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.addCron</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L10">application/queue-manager/services.ts:10</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L16">application/queue-manager/services.ts:16</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="addlog"><span>add<wbr/>Log</span><a href="#addlog" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -280,7 +283,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.addLog</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L20">application/queue-manager/observability.ts:20</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L21">application/queue-manager/observability.ts:21</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="cancel"><span>cancel</span><a href="#cancel" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -294,23 +297,23 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.cancel</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L9">application/queue-manager/job-management.ts:9</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L15">application/queue-manager/job-management.ts:15</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="changedelay"><span>change<wbr/>Delay</span><a href="#changedelay" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
 <li class="tsd-is-inherited">
-<div class="tsd-signature tsd-anchor-link" id="changedelay-1"><span class="tsd-kind-call-signature">changeDelay</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">jobId</span><span class="tsd-signature-symbol">:</span> <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">delay</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">token</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span><a href="#changedelay-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-signature tsd-anchor-link" id="changedelay-1"><span class="tsd-kind-call-signature">changeDelay</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">jobId</span><span class="tsd-signature-symbol">:</span> <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">rawDelay</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">token</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span><a href="#changedelay-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li><span><span class="tsd-kind-parameter">jobId</span>: <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a></span></li>
-<li><span><span class="tsd-kind-parameter">delay</span>: <span class="tsd-signature-type">number</span></span></li>
+<li><span><span class="tsd-kind-parameter">rawDelay</span>: <span class="tsd-signature-type">number</span></span></li>
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">token</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.changeDelay</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L51">application/queue-manager/job-management.ts:51</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L79">application/queue-manager/job-management.ts:79</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="changepriority"><span>change<wbr/>Priority</span><a href="#changepriority" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -326,7 +329,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.changePriority</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L30">application/queue-manager/job-management.ts:30</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L55">application/queue-manager/job-management.ts:55</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="changewaitingdelay"><span>change<wbr/>Waiting<wbr/>Delay</span><a href="#changewaitingdelay" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -341,7 +344,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.changeWaitingDelay</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L85">application/queue-manager/job-management.ts:85</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L115">application/queue-manager/job-management.ts:115</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="clean"><span>clean</span><a href="#clean" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -358,7 +361,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.clean</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L223">application/queue-manager/control.ts:223</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L228">application/queue-manager/control.ts:228</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="clearconcurrency"><span>clear<wbr/>Concurrency</span><a href="#clearconcurrency" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -372,7 +375,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.clearConcurrency</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L207">application/queue-manager/limits.ts:207</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L211">application/queue-manager/limits.ts:211</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="clearlogs"><span>clear<wbr/>Logs</span><a href="#clearlogs" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -387,7 +390,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.clearLogs</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L28">application/queue-manager/observability.ts:28</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L29">application/queue-manager/observability.ts:29</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="clearratelimit"><span>clear<wbr/>Rate<wbr/>Limit</span><a href="#clearratelimit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -401,7 +404,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.clearRateLimit</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L196">application/queue-manager/limits.ts:196</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L197">application/queue-manager/limits.ts:197</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="compactmemory"><span>compact<wbr/>Memory</span><a href="#compactmemory" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -411,7 +414,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.compactMemory</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/stats.ts#L81">application/queue-manager/stats.ts:81</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/stats.ts#L86">application/queue-manager/stats.ts:86</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="count"><span>count</span><a href="#count" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -425,7 +428,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.count</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L137">application/queue-manager/queries.ts:137</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L158">application/queue-manager/queries.ts:158</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="createlock"><span>create<wbr/>Lock</span><a href="#createlock" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -441,7 +444,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../types/domain_types_job.LockToken.html" class="tsd-signature-type tsd-kind-type-alias">LockToken</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.createLock</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L31">application/queue-manager/locks.ts:31</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L32">application/queue-manager/locks.ts:32</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="discard"><span>discard</span><a href="#discard" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -456,7 +459,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.discard</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L116">application/queue-manager/job-management.ts:116</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L151">application/queue-manager/job-management.ts:151</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="drain"><span>drain</span><a href="#drain" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -470,7 +473,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.drain</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L41">application/queue-manager/control.ts:41</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L42">application/queue-manager/control.ts:42</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="emitdashboardevent"><span>emit<wbr/>Dashboard<wbr/>Event</span><a href="#emitdashboardevent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -485,7 +488,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.emitDashboardEvent</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L60">application/queue-manager/services.ts:60</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L66">application/queue-manager/services.ts:66</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="extendlock"><span>extend<wbr/>Lock</span><a href="#extendlock" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -501,7 +504,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.extendLock</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L104">application/queue-manager/job-management.ts:104</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L138">application/queue-manager/job-management.ts:138</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="fail"><span>fail</span><a href="#fail" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -520,7 +523,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">AckOutcome</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.fail</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L144">application/queue-manager/ack.ts:144</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L145">application/queue-manager/ack.ts:145</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="failwithreason"><span>fail<wbr/>With<wbr/>Reason</span><a href="#failwithreason" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -536,7 +539,19 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">AckOutcome</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.failWithReason</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L155">application/queue-manager/ack.ts:155</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/ack.ts#L156">application/queue-manager/ack.ts:156</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member tsd-is-inherited">
+<h3 class="tsd-anchor-link" id="flushpendingwrites"><span>flush<wbr/>Pending<wbr/>Writes</span><a href="#flushpendingwrites" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures tsd-is-inherited">
+<li class="tsd-is-inherited">
+<div class="tsd-signature tsd-anchor-link" id="flushpendingwrites-1"><span class="tsd-kind-call-signature">flushPendingWrites</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><a href="#flushpendingwrites-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Non-throwing flush that respects a scheduled write retry backoff.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
+<p>Inherited from QueueManagerLifecycle.flushPendingWrites</p>
+<ul>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/stats.ts#L82">application/queue-manager/stats.ts:82</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="flushpersistence"><span>flush<wbr/>Persistence</span><a href="#flushpersistence" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -560,7 +575,25 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.forceReleaseClientJobs</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L67">application/queue-manager/locks.ts:67</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L71">application/queue-manager/locks.ts:71</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member tsd-is-inherited">
+<h3 class="tsd-anchor-link" id="forgetremovedresult"><span>forget<wbr/>Removed<wbr/>Result</span><a href="#forgetremovedresult" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures tsd-is-inherited">
+<li class="tsd-is-inherited">
+<div class="tsd-signature tsd-anchor-link" id="forgetremovedresult-1"><span class="tsd-kind-call-signature">forgetRemovedResult</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">jobId</span><span class="tsd-signature-symbol">:</span> <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#forgetremovedresult-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Drop the retained result of a job removed on completion (<code>removedResults</code>). The
+Cancel outcome (<code>cancelWithOutcome</code>) calls it when it reports the job missing, so an
+ACK that removed the job between the refusal and the state read leaves no result.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">jobId</span>: <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<p>Inherited from QueueManagerLifecycle.forgetRemovedResult</p>
+<ul>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L33">application/queue-manager/job-management.ts:33</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getalljoblocks"><span>get<wbr/>All<wbr/>Job<wbr/>Locks</span><a href="#getalljoblocks" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -614,7 +647,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getChildrenValues</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L40">application/queue-manager/queries.ts:40</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L61">application/queue-manager/queries.ts:61</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getcloudtelemetry"><span>get<wbr/>Cloud<wbr/>Telemetry</span><a href="#getcloudtelemetry" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -645,7 +678,10 @@
 <li class="tsd-is-inherited">
 <div class="tsd-signature tsd-anchor-link" id="getcompletionasync-1"><span class="tsd-kind-call-signature">getCompletionAsync</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">jobId</span><span class="tsd-signature-symbol">:</span> <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">found</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">result</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">unknown</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">&gt;</span><a href="#getcompletionasync-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Distinguish a completed generation from a valid undefined result.</p>
+<div class="tsd-comment tsd-typography"><p>The completion lookup (WaitJob, the embedded wait reader): distinguishes a completed
+generation from a valid undefined result, including cold SQLite completions. A job
+removed on completion answers from its retained result (<code>removedResults</code>, memory
+only, short-lived) while no current generation holds the ID.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -654,7 +690,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">found</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">result</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">unknown</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getCompletionAsync</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L30">application/queue-manager/queries.ts:30</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L35">application/queue-manager/queries.ts:35</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getcountsperpriority"><span>get<wbr/>Counts<wbr/>Per<wbr/>Priority</span><a href="#getcountsperpriority" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -668,7 +704,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getCountsPerPriority</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L128">application/queue-manager/limits.ts:128</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L129">application/queue-manager/limits.ts:129</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getcron"><span>get<wbr/>Cron</span><a href="#getcron" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -682,7 +718,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_cron.CronJob.html" class="tsd-signature-type tsd-kind-interface">CronJob</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getCron</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L41">application/queue-manager/services.ts:41</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L47">application/queue-manager/services.ts:47</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getdeduplicationjobid"><span>get<wbr/>Deduplication<wbr/>Job<wbr/>Id</span><a href="#getdeduplicationjobid" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -722,7 +758,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getDlq</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L144">application/queue-manager/limits.ts:144</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L145">application/queue-manager/limits.ts:145</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getdlqconfig"><span>get<wbr/>Dlq<wbr/>Config</span><a href="#getdlqconfig" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -750,7 +786,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getDlqCount</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L152">application/queue-manager/limits.ts:152</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L153">application/queue-manager/limits.ts:153</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getdlqentries"><span>get<wbr/>Dlq<wbr/>Entries</span><a href="#getdlqentries" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -765,7 +801,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_dlq.DlqEntry.html" class="tsd-signature-type tsd-kind-interface">DlqEntry</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getDlqEntries</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L148">application/queue-manager/limits.ts:148</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L149">application/queue-manager/limits.ts:149</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getdlqstats"><span>get<wbr/>Dlq<wbr/>Stats</span><a href="#getdlqstats" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -779,7 +815,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_dlq.DlqStats.html" class="tsd-signature-type tsd-kind-interface">DlqStats</a></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getDlqStats</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L156">application/queue-manager/limits.ts:156</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L157">application/queue-manager/limits.ts:157</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getfailedchildrenvalues"><span>get<wbr/>Failed<wbr/>Children<wbr/>Values</span><a href="#getfailedchildrenvalues" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -808,7 +844,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getGroupActiveCount</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L25">application/queue-manager/limits.ts:25</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L26">application/queue-manager/limits.ts:26</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getgroupconcurrency"><span>get<wbr/>Group<wbr/>Concurrency</span><a href="#getgroupconcurrency" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -823,7 +859,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">&gt;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getGroupConcurrency</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L79">application/queue-manager/limits.ts:79</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L80">application/queue-manager/limits.ts:80</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getgroupjobscount"><span>get<wbr/>Group<wbr/>Jobs<wbr/>Count</span><a href="#getgroupjobscount" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -838,7 +874,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getGroupJobsCount</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L16">application/queue-manager/limits.ts:16</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L17">application/queue-manager/limits.ts:17</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getgroupratelimit"><span>get<wbr/>Group<wbr/>Rate<wbr/>Limit</span><a href="#getgroupratelimit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -853,7 +889,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">GroupRateLimitOverride</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">GroupRateLimitOverride</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">&gt;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getGroupRateLimit</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L46">application/queue-manager/limits.ts:46</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L47">application/queue-manager/limits.ts:47</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getgroupratelimitttl"><span>get<wbr/>Group<wbr/>Rate<wbr/>Limit<wbr/>Ttl</span><a href="#getgroupratelimitttl" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -869,7 +905,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getGroupRateLimitTtl</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L64">application/queue-manager/limits.ts:64</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L65">application/queue-manager/limits.ts:65</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getgroupsjobscount"><span>get<wbr/>Groups<wbr/>Jobs<wbr/>Count</span><a href="#getgroupsjobscount" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -883,7 +919,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getGroupsJobsCount</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L21">application/queue-manager/limits.ts:21</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L22">application/queue-manager/limits.ts:22</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getignoredchildrenfailures"><span>get<wbr/>Ignored<wbr/>Children<wbr/>Failures</span><a href="#getignoredchildrenfailures" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -925,7 +961,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getJobByCustomId</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L129">application/queue-manager/queries.ts:129</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L150">application/queue-manager/queries.ts:150</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getjobindex"><span>get<wbr/>Job<wbr/>Index</span><a href="#getjobindex" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -950,7 +986,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getJobs</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L133">application/queue-manager/limits.ts:133</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L134">application/queue-manager/limits.ts:134</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getjobstate"><span>get<wbr/>Job<wbr/>State</span><a href="#getjobstate" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -978,7 +1014,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_job.JobLock.html" class="tsd-signature-type tsd-kind-interface">JobLock</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getLockInfo</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L51">application/queue-manager/locks.ts:51</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L55">application/queue-manager/locks.ts:55</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getlogs"><span>get<wbr/>Logs</span><a href="#getlogs" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -992,7 +1028,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_worker.JobLogEntry.html" class="tsd-signature-type tsd-kind-interface">JobLogEntry</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getLogs</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L24">application/queue-manager/observability.ts:24</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L25">application/queue-manager/observability.ts:25</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getmemorystats"><span>get<wbr/>Memory<wbr/>Stats</span><a href="#getmemorystats" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1012,7 +1048,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Map</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">PerQueueStats</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getPerQueueStats</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L32">application/queue-manager/observability.ts:32</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L35">application/queue-manager/observability.ts:35</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getprogress"><span>get<wbr/>Progress</span><a href="#getprogress" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1026,7 +1062,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">message</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">progress</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getProgress</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L133">application/queue-manager/queries.ts:133</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L154">application/queue-manager/queries.ts:154</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getprometheusmetrics"><span>get<wbr/>Prometheus<wbr/>Metrics</span><a href="#getprometheusmetrics" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1036,7 +1072,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getPrometheusMetrics</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L36">application/queue-manager/observability.ts:36</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L39">application/queue-manager/observability.ts:39</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getqueuejobcounts"><span>get<wbr/>Queue<wbr/>Job<wbr/>Counts</span><a href="#getqueuejobcounts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1078,7 +1114,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">concurrencyLimit</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">rateLimit</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span> <span class="tsd-signature-symbol">}</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getQueueLimits</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L250">application/queue-manager/limits.ts:250</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L254">application/queue-manager/limits.ts:254</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getqueuelimitstatus"><span>get<wbr/>Queue<wbr/>Limit<wbr/>Status</span><a href="#getqueuelimitstatus" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1093,7 +1129,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">{</span><br/>    <span class="tsd-kind-property">concurrencyLimit</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">maxed</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">rateLimit</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">duration</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">max</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">rateLimitTtl</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getQueueLimitStatus</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L260">application/queue-manager/limits.ts:260</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L264">application/queue-manager/limits.ts:264</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getqueuemetrics"><span>get<wbr/>Queue<wbr/>Metrics</span><a href="#getqueuemetrics" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1110,7 +1146,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/client.QueueMetrics.html" class="tsd-signature-type tsd-kind-interface">QueueMetrics</a></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getQueueMetrics</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L12">application/queue-manager/observability.ts:12</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L13">application/queue-manager/observability.ts:13</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getqueuessummary"><span>get<wbr/>Queues<wbr/>Summary</span><a href="#getqueuessummary" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1141,7 +1177,9 @@
 <li class="tsd-is-inherited">
 <div class="tsd-signature tsd-anchor-link" id="getresultasync-1"><span class="tsd-kind-call-signature">getResultAsync</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">jobId</span><span class="tsd-signature-symbol">:</span> <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span><a href="#getresultasync-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Async result port used by transports; memory and SQLite remain synchronous internally.</p>
+<div class="tsd-comment tsd-typography"><p>Async result port used by transports (GetResult); memory and SQLite remain
+synchronous internally. It reads completed jobs only, as before: the retained result
+of a job removed on completion answers the completion lookup, not GetResult.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -1150,7 +1188,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.getResultAsync</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L36">application/queue-manager/queries.ts:36</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L47">application/queue-manager/queries.ts:47</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getshards"><span>get<wbr/>Shards</span><a href="#getshards" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1209,7 +1247,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.isGroupPaused</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L116">application/queue-manager/limits.ts:116</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L117">application/queue-manager/limits.ts:117</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="ispaused"><span>is<wbr/>Paused</span><a href="#ispaused" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1223,7 +1261,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.isPaused</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L37">application/queue-manager/control.ts:37</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L38">application/queue-manager/control.ts:38</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="jobheartbeat"><span>job<wbr/>Heartbeat</span><a href="#jobheartbeat" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1238,7 +1276,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.jobHeartbeat</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L7">application/queue-manager/locks.ts:7</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L8">application/queue-manager/locks.ts:8</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="jobheartbeatbatch"><span>job<wbr/>Heartbeat<wbr/>Batch</span><a href="#jobheartbeatbatch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1253,7 +1291,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.jobHeartbeatBatch</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L19">application/queue-manager/locks.ts:19</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L20">application/queue-manager/locks.ts:20</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="listcrons"><span>list<wbr/>Crons</span><a href="#listcrons" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1263,7 +1301,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_cron.CronJob.html" class="tsd-signature-type tsd-kind-interface">CronJob</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.listCrons</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L45">application/queue-manager/services.ts:45</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L51">application/queue-manager/services.ts:51</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="listqueues"><span>list<wbr/>Queues</span><a href="#listqueues" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1273,7 +1311,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.listQueues</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L191">application/queue-manager/control.ts:191</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L195">application/queue-manager/control.ts:195</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="moveactivetowait"><span>move<wbr/>Active<wbr/>To<wbr/>Wait</span><a href="#moveactivetowait" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1288,7 +1326,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.moveActiveToWait</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L70">application/queue-manager/job-management.ts:70</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L100">application/queue-manager/job-management.ts:100</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="movetodelayed"><span>move<wbr/>To<wbr/>Delayed</span><a href="#movetodelayed" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1304,7 +1342,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.moveToDelayed</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L47">application/queue-manager/job-management.ts:47</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L75">application/queue-manager/job-management.ts:75</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="movetowaitingchildren"><span>move<wbr/>To<wbr/>Waiting<wbr/>Children</span><a href="#movetowaitingchildren" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1319,7 +1357,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.moveToWaitingChildren</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L89">application/queue-manager/job-management.ts:89</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L123">application/queue-manager/job-management.ts:123</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="obliterate"><span>obliterate</span><a href="#obliterate" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1333,7 +1371,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.obliterate</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L47">application/queue-manager/control.ts:47</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L48">application/queue-manager/control.ts:48</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="pause"><span>pause</span><a href="#pause" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1347,7 +1385,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.pause</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L12">application/queue-manager/control.ts:12</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L13">application/queue-manager/control.ts:13</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="pausegroup"><span>pause<wbr/>Group</span><a href="#pausegroup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1362,7 +1400,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.pauseGroup</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L94">application/queue-manager/limits.ts:94</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L95">application/queue-manager/limits.ts:95</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="promote"><span>promote</span><a href="#promote" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1376,7 +1414,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.promote</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L39">application/queue-manager/job-management.ts:39</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L67">application/queue-manager/job-management.ts:67</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="promotejobs"><span>promote<wbr/>Jobs</span><a href="#promotejobs" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1391,7 +1429,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.promoteJobs</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L43">application/queue-manager/job-management.ts:43</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L71">application/queue-manager/job-management.ts:71</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="pull"><span>pull</span><a href="#pull" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1408,7 +1446,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.pull</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L31">application/queue-manager/delivery.ts:31</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L39">application/queue-manager/delivery.ts:39</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="pullbatch"><span>pull<wbr/>Batch</span><a href="#pullbatch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1426,7 +1464,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.pullBatch</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L70">application/queue-manager/delivery.ts:70</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L80">application/queue-manager/delivery.ts:80</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="pullbatchwithlock"><span>pull<wbr/>Batch<wbr/>With<wbr/>Lock</span><a href="#pullbatchwithlock" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1446,7 +1484,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">jobs</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">tokens</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.pullBatchWithLock</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L86">application/queue-manager/delivery.ts:86</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L97">application/queue-manager/delivery.ts:97</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="pullwithlock"><span>pull<wbr/>With<wbr/>Lock</span><a href="#pullwithlock" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1465,7 +1503,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">job</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">token</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.pullWithLock</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L49">application/queue-manager/delivery.ts:49</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L57">application/queue-manager/delivery.ts:57</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="purgedlq"><span>purge<wbr/>Dlq</span><a href="#purgedlq" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1479,7 +1517,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.purgeDlq</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L168">application/queue-manager/limits.ts:168</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L169">application/queue-manager/limits.ts:169</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="push"><span>push</span><a href="#push" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1494,7 +1532,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.push</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L17">application/queue-manager/delivery.ts:17</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L22">application/queue-manager/delivery.ts:22</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="pushbatch"><span>push<wbr/>Batch</span><a href="#pushbatch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1509,7 +1547,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.pushBatch</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L22">application/queue-manager/delivery.ts:22</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L29">application/queue-manager/delivery.ts:29</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="pushflow"><span>push<wbr/>Flow</span><a href="#pushflow" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1523,7 +1561,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">AtomicFlowBatchResult</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.pushFlow</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L27">application/queue-manager/delivery.ts:27</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/delivery.ts#L35">application/queue-manager/delivery.ts:35</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="ratelimitgroup"><span>rate<wbr/>Limit<wbr/>Group</span><a href="#ratelimitgroup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1539,7 +1577,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.rateLimitGroup</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L121">application/queue-manager/limits.ts:121</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L122">application/queue-manager/limits.ts:122</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="registerclientjob"><span>register<wbr/>Client<wbr/>Job</span><a href="#registerclientjob" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1554,7 +1592,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.registerClientJob</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L55">application/queue-manager/locks.ts:55</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L59">application/queue-manager/locks.ts:59</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="registerworker"><span>register<wbr/>Worker</span><a href="#registerworker" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1571,7 +1609,7 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/domain_types_worker.Worker.html" class="tsd-signature-type tsd-kind-interface">Worker</a></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.registerWorker</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L72">application/queue-manager/services.ts:72</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L98">application/queue-manager/services.ts:98</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="releaseclientjobs"><span>release<wbr/>Client<wbr/>Jobs</span><a href="#releaseclientjobs" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1585,7 +1623,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.releaseClientJobs</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L63">application/queue-manager/locks.ts:63</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L67">application/queue-manager/locks.ts:67</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="releaselock"><span>release<wbr/>Lock</span><a href="#releaselock" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1600,7 +1638,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.releaseLock</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L47">application/queue-manager/locks.ts:47</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L51">application/queue-manager/locks.ts:51</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="removechilddependency"><span>remove<wbr/>Child<wbr/>Dependency</span><a href="#removechilddependency" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1628,7 +1666,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.removeCron</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L35">application/queue-manager/services.ts:35</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L41">application/queue-manager/services.ts:41</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="removededuplicationkey"><span>remove<wbr/>Deduplication<wbr/>Key</span><a href="#removededuplicationkey" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1660,7 +1698,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.removeDlqJob</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L173">application/queue-manager/limits.ts:173</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L174">application/queue-manager/limits.ts:174</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="removegroupconcurrency"><span>remove<wbr/>Group<wbr/>Concurrency</span><a href="#removegroupconcurrency" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1675,7 +1713,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.removeGroupConcurrency</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L84">application/queue-manager/limits.ts:84</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L85">application/queue-manager/limits.ts:85</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="removegroupratelimit"><span>remove<wbr/>Group<wbr/>Rate<wbr/>Limit</span><a href="#removegroupratelimit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1690,7 +1728,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.removeGroupRateLimit</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L54">application/queue-manager/limits.ts:54</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L55">application/queue-manager/limits.ts:55</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="removejobdeduplicationkey"><span>remove<wbr/>Job<wbr/>Deduplication<wbr/>Key</span><a href="#removejobdeduplicationkey" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1718,7 +1756,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.removeLock</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L27">application/queue-manager/locks.ts:27</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L28">application/queue-manager/locks.ts:28</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="removeunprocessedchildren"><span>remove<wbr/>Unprocessed<wbr/>Children</span><a href="#removeunprocessedchildren" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1748,7 +1786,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.renewJobLock</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L39">application/queue-manager/locks.ts:39</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L41">application/queue-manager/locks.ts:41</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="renewjoblockbatch"><span>renew<wbr/>Job<wbr/>Lock<wbr/>Batch</span><a href="#renewjoblockbatch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1762,7 +1800,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.renewJobLockBatch</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L43">application/queue-manager/locks.ts:43</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L46">application/queue-manager/locks.ts:46</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="resume"><span>resume</span><a href="#resume" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1776,7 +1814,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.resume</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L25">application/queue-manager/control.ts:25</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/control.ts#L26">application/queue-manager/control.ts:26</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="resumegroup"><span>resume<wbr/>Group</span><a href="#resumegroup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1791,7 +1829,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.resumeGroup</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L105">application/queue-manager/limits.ts:105</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L106">application/queue-manager/limits.ts:106</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="retrycompleted"><span>retry<wbr/>Completed</span><a href="#retrycompleted" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1807,7 +1845,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.retryCompleted</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L177">application/queue-manager/limits.ts:177</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L178">application/queue-manager/limits.ts:178</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="retrydlq"><span>retry<wbr/>Dlq</span><a href="#retrydlq" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1823,7 +1861,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.retryDlq</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L160">application/queue-manager/limits.ts:160</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L161">application/queue-manager/limits.ts:161</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="retrydlqbyfilter"><span>retry<wbr/>Dlq<wbr/>By<wbr/>Filter</span><a href="#retrydlqbyfilter" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1838,7 +1876,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.retryDlqByFilter</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L164">application/queue-manager/limits.ts:164</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L165">application/queue-manager/limits.ts:165</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="setconcurrency"><span>set<wbr/>Concurrency</span><a href="#setconcurrency" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1853,7 +1891,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.setConcurrency</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L201">application/queue-manager/limits.ts:201</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L202">application/queue-manager/limits.ts:202</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="setdashboardemit"><span>set<wbr/>Dashboard<wbr/>Emit</span><a href="#setdashboardemit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1867,7 +1905,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.setDashboardEmit</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L49">application/queue-manager/services.ts:49</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L55">application/queue-manager/services.ts:55</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="setdlqconfig"><span>set<wbr/>Dlq<wbr/>Config</span><a href="#setdlqconfig" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1898,7 +1936,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.setGroupConcurrency</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L69">application/queue-manager/limits.ts:69</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L70">application/queue-manager/limits.ts:70</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="setgroupratelimit"><span>set<wbr/>Group<wbr/>Rate<wbr/>Limit</span><a href="#setgroupratelimit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1915,7 +1953,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.setGroupRateLimit</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L30">application/queue-manager/limits.ts:30</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L31">application/queue-manager/limits.ts:31</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="setoperationalmetricsprovider"><span>set<wbr/>Operational<wbr/>Metrics<wbr/>Provider</span><a href="#setoperationalmetricsprovider" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1929,7 +1967,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.setOperationalMetricsProvider</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L75">application/queue-manager/observability.ts:75</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L78">application/queue-manager/observability.ts:78</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="setratelimit"><span>set<wbr/>Rate<wbr/>Limit</span><a href="#setratelimit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1946,7 +1984,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.setRateLimit</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L190">application/queue-manager/limits.ts:190</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/limits.ts#L191">application/queue-manager/limits.ts:191</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="setstallconfig"><span>set<wbr/>Stall<wbr/>Config</span><a href="#setstallconfig" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -1985,7 +2023,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.subscribe</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L64">application/queue-manager/services.ts:64</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L70">application/queue-manager/services.ts:70</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="trimqueueevents"><span>trim<wbr/>Queue<wbr/>Events</span><a href="#trimqueueevents" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2000,7 +2038,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.trimQueueEvents</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L16">application/queue-manager/observability.ts:16</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/observability.ts#L17">application/queue-manager/observability.ts:17</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="unregisterclientjob"><span>unregister<wbr/>Client<wbr/>Job</span><a href="#unregisterclientjob" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2015,7 +2053,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.unregisterClientJob</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L59">application/queue-manager/locks.ts:59</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L63">application/queue-manager/locks.ts:63</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="unregisterworker"><span>unregister<wbr/>Worker</span><a href="#unregisterworker" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2029,7 +2067,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.unregisterWorker</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L89">application/queue-manager/services.ts:89</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L115">application/queue-manager/services.ts:115</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="unregisterworkersbyclientid"><span>unregister<wbr/>Workers<wbr/>By<wbr/>Client<wbr/>Id</span><a href="#unregisterworkersbyclientid" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2043,7 +2081,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.unregisterWorkersByClientId</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L95">application/queue-manager/services.ts:95</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L121">application/queue-manager/services.ts:121</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="updatejobdata"><span>update<wbr/>Job<wbr/>Data</span><a href="#updatejobdata" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2058,7 +2096,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.updateJobData</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L26">application/queue-manager/job-management.ts:26</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L48">application/queue-manager/job-management.ts:48</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="updatejobparent"><span>update<wbr/>Job<wbr/>Parent</span><a href="#updatejobparent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2073,7 +2111,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.updateJobParent</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L56">application/queue-manager/queries.ts:56</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/queries.ts#L77">application/queue-manager/queries.ts:77</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="updateprogress"><span>update<wbr/>Progress</span><a href="#updateprogress" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2089,7 +2127,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.updateProgress</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L17">application/queue-manager/job-management.ts:17</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/job-management.ts#L37">application/queue-manager/job-management.ts:37</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="verifylock"><span>verify<wbr/>Lock</span><a href="#verifylock" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2104,7 +2142,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.verifyLock</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L35">application/queue-manager/locks.ts:35</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/locks.ts#L37">application/queue-manager/locks.ts:37</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="waitforjobcompletion"><span>wait<wbr/>For<wbr/>Job<wbr/>Completion</span><a href="#waitforjobcompletion" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -2120,7 +2158,31 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from QueueManagerLifecycle.waitForJobCompletion</p>
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L68">application/queue-manager/services.ts:68</a></li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L74">application/queue-manager/services.ts:74</a></li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member tsd-is-inherited">
+<h3 class="tsd-anchor-link" id="waitforjobresult"><span>wait<wbr/>For<wbr/>Job<wbr/>Result</span><a href="#waitforjobresult" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures tsd-is-inherited">
+<li class="tsd-is-inherited">
+<div class="tsd-signature tsd-anchor-link" id="waitforjobresult-1"><span class="tsd-kind-call-signature">waitForJobResult</span><span class="tsd-signature-symbol">(</span><br/>    <span class="tsd-kind-parameter">jobId</span><span class="tsd-signature-symbol">:</span> <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">timeoutMs</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">signal</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">AbortSignal</span><span class="tsd-signature-symbol">,</span><br/><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">JobWaitResult</span><span class="tsd-signature-symbol">&gt;</span><a href="#waitforjobresult-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p><code>waitForJobCompletion</code> that also returns the job's result. A wait woken by the
+job's <code>completed</code> event answers with the event's data, the worker's return value,
+so a job removed on completion (which keeps no result) still returns it to a
+waiter registered when it completed. A wait released without an event reads the
+store only while its completion is cached; shutdown clears that cache before the
+callback runs. <code>result</code> is undefined on a timeout or abort. An invalid <code>timeoutMs</code>
+throws synchronously, as <code>waitForJobCompletion</code> does.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">jobId</span>: <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a></span></li>
+<li><span><span class="tsd-kind-parameter">timeoutMs</span>: <span class="tsd-signature-type">number</span></span></li>
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">signal</span>: <span class="tsd-signature-type">AbortSignal</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">JobWaitResult</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<p>Inherited from QueueManagerLifecycle.waitForJobResult</p>
+<ul>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/application/queue-manager/services.ts#L87">application/queue-manager/services.ts:87</a></li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -2139,7 +2201,7 @@
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary>
 <div><a href="#webhookmanager" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>webhook<wbr/>Manager</span></a><a href="#workermanager" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>worker<wbr/>Manager</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Methods</summary>
-<div><a href="#ack" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>ack</span></a><a href="#ackbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>ack<wbr/>Batch</span></a><a href="#ackbatchwithresults" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>ack<wbr/>Batch<wbr/>With<wbr/>Results</span></a><a href="#addcron" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>add<wbr/>Cron</span></a><a href="#addlog" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>add<wbr/>Log</span></a><a href="#cancel" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>cancel</span></a><a href="#changedelay" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>change<wbr/>Delay</span></a><a href="#changepriority" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>change<wbr/>Priority</span></a><a href="#changewaitingdelay" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>change<wbr/>Waiting<wbr/>Delay</span></a><a href="#clean" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clean</span></a><a href="#clearconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clear<wbr/>Concurrency</span></a><a href="#clearlogs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clear<wbr/>Logs</span></a><a href="#clearratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clear<wbr/>Rate<wbr/>Limit</span></a><a href="#compactmemory" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>compact<wbr/>Memory</span></a><a href="#count" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>count</span></a><a href="#createlock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>create<wbr/>Lock</span></a><a href="#discard" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>discard</span></a><a href="#drain" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>drain</span></a><a href="#emitdashboardevent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>emit<wbr/>Dashboard<wbr/>Event</span></a><a href="#extendlock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>extend<wbr/>Lock</span></a><a href="#fail" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>fail</span></a><a href="#failwithreason" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>fail<wbr/>With<wbr/>Reason</span></a><a href="#flushpersistence" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>flush<wbr/>Persistence</span></a><a href="#forcereleaseclientjobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>force<wbr/>Release<wbr/>Client<wbr/>Jobs</span></a><a href="#getalljoblocks" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Locks</span></a><a href="#getalljoblogs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Logs</span></a><a href="#getalljobresults" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Results</span></a><a href="#getallqueuejobcounts" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Queue<wbr/>Job<wbr/>Counts</span></a><a href="#getchildrenvalues" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Children<wbr/>Values</span></a><a href="#getcloudtelemetry" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Cloud<wbr/>Telemetry</span></a><a href="#getcompletedjobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Completed<wbr/>Jobs</span></a><a href="#getcompletionasync" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Completion<wbr/>Async</span></a><a href="#getcountsperpriority" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Counts<wbr/>Per<wbr/>Priority</span></a><a href="#getcron" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Cron</span></a><a href="#getdeduplicationjobid" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Deduplication<wbr/>Job<wbr/>Id</span></a><a href="#getdepcompletions" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dep<wbr/>Completions</span></a><a href="#getdlq" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq</span></a><a href="#getdlqconfig" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq<wbr/>Config</span></a><a href="#getdlqcount" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq<wbr/>Count</span></a><a href="#getdlqentries" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq<wbr/>Entries</span></a><a href="#getdlqstats" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq<wbr/>Stats</span></a><a href="#getfailedchildrenvalues" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Failed<wbr/>Children<wbr/>Values</span></a><a href="#getgroupactivecount" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Active<wbr/>Count</span></a><a href="#getgroupconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Concurrency</span></a><a href="#getgroupjobscount" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Jobs<wbr/>Count</span></a><a href="#getgroupratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Rate<wbr/>Limit</span></a><a href="#getgroupratelimitttl" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Rate<wbr/>Limit<wbr/>Ttl</span></a><a href="#getgroupsjobscount" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Groups<wbr/>Jobs<wbr/>Count</span></a><a href="#getignoredchildrenfailures" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Ignored<wbr/>Children<wbr/>Failures</span></a><a href="#getjob" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Job</span></a><a href="#getjobbycustomid" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Job<wbr/>By<wbr/>Custom<wbr/>Id</span></a><a href="#getjobindex" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Job<wbr/>Index</span></a><a href="#getjobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Jobs</span></a><a href="#getjobstate" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Job<wbr/>State</span></a><a href="#getlockinfo" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Lock<wbr/>Info</span></a><a href="#getlogs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Logs</span></a><a href="#getmemorystats" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Memory<wbr/>Stats</span></a><a href="#getperqueuestats" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Per<wbr/>Queue<wbr/>Stats</span></a><a href="#getprogress" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Progress</span></a><a href="#getprometheusmetrics" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Prometheus<wbr/>Metrics</span></a><a href="#getqueuejobcounts" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Job<wbr/>Counts</span></a><a href="#getqueuejobcountsbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Job<wbr/>Counts<wbr/>Batch</span></a><a href="#getqueuelimits" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Limits</span></a><a href="#getqueuelimitstatus" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Limit<wbr/>Status</span></a><a href="#getqueuemetrics" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Metrics</span></a><a href="#getqueuessummary" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queues<wbr/>Summary</span></a><a href="#getresult" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Result</span></a><a href="#getresultasync" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Result<wbr/>Async</span></a><a href="#getshards" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Shards</span></a><a href="#getstallconfig" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Stall<wbr/>Config</span></a><a href="#getstats" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Stats</span></a><a href="#getstoragestatus" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Storage<wbr/>Status</span></a><a href="#isgrouppaused" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>is<wbr/>Group<wbr/>Paused</span></a><a href="#ispaused" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>is<wbr/>Paused</span></a><a href="#jobheartbeat" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>job<wbr/>Heartbeat</span></a><a href="#jobheartbeatbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>job<wbr/>Heartbeat<wbr/>Batch</span></a><a href="#listcrons" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>list<wbr/>Crons</span></a><a href="#listqueues" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>list<wbr/>Queues</span></a><a href="#moveactivetowait" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>move<wbr/>Active<wbr/>To<wbr/>Wait</span></a><a href="#movetodelayed" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>move<wbr/>To<wbr/>Delayed</span></a><a href="#movetowaitingchildren" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>move<wbr/>To<wbr/>Waiting<wbr/>Children</span></a><a href="#obliterate" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>obliterate</span></a><a href="#pause" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pause</span></a><a href="#pausegroup" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pause<wbr/>Group</span></a><a href="#promote" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>promote</span></a><a href="#promotejobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>promote<wbr/>Jobs</span></a><a href="#pull" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pull</span></a><a href="#pullbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pull<wbr/>Batch</span></a><a href="#pullbatchwithlock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pull<wbr/>Batch<wbr/>With<wbr/>Lock</span></a><a href="#pullwithlock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pull<wbr/>With<wbr/>Lock</span></a><a href="#purgedlq" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>purge<wbr/>Dlq</span></a><a href="#push" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>push</span></a><a href="#pushbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>push<wbr/>Batch</span></a><a href="#pushflow" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>push<wbr/>Flow</span></a><a href="#ratelimitgroup" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>rate<wbr/>Limit<wbr/>Group</span></a><a href="#registerclientjob" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Client<wbr/>Job</span></a><a href="#registerworker" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Worker</span></a><a href="#releaseclientjobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>release<wbr/>Client<wbr/>Jobs</span></a><a href="#releaselock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>release<wbr/>Lock</span></a><a href="#removechilddependency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Child<wbr/>Dependency</span></a><a href="#removecron" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Cron</span></a><a href="#removededuplicationkey" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Deduplication<wbr/>Key</span></a><a href="#removedlqjob" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Dlq<wbr/>Job</span></a><a href="#removegroupconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Group<wbr/>Concurrency</span></a><a href="#removegroupratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Group<wbr/>Rate<wbr/>Limit</span></a><a href="#removejobdeduplicationkey" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Job<wbr/>Deduplication<wbr/>Key</span></a><a href="#removelock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Lock</span></a><a href="#removeunprocessedchildren" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Unprocessed<wbr/>Children</span></a><a href="#renewjoblock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>renew<wbr/>Job<wbr/>Lock</span></a><a href="#renewjoblockbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>renew<wbr/>Job<wbr/>Lock<wbr/>Batch</span></a><a href="#resume" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>resume</span></a><a href="#resumegroup" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>resume<wbr/>Group</span></a><a href="#retrycompleted" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>retry<wbr/>Completed</span></a><a href="#retrydlq" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>retry<wbr/>Dlq</span></a><a href="#retrydlqbyfilter" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>retry<wbr/>Dlq<wbr/>By<wbr/>Filter</span></a><a href="#setconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Concurrency</span></a><a href="#setdashboardemit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Dashboard<wbr/>Emit</span></a><a href="#setdlqconfig" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Dlq<wbr/>Config</span></a><a href="#setgroupconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Group<wbr/>Concurrency</span></a><a href="#setgroupratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Group<wbr/>Rate<wbr/>Limit</span></a><a href="#setoperationalmetricsprovider" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Operational<wbr/>Metrics<wbr/>Provider</span></a><a href="#setratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Rate<wbr/>Limit</span></a><a href="#setstallconfig" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Stall<wbr/>Config</span></a><a href="#shutdown" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>shutdown</span></a><a href="#subscribe" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>subscribe</span></a><a href="#trimqueueevents" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>trim<wbr/>Queue<wbr/>Events</span></a><a href="#unregisterclientjob" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>unregister<wbr/>Client<wbr/>Job</span></a><a href="#unregisterworker" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>unregister<wbr/>Worker</span></a><a href="#unregisterworkersbyclientid" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>unregister<wbr/>Workers<wbr/>By<wbr/>Client<wbr/>Id</span></a><a href="#updatejobdata" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>update<wbr/>Job<wbr/>Data</span></a><a href="#updatejobparent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>update<wbr/>Job<wbr/>Parent</span></a><a href="#updateprogress" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>update<wbr/>Progress</span></a><a href="#verifylock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>verify<wbr/>Lock</span></a><a href="#waitforjobcompletion" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>wait<wbr/>For<wbr/>Job<wbr/>Completion</span></a></div></details></div></details></div>
+<div><a href="#ack" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>ack</span></a><a href="#ackbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>ack<wbr/>Batch</span></a><a href="#ackbatchwithresults" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>ack<wbr/>Batch<wbr/>With<wbr/>Results</span></a><a href="#addcron" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>add<wbr/>Cron</span></a><a href="#addlog" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>add<wbr/>Log</span></a><a href="#cancel" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>cancel</span></a><a href="#changedelay" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>change<wbr/>Delay</span></a><a href="#changepriority" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>change<wbr/>Priority</span></a><a href="#changewaitingdelay" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>change<wbr/>Waiting<wbr/>Delay</span></a><a href="#clean" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clean</span></a><a href="#clearconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clear<wbr/>Concurrency</span></a><a href="#clearlogs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clear<wbr/>Logs</span></a><a href="#clearratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clear<wbr/>Rate<wbr/>Limit</span></a><a href="#compactmemory" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>compact<wbr/>Memory</span></a><a href="#count" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>count</span></a><a href="#createlock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>create<wbr/>Lock</span></a><a href="#discard" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>discard</span></a><a href="#drain" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>drain</span></a><a href="#emitdashboardevent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>emit<wbr/>Dashboard<wbr/>Event</span></a><a href="#extendlock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>extend<wbr/>Lock</span></a><a href="#fail" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>fail</span></a><a href="#failwithreason" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>fail<wbr/>With<wbr/>Reason</span></a><a href="#flushpendingwrites" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>flush<wbr/>Pending<wbr/>Writes</span></a><a href="#flushpersistence" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>flush<wbr/>Persistence</span></a><a href="#forcereleaseclientjobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>force<wbr/>Release<wbr/>Client<wbr/>Jobs</span></a><a href="#forgetremovedresult" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>forget<wbr/>Removed<wbr/>Result</span></a><a href="#getalljoblocks" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Locks</span></a><a href="#getalljoblogs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Logs</span></a><a href="#getalljobresults" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Job<wbr/>Results</span></a><a href="#getallqueuejobcounts" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>All<wbr/>Queue<wbr/>Job<wbr/>Counts</span></a><a href="#getchildrenvalues" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Children<wbr/>Values</span></a><a href="#getcloudtelemetry" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Cloud<wbr/>Telemetry</span></a><a href="#getcompletedjobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Completed<wbr/>Jobs</span></a><a href="#getcompletionasync" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Completion<wbr/>Async</span></a><a href="#getcountsperpriority" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Counts<wbr/>Per<wbr/>Priority</span></a><a href="#getcron" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Cron</span></a><a href="#getdeduplicationjobid" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Deduplication<wbr/>Job<wbr/>Id</span></a><a href="#getdepcompletions" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dep<wbr/>Completions</span></a><a href="#getdlq" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq</span></a><a href="#getdlqconfig" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq<wbr/>Config</span></a><a href="#getdlqcount" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq<wbr/>Count</span></a><a href="#getdlqentries" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq<wbr/>Entries</span></a><a href="#getdlqstats" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Dlq<wbr/>Stats</span></a><a href="#getfailedchildrenvalues" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Failed<wbr/>Children<wbr/>Values</span></a><a href="#getgroupactivecount" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Active<wbr/>Count</span></a><a href="#getgroupconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Concurrency</span></a><a href="#getgroupjobscount" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Jobs<wbr/>Count</span></a><a href="#getgroupratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Rate<wbr/>Limit</span></a><a href="#getgroupratelimitttl" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Group<wbr/>Rate<wbr/>Limit<wbr/>Ttl</span></a><a href="#getgroupsjobscount" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Groups<wbr/>Jobs<wbr/>Count</span></a><a href="#getignoredchildrenfailures" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Ignored<wbr/>Children<wbr/>Failures</span></a><a href="#getjob" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Job</span></a><a href="#getjobbycustomid" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Job<wbr/>By<wbr/>Custom<wbr/>Id</span></a><a href="#getjobindex" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Job<wbr/>Index</span></a><a href="#getjobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Jobs</span></a><a href="#getjobstate" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Job<wbr/>State</span></a><a href="#getlockinfo" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Lock<wbr/>Info</span></a><a href="#getlogs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Logs</span></a><a href="#getmemorystats" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Memory<wbr/>Stats</span></a><a href="#getperqueuestats" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Per<wbr/>Queue<wbr/>Stats</span></a><a href="#getprogress" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Progress</span></a><a href="#getprometheusmetrics" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Prometheus<wbr/>Metrics</span></a><a href="#getqueuejobcounts" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Job<wbr/>Counts</span></a><a href="#getqueuejobcountsbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Job<wbr/>Counts<wbr/>Batch</span></a><a href="#getqueuelimits" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Limits</span></a><a href="#getqueuelimitstatus" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Limit<wbr/>Status</span></a><a href="#getqueuemetrics" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queue<wbr/>Metrics</span></a><a href="#getqueuessummary" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Queues<wbr/>Summary</span></a><a href="#getresult" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Result</span></a><a href="#getresultasync" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Result<wbr/>Async</span></a><a href="#getshards" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Shards</span></a><a href="#getstallconfig" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Stall<wbr/>Config</span></a><a href="#getstats" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Stats</span></a><a href="#getstoragestatus" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Storage<wbr/>Status</span></a><a href="#isgrouppaused" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>is<wbr/>Group<wbr/>Paused</span></a><a href="#ispaused" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>is<wbr/>Paused</span></a><a href="#jobheartbeat" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>job<wbr/>Heartbeat</span></a><a href="#jobheartbeatbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>job<wbr/>Heartbeat<wbr/>Batch</span></a><a href="#listcrons" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>list<wbr/>Crons</span></a><a href="#listqueues" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>list<wbr/>Queues</span></a><a href="#moveactivetowait" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>move<wbr/>Active<wbr/>To<wbr/>Wait</span></a><a href="#movetodelayed" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>move<wbr/>To<wbr/>Delayed</span></a><a href="#movetowaitingchildren" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>move<wbr/>To<wbr/>Waiting<wbr/>Children</span></a><a href="#obliterate" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>obliterate</span></a><a href="#pause" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pause</span></a><a href="#pausegroup" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pause<wbr/>Group</span></a><a href="#promote" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>promote</span></a><a href="#promotejobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>promote<wbr/>Jobs</span></a><a href="#pull" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pull</span></a><a href="#pullbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pull<wbr/>Batch</span></a><a href="#pullbatchwithlock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pull<wbr/>Batch<wbr/>With<wbr/>Lock</span></a><a href="#pullwithlock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pull<wbr/>With<wbr/>Lock</span></a><a href="#purgedlq" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>purge<wbr/>Dlq</span></a><a href="#push" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>push</span></a><a href="#pushbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>push<wbr/>Batch</span></a><a href="#pushflow" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>push<wbr/>Flow</span></a><a href="#ratelimitgroup" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>rate<wbr/>Limit<wbr/>Group</span></a><a href="#registerclientjob" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Client<wbr/>Job</span></a><a href="#registerworker" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Worker</span></a><a href="#releaseclientjobs" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>release<wbr/>Client<wbr/>Jobs</span></a><a href="#releaselock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>release<wbr/>Lock</span></a><a href="#removechilddependency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Child<wbr/>Dependency</span></a><a href="#removecron" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Cron</span></a><a href="#removededuplicationkey" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Deduplication<wbr/>Key</span></a><a href="#removedlqjob" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Dlq<wbr/>Job</span></a><a href="#removegroupconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Group<wbr/>Concurrency</span></a><a href="#removegroupratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Group<wbr/>Rate<wbr/>Limit</span></a><a href="#removejobdeduplicationkey" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Job<wbr/>Deduplication<wbr/>Key</span></a><a href="#removelock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Lock</span></a><a href="#removeunprocessedchildren" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Unprocessed<wbr/>Children</span></a><a href="#renewjoblock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>renew<wbr/>Job<wbr/>Lock</span></a><a href="#renewjoblockbatch" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>renew<wbr/>Job<wbr/>Lock<wbr/>Batch</span></a><a href="#resume" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>resume</span></a><a href="#resumegroup" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>resume<wbr/>Group</span></a><a href="#retrycompleted" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>retry<wbr/>Completed</span></a><a href="#retrydlq" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>retry<wbr/>Dlq</span></a><a href="#retrydlqbyfilter" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>retry<wbr/>Dlq<wbr/>By<wbr/>Filter</span></a><a href="#setconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Concurrency</span></a><a href="#setdashboardemit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Dashboard<wbr/>Emit</span></a><a href="#setdlqconfig" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Dlq<wbr/>Config</span></a><a href="#setgroupconcurrency" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Group<wbr/>Concurrency</span></a><a href="#setgroupratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Group<wbr/>Rate<wbr/>Limit</span></a><a href="#setoperationalmetricsprovider" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Operational<wbr/>Metrics<wbr/>Provider</span></a><a href="#setratelimit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Rate<wbr/>Limit</span></a><a href="#setstallconfig" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Stall<wbr/>Config</span></a><a href="#shutdown" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>shutdown</span></a><a href="#subscribe" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>subscribe</span></a><a href="#trimqueueevents" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>trim<wbr/>Queue<wbr/>Events</span></a><a href="#unregisterclientjob" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>unregister<wbr/>Client<wbr/>Job</span></a><a href="#unregisterworker" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>unregister<wbr/>Worker</span></a><a href="#unregisterworkersbyclientid" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>unregister<wbr/>Workers<wbr/>By<wbr/>Client<wbr/>Id</span></a><a href="#updatejobdata" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>update<wbr/>Job<wbr/>Data</span></a><a href="#updatejobparent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>update<wbr/>Job<wbr/>Parent</span></a><a href="#updateprogress" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>update<wbr/>Progress</span></a><a href="#verifylock" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>verify<wbr/>Lock</span></a><a href="#waitforjobcompletion" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>wait<wbr/>For<wbr/>Job<wbr/>Completion</span></a><a href="#waitforjobresult" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>wait<wbr/>For<wbr/>Job<wbr/>Result</span></a></div></details></div></details></div>
 <div class="site-menu">
 <nav id="tsd-sidebar-links" class="tsd-navigation"><a href="https://bunqueue.dev/guide/introduction/" class="tsd-nav-link">Guide</a><a href="https://github.com/egeominotti/bunqueue" class="tsd-nav-link">GitHub</a></nav>
 <nav class="tsd-navigation"><a href="../index.html">bunqueue</a>

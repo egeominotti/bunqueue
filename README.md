@@ -153,10 +153,10 @@ Choose a Linux distribution with the same tags on either registry:
 
 | Variant | Version tag | Moving tag | Runtime base |
 |---|---|---|---|
-| Alpine (default) | `2.9.14-alpine` | `alpine`, `latest` | Alpine 3.22, musl |
-| Debian | `2.9.14-debian` | `debian` | Debian 13 |
-| Debian slim | `2.9.14-slim` | `slim` | Debian 13 slim |
-| Distroless | `2.9.14-distroless` | `distroless` | Debian 13, no shell or package manager |
+| Alpine (default) | `2.9.15-alpine` | `alpine`, `latest` | Alpine 3.22, musl |
+| Debian | `2.9.15-debian` | `debian` | Debian 13 |
+| Debian slim | `2.9.15-slim` | `slim` | Debian 13 slim |
+| Distroless | `2.9.15-distroless` | `distroless` | Debian 13, no shell or package manager |
 
 **Which variant should I use?**
 
@@ -182,18 +182,18 @@ user permission to install packages at runtime.
 docker run -d --name bunqueue --restart unless-stopped \
   -p 127.0.0.1:6789:6789 -p 127.0.0.1:6790:6790 \
   -v bunqueue-data:/app/data \
-  egeominotti/bunqueue:2.9.14-alpine
+  egeominotti/bunqueue:2.9.15-alpine
 
 curl --fail http://127.0.0.1:6790/health
 ```
 
-This example exposes the APIs only on your machine. Replace `2.9.14-alpine` with
-`2.9.14-debian`, `2.9.14-slim`, or `2.9.14-distroless` to choose another base.
+This example exposes the APIs only on your machine. Replace `2.9.15-alpine` with
+`2.9.15-debian`, `2.9.15-slim`, or `2.9.15-distroless` to choose another base.
 Moving tags such as `alpine` follow newer releases; version tags identify a
 release, while a digest pins the exact image even across base-image rebuilds.
 
 Every variant supports both architectures, runs as UID/GID `1001:1001`, and
-stores SQLite data in `/app/data`. Unsuffixed tags such as `2.9.14` stay on Alpine.
+stores SQLite data in `/app/data`. Unsuffixed tags such as `2.9.15` stay on Alpine.
 Production images contain the compiled server and required system libraries;
 development dependencies and a separate Bun installation stay out of the image.
 The built-in health check uses `/app/bunqueue healthcheck`, including on distroless.
@@ -289,7 +289,7 @@ Framework Integrations.
   `QueueEvents`, `FlowProducer`, plus `QueuePro`/`WorkerPro` aliases, fair job
   groups, native processor batches, cooperative cancellation, and Observable
   results; [migrating takes minutes](https://bunqueue.dev/guide/migration/)
-- **MCP server included** — 75 tools; AI agents get full queue control out of the box
+- **MCP server included** — 79 primary tools; AI agents get full queue control out of the box
 - **Everything server-side** — retries with backoff, priorities, cron, rate limits, dead letter queue
 - **Measured, operation-specific performance** — 729K jobs/sec internal
   in-memory batch push, 186K jobs/sec public on-disk Embedded `addBulk`, and
@@ -589,15 +589,18 @@ step timeouts, typed events, SQLite-persisted execution state.
 
 ## Built for AI Agents (MCP Server)
 
-bunqueue ships a native MCP server: 75 tools, 5 resources, 3 prompts. Agents
+bunqueue ships a native MCP server: 79 primary tools, 5 resources, 3 prompts. Agents
 schedule cron jobs, push and process jobs, retry failures, set rate limits,
 and read stats — no glue code. HTTP handlers let an agent register a URL and
 have a worker call it for every job. Run it over stdio or Streamable HTTP, and
-opt in to toolsets, confirmation of destructive calls and workflow approvals.
+use the agent preset for dynamic toolsets and destructive-call confirmation.
+The 79 primary tools include bounded paging, job observation and queue diagnosis;
+2 scoped resource templates limit reads to a queue. Optional workflows add up to
+3 tools. Dynamic discovery tools are counted separately.
 
 ```bash
 bun add bunqueue @modelcontextprotocol/sdk   # the MCP SDK is an optional peer
-claude mcp add bunqueue -- bunx --package=bunqueue bunqueue-mcp
+claude mcp add bunqueue -e BUNQUEUE_MCP_PROFILE=agent -- bunx --package=bunqueue bunqueue-mcp
 ```
 
 ```json
@@ -606,7 +609,8 @@ claude mcp add bunqueue -- bunx --package=bunqueue bunqueue-mcp
   "mcpServers": {
     "bunqueue": {
       "command": "bunx",
-      "args": ["--package=bunqueue", "bunqueue-mcp"]
+      "args": ["--package=bunqueue", "bunqueue-mcp"],
+      "env": { "BUNQUEUE_MCP_PROFILE": "agent" }
     }
   }
 }
@@ -616,6 +620,19 @@ Then just ask: _"Schedule a cleanup job every day at 3 AM"_ · _"Show me all
 failed jobs and retry them"_ · _"Set rate limit to 50/sec on api-calls"_.
 
 [MCP guide →](https://bunqueue.dev/guide/mcp/)
+
+Check configuration before connecting:
+`BUNQUEUE_MCP_PROFILE=agent bunx --package=bunqueue bunqueue-mcp --doctor --json`.
+Doctor reports readiness without opening embedded databases; startup still checks
+workflow schemas. Read structured outcomes and observe final job state before
+claiming success. Queue-scoped pages omit payloads by default.
+
+For durable agent turns, use [`Workflow` + `Engine`](https://bunqueue.dev/guide/workflow/)
+and the optional [`bunqueue/agents`](https://bunqueue.dev/guide/workflow/agent-sdks/)
+journal for sessions, redacted progress replay and uncertain external effects.
+Session resume and queue retries still require provider idempotency and explicit
+business-effect reconciliation. The repository [skill](skills/bunqueue/SKILL.md)
+routes directly to queue, workflow, MCP and agent references.
 
 ## Dashboard
 

@@ -1,6 +1,6 @@
 {
   "name": "bunqueue",
-  "version": "2.9.14",
+  "version": "2.9.15",
   "description": "High-performance job queue for Bun and AI agents. Memory or one-file SQLite, optional PostgreSQL 15–18 multi-broker persistence, cron, retries, DLQ, and MCP.",
   "keywords": [
     "agentic",
@@ -100,6 +100,12 @@
       "bun": "./dist/client/workflow/index.js",
       "node": "./dist/bun-only.js",
       "import": "./dist/client/workflow/index.js"
+    },
+    "./agents": {
+      "types": "./dist/agents/index.d.ts",
+      "bun": "./dist/agents/index.js",
+      "node": "./dist/bun-only.js",
+      "import": "./dist/agents/index.js"
     },
     "./package.json": "./package.json"
   },

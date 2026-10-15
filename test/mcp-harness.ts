@@ -21,6 +21,8 @@ import { createTcpServer } from '../src/infrastructure/server/tcp';
 import { EmbeddedBackend, TcpBackend, type McpBackend } from '../src/mcp/adapter';
 import type { DecisionModel } from '../src/mcp/decisionModel';
 import { HttpHandlerRegistry } from '../src/mcp/httpHandler';
+import { registerPrompts } from '../src/mcp/prompts';
+import { registerResources } from '../src/mcp/resources';
 import { setupTools } from '../src/mcp/toolSetup';
 
 export type McpMode = 'embedded' | 'tcp';
@@ -30,6 +32,8 @@ export interface HarnessOptions {
   mode?: McpMode;
   env?: Record<string, string>;
   decision?: DecisionModel | null;
+  diagnosticPrompts?: boolean;
+  inspectionResources?: boolean;
   /** When set, the client declares form elicitation and answers with this callback. */
   elicit?: (message: string) => ElicitResult;
 }
@@ -64,11 +68,15 @@ export async function startMcp(options: HarnessOptions = {}) {
   }
   const server = new McpServer({ name: 'bunqueue-mcp', version: 'test' });
   // In TCP mode HTTP handlers must process jobs on the remote broker, not locally.
-  const handlers = new HttpHandlerRegistry(broker ? { host: '127.0.0.1', port: broker.port } : undefined);
+  const handlers = new HttpHandlerRegistry(
+    broker ? { host: '127.0.0.1', port: broker.port } : undefined
+  );
   setupTools(server, backend, handlers, {
     env: options.env ?? {},
     decision: options.decision ?? null,
   });
+  if (options.diagnosticPrompts) registerPrompts(server, backend);
+  if (options.inspectionResources) registerResources(server, backend);
 
   const client = new Client(
     { name: 'test-client', version: '1.0.0' },

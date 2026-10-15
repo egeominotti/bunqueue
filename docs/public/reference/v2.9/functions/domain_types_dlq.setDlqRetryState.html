@@ -16,7 +16,10 @@
 <li class="">
 <div class="tsd-signature tsd-anchor-link" id="setdlqretrystate"><span class="tsd-kind-call-signature">setDlqRetryState</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">job</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">state</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/domain_types_dlq.DlqRetryState.html" class="tsd-signature-type tsd-kind-interface">DlqRetryState</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#setdlqretrystate" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Restore internal DLQ state from SQLite as a non-enumerable Job property.</p>
+<div class="tsd-comment tsd-typography"><p>Restore internal DLQ state from SQLite as a non-enumerable Job property.
+Clearing assigns <code>undefined</code> instead of deleting the property: a delete gave
+every retried job a hidden class (Structure) of its own, plus its own
+property-name cache once serialized, about 1 KB per retained job.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -25,7 +28,7 @@
 <li><span><span class="tsd-kind-parameter">state</span>: <a href="../interfaces/domain_types_dlq.DlqRetryState.html" class="tsd-signature-type tsd-kind-interface">DlqRetryState</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/dlq.ts#L60">domain/types/dlq.ts:60</a></li></ul></aside></div></li></ul></section></div>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/dlq.ts#L65">domain/types/dlq.ts:65</a></li></ul></aside></div></li></ul></section></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

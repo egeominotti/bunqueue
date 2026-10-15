@@ -20,6 +20,15 @@ head:
 
 ## Why an agent needs this
 
+For Claude/OpenAI/Mastra turns, start with
+[Agent SDK integrations](/guide/workflow/agent-sdks/) and the optional
+`bunqueue/agents` journal: explicitly wire session resume, cancellation, parsed
+terminal output and stable business effect IDs. Pending remote effects require
+reconciliation; a provider's final text or a missing local result cannot prove
+non-application. Bounded progress replay reports per-run retention gaps. Preserve
+provider-local transcript/workspace artifacts alongside your durable stores.
+Operator queue access uses the [MCP agent preset and bounded reads](/guide/mcp/).
+
 Take a normal agent loop. Ten turns, a handful of tool calls, running inside `generateText`.
 
 It works, right up until the pod restarts at turn seven.
@@ -165,6 +174,8 @@ import { generateText, stepCountIs, tool } from 'ai';
 import { Engine, Workflow } from 'bunqueue/workflow';
 import { z } from 'zod';
 
+declare const configuredModel: string; // Required CLI/user input; no example-selected default.
+
 const provisionTools = {
   provision_database: tool({
     description: 'Provision a Postgres database for the tenant.',
@@ -179,7 +190,7 @@ const provisionTools = {
 const agentSaga = new Workflow<{ tenant: string }>('provision-tenant')
   .step('plan', async (ctx) => {
     const result = await generateText({
-      model: anthropic('claude-sonnet-5'),
+      model: anthropic(configuredModel),
       tools: provisionTools,
       stopWhen: stepCountIs(1),
       messages: [{ role: 'user', content: `Provision infrastructure for ${ctx.input.tenant}.` }],
@@ -247,7 +258,7 @@ const agent = new Workflow<{ task: string }>('agent').doUntil(
     }
 
     const result = await generateText({
-      model: anthropic('claude-sonnet-5'),
+      model: anthropic(configuredModel),
       tools,
       stopWhen: stepCountIs(1),
       messages: [

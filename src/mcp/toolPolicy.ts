@@ -81,6 +81,7 @@ const destroy = (toolset: ToolsetId, idempotent: boolean, target: ConfirmTarget)
 const optional = (policy: ToolPolicy): ToolPolicy => ({ ...policy, optional: true });
 
 export const TOOL_POLICIES: Record<string, ToolPolicy> = {
+  bunqueue_get_capabilities: read('monitoring'),
   // jobs
   bunqueue_add_job: write('jobs', false),
   bunqueue_add_jobs_bulk: write('jobs', false),
@@ -89,6 +90,7 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   bunqueue_get_job_result: read('jobs'),
   bunqueue_get_job_by_custom_id: read('jobs'),
   bunqueue_wait_for_job: read('jobs'),
+  bunqueue_observe_job: read('jobs'),
   bunqueue_get_progress: read('jobs'),
   bunqueue_update_progress: write('jobs', true),
   bunqueue_get_job_logs: read('jobs'),
@@ -116,6 +118,7 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   bunqueue_list_queues: read('queues'),
   bunqueue_count_jobs: read('queues'),
   bunqueue_get_jobs: read('queues'),
+  bunqueue_list_jobs_page: read('queues'),
   bunqueue_get_job_counts: read('queues'),
   bunqueue_get_counts_per_priority: read('queues'),
   bunqueue_is_paused: read('queues'),
@@ -165,6 +168,7 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   bunqueue_set_webhook_enabled: write('webhooks', true),
   // monitoring
   bunqueue_get_stats: read('monitoring'),
+  bunqueue_diagnose_queue: read('monitoring'),
   bunqueue_get_queue_stats: read('monitoring'),
   bunqueue_get_per_queue_stats: read('monitoring'),
   bunqueue_get_memory_stats: read('monitoring'),

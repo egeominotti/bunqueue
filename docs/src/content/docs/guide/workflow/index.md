@@ -36,6 +36,13 @@ nothing in the core imports it, so its churn cannot reach them.
 
 ## The problem it solves
 
+For agent turns, pair this lifecycle with the optional
+[`bunqueue/agents` journal](/guide/workflow/agent-sdks/) for durable sessions,
+redacted progress and explicit external-effect reconciliation. Use
+[approval gates](/guide/workflow/approval/) before sensitive application actions;
+the [MCP agent preset](/guide/mcp/) supplies separate operator-tool confirmation,
+readiness diagnostics, structured outcomes and scoped observation.
+
 Write that sequence as plain code and three things go wrong the first time it breaks in production:
 
 1. **The process dies halfway.** The card was charged, the confirmation never went out, and nothing remembers where it got to.

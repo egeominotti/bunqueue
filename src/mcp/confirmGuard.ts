@@ -1,7 +1,7 @@
 /**
  * Opt-in safety mode for the MCP server (BUNQUEUE_MCP_CONFIRM=destructive).
  *
- * - Every tool gets MCP annotations (readOnly / destructive / idempotent / openWorld).
+ * - Policy annotations are always applied independently by toolResults.ts.
  * - Guarded tools (irreversible data loss, re-running completed work in bulk or an
  *   irrevocable approval, see toolPolicy.ts) run only after a confirmation:
  *   1. the client asks the user (MCP elicitation) and the user accepts; or, when the
@@ -18,7 +18,7 @@ import type { RequestId } from '@modelcontextprotocol/sdk/types.js';
 import type { McpBackend } from './adapter';
 import { describeImpact, type ImpactContext } from './confirmImpact';
 import type { DecisionModel } from './decisionModel';
-import { TOOL_POLICIES, annotationsFor, type ToolPolicy } from './toolPolicy';
+import { TOOL_POLICIES, type ToolPolicy } from './toolPolicy';
 
 interface ToolResult {
   [key: string]: unknown;
@@ -101,14 +101,13 @@ async function askUser(
 }
 
 async function gate(
-  server: McpServer,
-  backend: McpBackend,
+  context: { server: McpServer; backend: McpBackend; options: ConfirmOptions },
   name: string,
   policy: ToolPolicy,
   args: Record<string, unknown>,
-  options: ConfirmOptions,
   extra: unknown
 ): Promise<ToolResult | null> {
+  const { server, backend, options } = context;
   const rule = policy.confirm;
   if (!rule || (rule.when && !rule.when(args))) return null;
   const target = String(args[rule.target] ?? '');
@@ -164,7 +163,7 @@ async function gate(
   return null;
 }
 
-/** Add annotations to every tool and wrap guarded tools with the confirmation gate. */
+/** Wrap guarded tools with the confirmation gate; annotations are always applied separately. */
 export function applyConfirmGuard(
   server: McpServer,
   tools: Map<string, RegisteredTool>,
@@ -175,7 +174,6 @@ export function applyConfirmGuard(
     const policy = TOOL_POLICIES[name];
     if (!policy) continue;
     if (!policy.confirm) {
-      tool.update({ annotations: { ...tool.annotations, ...annotationsFor(policy) } });
       continue;
     }
     const shape =
@@ -199,10 +197,9 @@ export function applyConfirmGuard(
         );
     }
     tool.update({
-      annotations: { ...tool.annotations, ...annotationsFor(policy) },
       paramsSchema: guardedShape,
       callback: (async (args: Record<string, unknown>, extra: unknown) => {
-        const refusal = await gate(server, backend, name, policy, args, options, extra);
+        const refusal = await gate({ server, backend, options }, name, policy, args, extra);
         if (refusal) return refusal;
         const { confirm: _confirm, userRequest: _request, ...rest } = args;
         return original(rest, extra);

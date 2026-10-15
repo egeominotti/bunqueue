@@ -37,6 +37,9 @@
 !docs/src/content/docs/**
 !docs/src/data/
 !docs/src/data/firstJob.ts
+!docs/src/data/apiVersions.json
+!docs/scripts/
+!docs/scripts/validate-discovery.ts
 !docs/src/lib/
 !docs/src/lib/reference-seo.ts
 !docs/src/lib/rehypeTableLabels.ts

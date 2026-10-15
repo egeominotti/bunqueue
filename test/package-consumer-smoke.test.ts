@@ -66,6 +66,7 @@ describe('published package consumer contract', () => {
     // contract change, but dropping or adding an entrypoint is.
     expect(Object.keys(manifest.exports).sort()).toEqual([
       '.',
+      './agents',
       './client',
       './mcp',
       './package.json',
@@ -74,6 +75,8 @@ describe('published package consumer contract', () => {
     ]);
     expect(existsSync(join(packageRoot, 'dist/client/index.js'))).toBe(true);
     expect(existsSync(join(packageRoot, 'dist/client/workflow/index.js'))).toBe(true);
+    expect(existsSync(join(packageRoot, 'dist/agents/index.js'))).toBe(true);
+    expect(existsSync(join(packageRoot, 'dist/agents/index.d.ts'))).toBe(true);
 
     // A real `bun add bunqueue` also installs the manifest's runtime
     // dependencies. Providing exactly those — and nothing else — keeps the
@@ -94,11 +97,12 @@ describe('published package consumer contract', () => {
       "import { Queue, Worker } from 'bunqueue/client';",
       "import { Engine } from 'bunqueue/workflow';",
       "import { QueueManager } from 'bunqueue/queue';",
-      "console.log([typeof defineConfig, typeof Queue, typeof Worker, typeof Engine, typeof QueueManager].join(' '));",
+      "import { AgentJournal, consumeAgentTurn, runAgentEffect, mapClaudeMessages } from 'bunqueue/agents';",
+      "console.log([defineConfig, Queue, Worker, Engine, QueueManager, AgentJournal, consumeAgentTurn, runAgentEffect, mapClaudeMessages].map(value => typeof value).join(' '));",
     ].join('\n');
 
     expect(run([process.execPath, '-e', probe], consumer)).toBe(
-      'function function function function function'
+      'function function function function function function function function function'
     );
 
     const typeProbe = join(consumer, 'group-types.ts');
@@ -106,13 +110,21 @@ describe('published package consumer contract', () => {
       typeProbe,
       [
         "import type { GroupJobOptions, GroupWorkerOptions } from 'bunqueue/client';",
+        "import type { AgentRunIdentity, AgentTurnOptions } from 'bunqueue/agents';",
         "const job: GroupJobOptions = { id: 'tenant-a' };",
         'const worker: GroupWorkerOptions = { concurrency: 2, limit: { max: 10, duration: 1000 } };',
-        'void [job, worker];',
+        "const identity: AgentRunIdentity = { executionId: 'run-a', stepId: 'step-a' };",
+        'const turn: AgentTurnOptions<{ ok: boolean }> = { schema: { parse: () => ({ ok: true }) } };',
+        '// @ts-expect-error A journal identity requires both execution and step IDs.',
+        "const incomplete: AgentRunIdentity = { executionId: 'run-a' };",
+        '// @ts-expect-error The schema must produce the declared output type.',
+        "const invalid: AgentTurnOptions<boolean> = { schema: { parse: () => 'wrong' } };",
+        'void [job, worker, identity, turn, incomplete, invalid];',
       ].join('\n')
     );
     run(
       [
+        process.execPath,
         join(root, 'node_modules/.bin/tsc'),
         '--noEmit',
         '--strict',
@@ -127,6 +139,20 @@ describe('published package consumer contract', () => {
       ],
       consumer
     );
+
+    // Bun can supply a `node` fallback executable. Check the actual runtime
+    // before asserting the packed Node guard; probe errors must still fail.
+    const node = Bun.which('node');
+    if (node) {
+      const runtime = attempt([node, '-p', 'Boolean(process.versions.bun)'], consumer);
+      expect(runtime.code).toBe(0);
+      expect(['true', 'false']).toContain(runtime.output);
+      if (runtime.output === 'false') {
+        const guard = attempt([node, '-e', "import('bunqueue/agents');"], consumer);
+        expect(guard.code).toBe(1);
+        expect(guard.output).toContain('bunqueue is Bun-only and requires the Bun runtime');
+      }
+    }
 
     // `./mcp` is the one entrypoint with an optional peer. A consumer without
     // `@modelcontextprotocol/sdk` must get the actionable install message rather

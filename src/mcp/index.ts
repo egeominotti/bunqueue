@@ -64,6 +64,11 @@
 
 async function launch(): Promise<void> {
   try {
+    if (process.argv.includes('--doctor')) {
+      const { runDoctor } = await import('./doctor.js');
+      await runDoctor(process.argv.includes('--json'));
+      return;
+    }
     const mod = await import('./server.js');
     await mod.run();
   } catch (err: unknown) {

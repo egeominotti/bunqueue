@@ -7,24 +7,13 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpBackend } from './adapter';
+import { totalJobs } from './diagnostics';
+import { boundedPrompt, boundedRows, boundedValue } from './inspectionBounds';
+import { listJobsPage } from './inspectionPage';
+import { errorPrompt } from './promptHelpers';
 
 /** Max queues to include in health report to avoid oversized prompts */
 const MAX_QUEUES_IN_REPORT = 50;
-
-function errorPrompt(description: string, error: string) {
-  return {
-    description,
-    messages: [
-      {
-        role: 'user' as const,
-        content: {
-          type: 'text' as const,
-          text: `Failed to gather bunqueue data: ${error}\n\nThe server may be unreachable. Check connectivity and try again.`,
-        },
-      },
-    ],
-  };
-}
 
 export function registerPrompts(server: McpServer, backend: McpBackend) {
   // ─── Health Report ─────────────────────────────────────────────────────
@@ -49,6 +38,7 @@ export function registerPrompts(server: McpServer, backend: McpBackend) {
             name: q,
             counts: await backend.getJobCounts(q),
             paused: await backend.isPaused(q),
+            limits: await backend.getQueueLimits(q),
           }))
         );
 
@@ -61,7 +51,7 @@ export function registerPrompts(server: McpServer, backend: McpBackend) {
               role: 'user' as const,
               content: {
                 type: 'text' as const,
-                text: `Analyze the following bunqueue server health data and produce a structured health report.
+                text: boundedPrompt(`Analyze the following bunqueue server health data and produce a structured health report.
 
 For each area, assign a severity level: OK, WARNING, or CRITICAL.
 
@@ -72,13 +62,17 @@ ${JSON.stringify(stats, null, 2)}
 ${JSON.stringify(storage, null, 2)}
 
 ## Queue Details (${queueDetails.length}${truncated ? ` of ${queues.length}` : ''} queues)
-${JSON.stringify(queueDetails, null, 2)}
+${JSON.stringify(
+  boundedRows(queueDetails, (q) => ({ ...q, total: totalJobs(q.counts) })),
+  null,
+  2
+)}
 
 ## Workers (${workers.length} registered)
-${JSON.stringify(workers, null, 2)}
+${JSON.stringify(boundedRows(workers), null, 2)}
 
 ## Cron Jobs (${crons.length} scheduled)
-${JSON.stringify(crons, null, 2)}
+${JSON.stringify(boundedRows(crons), null, 2)}
 
 ## Memory Stats
 ${JSON.stringify(memory, null, 2)}
@@ -92,7 +86,7 @@ Produce a report with these sections:
 4. **Workers** — Worker count and heartbeat freshness (stale if >60s ago)
 5. **Memory** — Collections near capacity limits
 6. **Cron Jobs** — Scheduled job status, any missed next_run times
-7. **Recommendations** — Prioritized list of actions to take`,
+7. **Recommendations** — Prioritized list of actions to take`),
               },
             },
           ],
@@ -114,17 +108,18 @@ Produce a report with these sections:
     { queue: z.string().describe('Queue name to debug') },
     async ({ queue }) => {
       try {
-        const [counts, paused, dlqStats, dlqPage, activeJobs, priorities] = await Promise.all([
-          backend.getJobCounts(queue),
-          backend.isPaused(queue),
-          backend.getDlqStats(queue),
-          backend.getDlqEntries(queue, { limit: 10 }),
-          backend.getJobs(queue, { state: 'active' }),
-          backend.getCountsPerPriority(queue),
-        ]);
+        const [counts, paused, dlqStats, dlqPage, activePage, priorities, limits] =
+          await Promise.all([
+            backend.getJobCounts(queue),
+            backend.isPaused(queue),
+            backend.getDlqStats(queue),
+            backend.getDlqEntries(queue, { limit: 10 }),
+            listJobsPage(backend, { queue, state: 'active', limit: 10 }),
+            backend.getCountsPerPriority(queue),
+            backend.getQueueLimits(queue),
+          ]);
 
-        const total =
-          counts.waiting + counts.delayed + counts.active + counts.completed + counts.failed;
+        const total = totalJobs(counts);
 
         return {
           description: `Deep diagnostic for queue "${queue}"`,
@@ -133,7 +128,7 @@ Produce a report with these sections:
               role: 'user' as const,
               content: {
                 type: 'text' as const,
-                text: `Analyze the following diagnostic data for bunqueue queue "${queue}" and identify any issues.
+                text: boundedPrompt(`Analyze the following diagnostic data for bunqueue queue "${queue}" and identify any issues.
 
 ## Job State Breakdown
 ${JSON.stringify(counts, null, 2)}
@@ -142,25 +137,37 @@ ${JSON.stringify(counts, null, 2)}
 - Paused: ${paused}
 - Total jobs: ${total}
 
-## Active Jobs (${activeJobs.length} currently processing)
-${JSON.stringify(activeJobs, null, 2)}
+## Queue Limits
+${JSON.stringify(limits, null, 2)}
+
+## Active Jobs (${counts.active} currently processing, showing ${activePage.count})
+${JSON.stringify(activePage, null, 2)}
 
 ## Dead Letter Queue (${dlqStats.total} entries, showing the oldest ${dlqPage.entries.length})
 Entries by failure reason: ${JSON.stringify(dlqStats.byReason)}
-${JSON.stringify(dlqPage.entries, null, 2)}
+${JSON.stringify(
+  boundedRows(dlqPage.entries, (entry) => ({
+    jobId: entry.job.id,
+    reason: entry.reason,
+    enteredAt: entry.enteredAt,
+    attemptCount: entry.attemptCount,
+  })),
+  null,
+  2
+)}
 
 ## Priority Distribution
-${JSON.stringify(priorities, null, 2)}
+${JSON.stringify(boundedValue(priorities).value, null, 2)}
 
 ---
 
 Analyze and report:
 1. **Queue Health** — Overall assessment (HEALTHY, DEGRADED, or UNHEALTHY)
-2. **Backlog Analysis** — Waiting-to-active ratio, is the queue growing?
-3. **Failure Analysis** — Failed count, DLQ reasons and error messages, common patterns
-4. **Stuck Jobs** — Active jobs that may be stalled (check startedAt timestamps)
-5. **Priority Issues** — Priority starvation (low-priority jobs not processed)
-6. **Recommendations** — Specific actions to resolve identified issues`,
+2. **Backlog Analysis** — Describe ready/delayed/dependency counts; growth requires observations over time
+3. **Failure Analysis** — Failed count and DLQ reasons; inspect error messages with bunqueue_get_dlq before identifying message patterns
+4. **Stuck Jobs** — Active age alone cannot establish a stall; inspect heartbeat/lease evidence
+5. **Priority Issues** — A snapshot cannot establish priority starvation
+6. **Recommendations** — Specific actions to resolve identified issues`),
               },
             },
           ],
@@ -189,22 +196,37 @@ Analyze and report:
         ]);
 
         const targetQueues = queue ? [queue] : allQueues.slice(0, MAX_QUEUES_IN_REPORT);
+        const totalQueues = queue ? 1 : allQueues.length;
         const queueDiagnostics = await Promise.all(
           targetQueues.map(async (q) => {
-            const [counts, paused, dlq] = await Promise.all([
+            const [counts, paused, dlq, limits] = await Promise.all([
               backend.getJobCounts(q),
               backend.isPaused(q),
               backend.getDlqStats(q),
+              backend.getQueueLimits(q),
             ]);
             const dlqByReason = Object.fromEntries(
               Object.entries(dlq.byReason).filter(([, count]) => count > 0)
             );
-            return { name: q, counts, paused, dlqEntries: dlq.total, dlqByReason };
+            return {
+              name: q,
+              counts,
+              total: totalJobs(counts),
+              paused,
+              limits,
+              dlqEntries: dlq.total,
+              dlqByReason,
+            };
           })
         );
 
         const problematic = queueDiagnostics.filter(
-          (q) => q.paused || q.dlqEntries > 0 || (q.counts.waiting > 0 && q.counts.active === 0)
+          (q) =>
+            q.paused ||
+            q.limits.rateLimited ||
+            q.limits.concurrencyMaxed ||
+            q.dlqEntries > 0 ||
+            (q.counts.waiting + q.counts.prioritized > 0 && q.counts.active === 0)
         );
 
         return {
@@ -216,32 +238,35 @@ Analyze and report:
               role: 'user' as const,
               content: {
                 type: 'text' as const,
-                text: `INCIDENT: Jobs are not being processed. Triage and resolve.
+                text: boundedPrompt(`INCIDENT: Jobs are not being processed. Triage and resolve.
+
+Queue scope: ${targetQueues.length} of ${totalQueues}; truncated: ${targetQueues.length < totalQueues}.
 
 ## System Overview
 ${JSON.stringify(stats, null, 2)}
 
 ## Workers (${workers.length} registered)
-${JSON.stringify(workers, null, 2)}
+${JSON.stringify(boundedRows(workers), null, 2)}
 
-## Queue Diagnostics (${queueDiagnostics.length} queues)
-${JSON.stringify(queueDiagnostics, null, 2)}
+## Queue Diagnostics (${queueDiagnostics.length} of ${totalQueues} queues)
+${JSON.stringify(boundedRows(queueDiagnostics, undefined, totalQueues), null, 2)}
 
 ## Flagged Queues (${problematic.length} problematic)
-${JSON.stringify(problematic, null, 2)}
+${JSON.stringify(boundedRows(problematic), null, 2)}
 
 ---
 
 Run through this checklist:
 
 ### Step 1: Worker Health
-- Are workers registered? (0 workers = root cause)
+- Are workers registered? Registration is optional; zero registered workers does not prove no consumers
 - Are heartbeats fresh? (stale if lastHeartbeat > 60s ago)
 - Are workers assigned to the affected queues?
 
 ### Step 2: Queue Status
 - Which queues are paused? (Use \`bunqueue_resume_queue\` to unpause)
-- Which have waiting > 0 but active = 0? (These are stuck)
+- Which have ready jobs and no active jobs? Check limits and consumers; this alone does not establish a stall
+- Are rate limits, concurrency limits, delays or dependencies holding jobs back?
 
 ### Step 3: Throughput
 - Is throughput zero or abnormally low?
@@ -252,7 +277,7 @@ Run through this checklist:
 - Are jobs failing repeatedly? (Use \`bunqueue_get_dlq\` for the errors, filtered by reason if useful)
 
 ### Step 5: Root Cause & Resolution
-Identify the most likely root cause and provide specific actions using bunqueue tools.`,
+Identify hypotheses supported by the observations and propose specific actions using bunqueue tools. Unknown causes must remain unknown.`),
               },
             },
           ],

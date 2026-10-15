@@ -1,5 +1,14 @@
 # Architecture Overview
 
+The optional [`bunqueue/agents`](./features/agent-integrations.md) boundary lives
+in `src/agents/`: a normalized turn consumer, structural Claude adapter, bounded
+progress journal and external-effect helper. It imports no provider or queue/
+workflow internals. A dedicated SQLite file stores sessions/effect uncertainty
+independently of engine persistence. Callers explicitly wire workflow identity,
+parsing, provider cancellation and session resume. Scheduling and compensation
+are unchanged; failed-step effects require caller reconciliation. The package's
+`./agents` export is Bun-only like `./workflow`.
+
 Production container packaging provides Alpine, Debian, Debian slim, and
 distroless variants of the same compiled server. Native image checks precede
 publication to Docker Hub and GHCR; the default remains Alpine. Images,
@@ -272,9 +281,15 @@ do not re-poll in a tight loop.
   bearer auth, Host/Origin checks, session registry, `Bun.serve` router).
   `toolSetup.ts`, `toolPolicy.ts`, `toolsets.ts`, `confirmGuard.ts`,
   `confirmImpact.ts` and `decisionModel.ts` own the opt-in agent features
-  (toolsets, confirmation, SystemOne decision model). `tools/` registers the 75
-  tools plus 3 opt-in workflow tools, with shared zod schemas in `schemas.ts`
-  and `cronOptions.ts`. `backend/embedded/` and `backend/tcp/` implement the
+  (toolsets, confirmation, SystemOne decision model). `tools/` registers the 79 primary
+  tools plus up to 3 opt-in workflow tools, with shared zod schemas in `schemas.ts`
+  and `cronOptions.ts`. `agentProfile.ts`, `capabilities.ts` and `doctor.ts`
+  resolve the agent preset, expose safe effective configuration and check
+  read-only readiness. `toolResults.ts`/`resultSchemas.ts` normalize outcomes
+  and schemas outside confirmation. `observationTools.ts`, `diagnostics.ts`,
+  `inspectionPage.ts`, `inspectionBounds.ts` and `jobObservation.ts` own bounded
+  scoped inspection; `promptHelpers.ts` bounds diagnostic prompt text.
+  `backend/embedded/` and `backend/tcp/` implement the
   `McpBackend` contract from `types/` (`adapter.ts`, `jobOptions.ts`,
   `inspection.ts`); both share `backend/jobOptions.ts`, `jobOptionsView.ts`,
   `dlqView.ts`, `dlqFilter.ts`, `limitsView.ts` and `serializers.ts`, and the TCP
@@ -599,6 +614,14 @@ observability remains isolated from durable scheduling state.
    application's Engine to run.
 
 See [Native MCP Server](./features/mcp-server.md).
+
+`scripts/mcp-eval/` contains a separate offline functional task harness, scenario
+fixtures, deterministic driver, result aggregation and complete catalog byte
+measurement. It connects a real MCP client to the production server factory,
+with a new temporary SQLite store and dynamic TCP port per fixture. Independent
+backend reads grade completion/accounting and required guard non-execution.
+The optional external-driver interface does not establish LLM performance.
+See [MCP evaluation](./features/mcp-evaluation.md).
 
 See [Job Lifecycle](./features/job-lifecycle.md) for the full state machine.
 
@@ -1234,7 +1257,7 @@ against on-disk SQLite) and asserts hard invariants — not just "it ran".
 
 ### Interfaces & configuration
 
-- [Native MCP Server](./features/mcp-server.md) — Exposes bunqueue to AI agents via the bunqueue-mcp binary over MCP stdio (default) or the opt-in Streamable HTTP transport (bearer auth, Host/Origin checks, one server per session), registering 75 tools, 5 resources, and 3 prompts backed by either an embedded QueueManager or a remote TCP server; opt-in toolset disclosure, confirmation of guarded calls, SystemOne decision models (Jev, Clef, Clef-flash, Kev 9B, Laya, DiffusionGemma Jev) and 3 workflow-engine tools (list/inspect executions, deliver signals).
+- [Native MCP Server](./features/mcp-server.md) — Exposes bunqueue to AI agents via the bunqueue-mcp binary over MCP stdio (default) or the opt-in Streamable HTTP transport (bearer auth, Host/Origin checks, one server per session), registering 79 primary tools, 5 resources, and 3 prompts backed by either an embedded QueueManager or a remote TCP server; opt-in toolset disclosure, confirmation of guarded calls, SystemOne decision models (Jev, Clef, Clef-flash, Kev 9B, Laya, DiffusionGemma Jev) and 3 workflow-engine tools (list/inspect executions, deliver signals).
 - [CLI](./features/cli.md) — The bunqueue executable: boots the server or acts as a thin one-shot TCP client that maps CLI verbs to msgpack protocol commands and renders responses.
 - [Configuration & Entrypoint](./features/configuration.md) — Config layer and process entrypoint: resolves and validates CLI/config-file/env/default precedence into typed config (an invalid setting stops startup, naming it), dispatches the bunqueue executable, and provides the Logger, VERSION, and Bun-only runtime guards.
 

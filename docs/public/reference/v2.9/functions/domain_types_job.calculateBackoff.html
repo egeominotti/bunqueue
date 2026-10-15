@@ -16,13 +16,19 @@
 <li class="">
 <div class="tsd-signature tsd-anchor-link" id="calculatebackoff"><span class="tsd-kind-call-signature">calculateBackoff</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">job</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><a href="#calculatebackoff" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Retry delay after a failure: always a finite number of milliseconds &gt;= 0, whatever
+the attempt count or a legacy job's stored values. <code>fixed</code> is the base with ±20%
+jitter; otherwise <code>base * 2^attempts</code> with -50%..+50% jitter. Both are capped at
+<code>backoff.maxDelay</code> (default 1 hour). A zero base retries at once for any attempt
+count (no <code>0 * 2^1024 = NaN</code>), and a NaN or missing base uses the 1000 ms default.</p>
+</div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li><span><span class="tsd-kind-parameter">job</span>: <a href="../interfaces/domain_types_job.Job.html" class="tsd-signature-type tsd-kind-interface">Job</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/job/state.ts#L37">domain/job/state.ts:37</a></li></ul></aside></div></li></ul></section></div>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/job/state.ts#L64">domain/job/state.ts:64</a></li></ul></aside></div></li></ul></section></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

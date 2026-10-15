@@ -44,6 +44,12 @@ checks, see [Canonical client parity](./features/client-runtime-parity.md).
 
 **Suggested reading order:** Architecture → Data Model → the feature docs for the area you are touching.
 
+For optional provider-independent session, progress and effect journaling, see
+[Agent Integrations](./features/agent-integrations.md).
+
+For offline real-MCP task checks and current complete descriptor measurements,
+see [MCP Evaluation](./features/mcp-evaluation.md).
+
 ---
 
 ## Feature reference (`features/`)
@@ -132,7 +138,7 @@ Each module has one file documenting its purpose, responsibilities, dependencies
 | Document                                                      | Purpose                                                                                                                                                                           |
 | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [CLI](./features/cli.md)                                      | The `bunqueue` executable: boots the server or acts as a thin one-shot TCP client that maps CLI verbs to msgpack protocol commands and renders responses.                         |
-| [Native MCP Server](./features/mcp-server.md)                 | Exposes bunqueue to AI agents via the `bunqueue-mcp` binary over MCP stdio or the opt-in Streamable HTTP transport, registering 75 tools, resources, and prompts backed by either an embedded engine or a remote TCP server; opt-in toolsets, guarded-call confirmation, SystemOne decision models and workflow-engine execution/signal tools. |
+| [Native MCP Server](./features/mcp-server.md)                 | Exposes bunqueue to AI agents via the `bunqueue-mcp` binary over MCP stdio or the opt-in Streamable HTTP transport, registering 79 primary tools, resources, and prompts backed by either an embedded engine or a remote TCP server; opt-in toolsets, guarded-call confirmation, SystemOne decision models and workflow-engine execution/signal tools. |
 | [bunqueue Cloud Integration](./features/cloud-integration.md) | Opt-in agent that pushes full server telemetry snapshots to the bunqueue.io dashboard over HTTP and receives whitelisted remote commands over WebSocket.                          |
 
 ---
@@ -164,6 +170,13 @@ generator separates cover definitions from rendering; `reference-seo.ts` adds
 current API canonicals, metadata and social images, while `sitemap.ts` owns
 sitemap priorities and `src/routeData.ts` removes a repeated brand suffix from
 page titles.
+After the Astro build, `docs/scripts/validate-discovery.ts` checks generated
+full-text coverage and executable examples, canonical HTML metadata, reference
+indexing rules, sitemaps, robots directives, and curated `public/llms.txt` links.
+Curated same-site links must target canonical HTML, with one exact resource
+exception for `https://bunqueue.dev/llms-full.txt`, whose generated content is
+validated first. Other text resources, query variants, and noncanonical paths
+remain invalid.
 Shared documentation navigation, reading styles and homepage onboarding live in
 `docs/src/components/` and `docs/src/styles/`, including the simulated hero
 queue in `home/HomeLedger.astro`, the Docker variant selector in

@@ -36,9 +36,22 @@ Uses the official @modelcontextprotocol/sdk for protocol compliance.</p>
 <h4 class="tsd-anchor-link" id="example-tcp-mode-remote-server">Example: TCP mode (remote server):<a href="#example-tcp-mode-remote-server" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><pre><code class="json"><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-9">&quot;mcpServers&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">    </span><span class="hl-9">&quot;bunqueue&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">      </span><span class="hl-9">&quot;command&quot;</span><span class="hl-1">: </span><span class="hl-7">&quot;bunx&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-9">&quot;args&quot;</span><span class="hl-1">: [</span><span class="hl-7">&quot;--package=bunqueue&quot;</span><span class="hl-1">, </span><span class="hl-7">&quot;bunqueue-mcp&quot;</span><span class="hl-1">],</span><br/><span class="hl-1">      </span><span class="hl-9">&quot;env&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">        </span><span class="hl-9">&quot;BUNQUEUE_MODE&quot;</span><span class="hl-1">: </span><span class="hl-7">&quot;tcp&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-9">&quot;BUNQUEUE_HOST&quot;</span><span class="hl-1">: </span><span class="hl-7">&quot;localhost&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-9">&quot;BUNQUEUE_PORT&quot;</span><span class="hl-1">: </span><span class="hl-7">&quot;6789&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-9">&quot;BUNQUEUE_TOKEN&quot;</span><span class="hl-1">: </span><span class="hl-7">&quot;secret&quot;</span><br/><span class="hl-1">      }</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
+<p>Two transports, independent of the connection mode:</p>
+<ul>
+<li>stdio (default): one client over stdin/stdout, as in the examples above</li>
+<li>http (opt-in): MCP Streamable HTTP for several concurrent clients, one
+session each, sharing a single backend</li>
+</ul>
+</div>
+<div class="tsd-tag-example">
+<h4 class="tsd-anchor-link" id="example-streamable-http-transport-binds-1270016791-path-mcp">Example: Streamable HTTP transport (binds 127.0.0.1:6791, path /mcp):<a href="#example-streamable-http-transport-binds-1270016791-path-mcp" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><pre><code class="sh"><span class="hl-6">BUNQUEUE_MCP_TRANSPORT</span><span class="hl-1">=</span><span class="hl-7">http</span><span class="hl-1"> </span><span class="hl-6">BUNQUEUE_MCP_HTTP_TOKEN</span><span class="hl-1">=</span><span class="hl-7">secret</span><span class="hl-1"> </span><span class="hl-3">bunx</span><span class="hl-1"> </span><span class="hl-0">--package=bunqueue</span><span class="hl-1"> </span><span class="hl-7">bunqueue-mcp</span><br/><span class="hl-4"># stderr: bunqueue MCP server started (mode: embedded, transport: http,</span><br/><span class="hl-4">#         url: http://127.0.0.1:6791/mcp, version: X)</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Clients send <code>Authorization: Bearer secret</code>. A non-loopback
+BUNQUEUE_MCP_HTTP_HOST requires BUNQUEUE_MCP_HTTP_TOKEN.</p>
 </div></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/mcp/index.ts#L51">mcp/index.ts:51</a></li></ul></aside></div></li></ul></section></div>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/mcp/index.ts#L65">mcp/index.ts:65</a></li></ul></aside></div></li></ul></section></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

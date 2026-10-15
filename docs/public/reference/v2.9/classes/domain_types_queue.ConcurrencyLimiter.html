@@ -12,10 +12,15 @@
 <li><a href="" aria-current="page">ConcurrencyLimiter</a></li></ul>
 <h1>Class ConcurrencyLimiter</h1></div>
 <section class="tsd-panel tsd-comment">
-<div class="tsd-comment tsd-typography"><p>Concurrency limiter</p>
+<div class="tsd-comment tsd-typography"><p>Concurrency limiter: admits at most <code>limit</code> jobs of a queue at once.</p>
+<p>It records which job ids hold a slot rather than a bare counter, so acquire
+and release are symmetric per job: releasing a job that holds no slot (one
+that was released already, or that is not active) is a no-op and can never
+open a phantom slot. A limiter created while jobs of the queue are already
+active is seeded with their ids, so they count toward the new limit.</p>
 </div></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L84">domain/types/queue.ts:84</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L94">domain/types/queue.ts:94</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -40,15 +45,16 @@
 <h3 class="tsd-anchor-link" id="constructor"><span>constructor</span><a href="#constructor" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li class="">
-<div class="tsd-signature tsd-anchor-link" id="constructorconcurrencylimiter"><span class="tsd-signature-keyword">new</span> <span class="tsd-kind-constructor-signature">ConcurrencyLimiter</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">limit</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="" class="tsd-signature-type tsd-kind-class">ConcurrencyLimiter</a><a href="#constructorconcurrencylimiter" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-signature tsd-anchor-link" id="constructorconcurrencylimiter"><span class="tsd-signature-keyword">new</span> <span class="tsd-kind-constructor-signature">ConcurrencyLimiter</span><span class="tsd-signature-symbol">(</span><br/>    <span class="tsd-kind-parameter">limit</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">activeJobIds</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Iterable</span><span class="tsd-signature-symbol">&lt;</span><a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">,</span><br/><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="" class="tsd-signature-type tsd-kind-class">ConcurrencyLimiter</a><a href="#constructorconcurrencylimiter" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
-<li><span><span class="tsd-kind-parameter">limit</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
+<li><span><span class="tsd-kind-parameter">limit</span>: <span class="tsd-signature-type">number</span></span></li>
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">activeJobIds</span>: <span class="tsd-signature-type">Iterable</span><span class="tsd-signature-symbol">&lt;</span><a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">ConcurrencyLimiter</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L87">domain/types/queue.ts:87</a></li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L97">domain/types/queue.ts:97</a></li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -62,7 +68,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L106">domain/types/queue.ts:106</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L117">domain/types/queue.ts:117</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="getlimit"><span>get<wbr/>Limit</span><a href="#getlimit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -73,25 +79,29 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L111">domain/types/queue.ts:111</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L122">domain/types/queue.ts:122</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="release"><span>release</span><a href="#release" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li class="">
-<div class="tsd-signature tsd-anchor-link" id="release-1"><span class="tsd-kind-call-signature">release</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#release-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-signature tsd-anchor-link" id="release-1"><span class="tsd-kind-call-signature">release</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">jobId</span><span class="tsd-signature-symbol">:</span> <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#release-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Release a slot</p>
+<div class="tsd-comment tsd-typography"><p>Release the slot held by <code>jobId</code>; a job without a slot changes nothing.</p>
 </div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">jobId</span>: <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L99">domain/types/queue.ts:99</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L112">domain/types/queue.ts:112</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="setlimit"><span>set<wbr/>Limit</span><a href="#setlimit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li class="">
 <div class="tsd-signature tsd-anchor-link" id="setlimit-1"><span class="tsd-kind-call-signature">setLimit</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">limit</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#setlimit-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Update limit</p>
+<div class="tsd-comment tsd-typography"><p>Update limit; the jobs holding a slot keep it.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -99,18 +109,22 @@
 <li><span><span class="tsd-kind-parameter">limit</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L116">domain/types/queue.ts:116</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L127">domain/types/queue.ts:127</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="tryacquire"><span>try<wbr/>Acquire</span><a href="#tryacquire" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li class="">
-<div class="tsd-signature tsd-anchor-link" id="tryacquire-1"><span class="tsd-kind-call-signature">tryAcquire</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><a href="#tryacquire-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-signature tsd-anchor-link" id="tryacquire-1"><span class="tsd-kind-call-signature">tryAcquire</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">jobId</span><span class="tsd-signature-symbol">:</span> <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><a href="#tryacquire-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Try to acquire a slot</p>
+<div class="tsd-comment tsd-typography"><p>Try to acquire a slot for <code>jobId</code>; a job that already holds one keeps it.</p>
 </div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">jobId</span>: <a href="../types/domain_types_job.JobId.html" class="tsd-signature-type tsd-kind-type-alias">JobId</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L90">domain/types/queue.ts:90</a></li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in <a href="https://github.com/egeominotti/bunqueue/blob/main/src/domain/types/queue.ts#L105">domain/types/queue.ts:105</a></li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

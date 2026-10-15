@@ -8,6 +8,7 @@
  *
  *   bun scripts/agent-sdks/claude-agent-live.ts
  *
+ * Model selection comes entirely from the user's Claude CLI configuration.
  * Credentials come from the local Claude Code login, or from ANTHROPIC_API_KEY.
  * The agent is confined to a fresh temporary directory; nothing in this repo is touched.
  */
@@ -18,8 +19,12 @@ import { join } from 'node:path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { Engine, Workflow } from '../../src/client/workflow';
 import { shutdownManager } from '../../src/client';
-
-const MODEL = Bun.env.AGENT_MODEL ?? 'claude-sonnet-5';
+import {
+  AgentJournal,
+  consumeAgentTurn,
+  mapClaudeMessages,
+  type AgentTurnOptions,
+} from '../../src/agents';
 
 function log(scenario: string, msg: string) {
   console.log(`[${scenario}] ${msg}`);
@@ -29,29 +34,43 @@ function log(scenario: string, msg: string) {
  * One agent turn. Returns the session id so the workflow can journal it, which is what
  * makes a later turn a continuation rather than a fresh conversation.
  */
-async function agentTurn(prompt: string, cwd: string, resume?: string) {
+async function agentTurn(
+  prompt: string,
+  cwd: string,
+  options: AgentTurnOptions<string> & { resume?: string } = {}
+) {
+  const abortController = new AbortController();
+  if (options.signal?.aborted) abortController.abort();
   const q = query({
     prompt,
     options: {
-      model: MODEL,
       cwd,
       maxTurns: 6,
       allowedTools: ['Read', 'Write', 'Edit'],
       permissionMode: 'bypassPermissions',
-      ...(resume ? { resume } : {}),
+      abortController,
+      ...(options.resume ? { resume: options.resume } : {}),
     },
   });
 
-  let sessionId = '';
-  let text = '';
-  for await (const message of q) {
-    if (message.type === 'system' && message.subtype === 'init') sessionId = message.session_id;
-    if (message.type === 'result' && message.subtype === 'success') {
-      text = message.result;
-      sessionId = message.session_id;
-    }
+  try {
+    const result = await consumeAgentTurn(mapClaudeMessages(q), {
+      ...options,
+      schema: options.schema ?? {
+        parse(value: unknown) {
+          if (typeof value !== 'string') throw new Error('Expected text output');
+          return value;
+        },
+      },
+      cancel: () => {
+        abortController.abort();
+        q.close();
+      },
+    });
+    return { sessionId: result.sessionId, text: result.output };
+  } finally {
+    q.close();
   }
-  return { sessionId, text };
 }
 
 async function settle(engine: Engine, id: string, want: string, ms = 180_000) {
@@ -67,6 +86,7 @@ async function settle(engine: Engine, id: string, want: string, ms = 180_000) {
 async function scenario1() {
   const S = 'S1';
   const cwd = await mkdtemp(join(tmpdir(), 'bq-agent-'));
+  const agentJournal = new AgentJournal(join(cwd, 'agent-turns.sqlite'));
   await writeFile(join(cwd, 'VERSION.txt'), 'lodash 4.17.20\n');
 
   // Stands in for the forge. Real code would call the GitHub API here.
@@ -75,13 +95,13 @@ async function scenario1() {
   const flow = new Workflow<{ repo: string }>('dependency-upgrade')
     .step(
       'create-branch',
-      async (ctx) => {
+      (ctx) => {
         forge.branches.add(`${ctx.input.repo}#bot/upgrade`);
         log(S, `branch created (${forge.branches.size} open)`);
         return { branch: 'bot/upgrade' };
       },
       {
-        compensate: async (ctx) => {
+        compensate: (ctx) => {
           forge.branches.delete(`${ctx.input.repo}#bot/upgrade`);
           log(S, 'compensate: branch deleted');
         },
@@ -89,22 +109,29 @@ async function scenario1() {
     )
     .step(
       'open-draft-pr',
-      async () => {
+      () => {
         forge.prs.set('PR-7', 'open');
         log(S, 'draft PR opened');
         return { pr: 'PR-7' };
       },
       {
-        compensate: async () => {
+        compensate: () => {
           forge.prs.set('PR-7', 'closed');
           log(S, 'compensate: PR closed');
         },
       }
     )
-    .step('agent-edit', async () => {
+    .step('agent-edit', async (ctx) => {
       const r = await agentTurn(
         'Edit VERSION.txt so it reads exactly "lodash 4.17.21". Then reply with the single word DONE.',
-        cwd
+        cwd,
+        {
+          journal: agentJournal,
+          executionId: ctx.executionId,
+          stepId: 'agent-edit',
+          signal: ctx.signal,
+          resume: agentJournal.getSession(ctx.executionId, 'agent-edit') ?? undefined,
+        }
       );
       log(S, `agent session ${r.sessionId.slice(0, 8)} replied: ${r.text.trim().slice(0, 40)}`);
       return { sessionId: r.sessionId, reply: r.text };
@@ -112,7 +139,7 @@ async function scenario1() {
     .waitFor('code-review', { timeout: 600_000 })
     .step(
       'merge',
-      async (ctx) => {
+      (ctx) => {
         const decision = ctx.signals['code-review'] as { approved: boolean };
         if (!decision.approved) throw new Error('review rejected the upgrade');
         return { merged: true };
@@ -147,6 +174,7 @@ async function scenario1() {
     `rollbackStatus=${exec?.rollbackStatus} prs=${forge.prs.get('PR-7')} branches=${forge.branches.size}`
   );
   await engine.close(true);
+  agentJournal.close();
   return ok;
 }
 
@@ -157,21 +185,30 @@ async function scenario1() {
 async function scenario2() {
   const S = 'S2';
   const cwd = await mkdtemp(join(tmpdir(), 'bq-agent-'));
+  const agentJournal = new AgentJournal(join(cwd, 'agent-turns.sqlite'));
 
   const flow = new Workflow('agent-two-phase')
-    .step('turn-1', async () => {
-      const r = await agentTurn('Remember this codeword: FLAMINGO. Reply with just: OK', cwd);
+    .step('turn-1', async (ctx) => {
+      const r = await agentTurn('Remember this codeword: FLAMINGO. Reply with just: OK', cwd, {
+        journal: agentJournal,
+        executionId: ctx.executionId,
+        stepId: 'turn-1',
+        signal: ctx.signal,
+        resume: agentJournal.getSession(ctx.executionId, 'turn-1') ?? undefined,
+      });
       log(S, `turn 1 session ${r.sessionId.slice(0, 8)} → ${r.text.trim().slice(0, 30)}`);
       return { sessionId: r.sessionId, text: r.text };
     })
     .step('turn-2', async (ctx) => {
       const prev = ctx.steps['turn-1'] as { sessionId: string };
       // The id came out of the journal, not out of a variable in this process.
-      const r = await agentTurn(
-        'What was the codeword? Reply with just the word.',
-        cwd,
-        prev.sessionId
-      );
+      const r = await agentTurn('What was the codeword? Reply with just the word.', cwd, {
+        journal: agentJournal,
+        executionId: ctx.executionId,
+        stepId: 'turn-2',
+        signal: ctx.signal,
+        resume: agentJournal.getSession(ctx.executionId, 'turn-2') ?? prev.sessionId,
+      });
       log(S, `turn 2 session ${r.sessionId.slice(0, 8)} → ${r.text.trim().slice(0, 30)}`);
       return { sessionId: r.sessionId, text: r.text };
     });
@@ -184,6 +221,7 @@ async function scenario2() {
     const e = engine.getExecution(run.id);
     log(S, `state=${e?.state} err=${JSON.stringify(e?.steps)}`);
     await engine.close(true);
+    agentJournal.close();
     return false;
   }
 
@@ -195,6 +233,7 @@ async function scenario2() {
   log(S, `same session=${t2.sessionId === t1.sessionId} remembered=${remembered}`);
 
   await engine.close(true);
+  agentJournal.close();
   return remembered;
 }
 

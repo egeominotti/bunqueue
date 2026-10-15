@@ -13,7 +13,7 @@ head:
   - tag: meta
     attrs:
       property: og:description
-      content: 75 MCP tools for AI agents over stdio or Streamable HTTP. Add jobs, schedule crons, retry failures, monitor queues. Optional toolsets, confirmations and decision models.
+      content: 79 primary MCP tools for AI agents over stdio or Streamable HTTP. Add jobs, schedule crons, retry failures, monitor queues. Optional toolsets, confirmations and decision models.
   - tag: meta
     attrs:
       name: keywords
@@ -30,9 +30,25 @@ import HttpHandlerFlow from '../../../components/HttpHandlerFlow.astro';
   <p class="bq-hero-sub">Connect Claude, Cursor or any MCP client to bunqueue, then ask in plain language: add jobs, schedule crons, retry failures, check on your queues. No code to write.</p>
 </div>
 
-[MCP](https://modelcontextprotocol.io) (Model Context Protocol) is the standard way for AI agents to call tools. bunqueue includes an MCP server, `bunqueue-mcp`, with 75 tools that cover the whole queue: jobs, queues, crons, retries, limits, flows, workers, webhooks and monitoring.
+[MCP](https://modelcontextprotocol.io) (Model Context Protocol) is the standard way for AI agents to call tools. bunqueue includes an MCP server, `bunqueue-mcp`, with 79 primary tools that cover the whole queue: jobs, queues, crons, retries, limits, flows, workers, webhooks and monitoring.
 
 ## Start in two minutes
+
+For an agent session, set `BUNQUEUE_MCP_PROFILE=agent` in the MCP environment.
+It defaults absent toolset/confirmation settings to `dynamic`/`destructive`;
+explicit settings take precedence. It enables no provider. With Claude Code:
+
+```bash
+claude mcp add bunqueue -e BUNQUEUE_MCP_PROFILE=agent -- bunx --package=bunqueue bunqueue-mcp
+```
+
+Use the same environment for `bunqueue-mcp --doctor --json` before connecting.
+Exit 0 reports configuration/filesystem readiness and a read-only TCP probe;
+exit 1 reports invalid settings or an unavailable broker. Doctor starts no MCP
+transport, worker, provider or SQLite connection. Embedded recovery/engine health
+is not tested. Workflow `schemaChecked: false` means startup still validates the
+workflow store and signal availability. Load `monitoring` and call
+`bunqueue_get_capabilities` for the running server's effective configuration.
 
 <Steps>
 
@@ -110,7 +126,7 @@ You never call tools yourself: the agent picks them. The full list is in the [to
 
 <McpArchitecture />
 
-The MCP server works in one of two modes. All 75 tools work in both, including [HTTP handlers](#process-jobs-with-http-handlers): in TCP mode their workers connect to your server and process its jobs, and the MCP process never opens a local database, even with `DATA_PATH` set. Two differences remain: `bunqueue_get_stats` reports push and pull rates in TCP mode, and prioritized, waiting-for-children, lifetime and cron totals in embedded mode; and [workflow approvals](#workflow-approvals) need TCP.
+The MCP server works in one of two modes. All 79 primary tools work in both, including [HTTP handlers](#process-jobs-with-http-handlers): in TCP mode their workers connect to your server and process its jobs, and the MCP process never opens a local database, even with `DATA_PATH` set. Two differences remain: `bunqueue_get_stats` reports push and pull rates in TCP mode, and prioritized, waiting-for-children, lifetime and cron totals in embedded mode; and [workflow approvals](#workflow-approvals) need TCP.
 
 | | **Embedded** (default) | **TCP** |
 |---|---|---|
@@ -162,11 +178,55 @@ Handlers live inside the MCP server process. With the default stdio setup they s
 
 ## Optional: lighter and safer agents
 
+Current context measurements include the complete descriptors with annotations,
+input schemas and output schemas. The default tools/list response is 144,912
+UTF-8 bytes (~36,228 tokens); the agent preset's initial two-tool catalog is
+5,264 bytes (~1,316). These estimates use ceil(bytes/4), not a model tokenizer.
+See [evaluation methods/results](https://github.com/egeominotti/bunqueue/tree/main/scripts/mcp-eval).
+
+## Read structured outcomes and bounded state
+
+Tools keep legacy text and add `structuredContent` with `outcome`, `data`, optional
+`error` and `suggestedAction`. Outcomes are `success`, `not_applied`,
+`confirmation_required`, `error`. Check error code/retryable/outcomeUncertain;
+uncertain writes require inspection/reconciliation before retry. SDK validation
+failures before the handler may have only text and `isError`.
+
+After loading `jobs`, use `bunqueue_observe_job({ jobId, timeoutMs: 0 })` for a
+snapshot, or timeout up to 30000 ms for read-only polling. Completed/failed jobs
+are terminal; unknown/removed, timeout and cancellation never mean success.
+Empty/null results still represent completion. Failure details may be unavailable:
+follow the queue-scoped DLQ suggestions. `pollIntervalMs` accepts 25–1000 ms.
+Deadline/abort stops polling, though an already-issued backend read may finish.
+
+After loading `queues`, use `bunqueue_list_jobs_page({ queue, limit: 20,
+offset: 0 })`, then follow `nextOffset` until `hasMore` is false. Limits are 1–100,
+payloads are omitted unless `includeData: true`, and truncation is explicit.
+The serialized page data object, including queue/continuation metadata, is capped
+at 64 KiB (`maxBytes:65536`). The full MCP result includes legacy text, structured
+data and protocol overhead, so its finite wire size can exceed that page-data cap.
+Offsets are live rather than a snapshot; concurrent changes can shift rows.
+`monitoring` supplies `bunqueue_diagnose_queue({ queue })`: complete state counts,
+observed limits/blockers and safe samples. It does not infer root cause or missing
+workers. Legacy `get_jobs` and `wait_for_job` remain available.
+
+Two scoped resource templates expose the same safe reads:
+`bunqueue://queue/{queue}` and
+`bunqueue://queue/{queue}/jobs/{state}/{offset}/{limit}`.
+Encode the queue with `encodeURIComponent`, use state `all` or a supported state,
+and limit 1–100. Prefer these when a global resource would load irrelevant queues.
+
+MCP sessions are process-local. For application-owned durable turns and redacted
+progress replay, use the optional [`bunqueue/agents` journal](/guide/workflow/agent-sdks/)
+inside a [durable workflow](/guide/workflow/). Supply run/step identity explicitly;
+stable business call IDs and reconciliation protect uncertain remote effects.
+Provider session IDs require their local transcript/workspace artifacts too.
+
 Three features, all off by default. You turn them on in the server config, and they work well together.
 
 | Feature | Turn it on | What you get |
 |---------|------------|--------------|
-| [Load only the tools you need](#load-only-the-tools-the-agent-needs) | `BUNQUEUE_MCP_TOOLSETS=dynamic` | The agent loads groups of tools on demand: about 1,300 to 4,600 tokens per request instead of about 16,000 |
+| [Load only the tools you need](#load-only-the-tools-the-agent-needs) | `BUNQUEUE_MCP_TOOLSETS=dynamic` | Complete catalog plus one group: 11,185–31,267 bytes (~2,797–7,817 tokens, bytes/4 approximation) |
 | [Confirm destructive operations](#confirm-destructive-operations) | `BUNQUEUE_MCP_CONFIRM=destructive` | Operations that delete data for good ask you first, with their exact impact |
 | [Decision models](#decision-models-jev-clef-clef-flash-kev-9b-laya) | `BUNQUEUE_MCP_DECISION_PROVIDER` | A small, fast model picks tools from plain language and double-checks destructive requests |
 
@@ -181,18 +241,18 @@ claude mcp add bunqueue \
 
 ### Load only the tools the agent needs
 
-Every tool an agent can see costs context: the 75 descriptions add up to about 16,000 tokens on every request, before the agent reads your question. Toolsets cut that down.
+Every complete tool descriptor costs context. Current measurements above include schemas and annotations; toolsets let clients load only the groups they need. Actual context depends on how the client retains tool descriptions and disclosure responses.
 
 | `BUNQUEUE_MCP_TOOLSETS` | The agent sees |
 |-------------------------|----------------|
-| unset, or `all` | All 75 tools, up to 78 with the [workflow tools](#workflow-approvals) (the default) |
+| unset, or `all` | All 79 primary tools, up to 82 with the [workflow tools](#workflow-approvals) (the default) |
 | `queues,dlq` | Only those groups. Works with every client |
 | `dynamic` | A short catalog of the groups. The agent loads the ones it needs |
 | `dynamic,monitoring` | The catalog, with `monitoring` already loaded |
 
 The groups are `jobs`, `job-control`, `processing`, `queues`, `dlq`, `cron`, `limits`, `flows`, `workers`, `webhooks` and `monitoring` (plus `workflows` when [workflow tools](#workflow-approvals) are on).
 
-In `dynamic` mode the agent starts with two tools: `bunqueue_enable_toolsets`, which loads groups, and `bunqueue_call_tool`, for clients that do not refresh their tool list after a group is loaded. The catalog alone costs about 850 tokens; with one group loaded, 1,300 to 4,600 depending on the group (about 1,800 for a typical group, close to 90% less than the full list; `jobs` and `flows` are the largest).
+In `dynamic` mode the agent starts with `bunqueue_enable_toolsets` and `bunqueue_call_tool` (the fallback for clients that do not refresh their list). The complete catalog costs 5,264 bytes; with one group loaded, tools/list is 11,185–31,267 bytes. Actual disclosure responses add 19,645–82,862 bytes because they include both legacy text and structured descriptors. Older ~850/~16,000 token estimates predated output schemas. Dynamic discovery and optional workflow tools are counted separately from the 79 primary tools.
 
 <details>
 <summary>How well does the agent pick the right group?</summary>
@@ -439,6 +499,7 @@ Set them in the `env` block of the server config. An invalid `BUNQUEUE_MCP_*` va
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BUNQUEUE_MCP_TOOLSETS` | all tools | `all`, a list of groups, or `dynamic` (optionally followed by groups to preload) |
+| `BUNQUEUE_MCP_PROFILE` | unset | `agent` supplies dynamic/destructive defaults only for absent explicit settings |
 | `BUNQUEUE_MCP_CONFIRM` | off | `destructive` to require confirmation for the nine destructive tools (ten with workflow tools) |
 | `BUNQUEUE_MCP_DECISION_PROVIDER` | none | `typesafe`, `cloudflare` or `systemone` |
 | `BUNQUEUE_MCP_DECISION_MODEL` | `jev-latest` / `clef-flash` | Model id; required for `systemone` |

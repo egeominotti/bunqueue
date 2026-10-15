@@ -18,6 +18,57 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## [2.9.15] - 2026-10-15
+
+### Added
+
+- **Agent-oriented MCP inspection:** `bunqueue_diagnose_queue` accounts for all
+  queue states and reports observed limits and blockers, `bunqueue_observe_job`
+  distinguishes completion, failure and unknown jobs with bounded polling, and
+  `bunqueue_list_jobs_page` provides bounded offset pages with explicit projection
+  and truncation metadata. Scoped queue/job resource templates avoid broad reads.
+- **Structured MCP contracts:** registered tools expose policy annotations,
+  output schemas and structured outcomes alongside existing text responses.
+  Dynamic discovery includes complete descriptors, and
+  `bunqueue_get_capabilities` reports effective server settings and tools.
+- **Agent preset and readiness checks:** `BUNQUEUE_MCP_PROFILE=agent` enables
+  dynamic discovery and destructive-operation confirmation when those settings
+  were not explicitly supplied. `bunqueue-mcp --doctor --json` checks configuration,
+  paths and TCP readiness without starting consumers or opening workflow SQLite.
+- **Optional `bunqueue/agents` entrypoint:** provider-neutral turn consumption,
+  a Claude message adapter and an independent SQLite journal support durable
+  session checkpoints, bounded progress replay and stable external-effect keys.
+  Pending effects require reconciliation before a retry; provider artifacts and
+  cooperative cancellation remain application responsibilities.
+- **Executable integration guidance and offline evaluations:** Claude, OpenAI
+  Agents and Mastra examples use caller/CLI model configuration. Five real-MCP
+  scenarios run against embedded and TCP backends with independent state checks.
+  Catalog measurements include schemas and annotations; deterministic task scores
+  are not live-model success rates. Workflow/agent skills and public API references
+  now expose the integration contracts.
+
+### Fixed
+
+- MCP diagnostic prompts omitted prioritized, paused and dependency-blocked work
+  from their accounting and could imply an unobserved cause. They now report
+  complete counts, observed limits and bounded samples.
+- MCP write errors after a potentially committed operation could look safely
+  retryable. Structured errors preserve uncertainty and require reconciliation;
+  pre-dispatch refusals remain distinguishable from attempted writes.
+- Agent examples could silently accept provider errors or interrupted streams,
+  share effect state between concurrent runs, or replace an explicit structured
+  `null` result with text. Typed terminal outcomes, per-run effect identity and
+  output validation now preserve those contracts.
+- Documentation discovery validation accepts the independently validated
+  `llms-full.txt` resource while continuing to reject non-canonical page links
+  and unknown text resources.
+
+### Compatibility
+
+- Queue scheduling, queue persistence and workflow engine behavior remain unchanged.
+  Existing MCP listing/wait tools and text results remain available. The agents
+  helper is optional and Bun-only, imports no provider SDK and uses its own database.
+
 ## [2.9.14] - 2026-10-14
 
 ### Fixed

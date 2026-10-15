@@ -527,6 +527,11 @@ variant build inputs instead of a missing file. It does
 not install SDK toolchains or copy credentials into the core test image.
 `Dockerfile.test.dockerignore` limits the build context to those inputs.
 
+The image also includes the real discovery validator and API version manifest.
+Its hermetic regression builds a temporary documentation tree and executes that
+validator, checking the known full-text resource and rejecting invalid links or
+missing content without requiring an Astro build or documentation dependencies.
+
 Regression helpers that poll state must fail closed when their deadline expires.
 Tests concerned with failure classification rather than scheduling explicitly
 set `backoff: 0`, so randomized production retry jitter cannot turn an incomplete

@@ -1,13 +1,16 @@
 /**
- * Registers the 75 bunqueue MCP tools and applies the opt-in features:
- * BUNQUEUE_MCP_TOOLSETS (tool disclosure), BUNQUEUE_MCP_CONFIRM (annotations and
+ * Registers the bunqueue MCP tools and applies the opt-in features:
+ * BUNQUEUE_MCP_TOOLSETS (tool disclosure), BUNQUEUE_MCP_CONFIRM (guards for
  * confirmation of destructive calls), BUNQUEUE_MCP_DECISION_* (decision model) and
  * BUNQUEUE_MCP_WORKFLOW_DB (workflow engine tools, toolset `workflows`).
- * With none of them set the tool list is exactly the historical one.
+ * All tools always carry annotations and structured results. Without opt-ins all
+ * tools are disclosed and destructive calls run immediately.
  */
 
 import type { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpBackend } from './adapter';
+import { agentProfileFromEnv } from './agentProfile';
+import { registerCapabilities } from './capabilities';
 import { applyConfirmGuard, confirmModeFromEnv, decisionThresholdFromEnv } from './confirmGuard';
 import { DecisionModel, decisionConfigFromEnv } from './decisionModel';
 import type { HttpHandlerRegistry } from './httpHandler';
@@ -19,6 +22,7 @@ import { registerHandlerTools } from './tools/handlerTools';
 import { registerJobMgmtTools } from './tools/jobMgmtTools';
 import { registerJobTools } from './tools/jobTools';
 import { registerMonitoringTools } from './tools/monitoringTools';
+import { registerObservationTools } from './tools/observationTools';
 import { registerQueueTools } from './tools/queueTools';
 import { registerRateLimitTools } from './tools/rateLimitTools';
 import { registerWebhookTools } from './tools/webhookTools';
@@ -26,6 +30,7 @@ import { registerWorkerMgmtTools } from './tools/workerMgmtTools';
 import { registerWorkflowTools } from './tools/workflowTools';
 import { applyToolsets, assertPolicyCoverage, toolsetModeFromEnv } from './toolsets';
 import { workflowToolsFromEnv } from './workflow/config';
+import { applyToolResults } from './toolResults';
 
 export interface ToolSetupOptions {
   env?: NodeJS.ProcessEnv;
@@ -41,6 +46,7 @@ export interface ToolSetupOptions {
 
 /** The validated opt-in configuration shared by every server built from it. */
 export interface ToolSettings {
+  profile: 'default' | 'agent';
   toolsets: ReturnType<typeof toolsetModeFromEnv>;
   confirm: boolean;
   threshold: number;
@@ -56,7 +62,7 @@ export function resolveToolSettings(
   backend: McpBackend,
   options: Pick<ToolSetupOptions, 'env' | 'decision'> = {}
 ): ToolSettings {
-  const env = options.env ?? process.env;
+  const { env, profile } = agentProfileFromEnv(options.env ?? process.env);
   const toolsets = toolsetModeFromEnv(env);
   const confirm = confirmModeFromEnv(env);
   const threshold = decisionThresholdFromEnv(env);
@@ -77,7 +83,7 @@ export function resolveToolSettings(
       'bunqueue MCP: a decision model is configured but unused; enable BUNQUEUE_MCP_CONFIRM=destructive or BUNQUEUE_MCP_TOOLSETS=dynamic\n'
     );
   }
-  return { toolsets, confirm, threshold, decision, workflows };
+  return { profile, toolsets, confirm, threshold, decision, workflows };
 }
 
 /** Record every tool registered through server.tool() while `register` runs. */
@@ -104,8 +110,8 @@ export function setupTools(
   handlerRegistry: HttpHandlerRegistry,
   options: ToolSetupOptions = {}
 ): Map<string, RegisteredTool> {
-  const { toolsets, confirm, threshold, decision, workflows } =
-    options.settings ?? resolveToolSettings(backend, options);
+  const settings = options.settings ?? resolveToolSettings(backend, options);
+  const { toolsets, confirm, threshold, decision, workflows } = settings;
 
   const tools = captureTools(server, () => {
     registerJobTools(server, backend);
@@ -118,12 +124,13 @@ export function setupTools(
     registerWebhookTools(server, backend);
     registerWorkerMgmtTools(server, backend);
     registerMonitoringTools(server, backend);
+    registerObservationTools(server, backend);
+    registerCapabilities(server, backend, settings);
     registerFlowTools(server, backend);
     registerHandlerTools(server, handlerRegistry);
     if (workflows) registerWorkflowTools(server, backend, workflows);
   });
 
-  if (!confirm && toolsets.kind === 'all' && !decision) return tools;
   assertPolicyCoverage(tools);
   if (confirm) {
     applyConfirmGuard(server, tools, backend, {
@@ -132,6 +139,8 @@ export function setupTools(
       impact: { workflows: workflows?.db },
     });
   }
-  applyToolsets(server, tools, toolsets, decision);
+  applyToolResults(tools);
+  const discovery = captureTools(server, () => applyToolsets(server, tools, toolsets, decision));
+  applyToolResults(discovery);
   return tools;
 }

@@ -1,5 +1,5 @@
 /**
- * Builds one fully registered bunqueue McpServer: the 75 tools (plus the optional
+ * Builds one fully registered bunqueue McpServer: the 79 tools (plus the optional
  * workflow tools) with their opt-in features (see toolSetup.ts), the resources and
  * the prompts. stdio uses a single server; the HTTP transport calls this once per
  * session, every server sharing the same backend and HTTP handler registry.
@@ -23,7 +23,7 @@ export function createMcpServer(
     version: VERSION,
   });
 
-  // Register all tools (75, plus 3 optional workflow tools) and the opt-in features
+  // Register all tools (79, plus 3 optional workflow tools) and the opt-in features
   // (see toolSetup.ts); throws on invalid opt-in settings
   setupTools(server, backend, handlerRegistry, options);
 
