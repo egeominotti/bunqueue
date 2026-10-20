@@ -253,18 +253,6 @@ head:
   between two idle checkpoints around each suite command, so the growth
   signal no longer compares samples from different build and test steps.
 
-### Documentation
-
-- **agentvm on the homepage.** A new section after AI agents presents
-  [agentvm](https://github.com/egeominotti/agentvm), a separate project by the
-  bunqueue author that runs Claude Code agents in parallel on a Mac, each in
-  its own disposable Debian VM. It shows the quickstart command and its
-  requirements, a seven-step tour (install, launch, work, all VMs, save,
-  snapshots, resources) that pairs every screenshot of the agentvm README with
-  how that part works, the internals and the measured figures. A banner with
-  a screenshot opens the hero, above the license and the other announcements,
-  and links to it.
-
 ## [2.9.13] - 2026-10-09
 
 ### Fixed
