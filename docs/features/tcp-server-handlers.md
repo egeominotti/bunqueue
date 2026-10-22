@@ -218,7 +218,15 @@ Notable management/advanced flows:
   consistent broker projection; its `waitForJobResult` override keeps waiting
   through `waitForJobCompletion` and then reads that row, and the manager
   registers a cancellable event waiter before its durable completion recheck
-  so a remote completion cannot be lost between check and subscribe. On memory
+  so a remote completion cannot be lost between check and subscribe. Before its
+  first read the handler also subscribes to the job's `completed` event, so a
+  completion that lands during its reads answers at once even when it leaves
+  nothing a later read finds; `QueueManager.capturedCompletionResult` names the
+  result of that answer: the event's data on memory and SQLite, which broadcast
+  the event in the step that completes the job, and the completion record on
+  PostgreSQL, whose events arrive after their commit, so a captured event can
+  predate a `Cancel` that removed the completed job and cleared its result
+  (issue #162, `test/postgres-waitjob-cancel-stale-result.test.ts`). On memory
   and SQLite the completion port also answers from the memory-only record of a
   job removed on completion (`removedResults`, 60 s and 1,000 records by
   default, see [Core Queue Engine](./core-queue-engine.md#removed-result-retention)):

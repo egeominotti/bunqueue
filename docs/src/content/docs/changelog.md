@@ -69,6 +69,16 @@ head:
   `resume`, rate limit, concurrency, stall and DLQ configuration) can still be
   briefly reverted. No data was lost, and claims were always decided in
   PostgreSQL.
+- With the PostgreSQL backend, `WaitJob` (and so `waitUntilFinished` without
+  QueueEvents) no longer returns the result of a completed job that `Cancel`
+  has since removed ([#162](https://github.com/egeominotti/bunqueue/issues/162)).
+  A broker receives a job's `completed` event after its commit, so the event of
+  the ACK could arrive after the Cancel; a WaitJob reading the job at that
+  moment answered with the event's result instead of `completed` without a
+  result. It now takes the result from the job's completion record, which the
+  Cancel cleared, as a waiting `WaitJob` already did. Memory and SQLite are
+  unchanged. `test/postgres-cancel-outcome.test.ts` failed 8 of 50 runs under
+  injected 0-15 ms scheduling delays before and 0 of 50 after.
 
 ### Testing
 

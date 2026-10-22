@@ -256,6 +256,18 @@ export abstract class PostgresQueueManagerState extends QueueManager {
     });
   }
 
+  /**
+   * A `completed` event WaitJob captured answers from the completion record, as
+   * `waitForJobResult` does, never from the event: `onStoreEvent` delivers journal
+   * events after their commit, so the event can predate a `Cancel` that has since
+   * removed the completed job and cleared the record's result (issue #162). The record
+   * keeps the result of a completion until a later commit changes it (removeOnComplete
+   * included); after a prune, clean or obliterate the answer has no result.
+   */
+  override async capturedCompletionResult(jobId: JobId): Promise<unknown> {
+    return (await this.getCompletionAsync(jobId)).result;
+  }
+
   protected applyPostgresClaim(claim: Parameters<PostgresQueueSnapshot['claim']>[0]): void {
     this.projectionRefreshes.supersede(claim.job.id);
     this.invalidateQueueRefreshes(claim.job.queue);

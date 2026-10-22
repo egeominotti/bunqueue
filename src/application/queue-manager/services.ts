@@ -95,6 +95,17 @@ export class QueueManagerServices extends QueueManagerObservability {
       });
   }
 
+  /**
+   * The result WaitJob answers for the job's `completed` event it captured while it
+   * read the job, before its hold: the event's data, the worker's return value, which a
+   * job removed on completion keeps nowhere else. Memory and SQLite broadcast the event
+   * in the step that completes the job, so a captured event is never older than the
+   * WaitJob that captured it. PostgreSQL overrides it (issue #162).
+   */
+  async capturedCompletionResult(_jobId: JobId, eventResult: unknown): Promise<unknown> {
+    return eventResult;
+  }
+
   registerWorker(
     name: string,
     queues: string[],
