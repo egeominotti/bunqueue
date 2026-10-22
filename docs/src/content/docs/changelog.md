@@ -22,10 +22,25 @@ head:
 
 ### Security
 
-- The weekly SDK advisory audit passes again. `oxfmt` pins its worker pool,
-  `tinypool`, to 2.1.0, which has two critical advisories; the repository and
-  the TypeScript SDK now override it to a patched release. It is a development
-  dependency only and neither published package ships it.
+- The weekly SDK advisory audit passes again for all six SDKs. It had failed
+  every week since 16 August: until 4 October at the Go step, which skipped the
+  Rust and Elixir audits, and on 11 and 18 October at the TypeScript step, which
+  skipped the other five:
+  - `oxfmt` pins its worker pool, `tinypool`, to 2.1.0, which has two critical
+    advisories; the repository and the TypeScript SDK now override it to a
+    patched release. It is a development dependency only and neither published
+    package ships it.
+  - The Go toolchain used by CI, the SDK workflows and the SDK test image moves
+    from 1.26.5 to 1.26.10. The Go SDK's TLS connection reaches four standard
+    library vulnerabilities fixed between 1.26.6 and 1.26.10 (GO-2026-6809,
+    GO-2026-6607, GO-2026-6090, GO-2026-5972). The module still declares
+    `go 1.26.5`; build applications with Go 1.26.10 or later on 1.26, or
+    1.27.3 or later.
+  - The Rust SDK's lockfile moves `rustls` to 0.23.46 and `rustls-webpki` to
+    0.103.16 (RUSTSEC-2026-0285, -0346, -0348, -0349 and -0382); rustls 0.23.46
+    also brings `aws-lc-rs` 1.18 and `aws-lc-sys` 0.46. The existing dependency
+    ranges allow all of them, so applications only need
+    `cargo update -p rustls -p rustls-webpki`.
 
 ### Testing
 
