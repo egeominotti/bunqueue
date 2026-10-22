@@ -71,6 +71,9 @@
     "oxlint-tsgolint": "7.0.2001",
     "typescript": "^5.7.0"
   },
+  "overrides": {
+    "tinypool": "^2.1.2"
+  },
   "author": "Egeo Minotti",
   "homepage": "https://bunqueue.dev/guide/sdks/",
   "repository": {

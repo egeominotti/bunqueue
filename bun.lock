@@ -36,6 +36,9 @@
       ],
     },
   },
+  "overrides": {
+    "tinypool": "^2.1.2",
+  },
   "packages": {
     "@a2a-js/sdk": ["@a2a-js/sdk@0.3.14", "", { "dependencies": { "uuid": "^11.1.0" }, "peerDependencies": { "@bufbuild/protobuf": "^2.10.2", "@grpc/grpc-js": "^1.11.0", "express": "^4.21.2 || ^5.1.0" }, "optionalPeers": ["@bufbuild/protobuf", "@grpc/grpc-js", "express"] }, "sha512-F6Ew1AtPzCLhTn8h9yiqTe7DiDf6XVrSnq9V1YqSl9eWqPm6anMveTiKdCSb/76cW0YiJc24rNaUrVezFFHbqQ=="],
 
@@ -729,7 +732,7 @@
 
     "strtok3": ["strtok3@10.3.5", "", { "dependencies": { "@tokenizer/token": "^0.3.0" } }, "sha512-ki4hZQfh5rX0QDLLkOCj+h+CVNkqmp/CMf8v8kZpkNVK6jGQooMytqzLZYUVYIZcFZ6yDB70EfD8POcFXiF5oA=="],
 
-    "tinypool": ["tinypool@2.1.0", "", {}, "sha512-Pugqs6M0m7Lv1I7FtxN4aoyToKg1C4tu+/381vH35y8oENM/Ai7f7C4StcoK4/+BSw9ebcS8jRiVrORFKCALLw=="],
+    "tinypool": ["tinypool@2.2.0", "", {}, "sha512-jBrmx4lYmaC9k/mgPbylxs7kBUxHtD8256up+HjLaDFfXScKJQyil+SWXSvhAtT7XHo+yTVlpB81PGmHP8oLSQ=="],
 
     "toidentifier": ["toidentifier@1.0.1", "", {}, "sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA=="],
 

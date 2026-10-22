@@ -5,6 +5,21 @@ All notable changes to `bunqueue-client` (TypeScript SDK) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- Development only: `oxfmt` pins `tinypool` 2.1.0, which has two critical
+  advisories, so `tinypool` is overridden to a patched release and the weekly
+  `bun audit` passes again. The published package is unchanged.
+
+### Testing
+
+- The cooperative-cancel e2e test waits until both jobs run in the worker, not
+  only until the broker counts them active: `cancelAllJobs` cancels jobs the
+  worker holds, and a pull reply still in flight made it cancel one job instead
+  of two, so the test timed out intermittently.
+
 ## [0.2.3] - 2026-10-05
 
 Bun and Node.js run a timer whose delay is `NaN`, negative or above 2^31 - 1 ms

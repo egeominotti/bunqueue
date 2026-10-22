@@ -202,9 +202,11 @@ test('api: addCron + getJobSchedulersCount + setWebhookEnabled + getWorkersCount
 test('api: worker cooperative cancel — cancelJob, cancelAllJobs, isJobCancelled', async () => {
   const queue = makeQueue<{ n: number }>('api-cancel');
   const seenCancelled: string[] = [];
+  const started = new Set<string>();
   const worker = makeWorker<{ n: number }, string>(
     queue.name,
     async (job) => {
+      started.add(job.id);
       for (let i = 0; i < 200; i++) {
         if (worker.isJobCancelled(job.id)) throw new Error('aborted by cancel');
         await new Promise((r) => setTimeout(r, 20));
@@ -217,6 +219,10 @@ test('api: worker cooperative cancel — cancelJob, cancelAllJobs, isJobCancelle
   const a = await queue.add('long-a', { n: 1 }, { attempts: 1 });
   const b = await queue.add('long-b', { n: 2 }, { attempts: 1 });
   await waitFor(async () => (await queue.getJobCounts()).active === 2);
+  // The broker counts a job active before the worker has read its PULLB reply,
+  // and cancelJob/cancelAllJobs only see jobs the worker already holds: wait
+  // until both processors run here, or cancelAllJobs can miss the second job.
+  await waitFor(() => started.size === 2);
   assert(worker.cancelJob(a.id, 'stop one') === true, 'cancelJob true for active');
   assert(worker.cancelJob('nope') === false, 'cancelJob false for unknown');
   worker.cancelAllJobs('stop everything');

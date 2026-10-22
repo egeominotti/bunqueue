@@ -18,6 +18,31 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## [Unreleased]
+
+### Security
+
+- The weekly SDK advisory audit passes again. `oxfmt` pins its worker pool,
+  `tinypool`, to 2.1.0, which has two critical advisories; the repository and
+  the TypeScript SDK now override it to a patched release. It is a development
+  dependency only and neither published package ships it.
+
+### Testing
+
+- Two PostgreSQL event catch-up regressions no longer fail intermittently. They
+  treated "event cursor at the journal head" as "snapshot updated", which stopped
+  being true when job events became asynchronous projection refreshes; they now
+  also wait for queued refreshes to settle and for the expected DLQ. Under
+  injected 0-15 ms scheduling delays the old wait failed 14 of 200 runs and the
+  new one 0 of 200. The PostgreSQL design notes now describe the asynchronous
+  refresh instead of a direct snapshot update.
+- The TypeScript SDK's cooperative-cancel end-to-end test no longer times out
+  intermittently. The broker counts a job active before the worker has read its
+  pull reply, and `cancelAllJobs` only cancels jobs the worker already holds, so
+  the test could cancel one job instead of two; it now also waits until both
+  processors have started. With a 5 ms stall after each count request the old
+  test failed 31 of 50 runs and the new one 0 of 50.
+
 ## [2.9.17] - 2026-10-22
 
 ### Changed
