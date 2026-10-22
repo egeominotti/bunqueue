@@ -41,6 +41,17 @@ head:
     also brings `aws-lc-rs` 1.18 and `aws-lc-sys` 0.46. The existing dependency
     ranges allow all of them, so applications only need
     `cargo update -p rustls -p rustls-webpki`.
+- The repository's development dependencies no longer carry critical or high
+  advisories: with the `tinypool` override above, `bun audit` drops from 48
+  findings (3 critical, 19 high) to one moderate (`sprintf-js`, which has no
+  fixed release) and one low. The lockfile now resolves patched releases inside
+  the existing version ranges (`bun audit fix`; `package.json` is unchanged):
+  the MCP SDK used to develop and test `bunqueue-mcp` moves to 1.32.0, and
+  `proxy-addr`, `brace-expansion`, `fast-uri`, `hono`, `@hono/node-server`,
+  `ip-address`, `js-yaml`, `markdown-it`, `nanoid` and `qs` move to their
+  patched releases. The published package's dependencies were already clean
+  (`bun audit --prod`), and its optional `@modelcontextprotocol/sdk` peer range
+  is unchanged.
 
 ### Testing
 
