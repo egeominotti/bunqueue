@@ -33,7 +33,16 @@ export interface PostgresDirectProjectionTicket {
 type ProjectionLoader = (
   requests: readonly { id: JobId; queue: string }[]
 ) => Promise<ReadonlyMap<JobId, PostgresJobProjection>>;
-type ProjectionApplier = (id: JobId, projection: PostgresJobProjection) => void;
+/**
+ * `ownWrite`: a direct refresh after this broker committed a change to the job, whose
+ * caller already invalidated the requested `queue`.
+ */
+type ProjectionApplier = (
+  id: JobId,
+  projection: PostgresJobProjection,
+  ownWrite: boolean,
+  queue: string
+) => void;
 type ProjectionReporter = (queue: string, id: JobId, error: unknown) => void;
 
 /** Coalesced, generation-fenced repair of the local PostgreSQL read model. */
@@ -103,13 +112,14 @@ export class PostgresProjectionRefreshes {
     }
   }
 
-  async refreshNow(id: JobId, queue: string): Promise<PostgresJobProjection> {
-    const projections = await this.refreshManyNow([{ id, queue }]);
+  async refreshNow(id: JobId, queue: string, ownWrite = false): Promise<PostgresJobProjection> {
+    const projections = await this.refreshManyNow([{ id, queue }], ownWrite);
     return projections.get(id) ?? { row: null, completion: null };
   }
 
   async refreshManyNow(
-    requests: readonly { id: JobId; queue: string }[]
+    requests: readonly { id: JobId; queue: string }[],
+    ownWrite = false
   ): Promise<ReadonlyMap<JobId, PostgresJobProjection>> {
     let remaining = [...requests];
     const loaded = new Map<JobId, PostgresJobProjection>();
@@ -130,7 +140,7 @@ export class PostgresProjectionRefreshes {
             invalidated.push(request);
             continue;
           }
-          this.apply(request.id, projection);
+          this.apply(request.id, projection, ownWrite, request.queue);
           this.report(request.queue, request.id, null);
           this.endGeneration(request.id, generations.get(request.id));
         }
@@ -209,7 +219,8 @@ export class PostgresProjectionRefreshes {
       const projections = await this.load(batch.map(([id, { queue }]) => ({ id, queue })));
       for (const [id, request] of batch) {
         if (this.generations.get(id) !== request.generation) continue;
-        this.apply(id, projections.get(id) ?? { row: null, completion: null });
+        const projection = projections.get(id) ?? { row: null, completion: null };
+        this.apply(id, projection, false, request.queue);
         this.report(request.queue, id, null);
         this.endGeneration(id, request.generation);
       }

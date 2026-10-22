@@ -96,18 +96,22 @@ async function removeCompletedRow(
 
 /**
  * Cancel a pending job, or remove a completed one, matching the QueueManager contract:
- * an active or failed job is never removed by Cancel.
+ * an active or failed job is never removed by Cancel. Returns the removed job's queue,
+ * or null when nothing was removed.
  */
-export async function cancelPostgresJob(ctx: PostgresContext, id: JobId): Promise<boolean> {
+export async function cancelPostgresJob(ctx: PostgresContext, id: JobId): Promise<string | null> {
   return await ctx.sql.begin(async (tx) => {
     await lockPostgresDestructionCandidates(tx, ctx, [id]);
     const row = await lockJob(tx, ctx, id);
-    if (row?.state === 'completed') return await removeCompletedRow(tx, ctx, row);
+    if (row?.state === 'completed') {
+      await removeCompletedRow(tx, ctx, row);
+      return row.queue;
+    }
     if (!row || !['waiting', 'prioritized', 'delayed', 'waiting-children'].includes(row.state)) {
-      return false;
+      return null;
     }
     const { protectedIds } = await partitionPostgresDestructionCandidates(tx, ctx, [id], [id]);
-    if (protectedIds.length > 0) return false;
+    if (protectedIds.length > 0) return null;
     const job = decodePostgresJob(row).job;
     await deleteJobDependencies(tx, ctx, id);
     await tx`
@@ -128,7 +132,7 @@ export async function cancelPostgresJob(ctx: PostgresContext, id: JobId): Promis
       state: row.state,
       removed: true,
     });
-    return true;
+    return job.queue;
   });
 }
 

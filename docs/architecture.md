@@ -818,8 +818,12 @@ factory applies PostgreSQL-native statement, lock, idle-transaction, and
 application-name parameters. `postgres/eventCommitGc.ts` adaptively drains
 orphaned commit envelopes in bounded database turns,
 while `postgres-queue-manager/projectionRefreshes.ts` coalesces authoritative
-per-job repair with job- and queue-scoped generation fencing. Every path that
-drops a pending per-job retry because it installs authoritative state (consumed
+per-job repair with job- and queue-scoped generation fencing.
+`postgres-queue-manager/jobRefreshes.ts` reloads a job after a mutation; after
+an own commit it first marks any older in-flight full-queue refresh of the
+job's queue stale, so that refresh cannot roll the commit back (#158). Every
+path that drops a pending per-job retry because it installs authoritative state
+(consumed
 direct ticket, local claim, queue refresh) also clears that job's
 projection-refresh health key, so readiness cannot stay degraded without a
 retry; completion

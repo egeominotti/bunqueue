@@ -2,7 +2,7 @@ import { assertDuration } from '../../shared/durations';
 import { safeTimeout, type SafeTimer } from '../../shared/timers';
 import { POSTGRES_MAX_RETRY_DELAY_MS } from '../../infrastructure/persistence/postgres/maintenanceSchedule';
 
-/** Reload one queue's read model; false when a concurrent event made the load stale. */
+/** Reload one queue's read model; false when a concurrent event or own write made it stale. */
 type QueueRefresh = (queue: string) => Promise<boolean>;
 type QueueRefreshReporter = (queue: string, error: unknown) => void;
 
@@ -15,9 +15,9 @@ interface PendingPause {
  * Coalesced full-queue refreshes of the local PostgreSQL read model, retried until one
  * applies.
  *
- * One loop runs per dirty queue. A load made stale by a concurrent event waits
- * `retryDelayMs` before reloading; a failed load waits `retryDelayMs`, then doubles up
- * to 1 s. The manager passes `postgresRetryDelayMs`: the poll interval, capped at 1 s,
+ * One loop runs per dirty queue. A load made stale by a concurrent event or own write
+ * waits `retryDelayMs` before reloading; a failed load waits `retryDelayMs`, then doubles
+ * up to 1 s. The manager passes `postgresRetryDelayMs`: the poll interval, capped at 1 s,
  * so a long `pollIntervalMs` cannot keep a queue's read model stale. Every wait is a
  * cancellable `safeTimeout` that `stop()` ends at once: shutdown never sleeps one out.
  */

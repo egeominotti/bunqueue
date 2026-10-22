@@ -267,7 +267,9 @@ export class PostgresQueueStore extends PostgresLeaseStore {
   updateParent = (childId: JobId, parentId: JobId) =>
     updatePostgresJobParent(this.context, childId, parentId);
   promote = (id: JobId) => promotePostgresJob(this.context, id);
-  cancel = (id: JobId) => cancelPostgresJob(this.context, id);
+  cancel = async (id: JobId) => (await cancelPostgresJob(this.context, id)) !== null;
+  /** `cancel` that returns the removed job's queue, or null when nothing was removed. */
+  cancelReturningQueue = (id: JobId) => cancelPostgresJob(this.context, id);
   discard = (id: JobId, token?: string) => discardPostgresJob(this.context, id, token);
   remove = (id: JobId, token?: string) => removePostgresJob(this.context, id, token);
   removeDlq = (queue: string, id: JobId) => removePostgresDlqJob(this.context, queue, id);

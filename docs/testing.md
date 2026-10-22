@@ -582,11 +582,26 @@ PostgreSQL) record a refresh failure whose retry is still pending, then prove
 that a lease renewal, batched completion, local claim, or queue refresh that
 supersedes it clears the per-job health key so `/ready` returns 200, that a
 cancelled or fenced-out ticket leaves the error to its repair refresh, and that
-a failed job read re-queues a retry. Additional deterministic cases keep a direct
-claim token across delayed journal replay, retry every captured client lease
-after a transient release error, bound repeated startup-buffer overflow, stop
-queue refresh under continuous event-version churn, serialize each maintenance
-subsystem, and prove store close awaits admitted maintenance.
+a failed job read re-queues a retry. Own-write regressions
+(`test/repro-postgres-own-terminal-refresh.test.ts`, issue #158) hold a full-queue
+refresh after PostgreSQL returned its read model, pause the broker's event
+stream, make a terminal failure, batched completion, claim, push, cancellation,
+DLQ removal or durable drain on that broker, and assert the broker still reports
+its own write after the older refresh settles; the terminal-failure case also
+asserts that the stale read model is reloaded exactly once. Further cases
+install the failure through the background fallback (the direct reload fails
+once, or direct reads of the same job supersede both reload attempts) and
+cancel a job pushed through another broker that this broker has not seen; the
+fallback cases also assert that the direct reload never installed the job.
+Companion cases prove that a direct job read and a rejected stale-token failure
+do not discard the refresh, that an own write with no refresh in flight loads no
+queue read model, and that a batched completion of a repeat job whose direct
+ticket was fenced out still installs its own post-commit queue refresh, so the
+next run is visible when `ackBatch` returns. Additional deterministic cases keep
+a direct claim token across delayed journal replay, retry every captured client
+lease after a transient release error, bound repeated startup-buffer overflow,
+stop queue refresh under continuous event-version churn, serialize each
+maintenance subsystem, and prove store close awaits admitted maintenance.
 Event-retention regressions hold the per-queue advisory lock while a committed
 writer requests an autonomous trim. They assert that normal contention leaves
 storage health intact, one coalesced retry restores the exact retained window

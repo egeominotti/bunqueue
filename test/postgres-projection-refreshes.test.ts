@@ -241,4 +241,33 @@ describe('PostgreSQL projection refresh lifecycle', () => {
     expect(generations.size).toBe(0);
     expect(generationQueues.size).toBe(0);
   });
+
+  test('marks only direct refreshes that follow an own write', async () => {
+    const applied: Array<[JobId, boolean, string]> = [];
+    const refreshes = new PostgresProjectionRefreshes(
+      async (requests) => new Map(requests.map(({ id }) => [id, emptyProjection])),
+      (id, _projection, ownWrite, queue) => applied.push([id, ownWrite, queue]),
+      () => undefined,
+      1
+    );
+    active.push(refreshes);
+    const read = jobId('own-write-read');
+    const write = jobId('own-write-single');
+    const batch = jobId('own-write-batch');
+    const event = jobId('own-write-event');
+    refreshes.start();
+
+    await refreshes.refreshNow(read, 'queue');
+    await refreshes.refreshNow(write, 'queue', true);
+    await refreshes.refreshManyNow([{ id: batch, queue: 'queue' }], true);
+    refreshes.request(event, 'queue');
+
+    expect(await eventually(() => applied.length === 4)).toBe(true);
+    expect(applied).toEqual([
+      [read, false, 'queue'],
+      [write, true, 'queue'],
+      [batch, true, 'queue'],
+      [event, false, 'queue'],
+    ]);
+  });
 });
