@@ -18,6 +18,15 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## [2.9.17] - 2026-10-22
+
+### Changed
+
+- Release artifacts and CI run on Bun 1.4.4 (previously 1.4.3). The standalone
+  executables and Docker images are compiled with it, and the main CI, the SDK
+  workflows, the release builder image and the disposable test images pin it.
+  The npm package's runtime requirement is unchanged (`bun >= 1.4.0`).
+
 ## [2.9.16] - 2026-10-15
 
 ### Fixed
