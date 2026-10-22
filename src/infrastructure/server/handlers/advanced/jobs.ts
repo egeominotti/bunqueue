@@ -126,13 +126,17 @@ export async function handleWaitJob(
       captured.result = event.data;
     }
   });
+  // The manager names the captured completion's result: PostgreSQL can deliver the
+  // event after a Cancel removed the job and its result (issue #162).
+  const capturedCompletion = async (): Promise<Response> =>
+    completed(await context.queueManager.capturedCompletionResult(id, captured.result));
   let controller: AbortController | undefined;
   try {
     const job = await context.queueManager.getJob(id);
-    if (captured.found) return completed(captured.result);
+    if (captured.found) return await capturedCompletion();
     if (!job) {
       const completion = await context.queueManager.getCompletionAsync(id);
-      if (captured.found) return completed(captured.result);
+      if (captured.found) return await capturedCompletion();
       return completion.found
         ? completed(completion.result)
         : response.error('Job not found', requestId);
@@ -141,10 +145,10 @@ export async function handleWaitJob(
       // The async read can return an old completed generation after its custom ID
       // has been reused. Only the current completion lookup can confirm success.
       const completion = await context.queueManager.getCompletionAsync(id);
-      if (captured.found) return completed(captured.result);
+      if (captured.found) return await capturedCompletion();
       if (completion.found) return completed(completion.result);
       const currentJob = await context.queueManager.getJob(id);
-      if (captured.found) return completed(captured.result);
+      if (captured.found) return await capturedCompletion();
       if (!currentJob) return response.error('Job not found', requestId);
     }
 

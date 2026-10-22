@@ -298,7 +298,15 @@ base's optional `signal` for signature parity and ignores it, as the
 `waitForJobCompletion` override does (WaitJob passes none): the wait ends on
 completion or after `timeoutMs`. WaitJob on the ID of a completed job removed by
 `Cancel` finds no row but finds the tombstone, so it answers `completed: true`
-with no result (memory and SQLite answer `Job not found`).
+with no result (memory and SQLite answer `Job not found`). This also holds when
+the job's `completed` event reaches the broker only after the `Cancel`: events
+are delivered after their commit, so any broker's stream, including the stream
+of the broker that made the ACK, can deliver that event once a later Cancel has
+committed. WaitJob subscribes to the
+`completed` event before its first read; on PostgreSQL a captured event answers
+from the completion record (`capturedCompletionResult` in `state.ts`), never
+from the event's data, which still carries the removed result (issue #162,
+`test/postgres-waitjob-cancel-stale-result.test.ts`).
 For a live PostgreSQL wait, the manager registers its cancellable event waiter
 before rechecking the completion table. This prevents both a result-cache race
 after a remote broker completes the job and the check-before-subscribe gap; the

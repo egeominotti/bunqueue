@@ -102,6 +102,10 @@ waitForJobResult(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise
 // result: the waking event's data; after a release without an event, getResultAsync(jobId);
 // undefined on timeout/abort. The PostgreSQL manager overrides it with its
 // waitForJobCompletion followed by the completion-record read (unchanged behavior).
+capturedCompletionResult(jobId: JobId, eventResult: unknown): Promise<unknown>;
+// The result WaitJob answers for a `completed` event it captured during its reads:
+// eventResult on memory/SQLite; the completion record on PostgreSQL, whose late
+// event can predate a Cancel that cleared the result (issue #162).
 
 // jobLogsManager.ts
 function addJobLog(jobId, message, ctx: JobLogsContext, level?: 'info'|'warn'|'error'): boolean;

@@ -597,7 +597,13 @@ Companion cases prove that a direct job read and a rejected stale-token failure
 do not discard the refresh, that an own write with no refresh in flight loads no
 queue read model, and that a batched completion of a repeat job whose direct
 ticket was fenced out still installs its own post-commit queue refresh, so the
-next run is visible when `ackBatch` returns. Additional deterministic cases keep
+next run is visible when `ackBatch` returns. Late-event WaitJob regressions
+(`test/postgres-waitjob-cancel-stale-result.test.ts`, issue #162) pause
+the event stream, complete a job and remove it with `Cancel`, then deliver the
+held `completed` event while WaitJob reads the job or its completion record, on
+the same broker and on a second one; WaitJob must answer `completed` without
+the removed result, and a completion that was not removed (with and without
+`removeOnComplete`) must still answer its result. Additional deterministic cases keep
 a direct claim token across delayed journal replay, retry every captured client
 lease after a transient release error, bound repeated startup-buffer overflow,
 stop queue refresh under continuous event-version churn, serialize each
