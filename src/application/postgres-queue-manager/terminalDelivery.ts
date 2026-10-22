@@ -118,7 +118,8 @@ export class PostgresQueueManagerTerminalDelivery extends PostgresQueueManagerQu
         if (this.activeTokens.get(item.id) === inputs[index].token) this.forgetToken(item.id);
         const ticket = tickets.get(item.id);
         if (transition.applied && ticket && this.projectionRefreshes.consumeDirect(ticket)) {
-          this.invalidateQueueRefreshes(transition.job?.queue);
+          const queue = transition.job?.queue ?? this.postgresSnapshot.get(item.id)?.job.queue;
+          this.invalidateQueueRefreshes(queue, item.id);
           const repeatQueue = applyPostgresBatchCompletion(this.postgresSnapshot, item, transition);
           if (repeatQueue) repeatQueues.add(repeatQueue);
         } else {

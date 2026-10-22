@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 function refreshes(
-  refresh: (queue: string) => Promise<boolean>,
+  refresh: (queue: string) => Promise<unknown>,
   retryDelayMs: number,
   reports: unknown[] = []
 ): PostgresQueueRefreshes {
@@ -51,15 +51,14 @@ describe('PostgreSQL queue refresh retries', () => {
     expect(attempts).toBe(1);
   });
 
-  test('a stale load waits one poll interval, then reloads', async () => {
+  test('a queue scheduled again while it loads waits one poll interval, then reloads', async () => {
     const reports: unknown[] = [];
-    let attempts = 0;
-    // As in the manager, a stale load marks its queue dirty again before returning false.
+    const starts: number[] = [];
+    // As when a queue invalidation arrives while the manager loads that queue.
     const subject: PostgresQueueRefreshes = refreshes(
       async (queue) => {
-        if (++attempts > 1) return true;
-        subject.markDirty(queue);
-        return false;
+        starts.push(performance.now());
+        if (starts.length === 1) subject.schedule(queue);
       },
       20,
       reports
@@ -67,9 +66,10 @@ describe('PostgreSQL queue refresh retries', () => {
 
     subject.schedule('orders');
 
-    expect(await eventually(() => attempts === 2)).toBe(true);
+    expect(await eventually(() => starts.length === 2)).toBe(true);
     await subject.settled();
     expect(reports).toEqual([null, null]);
+    expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(15);
   });
 
   test('a failure retries after the poll interval and reports recovery', async () => {

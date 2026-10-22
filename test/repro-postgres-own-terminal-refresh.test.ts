@@ -184,8 +184,9 @@ describe('PostgreSQL own writes versus an older in-flight queue refresh (#158)',
         () =>
           dlqIds(broker, queue).join() === String(job.id) && !has(broker, queue, job.id, 'active')
       );
-      // The held read model is discarded and reloaded once; the write starts no reload.
-      expect(loads).toBe(2);
+      // The held read model is installed around the failed job, which keeps its committed
+      // state, instead of being discarded and reloaded (#161); the write starts no reload.
+      expect(loads).toBe(1);
     });
   });
 

@@ -106,9 +106,10 @@ export class PostgresProjectionRefreshes {
     this.report(queue, id, null);
   }
 
-  supersedeQueue(queue: string): void {
+  /** `supersede` every job of `queue`, except those `keep` selects. */
+  supersedeQueue(queue: string, keep: (id: JobId) => boolean = () => false): void {
     for (const [id, generationQueue] of this.generationQueues) {
-      if (generationQueue === queue) this.supersede(id);
+      if (generationQueue === queue && !keep(id)) this.supersede(id);
     }
   }
 

@@ -44,32 +44,34 @@ export class PostgresQueueSnapshot {
     for (const row of rows) this.put(row);
   }
 
+  /** Install a queue's read model; jobs `keep` selects keep their local rows and results. */
   replaceQueue(
     queue: string,
     rows: readonly PostgresStoredJob[],
     state: PostgresQueueState,
-    completions: readonly PostgresCompletionResult[] = []
+    completions: readonly PostgresCompletionResult[] = [],
+    keep: (id: JobId) => boolean = () => false
   ): void {
     for (const [id, row] of this.jobs) {
-      if (row.job.queue === queue) this.remove(id);
+      if (row.job.queue === queue && !keep(id)) this.remove(id);
     }
-    this.removeQueueResults(queue);
-    for (const row of rows) this.put(row);
-    for (const completion of completions) this.putCompletion(completion);
+    this.removeQueueResults(queue, keep);
+    for (const row of rows) if (!keep(row.job.id)) this.put(row);
+    for (const entry of completions) if (!keep(entry.jobId)) this.putCompletion(entry);
     this.queues.set(queue, state);
     this.knownQueues.add(queue);
   }
 
-  removeQueue(queue: string): JobId[] {
+  removeQueue(queue: string, keep: (id: JobId) => boolean = () => false): JobId[] {
     const removed: JobId[] = [];
     for (const [id, row] of this.jobs) {
-      if (row.job.queue !== queue) continue;
+      if (row.job.queue !== queue || keep(id)) continue;
       this.remove(id);
       removed.push(id);
     }
-    this.removeQueueResults(queue);
+    this.removeQueueResults(queue, keep);
     this.queues.delete(queue);
-    this.knownQueues.delete(queue);
+    if (this.ids(queue).length === 0) this.knownQueues.delete(queue);
     return removed;
   }
 
@@ -222,9 +224,9 @@ export class PostgresQueueSnapshot {
     this.results.set(id, { queue, result });
   }
 
-  private removeQueueResults(queue: string): void {
+  private removeQueueResults(queue: string, keep: (id: JobId) => boolean): void {
     for (const [id, entry] of this.results) {
-      if (entry.queue === queue) this.results.delete(id);
+      if (entry.queue === queue && !keep(id)) this.results.delete(id);
     }
   }
 

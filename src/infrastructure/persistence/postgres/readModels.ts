@@ -1,6 +1,6 @@
 import type { CronJob } from '../../../domain/types/cron';
 import type { JobId } from '../../../domain/types/job';
-import { decodePostgresCompletionResult } from './codec';
+import { decodePostgresCompletionResult, numeric } from './codec';
 import { loadPostgresCompletionResults } from './completionQueries';
 import { getPostgresQueueState } from './control';
 import { listPostgresCrons } from './crons';
@@ -31,6 +31,12 @@ export interface PostgresQueueReadModel {
   readonly results: readonly PostgresCompletionResult[];
   readonly state: PostgresQueueState;
   readonly exists: boolean;
+  /**
+   * The newest journal `commit_seq` of the namespace visible to this snapshot (0: none).
+   * The commit sequencer assigns it under a namespace lock held until the commit is
+   * visible, so the snapshot holds every journaled commit up to it and none after it.
+   */
+  readonly horizon: number;
 }
 
 export interface PostgresProjectionRequest {
@@ -68,7 +74,7 @@ export async function loadPostgresQueueReadModel(
 ): Promise<PostgresQueueReadModel> {
   return await ctx.sql.begin('isolation level repeatable read read only', async (tx) => {
     await assertPostgresSnapshotBudget(ctx, tx, queue);
-    const [rows, results, state, [presence]] = await Promise.all([
+    const [rows, results, state, [presence], [journal]] = await Promise.all([
       listPostgresJobs(ctx, queue, { limit: 2_147_483_647, asc: true }, tx),
       loadPostgresCompletionResults(ctx, queue, tx),
       getPostgresQueueState(ctx, queue, tx),
@@ -81,8 +87,13 @@ export async function loadPostgresQueueReadModel(
           WHERE namespace = ${ctx.config.namespace} AND queue = ${queue}
         ) AS exists
       `,
+      tx<{ horizon: number | string | bigint | null }[]>`
+        SELECT MAX(commit_seq) AS horizon FROM bunqueue_event_commits
+        WHERE namespace = ${ctx.config.namespace} AND commit_seq IS NOT NULL
+      `,
     ]);
-    return { rows, results, state, exists: presence.exists };
+    const horizon = numeric(journal.horizon) ?? 0;
+    return { rows, results, state, exists: presence.exists, horizon };
   });
 }
 

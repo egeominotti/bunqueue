@@ -72,7 +72,17 @@ export async function loadPostgresJournalEventsAfter(
   }));
 }
 
-/** Remove commit envelopes after every referenced event and watermark is gone. */
+/**
+ * Remove commit envelopes after every referenced event and watermark is gone.
+ *
+ * Invariant: the namespace's `MAX(commit_seq)` never decreases. The newest envelope always
+ * keeps an event or watermark: retention keeps each queue's newest events, and only a
+ * later journaled transaction (with a higher `commit_seq`) deletes them or supersedes a
+ * watermark (obliteration journals its own queue event). Full-queue refreshes
+ * use that maximum as their snapshot horizon (`loadPostgresQueueReadModel`); if it could
+ * decrease, a newer read model could be dropped as older than one already installed, and
+ * the queue's local view would stay at that one until its next refresh.
+ */
 export async function prunePostgresEventCommits(
   ctx: PostgresContext,
   limit = 10_000,

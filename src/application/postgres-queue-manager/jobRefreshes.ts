@@ -6,9 +6,10 @@ import { PostgresQueueManagerState } from './state';
 export abstract class PostgresQueueManagerJobRefreshes extends PostgresQueueManagerState {
   /**
    * Reload `id` after a mutation. With `ownWrite` (this broker committed a change to the
-   * job) any older full-queue refresh still loading is made stale first, so the commit
-   * cannot be rolled back however it is installed: by this reload, by a direct read, or
-   * by the background retry this falls back to. Pass `false` when nothing was committed.
+   * job) every full-queue refresh still loading records the job first and keeps its local
+   * state, so the commit cannot be rolled back however it is installed: by this reload, by
+   * a direct read, or by the background retry this falls back to. Pass `false` when
+   * nothing was committed.
    */
   protected async refreshJob(id: JobId, queue?: string, ownWrite = true): Promise<void> {
     const targetQueue = queue ?? this.postgresSnapshot.get(id)?.job.queue ?? '';
@@ -50,7 +51,7 @@ export abstract class PostgresQueueManagerJobRefreshes extends PostgresQueueMana
 
   /** The queue the caller named and the queue the job has locally (normally the same). */
   private invalidateJobQueues(id: JobId, queue?: string): void {
-    this.invalidateQueueRefreshes(queue);
-    this.invalidateQueueRefreshes(this.postgresSnapshot.get(id)?.job.queue);
+    this.invalidateQueueRefreshes(queue, id);
+    this.invalidateQueueRefreshes(this.postgresSnapshot.get(id)?.job.queue, id);
   }
 }
