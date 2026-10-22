@@ -74,7 +74,7 @@ export class PostgresQueueManagerTerminalDelivery extends PostgresQueueManagerQu
       options.removeOnComplete
     );
     this.forgetToken(id);
-    await this.refreshJob(id);
+    await this.refreshJob(id, transition.job?.queue, transition.applied);
     if (transition.applied) return;
     if (transition.alreadyFinalized) return { applied: false, reason: 'already-finalized' };
     throw new Error(`Invalid or expired lock token for job ${String(id)}`);
@@ -110,7 +110,7 @@ export class PostgresQueueManagerTerminalDelivery extends PostgresQueueManagerQu
         throw error;
       }
       const repeatQueues = new Set<string>();
-      const refreshIds = new Set<JobId>();
+      const refreshIds = new Map<JobId, (typeof transitions)[number]>();
       const ignoredIndices: number[] = [];
       for (let index = 0; index < transitions.length; index++) {
         const transition = transitions[index];
@@ -118,11 +118,12 @@ export class PostgresQueueManagerTerminalDelivery extends PostgresQueueManagerQu
         if (this.activeTokens.get(item.id) === inputs[index].token) this.forgetToken(item.id);
         const ticket = tickets.get(item.id);
         if (transition.applied && ticket && this.projectionRefreshes.consumeDirect(ticket)) {
+          this.invalidateQueueRefreshes(transition.job?.queue);
           const repeatQueue = applyPostgresBatchCompletion(this.postgresSnapshot, item, transition);
           if (repeatQueue) repeatQueues.add(repeatQueue);
         } else {
           if (ticket) this.projectionRefreshes.cancelDirect(ticket);
-          refreshIds.add(item.id);
+          refreshIds.set(item.id, transition);
           if (transition.applied && transition.job && transition.job.repeat !== null) {
             repeatQueues.add(transition.job.queue);
           }
@@ -132,7 +133,9 @@ export class PostgresQueueManagerTerminalDelivery extends PostgresQueueManagerQu
         }
       }
       await Promise.all([
-        ...[...refreshIds].map((id) => this.refreshJob(id)),
+        ...[...refreshIds].map(([id, { job, applied }]) =>
+          this.refreshJob(id, job?.queue, applied)
+        ),
         ...[...repeatQueues].map((queue) => this.refreshQueueAfterCommit(queue)),
       ]);
       return ignoredIndices.length === 0
@@ -174,7 +177,7 @@ export class PostgresQueueManagerTerminalDelivery extends PostgresQueueManagerQu
       ...options,
     });
     this.forgetToken(id);
-    await this.refreshJob(id);
+    await this.refreshJob(id, transition.job?.queue, transition.applied);
     if (transition.applied) return;
     if (transition.alreadyFinalized) return { applied: false, reason: 'already-finalized' };
     throw new Error(`Invalid or expired lock token for job ${String(id)}`);

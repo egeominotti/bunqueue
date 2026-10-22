@@ -123,7 +123,7 @@ export class PostgresQueueManagerLease extends PostgresQueueManagerDelivery {
       rows = await this.postgresStore.renewMany(requests);
     } catch (error) {
       for (const ticket of tickets.values()) this.projectionRefreshes.cancelDirect(ticket);
-      await this.refreshJobs([...tickets.keys()]);
+      await this.refreshJobs([...tickets.keys()], undefined, false);
       throw error;
     }
     const renewed = new Set(rows.map(({ row, token }) => leaseKey(row.job.id, token)));
@@ -137,7 +137,7 @@ export class PostgresQueueManagerLease extends PostgresQueueManagerDelivery {
       repairIds.add(request.id);
       if (this.activeTokens.get(request.id) === request.token) this.forgetToken(request.id);
     }
-    if (repairIds.size > 0) await this.refreshJobs([...repairIds]);
+    if (repairIds.size > 0) await this.refreshJobs([...repairIds], undefined, false);
     return requests.reduce(
       (count, request) => count + (renewed.has(leaseKey(request.id, request.token)) ? 1 : 0),
       0

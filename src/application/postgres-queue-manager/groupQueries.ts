@@ -1,7 +1,7 @@
-import { PostgresQueueManagerState } from './state';
+import { PostgresQueueManagerJobRefreshes } from './jobRefreshes';
 
 /** Database-authoritative group getters shared by every PostgreSQL broker. */
-export class PostgresQueueManagerGroupQueries extends PostgresQueueManagerState {
+export class PostgresQueueManagerGroupQueries extends PostgresQueueManagerJobRefreshes {
   override async getGroupJobsCount(queue: string, groupId: string): Promise<number> {
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;

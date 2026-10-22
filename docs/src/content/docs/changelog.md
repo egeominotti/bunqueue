@@ -53,6 +53,23 @@ head:
   (`bun audit --prod`), and its optional `@modelcontextprotocol/sdk` peer range
   is unchanged.
 
+### Fixed
+
+- With the PostgreSQL backend, a broker no longer briefly loses its own
+  committed writes from its local view
+  ([#158](https://github.com/egeominotti/bunqueue/issues/158)). A full-queue
+  refresh that read PostgreSQL before the broker's own commit could finish after
+  it, so a job the broker had just failed terminally could be reported `active`
+  again and be missing from its DLQ until the job's event arrived; the same
+  applied to its claims, completions, pushes, cancellations, DLQ removals and
+  queue-wide operations. Each own commit now marks such an in-flight refresh as
+  stale before the change is installed locally, as a received event already
+  did, so the refresh is reloaded instead of applied. Optimistic local settings
+  that are applied before their deferred write commits (non-durable `pause`,
+  `resume`, rate limit, concurrency, stall and DLQ configuration) can still be
+  briefly reverted. No data was lost, and claims were always decided in
+  PostgreSQL.
+
 ### Testing
 
 - Two PostgreSQL event catch-up regressions no longer fail intermittently. They

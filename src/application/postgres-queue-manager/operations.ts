@@ -19,9 +19,11 @@ export class PostgresQueueManagerOperations extends PostgresQueueManagerCloud {
   override async cancel(id: JobId): Promise<boolean> {
     return await this.runPostgresOperation(async () => {
       await this.postgresReady;
-      const removed = await this.postgresStore.cancel(id);
-      if (removed) this.postgresSnapshot.remove(id);
-      return removed;
+      const queue = await this.postgresStore.cancelReturningQueue(id);
+      if (queue === null) return false;
+      this.invalidateQueueRefreshes(queue); // the committed row's queue, even if not local
+      this.postgresSnapshot.remove(id);
+      return true;
     });
   }
 
@@ -224,7 +226,7 @@ export class PostgresQueueManagerOperations extends PostgresQueueManagerCloud {
       this.unregisterClientJob(clientId, id);
       if (this.activeTokens.get(id) === token) this.activeTokens.delete(id);
       if (released) session.released++;
-      await this.refreshJob(id);
+      await this.refreshJob(id, undefined, released);
     }
     if (session.leases.size === 0) this.clientReleaseSessions.delete(clientId);
     return session.released;

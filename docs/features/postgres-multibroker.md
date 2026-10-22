@@ -274,6 +274,18 @@ reads `queue_state` from PostgreSQL instead of consulting the eventually
 consistent compatibility snapshot. This provides read-your-write behavior to
 all network SDKs even when the local broker is concurrently replaying its own
 notification. Memory and SQLite retain the original synchronous lookup.
+The snapshot is eventually consistent, including for the broker's own writes,
+with one guarantee added for issue
+[#158](https://github.com/egeominotti/bunqueue/issues/158). A full-queue
+refresh installs the `REPEATABLE READ` read model it loaded when it started, so
+one that started before the broker's own commit (for example a terminal
+`fail()`) could land afterwards and briefly report the job `active` again and
+missing from the broker's own DLQ. After each own commit, and before the change
+is installed locally, the broker marks any in-flight refresh of the affected
+queue stale, exactly as a received event does. That refresh is discarded and
+reloaded, whichever path then installs the change: the post-commit reload, a
+direct read, or a background retry. The event stream notes below list the
+writes this covers and the exceptions.
 TCP `GetResult` and both branches of `WaitJob` use an asynchronous result port.
 The PostgreSQL implementation reads the indexed completion record directly,
 while memory and SQLite delegate to their existing synchronous result lookup.
@@ -356,8 +368,8 @@ the same failure set; shutdown drains that queue and remains coalesced but
 retryable. A failed authoritative queue refresh keeps its invalidation dirty and
 retries with bounded exponential backoff (`queueRefreshes.ts`): the first wait is
 `postgresRetryDelayMs` (`pollIntervalMs`, capped at 1 s), later waits double up
-to 1 s, and a refresh made stale by a concurrent event waits the same capped
-delay before reloading. This prevents a
+to 1 s, and a refresh made stale by a concurrent event or own write waits the
+same capped delay before reloading. This prevents a
 transient read error after journal pruning from leaving only the retained event
 subset in the local snapshot. Per-queue refresh failures remain visible through
 storage health until that queue succeeds. Every wait is a cancellable
@@ -896,8 +908,62 @@ retain their existing host-clock behavior.
   reach the journal head before the snapshot reflects that event. Terminal
   and retry events also carry the complete DLQ entry and retry state, including
   explicit `null` clearing. Queue-control or payload-less events schedule a full
-  queue refresh. A per-queue event version retries stale full-queue refreshes,
-  and transient refresh failures retain a dirty marker for bounded-backoff retry,
+  queue refresh. A per-queue version (`queueEventVersions` in `state.ts`)
+  retries stale full-queue refreshes: a refresh applies its read model only if
+  the version is unchanged since it started loading. Every received event bumps
+  it. So does every own commit, synchronously after the commit and before the
+  local install ([#158](https://github.com/egeominotti/bunqueue/issues/158)):
+  - a post-commit job reload (`jobRefreshes.ts`: `ack`, `fail`, `push`,
+    progress, data, priority, delay, discard, relationship and client-release
+    mutations) bumps the queue the caller named and the job's local queue
+    before it loads; `ack`, `fail` and batched-completion repairs name the
+    committed job's queue. When it installs, it bumps the row's queue only if
+    that is not the requested queue (a job not yet local), so the reload does
+    not bump the requested queue a second time and discard a refresh of that
+    queue started after the commit, such as the queue refresh of a batch that
+    completed a repeat job;
+  - a claim, a batched completion, a DLQ removal, and a cancellation (using the
+    queue of the removed row returned by PostgreSQL, so a job this broker has
+    not seen yet is covered);
+  - the post-commit full refresh that queue-wide operations run (flows, repeat
+    jobs, drain, obliterate, promotion, retries, DLQ purge, cleaning and
+    durable queue settings).
+
+  A read model loaded before the broker's own commit is therefore discarded and
+  reloaded instead of rolling that write back. A bump never schedules a reload
+  by itself; only a refresh already in flight is retried. Rejected writes (an
+  `ack` or `fail` with a stale token or for an already finalized job) commit
+  nothing and bump nothing. Remaining exceptions:
+  - Optimistic local setters change the snapshot before their deferred write
+    commits: non-durable `pause`/`resume`, rate limit, concurrency, stall and
+    DLQ configuration, and non-durable `drain`/`obliterate`. An older refresh
+    can briefly revert them (for example `isPaused` returns `true`, then
+    `false`) until the write commits and the queue is reloaded. The TCP
+    `IsPaused` handler reads PostgreSQL instead.
+  - Direct job reads (`getJob`, `getJobState`) and lease renewals do not bump:
+    reads commit nothing, renewals journal no event, and frequent polls or
+    heartbeats could otherwise starve a large queue's refresh. A refresh whose
+    read model predates a renewal can show the previous expiry in `getLockInfo`
+    until the next renewal or event; PostgreSQL decides lease ownership and
+    expiry.
+  - For a job not yet in the local snapshot whose caller named no queue (the
+    ID-only mutations: progress, data, priority, delay, discard, promotion,
+    deduplication-key removal, relationship and client-release reloads), only
+    the post-commit reload learns the queue. If that reload fails or is
+    superseded, an older refresh can roll the write back until the write's own
+    journal event arrives.
+
+  The version check also bounds liveness: a full-queue refresh applies only if
+  no event or own commit for its queue arrives while it loads. With changes at
+  rate λ and a load time L, an attempt succeeds with probability about e^(-λL),
+  and attempts are spaced by the capped retry delay, so on a busy queue a
+  full-queue refresh can be retried indefinitely without applying. This
+  predates #158, since received events already bumped the version. Per-job
+  state still converges through affected-ID projections, and claims are decided
+  in PostgreSQL; only state that a full refresh alone repairs, such as queue
+  policy or DLQ rows pruned by another broker, can stay stale meanwhile.
+
+  Transient refresh failures retain a dirty marker for bounded-backoff retry,
   while an affected-ID refresh leaves any ID changed by an in-flight event
   untouched. PostgreSQL requires `maxQueueEvents >= 1`; zero is rejected
   explicitly because multi-broker convergence requires a durable journal row.

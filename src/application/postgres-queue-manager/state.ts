@@ -1,7 +1,6 @@
 import type { JobId } from '../../domain/types/job';
 import { PostgresQueueStore } from '../../infrastructure/persistence/postgres';
 import type { PostgresDeliveredStoreEvent } from '../../infrastructure/persistence/postgres';
-import type { PostgresStoredJob } from '../../infrastructure/persistence/postgres';
 import { QueueManager } from '../queueManager';
 import { stopBackgroundTasks } from '../backgroundTasks';
 import type { PostgresQueueManagerConfig } from './config';
@@ -15,6 +14,7 @@ import { PostgresQueueSnapshot } from './snapshot';
 import { PostgresStartupEventBuffer } from './startupEventBuffer';
 import { PostgresOperationGate } from './operationGate';
 import { applyPostgresJobProjection, PostgresProjectionRefreshes } from './projectionRefreshes';
+import type { PostgresJobProjection } from './projectionRefreshes';
 import { PostgresQueueRefreshes } from './queueRefreshes';
 import { postgresRetryDelayMs } from '../../infrastructure/persistence/postgres/maintenanceSchedule';
 
@@ -24,6 +24,7 @@ export abstract class PostgresQueueManagerState extends QueueManager {
   protected readonly activeTokens = new Map<JobId, string>();
   protected readonly postgresReady: Promise<void>;
   private readonly queueRefreshes: PostgresQueueRefreshes;
+  /** Bumped by received events and own commits; see `invalidateQueueRefreshes`. */
   private readonly queueEventVersions = new Map<string, number>();
   private snapshotEventBuffer: PostgresStartupEventBuffer | null = new PostgresStartupEventBuffer();
   private terminalMetricBaselineCommitSeq = 0;
@@ -57,8 +58,7 @@ export abstract class PostgresQueueManagerState extends QueueManager {
     );
     this.projectionRefreshes = new PostgresProjectionRefreshes(
       (requests) => this.postgresStore.loadJobProjections(requests),
-      (id, projection) =>
-        applyPostgresJobProjection(this.postgresSnapshot, this.activeTokens, id, projection),
+      (id, projection, ownWrite, queue) => this.applyProjection(id, projection, ownWrite, queue),
       (queue, id, error) => this.postgresStore.reportProjectionRefresh(queue, id, error),
       postgresRetryDelayMs(this.postgresStore.config)
     );
@@ -139,37 +139,6 @@ export abstract class PostgresQueueManagerState extends QueueManager {
     return this.operations.run(operation);
   }
 
-  protected async refreshJob(id: JobId, queue?: string): Promise<void> {
-    const targetQueue = queue ?? this.postgresSnapshot.get(id)?.job.queue ?? '';
-    try {
-      await this.projectionRefreshes.refreshNow(id, targetQueue);
-    } catch {
-      this.projectionRefreshes.request(id, targetQueue);
-    }
-  }
-
-  protected async fetchPostgresJob(id: JobId): Promise<PostgresStoredJob | null> {
-    const queue = this.postgresSnapshot.get(id)?.job.queue ?? '';
-    try {
-      return (await this.projectionRefreshes.refreshNow(id, queue)).row;
-    } catch (error) {
-      this.projectionRefreshes.request(id, queue); // the reported failure keeps a retry
-      throw error;
-    }
-  }
-
-  protected async refreshJobs(ids: readonly JobId[], queue?: string): Promise<void> {
-    const requests = [...new Set(ids)].map((id) => ({
-      id,
-      queue: queue ?? this.postgresSnapshot.get(id)?.job.queue ?? '',
-    }));
-    try {
-      await this.projectionRefreshes.refreshManyNow(requests);
-    } catch {
-      for (const request of requests) this.projectionRefreshes.request(request.id, request.queue);
-    }
-  }
-
   protected async refreshQueue(queue: string): Promise<boolean> {
     const eventVersion = this.queueEventVersions.get(queue) ?? 0;
     const { rows, state, exists, results } = await this.postgresStore.loadQueueReadModel(queue);
@@ -187,6 +156,7 @@ export abstract class PostgresQueueManagerState extends QueueManager {
   }
 
   protected async refreshQueueAfterCommit(queue: string): Promise<void> {
+    this.invalidateQueueRefreshes(queue); // an older in-flight load must not land after ours
     try {
       if (!(await this.refreshQueue(queue))) this.scheduleQueueRefresh(queue);
       else this.postgresStore.reportQueueRefresh(queue, null);
@@ -231,8 +201,35 @@ export abstract class PostgresQueueManagerState extends QueueManager {
     this.queueRefreshes.schedule(queue);
   }
 
+  /**
+   * Mark a full refresh of `queue` that is still loading as stale: it is discarded and
+   * reloaded instead of installing a read model that may predate a change this broker
+   * received or committed. Called for every received event and synchronously after each
+   * own commit, before its local install; it never starts a reload. Reads and lease
+   * renewals do not call it: they commit nothing or journal no event, so frequent polls
+   * or heartbeats could starve queue refreshes, and only the informational expiry differs.
+   */
+  protected invalidateQueueRefreshes(queue: string | undefined): void {
+    if (queue === undefined) return;
+    this.queueEventVersions.set(queue, (this.queueEventVersions.get(queue) ?? 0) + 1);
+  }
+
+  private applyProjection(
+    id: JobId,
+    projection: PostgresJobProjection,
+    ownWrite: boolean,
+    requestedQueue: string
+  ): void {
+    // The caller invalidated the requested queue before the reload. Bump again only a
+    // queue it could not name (a job not yet local): a second bump of the same queue
+    // would discard a refresh started after the commit, such as the caller's own.
+    const queue = projection.row?.job.queue ?? projection.completion?.queue;
+    if (ownWrite && queue !== requestedQueue) this.invalidateQueueRefreshes(queue);
+    applyPostgresJobProjection(this.postgresSnapshot, this.activeTokens, id, projection);
+  }
+
   private onStoreEvent(event: PostgresDeliveredStoreEvent): void {
-    this.queueEventVersions.set(event.queue, (this.queueEventVersions.get(event.queue) ?? 0) + 1);
+    this.invalidateQueueRefreshes(event.queue);
     const startupBuffer = this.snapshotEventBuffer;
     startupBuffer?.capture(event);
     if (startupBuffer) this.postgresSnapshot.apply(event);
@@ -261,6 +258,7 @@ export abstract class PostgresQueueManagerState extends QueueManager {
 
   protected applyPostgresClaim(claim: Parameters<PostgresQueueSnapshot['claim']>[0]): void {
     this.projectionRefreshes.supersede(claim.job.id);
+    this.invalidateQueueRefreshes(claim.job.queue);
     this.activeTokens.set(claim.job.id, claim.token);
     this.postgresSnapshot.claim(claim);
   }
