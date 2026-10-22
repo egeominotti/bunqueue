@@ -890,7 +890,10 @@ retain their existing host-clock behavior.
   miss is coalesced separately from journal work, while a complete failed or
   recovered durable scan updates runtime health independently of periodic
   maintenance. Job events carry the
-  authoritative job/state payload and update the snapshot directly. Terminal
+  authoritative job/state payload. While the startup snapshot loads they are
+  applied to it directly; afterwards each event requests an asynchronous
+  affected-ID projection refresh that re-reads the job, so the event cursor can
+  reach the journal head before the snapshot reflects that event. Terminal
   and retry events also carry the complete DLQ entry and retry state, including
   explicit `null` clearing. Queue-control or payload-less events schedule a full
   queue refresh. A per-queue event version retries stale full-queue refreshes,

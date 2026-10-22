@@ -244,7 +244,7 @@ jobs:
         run: php tests/soak.php
 
   go:
-    name: Go 1.26.5
+    name: Go 1.26.10
     runs-on: ubuntu-latest
     # Soak (15m) + 60s fuzzing on top of the suite.
     timeout-minutes: 50
@@ -256,7 +256,7 @@ jobs:
           bun-version: 1.4.4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: 1.26.5
+          go-version: 1.26.10
           cache-dependency-path: sdk/go/go.sum
       - name: Install server dependencies
         run: bun install --frozen-lockfile

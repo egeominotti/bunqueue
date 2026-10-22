@@ -122,7 +122,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: 1.26.5
+          go-version: 1.26.10
           cache-dependency-path: sdk/go/go.sum
       # The Go suite's TestMain spawns a real broker with `bun src/main.ts`, so
       # Gremlins cannot even gather baseline coverage without Bun on PATH.

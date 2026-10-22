@@ -27,7 +27,7 @@ jobs:
           tools: composer
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: 1.26.5
+          go-version: 1.26.10
       # A SHA pin cannot select the toolchain by branch name; pass it explicitly.
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:

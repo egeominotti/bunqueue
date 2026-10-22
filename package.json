@@ -175,6 +175,9 @@
     "typescript": "^5.9.3",
     "zod": "^4.3.6"
   },
+  "overrides": {
+    "tinypool": "^2.1.2"
+  },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0"
   },

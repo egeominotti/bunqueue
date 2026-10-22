@@ -48,6 +48,32 @@ async function eventually(condition: () => boolean | Promise<boolean>, timeoutMs
   return false;
 }
 
+/**
+ * Wait until `value` has delivered every committed journal event, has no queue refresh
+ * in flight, and its local DLQ shows exactly `expected`. The cursor alone is not enough:
+ * delivering an event advances it synchronously, while the snapshot is repaired by an
+ * asynchronous projection or full-queue refresh.
+ */
+async function caughtUpWithDlq(
+  value: PostgresQueueManager,
+  queue: string,
+  expected: readonly JobId[]
+): Promise<boolean> {
+  const stream = eventStream(value);
+  const refreshes = (value as unknown as RefreshInspectableManager).queueRefreshes;
+  return await eventually(async () => {
+    const cursor = stream.cursor;
+    if (cursor < (await managerStore(value).latestEventId())) return false;
+    await refreshes.settled();
+    return (
+      value
+        .getDlq(queue)
+        .map((job) => job.id)
+        .join() === expected.join()
+    );
+  });
+}
+
 async function cleanup(url: string, value: string): Promise<void> {
   const sql = new SQL(url, { max: 2 });
   try {
@@ -292,10 +318,7 @@ describe('PostgreSQL event catch-up regressions', () => {
         const queue = 'missed-notify';
         await active.setDlqConfigDurable(queue, { maxEntries: 1, maxAge: null });
         const evicted = await failTerminal(stale, stale, queue, 0);
-        const stream = eventStream(stale);
-        expect(
-          await eventually(async () => stream.cursor >= (await managerStore(stale).latestEventId()))
-        ).toBe(true);
+        expect(await caughtUpWithDlq(stale, queue, [evicted])).toBe(true);
         expect(stale.getDlq(queue).map((job) => job.id)).toEqual([evicted]);
 
         const paused = await pauseNotifications(stale);
@@ -338,10 +361,7 @@ describe('PostgreSQL event catch-up regressions', () => {
         const queue = 'flow-missed-notify';
         await active.setDlqConfigDurable(queue, { maxEntries: 1, maxAge: null });
         const evicted = await failTerminal(stale, stale, queue, 0);
-        const stream = eventStream(stale);
-        expect(
-          await eventually(async () => stream.cursor >= (await managerStore(stale).latestEventId()))
-        ).toBe(true);
+        expect(await caughtUpWithDlq(stale, queue, [evicted])).toBe(true);
         expect(stale.getDlq(queue).map((job) => job.id)).toEqual([evicted]);
 
         const paused = await pauseNotifications(stale);

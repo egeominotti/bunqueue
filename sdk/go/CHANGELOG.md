@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- CI, the SDK workflows and the SDK test image build with Go 1.26.10 instead
+  of 1.26.5. The TLS connection path (`dialTLS`, `roundTripLocked`,
+  `readExactlyLocked`) reaches four standard library vulnerabilities fixed
+  between 1.26.6 and 1.26.10: GO-2026-6809, GO-2026-6607, GO-2026-6090 and
+  GO-2026-5972. The module still declares `go 1.26.5`, so build applications
+  with Go 1.26.10 or later on 1.26, or 1.27.3 or later, to get the fixes.
+
 ### Fixed
 
 - A negative `PollTimeoutMs` (non-blocking pulls) no longer spins: the worker

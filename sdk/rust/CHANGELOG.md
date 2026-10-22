@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `Cargo.lock` moves `rustls` from 0.23.42 to 0.23.46 and `rustls-webpki` from
+  0.103.13 to 0.103.16, fixing RUSTSEC-2026-0285, -0346, -0348, -0349 and
+  -0382, so the weekly `cargo audit` passes. rustls 0.23.46 also brings
+  `aws-lc-rs` 1.18 and `aws-lc-sys` 0.46. The existing dependency ranges allow
+  all of them; applications run `cargo update -p rustls -p rustls-webpki`.
 - Wait after an empty pull, as the main client does
   (`pollTimeout > 0 ? 10 : drainDelay`): 50 ms when the poll timeout is 0
   (non-blocking), 10 ms when it is positive. An idle `Worker::run` re-issued
