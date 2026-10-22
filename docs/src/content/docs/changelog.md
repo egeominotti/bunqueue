@@ -62,12 +62,12 @@ head:
   it, so a job the broker had just failed terminally could be reported `active`
   again and be missing from its DLQ until the job's event arrived; the same
   applied to its claims, completions, pushes, cancellations, DLQ removals and
-  queue-wide operations. Each own commit now marks such an in-flight refresh as
-  stale before the change is installed locally, as a received event already
-  did, so the refresh is reloaded instead of applied. Optimistic local settings
+  queue-wide operations. Each own commit is now recorded for such an in-flight
+  refresh before the change is installed locally, so the refresh no longer
+  overwrites it (see #161 below for how it is applied). Optimistic local settings
   that are applied before their deferred write commits (non-durable `pause`,
-  `resume`, rate limit, concurrency, stall and DLQ configuration) can still be
-  briefly reverted. No data was lost, and claims were always decided in
+  `resume`, rate limit, concurrency, stall and DLQ configuration, `drain` and
+  `obliterate`) can still be briefly reverted until the queue is reloaded. No data was lost, and claims were always decided in
   PostgreSQL.
 - With the PostgreSQL backend, `WaitJob` (and so `waitUntilFinished` without
   QueueEvents) no longer returns the result of a completed job that `Cancel`
@@ -79,6 +79,24 @@ head:
   Cancel cleared, as a waiting `WaitJob` already did. Memory and SQLite are
   unchanged. `test/postgres-cancel-outcome.test.ts` failed 8 of 50 runs under
   injected 0-15 ms scheduling delays before and 0 of 50 after.
+- With the PostgreSQL backend, a full-queue refresh of a busy queue now applies
+  on its first load ([#161](https://github.com/egeominotti/bunqueue/issues/161)).
+  A refresh was discarded and reloaded whenever an event or the broker's own
+  write for any job of its queue arrived while it loaded, so with steady traffic
+  it could be retried indefinitely without applying. Meanwhile the broker's
+  local view missed queue-level changes made through other brokers (pause, rate
+  and concurrency limits, drain, clean, obliterate, DLQ pruning) and the
+  recovery after a startup event-buffer overflow, and the broker's own
+  queue-wide durable operations, such as `drainDurable` or a durable pause, could
+  be missing from its view when they returned. A refresh now reads the journal
+  position of its PostgreSQL snapshot and installs every job that did not
+  change after it, leaving the jobs changed meanwhile to their own per-job
+  refreshes, and an older refresh never replaces a newer one. Per-job state
+  still converged, and claims were always decided in PostgreSQL. This also
+  fixes the intermittent PostgreSQL test failure in which a broker still
+  reported a queue as not paused right after another broker paused it during a
+  burst of 256 pushes, and an ID-only update of a job the broker had not seen
+  yet can no longer be briefly undone by an older refresh.
 
 ### Testing
 

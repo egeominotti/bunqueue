@@ -210,7 +210,8 @@ do not re-poll in a tight loop.
   range for any finite job priority, and
   `maintenanceSchedule.ts` arms the runtime's periodic maintenance on
   [safe timers](./features/shared-timers.md). The manager's full-queue refresh
-  retries live in `postgres-queue-manager/queueRefreshes.ts`. Exact journal
+  retries live in `postgres-queue-manager/queueRefreshes.ts`, and the per-job
+  fencing of each refresh in `postgres-queue-manager/queueLoads.ts`. Exact journal
   cardinality and its guarded trigger definitions live in `eventRetention.ts` and
   `eventRetentionSchema.ts`.
   Server handler routing, protocol parsing, TCP connection/event-subscription
@@ -820,8 +821,13 @@ orphaned commit envelopes in bounded database turns,
 while `postgres-queue-manager/projectionRefreshes.ts` coalesces authoritative
 per-job repair with job- and queue-scoped generation fencing.
 `postgres-queue-manager/jobRefreshes.ts` reloads a job after a mutation; after
-an own commit it first marks any older in-flight full-queue refresh of the
-job's queue stale, so that refresh cannot roll the commit back (#158). Every
+an own commit it first records the job for every full-queue refresh of its queue
+still loading, so that refresh keeps the job's local state and cannot roll the
+commit back (#158). `postgres-queue-manager/queueLoads.ts` holds those per-load
+records (received events, own commits, and projections loaded during the load)
+and each queue's installed journal horizon while its loads overlap: a full-queue
+refresh installs every job not changed after its snapshot's horizon instead of
+being discarded on a busy queue, and never replaces a newer read model (#161). Every
 path that drops a pending per-job retry because it installs authoritative state
 (consumed
 direct ticket, local claim, queue refresh) also clears that job's

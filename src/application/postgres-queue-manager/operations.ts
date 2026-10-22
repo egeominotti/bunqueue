@@ -21,7 +21,7 @@ export class PostgresQueueManagerOperations extends PostgresQueueManagerCloud {
       await this.postgresReady;
       const queue = await this.postgresStore.cancelReturningQueue(id);
       if (queue === null) return false;
-      this.invalidateQueueRefreshes(queue); // the committed row's queue, even if not local
+      this.invalidateQueueRefreshes(queue, id); // the committed row's queue, even if not local
       this.postgresSnapshot.remove(id);
       return true;
     });

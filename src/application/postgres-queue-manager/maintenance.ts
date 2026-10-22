@@ -61,7 +61,7 @@ export class PostgresQueueManagerMaintenance extends PostgresQueueManagerRelatio
       await this.postgresReady;
       const removed = await this.postgresStore.removeDlq(queue, id);
       if (removed) {
-        this.invalidateQueueRefreshes(queue);
+        this.invalidateQueueRefreshes(queue, id);
         this.postgresSnapshot.remove(id);
       }
       return removed;

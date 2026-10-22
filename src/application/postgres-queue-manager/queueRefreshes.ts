@@ -2,8 +2,8 @@ import { assertDuration } from '../../shared/durations';
 import { safeTimeout, type SafeTimer } from '../../shared/timers';
 import { POSTGRES_MAX_RETRY_DELAY_MS } from '../../infrastructure/persistence/postgres/maintenanceSchedule';
 
-/** Reload one queue's read model; false when a concurrent event or own write made it stale. */
-type QueueRefresh = (queue: string) => Promise<boolean>;
+/** Reload one queue's read model. */
+type QueueRefresh = (queue: string) => Promise<void>;
 type QueueRefreshReporter = (queue: string, error: unknown) => void;
 
 interface PendingPause {
@@ -13,13 +13,14 @@ interface PendingPause {
 
 /**
  * Coalesced full-queue refreshes of the local PostgreSQL read model, retried until one
- * applies.
+ * succeeds.
  *
- * One loop runs per dirty queue. A load made stale by a concurrent event or own write
- * waits `retryDelayMs` before reloading; a failed load waits `retryDelayMs`, then doubles
- * up to 1 s. The manager passes `postgresRetryDelayMs`: the poll interval, capped at 1 s,
- * so a long `pollIntervalMs` cannot keep a queue's read model stale. Every wait is a
- * cancellable `safeTimeout` that `stop()` ends at once: shutdown never sleeps one out.
+ * One loop runs per dirty queue. A queue scheduled again while it loads waits
+ * `retryDelayMs` before reloading, so a stream of queue invalidations cannot run full loads
+ * back to back; a failed load waits `retryDelayMs`, then doubles up to 1 s. The manager
+ * passes `postgresRetryDelayMs`: the poll interval, capped at 1 s, so a long
+ * `pollIntervalMs` cannot keep a queue's read model stale. Every wait is a cancellable
+ * `safeTimeout` that `stop()` ends at once: shutdown never sleeps one out.
  */
 export class PostgresQueueRefreshes {
   private readonly loops = new Map<string, Promise<void>>();
@@ -35,11 +36,6 @@ export class PostgresQueueRefreshes {
     private readonly retryDelayMs: number
   ) {
     assertDuration(retryDelayMs, 'PostgresQueueRefreshes: retryDelayMs');
-  }
-
-  /** Mark `queue` stale again, for the loop that is reloading it. */
-  markDirty(queue: string): void {
-    this.dirty.add(queue);
   }
 
   /** Reload `queue` once the store is ready, coalescing with a loop already running. */
@@ -78,10 +74,10 @@ export class PostgresQueueRefreshes {
     let retryDelay = this.retryDelayMs;
     while (!this.stopped && this.dirty.delete(queue)) {
       try {
-        const applied = await this.refresh(queue);
-        if (!applied && !this.stopped) await this.pause(this.retryDelayMs);
+        await this.refresh(queue);
         this.report(queue, null);
         retryDelay = this.retryDelayMs;
+        if (this.dirty.has(queue)) await this.pause(this.retryDelayMs);
       } catch (error) {
         this.report(queue, error);
         if (this.stopped) return;

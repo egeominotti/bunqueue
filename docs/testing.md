@@ -588,7 +588,8 @@ refresh after PostgreSQL returned its read model, pause the broker's event
 stream, make a terminal failure, batched completion, claim, push, cancellation,
 DLQ removal or durable drain on that broker, and assert the broker still reports
 its own write after the older refresh settles; the terminal-failure case also
-asserts that the stale read model is reloaded exactly once. Further cases
+asserts that the held read model is installed around the failed job without a
+reload (#161). Further cases
 install the failure through the background fallback (the direct reload fails
 once, or direct reads of the same job supersede both reload attempts) and
 cancel a job pushed through another broker that this broker has not seen; the
@@ -603,10 +604,34 @@ the event stream, complete a job and remove it with `Cancel`, then deliver the
 held `completed` event while WaitJob reads the job or its completion record, on
 the same broker and on a second one; WaitJob must answer `completed` without
 the removed result, and a completion that was not removed (with and without
-`removeOnComplete`) must still answer its result. Additional deterministic cases keep
+`removeOnComplete`) must still answer its result. Busy-queue regressions
+(`test/postgres-busy-queue-refresh.test.ts`, issue #161) invalidate every
+full-queue load with a write to another job of the same queue that lands after
+PostgreSQL returned the read model: a remote push whose event the broker
+receives before the load returns, or an own push. They hold every load past
+five, so a refresh that applies only once the writes stop fails. They prove that
+a remote durable pause and a remote drain (which journals no per-job event)
+still reach the broker, and that an own `drainDurable` and an own durable pause
+are visible when they return, also an own `cleanDurable` whose own per-job
+events arrive while its refresh loads. Guard cases prove that a job claimed and a
+job pushed by another broker while a refresh loads keep their newer local state
+while that refresh still installs once, also when only the projection of an
+event at or below the snapshot's horizon, loaded during the refresh, holds the
+claim; that an own push survives a read model saying its queue does not exist;
+that a read whose projection loaded before a remote drain, and installs while
+the refresh loads, does not keep the drained job; that an older post-commit read
+model never replaces a newer one installed first; that a refresh which began
+later but took an older snapshot than the one installed is run again, so a job
+the installed refresh kept after a remote drain is removed; and that collecting
+commit envelopes never lowers the journal horizon.
+`test/postgres-queue-loads.test.ts` checks the same rules without a database:
+which jobs a load keeps, that a projection loaded before the load began keeps
+nothing, that an older read model is dropped (and reloaded when its load began
+after the installed one), and that a queue's installed
+horizon is forgotten once none of its loads is in flight. Additional deterministic cases keep
 a direct claim token across delayed journal replay, retry every captured client
 lease after a transient release error, bound repeated startup-buffer overflow,
-stop queue refresh under continuous event-version churn, serialize each
+let shutdown finish while a queue refresh loads amid own writes, serialize each
 maintenance subsystem, and prove store close awaits admitted maintenance.
 Event-retention regressions hold the per-queue advisory lock while a committed
 writer requests an autonomous trim. They assert that normal contention leaves

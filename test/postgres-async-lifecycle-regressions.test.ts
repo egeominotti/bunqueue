@@ -150,10 +150,10 @@ describe('PostgreSQL asynchronous lifecycle regressions', () => {
       const broker = manager(value, 'refresh-shutdown');
       try {
         await broker.waitUntilReady();
-        await broker.push('hot', { data: {} });
+        const job = await broker.push('hot', { data: {} });
         const internals = broker as unknown as {
           postgresStore: PostgresQueueStore;
-          queueEventVersions: Map<string, number>;
+          invalidateQueueRefreshes(queue: string, id: typeof job.id): void;
           refreshQueue(queue: string): Promise<void>;
           runPostgresOperation<T>(operation: () => Promise<T>): Promise<T>;
         };
@@ -164,10 +164,7 @@ describe('PostgreSQL asynchronous lifecycle regressions', () => {
         internals.postgresStore.loadQueueReadModel = async (queue) => {
           const snapshot = await loadQueueReadModel(queue);
           attempts++;
-          internals.queueEventVersions.set(
-            'hot',
-            (internals.queueEventVersions.get('hot') ?? 0) + 1
-          );
+          internals.invalidateQueueRefreshes('hot', job.id);
           return snapshot;
         };
         const refresh = internals.runPostgresOperation(() => internals.refreshQueue('hot'));
