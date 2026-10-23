@@ -18,7 +18,7 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## [Unreleased]
+## [2.9.18] - 2026-10-23
 
 ### Security
 
@@ -41,15 +41,18 @@ head:
     also brings `aws-lc-rs` 1.18 and `aws-lc-sys` 0.46. The existing dependency
     ranges allow all of them, so applications only need
     `cargo update -p rustls -p rustls-webpki`.
-- The repository's development dependencies no longer carry critical or high
+- The root package's development dependencies no longer carry critical or high
   advisories: with the `tinypool` override above, `bun audit` drops from 48
-  findings (3 critical, 19 high) to one moderate (`sprintf-js`, which has no
-  fixed release) and one low. The lockfile now resolves patched releases inside
-  the existing version ranges (`bun audit fix`; `package.json` is unchanged):
-  the MCP SDK used to develop and test `bunqueue-mcp` moves to 1.32.0, and
-  `proxy-addr`, `brace-expansion`, `fast-uri`, `hono`, `@hono/node-server`,
-  `ip-address`, `js-yaml`, `markdown-it`, `nanoid` and `qs` move to their
-  patched releases. The published package's dependencies were already clean
+  findings (3 critical, 19 high) to one low (`@ai-sdk/provider-utils` 2.x,
+  pinned through the locked `@mastra/core` 1.53.0, which `bun audit fix`
+  cannot move).
+  The lockfile now resolves patched releases inside the existing version ranges
+  (`bun audit fix`; `package.json` is unchanged): the MCP SDK used to develop
+  and test `bunqueue-mcp` moves to 1.32.0, and `proxy-addr`,
+  `brace-expansion`, `fast-uri`, `hono`, `@hono/node-server`, `js-yaml`,
+  `markdown-it`, `nanoid` and `qs` move to their patched releases, as does
+  `ip-address`, to 10.7.4, which also fixes GHSA-rxp7-6hxx-x8q5, published on
+  22 October. The published package's dependencies were already clean
   (`bun audit --prod`), and its optional `@modelcontextprotocol/sdk` peer range
   is unchanged.
 
