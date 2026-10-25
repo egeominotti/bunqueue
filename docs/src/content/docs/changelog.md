@@ -33,6 +33,43 @@ head:
   instead of running off the screen (the panel was sized from the 18rem left
   sidebar). On phones, prose, headings, code and callouts share one 20px
   gutter; paragraphs and headings used to sit 1rem further in.
+- The homepage uses the same typeface: every headline is set in Inter with
+  tight tracking instead of condensed Bricolage Grotesque, which the site no
+  longer loads (the font package, its preload and its CSS are removed). The
+  hero keeps one announcement, the newest release post (the Academy and AI
+  agents pills only jumped to the sections below it), sets the second sentence
+  of the headline in the muted color, and puts the actions under the subtitle.
+  FAQ questions open with a chevron on the right, the footer links are set in
+  Inter rather than monospace, code copy buttons match the documentation, and
+  the homepage no longer shows "Edit page" or "Last updated".
+- The homepage said the MCP server has 75 tools; it has 79 primary tools in 11
+  toolsets, as the MCP guide and `llms.txt` already said.
+- `/llms-full.txt` and the Markdown twin of every page (`/<page>.md`) are now
+  plain Markdown an AI agent can read without the site's presentation layer.
+  They used to carry the MDX source verbatim: outside code, `llms-full.txt`
+  alone had 97 `import` lines, 2,272 `<Tabs>`/`<TabItem>` tags, 957 layout
+  `<div>`s, 1,448 `class` attributes and 334 hero blocks; it now has none. A new converter (`docs/src/lib/agent-markdown.ts`)
+  removes imports, exports, MDX comments and layout HTML, turns each tab into
+  a bold label above its content (**Bun**, **Python**, ...), asides and
+  `:::note` directives into blockquotes, cards and link cards into titles and
+  links, and inline HTML into Markdown; the decorative page hero keeps only its
+  summary, interactive widgets leave a one-line note, and root-relative links
+  become absolute. Code blocks are never touched: every fenced example (1,591
+  in the page sources, 3,312 fence lines in `llms-full.txt` before and after)
+  comes through byte for byte, blank lines included.
+- `llms.txt` lists every documentation page (114, up from 62): new Queue,
+  Worker and Scheduling sections, the eight TCP command families, the
+  PostgreSQL multi-broker example pages, the SDK overview, the glossary, the
+  production guide and the versioned API reference. It explains that every page
+  has a `.md` twin and that Queue and Worker must share a mode, and its quick
+  example now creates the worker with `embedded: true`; without it the worker
+  connected over TCP and never saw the embedded queue's jobs.
+- The blog has two RSS feeds: every post (`/rss.xml`) and release posts only
+  (`/blog/releases.xml`), both auto-discoverable. Items carry a category
+  (Release or the article topic), the post author and the publication date;
+  same-day releases are ordered by version, and `lastBuildDate` is the newest
+  post date rather than the build time. The blog index shows RSS, releases and
+  GitHub releases links under its title, and every post links the feed.
 
 - Every release now has its own blog post at `/blog/bunqueue-vX-Y-Z/`, in the
   format of Bun's release posts: a one-line summary, install and upgrade

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug and ships 1 addition. job.name always 'default' for scheduled jobs: When jobs were created via Queue#upsertJobScheduler, the name from jobTemplate was not embedded in the cron job data.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.6.2
 

@@ -22,7 +22,7 @@ head:
   <p class="bq-hero-sub">Fixes a getJobs crash on queues with a million jobs and removes O(n) scans from the broker: dashboard counts 4,500x faster at 1M jobs, idle pulls on delayed queues 3,500x faster, 64 MB TCP frames 80x faster.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 This release is about one thing: a broker that does not slow down as it fills up.
 Several hot paths scanned every queued job, every connection or every buffered

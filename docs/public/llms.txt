@@ -9,6 +9,11 @@ Key facts:
 - Performance (native 2026-07-30 campaign): ~729K jobs/sec internal in-memory batch push, ~186K public on-disk Embedded addBulk, ~159K TCP PUSHB, ~17K TCP worker drain, and ~2.7K/~3.2K linear workflows/sec Embedded/TCP. Operations and persistence boundaries are reported separately.
 - Install: `bun add bunqueue` — import from `bunqueue/client` (Queue, Worker, FlowProducer, Bunqueue) or `bunqueue/workflow` (Workflow, Engine).
 
+How to read these docs:
+- Every page below has a plain-Markdown version for agents: append `.md` to its path (`/guide/queue/` is also served as `/guide/queue.md`). It carries the same text and code with no navigation, imports, JSX or layout HTML; tabs become bold labels (for example **Bun**, **Python**) above each language's code.
+- The whole documentation is also one text file: [Full documentation text](https://bunqueue.dev/llms-full.txt).
+- Queue and Worker must use the same mode: `embedded: true` on both (in-process, Bun only), or a TCP `connection` to a server on both. Without `embedded: true` a client connects over TCP to `localhost:6789`.
+
 ## Getting Started
 
 - [Introduction](https://bunqueue.dev/guide/introduction/): What bunqueue is, memory/SQLite defaults, PostgreSQL scaling, feature overview
@@ -20,6 +25,7 @@ Key facts:
 
 ## Client SDK
 
+- [Official SDKs](https://bunqueue.dev/guide/sdks/): TypeScript (Node.js, Deno, Bun, Cloudflare Workers), Python, PHP, Go, Rust and Elixir clients
 - [Workflow Quickstart](https://bunqueue.dev/guide/workflow/quickstart/): register definitions, recover, start, inspect terminal state and close
 - [Workflow Approval](https://bunqueue.dev/guide/workflow/approval/): waitFor, validated decisions, first-wins signals and MCP topology
 - [Workflow Durability](https://bunqueue.dev/guide/workflow/durability/): restart, recovery, stable identities and unknown effects
@@ -38,18 +44,68 @@ Key facts:
 - [Cron & Scheduled Jobs](https://bunqueue.dev/guide/cron/): Cron expressions, repeat intervals, IANA timezones
 - [Rate Limiting & Concurrency](https://bunqueue.dev/guide/rate-limiting/): Per-queue rate limits and concurrency caps
 
+## Queue
+
+- [Adding Jobs](https://bunqueue.dev/guide/queue/adding-jobs/): Single and bulk adds, priorities, delays, per-job attempts and timeouts, durable writes that skip the buffer
+- [JobOptions Reference](https://bunqueue.dev/guide/queue/options/): Every JobOptions field with its type and default (priority, delay, attempts, backoff, timeout, jobId, removeOnComplete, durable)
+- [Deduplication](https://bunqueue.dev/guide/queue/deduplication/): Custom job ids for idempotent adds, deduplication keys with a TTL, looking up or clearing a key
+- [Querying Jobs](https://bunqueue.dev/guide/queue/querying/): Fetch a job by id, list by state, count per state and priority, read results and progress, what each state means
+- [Queue Control](https://bunqueue.dev/guide/queue/control/): Pause and resume, drain, obliterate, clean by age and state, bulk retry, promote delayed jobs
+- [Progress, Logs and Dependencies](https://bunqueue.dev/guide/queue/progress/): Progress updates, per-job logs, parent/child links created by flows
+- [Rate Limits and Global Concurrency](https://bunqueue.dev/guide/queue/limits/): Per-window rate limits, a concurrency ceiling across every worker, clearing both
+- [Job Groups](https://bunqueue.dev/guide/queue/job-groups/): Per-tenant round-robin FIFO, per-group depth, rate limits and concurrency
+- [Job Schedulers](https://bunqueue.dev/guide/queue/schedulers/): Named, updatable repeatable schedules with upsertJobScheduler
+- [Workers, Stats and Metrics](https://bunqueue.dev/guide/queue/metrics/): Registered workers, per-queue statistics, windowed metrics, event stream trimming
+- [DLQ from the Queue](https://bunqueue.dev/guide/queue/dlq/): Configure, list, retry and purge the dead letter queue; embedded vs TCP differences
+- [Namespaces, Auto-Batching and Store-and-Forward](https://bunqueue.dev/guide/queue/advanced/): prefixKey isolation, transparent TCP auto-batching, forwarding local jobs to a central server
+
+## Worker
+
+- [Concurrency and Batch Pulling](https://bunqueue.dev/guide/worker/concurrency/): Parallel jobs, runtime concurrency changes, batch pulling and long polling
+- [The Job Object](https://bunqueue.dev/guide/worker/job-object/): Data and metadata, progress, per-job logs, lock extension, child results inside a processor
+- [Worker Events](https://bunqueue.dev/guide/worker/events/): completed, failed, progress, stalled, active, drained, log and closed, with payload signatures
+- [Errors, Retries and Backoff](https://bunqueue.dev/guide/worker/errors/): Attempts, exponential backoff, per-job timeouts, permanent failure into the DLQ
+- [Lifecycle and Graceful Shutdown](https://bunqueue.dev/guide/worker/lifecycle/): Pause, resume, and close so in-flight jobs finish instead of stalling on deploy
+- [Heartbeats, Stalls and Locks](https://bunqueue.dev/guide/worker/stalls/): Heartbeats, stall recovery when a worker dies, the lock that prevents double processing
+- [SandboxedWorker](https://bunqueue.dev/guide/worker/sandboxed/): Experimental isolated processing in worker threads on Bun, Node.js and Deno
+- [WorkerOptions Reference](https://bunqueue.dev/guide/worker/options/): Every WorkerOptions field with its default (concurrency, batchSize, pollTimeout, heartbeatInterval, lockDuration, prefixKey)
+
+## Scheduling, Retries & Flows
+
+- [Cron Recipes](https://bunqueue.dev/guide/cron/recipes/): Fixed intervals, cron patterns in an IANA timezone, jobs that repeat after each completion
+- [Cron Reference](https://bunqueue.dev/guide/cron/reference/): Five-field syntax and shortcuts, every repeat option with defaults and per-SDK names, cron from AI agents
+- [DLQ Automatic Retry](https://bunqueue.dev/guide/dlq/auto-retry/): Bounded exponential redelivery that survives SQLite or PostgreSQL broker restarts
+- [DLQ Configuration](https://bunqueue.dev/guide/dlq/configuration/): Every setDlqConfig option (automatic retry, interval, ceiling, expiry, per-queue cap) with defaults
+- [DLQ Operations](https://bunqueue.dev/guide/dlq/operations/): Filter by reason or age, retry a subset, remove one entry, health counters, purge
+- [DLQ Reference](https://bunqueue.dev/guide/dlq/reference/): Failure reasons, entry structure with attempt history, complete method surface
+- [Flow Patterns](https://bunqueue.dev/guide/flow/patterns/): Sequential chains, fan-in parents, deeper trees, reading child results
+- [Flow Failure Handling](https://bunqueue.dev/guide/flow/failures/): What a parent does when a child fails, and the four child options that change it
+- [FlowProducer Reference](https://bunqueue.dev/guide/flow/reference/): Every FlowProducer method, processor-side job helpers, the shape of a flow step
+- [Workflow Steps & Control Flow](https://bunqueue.dev/guide/workflow/steps/): Step context, retries with backoff, timeouts, schema validation, branching, parallel steps, loops
+- [Workflow Rollback](https://bunqueue.dev/guide/workflow/rollback/): Saga compensation order, per-step outcomes, failing rollbacks, the point of no return
+
 ## Server Mode & APIs
 
 - [Server Mode](https://bunqueue.dev/guide/server/): Standalone TCP+HTTP server, token auth, Docker, graceful shutdown
 - [CLI Reference](https://bunqueue.dev/guide/cli/): push/pull/ack, queue control, DLQ, cron, stats from the terminal
 - [HTTP REST API](https://bunqueue.dev/api/http/): 83 REST endpoints plus WebSocket and SSE real-time events
 - [TCP Protocol](https://bunqueue.dev/api/tcp/): MessagePack wire format, length-prefixed framing, and a linked summary of every command; the full command reference is split by family (jobs, queries, control and limits, DLQ, cron, flows, monitoring, workers and webhooks)
+  - [Job commands](https://bunqueue.dev/api/tcp/jobs/): PUSH, PUSHB, PUSHF, PULL, PULLB, ACK, ACKB, FAIL, job logs, lock extension
+  - [Query commands](https://bunqueue.dev/api/tcp/queries/): Job by id or custom id, state, result and progress, filtered paging, counts
+  - [Control commands](https://bunqueue.dev/api/tcp/control/): Cancel, update, promote, discard; pause, drain, clean; rate, concurrency and group config
+  - [DLQ commands](https://bunqueue.dev/api/tcp/dlq/): List with filters, stats, retry, purge, remove, re-queue completed jobs
+  - [Cron commands](https://bunqueue.dev/api/tcp/cron/): Create or update cron and interval schedules, list, read, delete
+  - [Flow commands](https://bunqueue.dev/api/tcp/flows/): Parent linking, failed and ignored child values, removing child dependencies
+  - [Monitoring commands](https://bunqueue.dev/api/tcp/monitoring/): Ping, hello, stats, metrics, Prometheus text, storage health, heartbeats
+  - [Worker and webhook commands](https://bunqueue.dev/api/tcp/workers/): Register and list workers; add, remove and list SSRF-checked webhooks
+- [API Reference by version](https://bunqueue.dev/reference/): Every exported class, interface and type, generated from the source of each release
 - [TypeScript Types](https://bunqueue.dev/api/types/): Job, Queue, Worker, DLQ, and connection interfaces
 - [Native TLS](https://bunqueue.dev/guide/tls/): Encrypt TCP and HTTP traffic without a reverse proxy
 - [MCP Server for AI Agents](https://bunqueue.dev/guide/mcp/): 79 primary MCP tools for Claude Desktop, Claude Code, Cursor, Windsurf over stdio or Streamable HTTP; opt-in toolsets, destructive-call confirmation, decision models (Jev, Clef, Clef-flash, Kev 9B, Laya) and workflow approval tools
 
 ## Operations & Production
 
+- [bunqueue in Production](https://bunqueue.dev/guide/production/): What survives a crash: at-least-once delivery, durable writes, backups, monitoring, go-live checklist
 - [Deployment Guide](https://bunqueue.dev/guide/deployment/): Docker, systemd, PM2, health checks, resource limits
 - [Web Dashboard](https://bunqueue.dev/guide/dashboard/): Open-source operator console for jobs, DLQ, cron, workers, workflows and server control
 - [Monitoring](https://bunqueue.dev/guide/monitoring/): Prometheus metrics, Grafana dashboards, DLQ alerts
@@ -70,6 +126,7 @@ Key facts:
 - [Migrate from BullMQ](https://bunqueue.dev/guide/migration/): Keep the Queue/Worker API, drop Redis
 - [bunqueue vs BullMQ](https://bunqueue.dev/guide/comparison/): Performance and feature comparison
 - [Benchmarks](https://bunqueue.dev/guide/benchmarks/): Reproducible throughput tests, embedded and TCP modes
+- [2.9.4 Performance vs Ten Releases](https://bunqueue.dev/guide/version-performance-2-9-4/): Controlled native comparison across Embedded and TCP SQLite job lifecycles
 - [SDK Performance](https://bunqueue.dev/guide/sdk-benchmarks/): Native producer throughput, latency, worker throughput, memory, and bottleneck analysis for all six official SDKs
 
 ## Architecture Internals
@@ -82,20 +139,28 @@ Key facts:
 - [Client SDK Internals](https://bunqueue.dev/architecture/client-sdk/): Connection pooling, embedded vs server mode, ACK batching
 - [Cron Scheduler Internals](https://bunqueue.dev/architecture/cron-scheduler/): MinHeap execution, lazy deletion, timezone handling
 - [Data Structures](https://bunqueue.dev/architecture/data-structures/): 4-ary MinHeap, skip lists, LRU cache, FNV-1a hashing
+- [Model-Based Testing](https://bunqueue.dev/architecture/model-based-testing/): fast-check command models against a real TCP broker, SQLite, shrinking and SIGKILL recovery
 
 ## Examples & Reference
 
 - [Code Examples](https://bunqueue.dev/examples/): Email queues, image processing, webhooks, ETL patterns
 - [PostgreSQL Multi-Broker Example](https://bunqueue.dev/examples/postgres-multibroker/): Verified Docker topology with PostgreSQL 18.6, three brokers, multiple queues and workers, reliability controls, durable flows, production operations, and an engineering report
+  - [Docker topology](https://bunqueue.dev/examples/postgres-multibroker/docker/): PostgreSQL 18.6 and three brokers with unique IDs, metrics, health checks, teardown
+  - [Queues, producers and workers](https://bunqueue.dev/examples/postgres-multibroker/queues-workers/): Typed queues, addBulk, priorities, delays, retries, progress, results, QueueEvents
+  - [Reliability controls](https://bunqueue.dev/examples/postgres-multibroker/reliability/): Concurrent custom IDs, global pause and resume, shared limits, DLQ recovery
+  - [Cross-queue flows](https://bunqueue.dev/examples/postgres-multibroker/flows/): A durable three-level FlowProducer graph across three queues and brokers
+  - [Operating N brokers](https://bunqueue.dev/examples/postgres-multibroker/operations/): Identities, connection budgets, routing, security, observability, upgrades, backups
+  - [Validation report](https://bunqueue.dev/examples/postgres-multibroker/validation/): Environment, exact commands, scenario results, findings and verdict
 - [Use Cases](https://bunqueue.dev/guide/use-cases/): AI agent workflows, payments, cron, multi-tenant queues
 - [FAQ](https://bunqueue.dev/faq/): Performance, scaling, SQLite vs Redis, migration questions
-- [Changelog](https://bunqueue.dev/changelog/): Version history and release notes
+- [Glossary](https://bunqueue.dev/guide/glossary/): Plain-language definitions of every concept (job, queue, worker, DLQ, backoff, embedded mode, stall detection)
+- [Changelog](https://bunqueue.dev/changelog/): Version history and release notes; each version also has a release post on the blog
 - [Contributing](https://bunqueue.dev/contributing/): Dev setup, coding standards, PR workflow
 
 ## Optional
 
 - [Interactive Simulator](https://bunqueue.dev/simulator/): Try bunqueue in the browser
-- [Blog Index](https://bunqueue.dev/blog/): All bunqueue articles
+- [Blog Index](https://bunqueue.dev/blog/): Release notes for every version (one post each, newest first) and all articles
 - [Blog: Why bunqueue](https://bunqueue.dev/blog/why-bunqueue/): SQLite instead of Redis, design rationale
 - [Blog: Getting Started in 5 Minutes](https://bunqueue.dev/blog/getting-started-five-minutes/): Embedded and TCP mode tutorial
 - [Blog: Workflow Engine](https://bunqueue.dev/blog/workflow-engine/): Multi-step orchestration without Temporal or Inngest
@@ -125,10 +190,11 @@ await queue.add('send-welcome', { to: 'user@example.com' }, {
   priority: 5,
 });
 
+// Same mode as the queue: without embedded: true the worker would connect over TCP.
 const worker = new Worker('emails', async (job) => {
   await sendEmail(job.data);
   return { sent: true };
-}, { concurrency: 10 });
+}, { embedded: true, concurrency: 10 });
 
 worker.on('completed', (job, result) => console.log(job.id, result));
 ```

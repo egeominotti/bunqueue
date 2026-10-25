@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 13 bugs. Cloud snapshots leaked unredacted job data (security): BUNQUEUE_CLOUD_REDACT_FIELDS was applied only to the event stream, never to periodic snapshots, so raw job.data and DLQ jobData (potential PII/secrets) were sent to the…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.19
 

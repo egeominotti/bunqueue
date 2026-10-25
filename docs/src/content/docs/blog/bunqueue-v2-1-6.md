@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 2 bugs and ships 2 additions. S3 backup hardening - 10 bug fixes with 33 new tests: - Replace silent catch in cleanup with proper logging - Reject retention &lt; 1 and intervalMs &lt; 60s in config validation - Validate SQLite magic bytes…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.1.6
 

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Ships 4 performance improvements and 2 additions. Reworked the main Examples page into an explicit beginner-to-advanced path: one embedded job, lifecycle and reliability, process boundaries, workflows, and finally the tested PostgreSQL…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.9.2
 

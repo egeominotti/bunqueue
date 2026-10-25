@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 6 bugs. BullMQ v5 prioritized state, bullMQ v5 waiting-children state, failParentOnFailure, flow atomicity and more.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.6.71
 

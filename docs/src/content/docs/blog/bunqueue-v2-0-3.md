@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 6 bugs. Major refactor: Split queue.ts into modular architecture (1955 → 485 lines) - Follows single responsibility principle with 14 focused modules - New modules: operations/add.ts, operations/counts.ts, operations/query.ts…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.0.3
 

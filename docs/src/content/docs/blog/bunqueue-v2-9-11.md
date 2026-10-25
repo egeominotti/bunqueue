@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 23 bugs. Bun and Node.js run a timer whose delay is NaN, negative, infinite or above 2^31 - 1 ms (about 24.8 days) after about 1 ms, and an interval with such a period, or with 0, about 870 times a second.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 Bun and Node.js run a timer whose delay is `NaN`, negative, infinite or above
 2^31 - 1 ms (about 24.8 days) after about 1 ms, and an interval with such a

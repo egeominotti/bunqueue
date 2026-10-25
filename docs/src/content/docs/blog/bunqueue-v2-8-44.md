@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 7 bugs. Scheduled and manual S3 backups now snapshot SQLite through VACUUM INTO, so committed WAL frames are preserved even when a reader blocks checkpoint truncation.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.44
 

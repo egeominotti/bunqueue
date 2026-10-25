@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 2 bugs. Queue.getJobCounts() silently returned all zeros in TCP mode (src/client/queue/operations/counts.ts): the sync getJobCounts() hardcoded {waiting:0,…} for the non-embedded branch, so a TCP client got zeros while the server…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 ## Bugfixes
 

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 2 bugs. cleanAsync() silently returned [] for completed/failed/wait (Issue #84), cleanQueue() only handled 'waiting' and 'delayed' state filters; all other states fell through to a no-op, leaving job data in SQLite.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.8
 

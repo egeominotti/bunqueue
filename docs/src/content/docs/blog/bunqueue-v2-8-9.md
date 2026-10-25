@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Ships 3 additions. Remote failure → the job fails locally (retry with backoff → local DLQ): persist the source queue to survive an uplink outage while its process or volume survives; retryDlq() re-enqueues when connectivity returns.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.9
 

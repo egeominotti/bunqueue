@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 3 bugs. TcpConnectionPool accepted maxInFlight and pipelining but never forwarded them to the clients it built, so every pooled connection ran with the default window of 100 no matter what you configured.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.32
 

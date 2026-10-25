@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. No-lock ack fails after stall re-queue (data loss): When a worker with useLocks=false processed a job that stall detection re-queued, the ack() call threw "Job not found" with no recovery path, leaving the job stuck in the…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.6.64
 

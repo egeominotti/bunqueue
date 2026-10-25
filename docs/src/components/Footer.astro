@@ -86,7 +86,7 @@ const year = new Date().getFullYear();
     margin-top: 4rem;
     border-top: 1px solid var(--bq-line, var(--sl-color-hairline));
     padding: 2.6rem 0 2rem;
-    font-family: var(--bq-mono, ui-monospace, monospace);
+    font-family: var(--sl-font, system-ui, sans-serif);
   }
 
   .bq-footer-grid {
@@ -102,15 +102,15 @@ const year = new Date().getFullYear();
   }
 
   .bq-footer-name {
-    font-family: var(--bq-display, inherit);
-    font-weight: 800;
+    font-weight: 700;
     font-size: 1.05rem;
+    letter-spacing: -0.02em;
     color: var(--sl-color-white);
     margin: 0.7rem 0 0.3rem;
   }
 
   .bq-footer-tag {
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     line-height: 1.6;
     color: var(--sl-color-gray-3);
     margin: 0;
@@ -124,15 +124,16 @@ const year = new Date().getFullYear();
   }
 
   .bq-footer nav p {
-    font-size: 0.72rem;
-    letter-spacing: 0.13em;
+    font-family: var(--bq-mono, ui-monospace, monospace);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--sl-color-gray-3);
     margin: 0 0 0.25rem;
   }
 
   .bq-footer nav a {
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     color: var(--sl-color-gray-2);
     text-decoration: none;
     width: fit-content;

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 7 bugs. Re-adding a finished custom jobId, or replacing a deduplicated job, without durable could lose both generations on a crash.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.9.13
 

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Remove 63 unnecessary as Type assertions across src/ flagged by @typescript-eslint/no-unnecessary-type-assertion on CI's stricter @types/bun@1.3.13.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.12
 

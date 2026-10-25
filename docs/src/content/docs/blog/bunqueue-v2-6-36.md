@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. /queues/:queue/jobs/list performance: Endpoint was taking 300-450ms even with limit=2 because it scanned the entire jobIndex (O(N) iterations + O(N) individual SQLite lookups) then sorted all results.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.6.36
 

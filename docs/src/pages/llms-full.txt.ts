@@ -2,14 +2,17 @@ import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { toAgentMarkdown } from '../lib/agent-markdown';
 import { inlineFirstJobCode, inlineRawCodeImports } from '../lib/llms-full';
 
 /**
  * Full-text dump of the docs for LLM grounding (https://llmstxt.org/).
  * Companion to the curated /llms.txt: this concatenates every page's title,
- * description, canonical URL and Markdown/MDX body into one file an LLM can
- * ingest without crawling. Tested sources imported with `?raw` are expanded
- * into fenced code blocks. Referenced from robots.txt.
+ * description, canonical URL and body into one file an LLM can ingest without
+ * crawling. Tested sources imported with `?raw` are expanded into fenced code
+ * blocks, then each body is converted to plain Markdown (lib/agent-markdown.ts:
+ * no imports, JSX or layout HTML; tabs, asides and cards keep their meaning).
+ * Referenced from robots.txt.
  */
 const SITE = 'https://bunqueue.dev';
 
@@ -128,10 +131,13 @@ export const GET: APIRoute = async () => {
   const sections = await Promise.all(
     pages.map(async (e) => {
       const desc = e.data.description ? `${e.data.description}\n` : '';
-      const raw = inlineFirstJobCode(
-        await inlineRawCodeImports(e.body ?? '', (specifier) =>
-          loadRawSource(e.filePath, specifier)
-        )
+      const raw = toAgentMarkdown(
+        inlineFirstJobCode(
+          await inlineRawCodeImports(e.body ?? '', (specifier) =>
+            loadRawSource(e.filePath, specifier)
+          )
+        ),
+        { site: SITE }
       );
       return `\n\n---\n\n# ${e.data.title}\n${desc}URL: ${urlFor(e.id)}\n\n${raw}`;
     })

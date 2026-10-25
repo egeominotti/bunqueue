@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 3 bugs. Weekly SDK soaks now raise the disposable broker's protocol request budget, so long-lived single-connection profiles measure SDK health instead of stopping at the production anti-abuse limit after roughly one minute.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.42
 
