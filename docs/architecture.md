@@ -405,7 +405,8 @@ See [TCP Server Handlers](./features/tcp-server-handlers.md) and
 
 Queue event subscriptions are the deliberate transport-level exception to
 ordinary request dispatch because they mutate socket-owned state. The TCP
-registry authenticates and records one queue per dedicated subscriber, owns one
+registry authenticates and records one queue per dedicated subscriber, indexes
+subscribers by queue (so fan-out touches only that queue's subscribers), owns one
 lazy QueueManager bridge for all subscribers, and sends unsolicited
 `type:'event'` envelopes through the same bounded write queues. Clients dispatch
 those envelopes before `reqId` correlation and resubscribe after reconnect.
@@ -703,7 +704,8 @@ proceed during the writer's flush.
   retry ordering and keeps new writes out of the in-flight batch
   ([`writeBuffer.ts`](../src/infrastructure/persistence/writeBuffer.ts)).
   Pending lookup/removal/state stamping is isolated in
-  [`writeBufferPending.ts`](../src/infrastructure/persistence/writeBufferPending.ts),
+  [`writeBufferPending.ts`](../src/infrastructure/persistence/writeBufferPending.ts)
+  (each buffer half is an id-indexed `PendingSegment`, so these do not scan the buffer),
   and [`sqlite/jobLifecycle.ts`](../src/infrastructure/persistence/sqlite/jobLifecycle.ts)
   persists the current state when a job transitions before its insert succeeds.
 - **Durable.** `add(..., { durable: true })` bypasses the buffer for an immediate

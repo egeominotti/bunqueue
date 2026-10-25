@@ -233,7 +233,7 @@ preserved. If destruction occurs reentrantly during admission, a tombstone is
 reconciled when the final admission owner exits: surviving post-destruction
 state keeps the name, while a fully removed admission unregisters immediately.
 
-**Counters and snapshots:** `incrementQueued`/`decrementQueued` keep shard totals in sync and feed `TemporalManager`. Public global/per-queue state snapshots still classify current `runAt` values so a matured delayed job cannot be counted as both delayed and ready before the periodic counter refresh. `queueStatsAggregator.ts` batches all requested queue counts into one pass over shared collections; WS/SSE count events are coalesced by `QueueCountsScheduler`.
+**Counters and snapshots:** `incrementQueued`/`decrementQueued` keep shard totals in sync and feed `TemporalManager`. Public global/per-queue state snapshots still classify current `runAt` values so a matured delayed job cannot be counted as both delayed and ready before the periodic counter refresh. The waiting/prioritized/delayed split comes from each queue's incremental counts (`IndexedPriorityQueue.countStatesAt`, see [Data Structures](./data-structures.md)), which apply the same classification at the read's `now` without scanning the heap; `getStats`, `getQueueJobCounts`, `getQueuesSummary`, `getPerQueueStats` and Prometheus use them, and `getCountsPerPriority` reads the incremental per-priority map (array-index priorities only; other keys keep the scan so the object key order is unchanged). `queueStatsAggregator.ts` batches all requested queue counts into one pass over the remaining shared collections; WS/SSE count events are coalesced by `QueueCountsScheduler`.
 
 ## Concurrency & Locking
 

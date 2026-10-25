@@ -1,6 +1,7 @@
 import {
   collectSkipRange,
   createSkipHead,
+  createSkipNode,
   iterateSkipValues,
   randomSkipLevel,
   removeMatchingSkipValues,
@@ -20,6 +21,10 @@ export class SkipList<T> {
   private readonly compare: (a: T, b: T) => number;
   private readonly equals?: (a: T, b: T) => boolean;
   private head: SkipNode<T>;
+  /** Last node at each level (null = none), for O(1) appends past the maximum. */
+  private tails: Array<SkipNode<T> | null>;
+  /** Scratch predecessor array reused by insert/delete. */
+  private readonly update: Array<SkipNode<T> | null>;
   private level: number = 0;
   private _size: number = 0;
 
@@ -43,6 +48,8 @@ export class SkipList<T> {
     this.probability = probability;
     this.equals = equals;
     this.head = createSkipHead<T>(maxLevel);
+    this.tails = new Array<SkipNode<T> | null>(maxLevel + 1).fill(null);
+    this.update = new Array<SkipNode<T> | null>(maxLevel + 1).fill(null);
   }
 
   /** Current number of elements */
@@ -55,26 +62,24 @@ export class SkipList<T> {
     return this._size === 0;
   }
 
-  /** Generate random level for new node */
   private randomLevel(): number {
     return randomSkipLevel(this.probability, this.maxLevel);
   }
 
   /**
-   * Insert value - O(log n)
-   * If an equals function was provided to the constructor, duplicates
-   * (where equals returns true) are skipped. Otherwise, multiple entries
-   * with the same comparator result are allowed (sorted multiset behavior).
-   * @returns true if inserted, false if duplicate was skipped
+   * Insert value - O(log n), O(1) past the maximum. With `equals`, true duplicates are
+   * skipped; otherwise equal-comparing entries coexist. Returns false if skipped.
    */
   insert(value: T): boolean {
-    const update: Array<SkipNode<T> | null> = [];
-    for (let i = 0; i <= this.maxLevel; i++) {
-      update.push(null);
+    const last = this.tails[0];
+    if (last !== null && this.compare(last.value, value) < 0) {
+      this.append(value);
+      return true;
     }
+
+    const update = this.update;
     let current = this.head;
 
-    // Find insert position at each level
     for (let i = this.level; i >= 0; i--) {
       let fwd = current.forward[i];
       while (fwd !== null && this.compare(fwd.value, value) < 0) {
@@ -84,21 +89,16 @@ export class SkipList<T> {
       update[i] = current;
     }
 
-    // Check for duplicate if equals function is provided
+    // Skip true duplicates among nodes with the same comparator result
     if (this.equals) {
-      // Check all nodes with same comparator result for true equality
       let node = current.forward[0];
       while (node !== null && this.compare(node.value, value) === 0) {
-        if (this.equals(node.value, value)) {
-          return false; // True duplicate found - skip insertion
-        }
+        if (this.equals(node.value, value)) return false;
         node = node.forward[0];
       }
     }
 
-    // Generate level for new node
     const newLevel = this.randomLevel();
-
     // If new level is higher than current, update head
     if (newLevel > this.level) {
       for (let i = this.level + 1; i <= newLevel; i++) {
@@ -107,15 +107,7 @@ export class SkipList<T> {
       this.level = newLevel;
     }
 
-    // Create new node
-    const newNodeForward: Array<SkipNode<T> | null> = [];
-    for (let i = 0; i <= newLevel; i++) {
-      newNodeForward.push(null);
-    }
-    const newNode: SkipNode<T> = {
-      value,
-      forward: newNodeForward,
-    };
+    const newNode = createSkipNode(value, newLevel);
 
     // Insert at each level
     for (let i = 0; i <= newLevel; i++) {
@@ -123,6 +115,7 @@ export class SkipList<T> {
       if (updateNode) {
         newNode.forward[i] = updateNode.forward[i];
         updateNode.forward[i] = newNode;
+        if (newNode.forward[i] === null) this.tails[i] = newNode;
       }
     }
 
@@ -130,18 +123,26 @@ export class SkipList<T> {
     return true;
   }
 
+  /** Append past the maximum: link behind each level's tail. */
+  private append(value: T): void {
+    const newLevel = this.randomLevel();
+    const newNode = createSkipNode(value, newLevel);
+    for (let i = 0; i <= newLevel; i++) {
+      (this.tails[i] ?? this.head).forward[i] = newNode;
+      this.tails[i] = newNode;
+    }
+    if (newLevel > this.level) this.level = newLevel;
+    this._size++;
+  }
+
   /**
    * Delete value - O(log n)
    * @returns true if found and deleted
    */
   delete(value: T): boolean {
-    const update: Array<SkipNode<T> | null> = [];
-    for (let i = 0; i <= this.maxLevel; i++) {
-      update.push(null);
-    }
+    const update = this.update;
     let current = this.head;
 
-    // Find node at each level
     for (let i = this.level; i >= 0; i--) {
       let fwd = current.forward[i];
       while (fwd !== null && this.compare(fwd.value, value) < 0) {
@@ -162,6 +163,7 @@ export class SkipList<T> {
       const updateNode = update[i];
       if (updateNode?.forward[i] === target) {
         updateNode.forward[i] = target.forward[i];
+        if (this.tails[i] === target) this.tails[i] = updateNode === this.head ? null : updateNode;
       } else {
         break;
       }
@@ -279,6 +281,8 @@ export class SkipList<T> {
    */
   clear(): void {
     this.head = createSkipHead<T>(this.maxLevel);
+    this.tails = new Array<SkipNode<T> | null>(this.maxLevel + 1).fill(null);
+    this.update.fill(null);
     this.level = 0;
     this._size = 0;
   }

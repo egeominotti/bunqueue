@@ -1,4 +1,4 @@
-import type { JobId } from '../../types/job';
+import type { Job, JobId } from '../../types/job';
 import type { QueueState } from '../../types/queue';
 import type { ShardOptions } from '../../types/shard';
 import { DependencyTracker } from '../dependencyTracker';
@@ -79,14 +79,28 @@ export class ShardState {
   getQueue(name: string): IndexedPriorityQueue {
     let queue = this.queues.get(name);
     if (!queue) {
-      queue = new IndexedPriorityQueue({
-        onInsert: (job) =>
+      const hooks = {
+        onInsert: (job: Job) =>
           this.groupScheduler.insert(name, job, () => this.queues.get(name)?.values() ?? []),
-        onRemove: (job) => this.groupScheduler.remove(name, job),
-      });
+        onRemove: (job: Job) => this.groupScheduler.remove(name, job),
+      };
+      queue = new IndexedPriorityQueue(hooks, undefined, undefined, true);
       this.queues.set(name, queue);
     }
     return queue;
+  }
+
+  /**
+   * Earliest runAt when no job of an existing queue can be ready or expired at `now`;
+   * `undefined` otherwise (or when the queue does not exist yet).
+   */
+  idleRunAt(name: string, now: number): number | null | undefined {
+    return this.queues.get(name)?.idleRunAt(now);
+  }
+
+  /** The last pull scan of an existing queue found no job due. */
+  markExhausted(name: string): void {
+    this.queues.get(name)?.markExhausted();
   }
 
   getState(name: string): QueueState {

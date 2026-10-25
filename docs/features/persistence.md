@@ -534,6 +534,17 @@ This module is not lock-coordinated with the shard locks documented in [Concurre
   immediately; retry exhaustion and removal of the last buffered job clear it
   for the same reason.
 - The double-buffer swap (`activeBuffer` ↔ `flushBuffer`) is the atomicity primitive: new `add()`s land in a fresh active buffer while the snapshot is written, so no job is written twice or missed across a flush boundary.
+- Each half of the double buffer is a `PendingSegment` (`writeBufferPending.ts`):
+  jobs in insertion order plus a `Map<JobId, slot | slot[]>` index. `getPendingJob`/
+  `hasPending` (first match, active segment before flushing segment),
+  `setPendingState` (every occurrence) and `removePending` (every occurrence, order
+  of the rest unchanged) cost O(occurrences of the id) instead of a scan of every
+  buffered job; a miss is one map lookup. A removal leaves a hole that reads skip;
+  holes are compacted once there are at least 64 and they outnumber the live jobs
+  (amortized O(1)). `insertJobsBatch` receives a fresh array snapshot of the flushing
+  segment, a transient requeue rebuilds the active segment as `transient` followed by
+  jobs added during the flush, and `removePendingForQueue`/`getPendingJobs` stay
+  linear.
 - All mutations are wrapped in `safeWrite()` which toggles the disk-full flag and re-throws.
 
 ## Edge Cases & Failure Modes
@@ -670,3 +681,12 @@ This module is not lock-coordinated with the shard locks documented in [Concurre
 - [Rate Limiting & Concurrency Control](./rate-limiting-and-concurrency.md) — owner of the control-state persisted in `queue_state` (#100).
 - [S3 Backup](./backup-s3.md) — file-level backup of the SQLite database.
 - [Configuration & Entrypoint](./configuration.md) — data-path resolution and env vars.
+
+### Statement caching on hot paths
+
+Statements outside `prepareStatements` that run per job use Bun's cached
+`db.query(sql)` instead of compiling with `db.prepare(sql)` on every call:
+`updateForRetry`, the `flow_failures` delete in `runDeleteJobRows`,
+`runClearActiveDedupKey`, `markWaitingChildren` and the `flow_failures` upsert in
+`commitFailedJob`. The SQL and results are unchanged; a retry no longer pays a
+statement compilation.

@@ -166,7 +166,7 @@ async function cleanOrphanedJobIndex(ctx: BackgroundContext, now: number): Promi
 
   // Phase 1: Collect candidates grouped by shard (read-only)
   const processingCandidates = new Map<number, JobId[]>();
-  const queueCandidates = new Map<number, Array<{ jobId: JobId; queueName: string }>>();
+  const queueCandidates = new Map<number, { jobIds: JobId[]; queueNames: string[] }>();
 
   for (const [jobId, loc] of ctx.jobIndex) {
     if (loc.type === 'processing') {
@@ -180,10 +180,11 @@ async function cleanOrphanedJobIndex(ctx: BackgroundContext, now: number): Promi
     } else if (loc.type === 'queue') {
       let list = queueCandidates.get(loc.shardIdx);
       if (!list) {
-        list = [];
+        list = { jobIds: [], queueNames: [] };
         queueCandidates.set(loc.shardIdx, list);
       }
-      list.push({ jobId, queueName: loc.queueName });
+      list.jobIds.push(jobId);
+      list.queueNames.push(loc.queueName);
     }
   }
 
@@ -211,9 +212,10 @@ async function cleanOrphanedJobIndex(ctx: BackgroundContext, now: number): Promi
   for (const [shardIdx, candidates] of queueCandidates) {
     await withWriteLock(ctx.shardLocks[shardIdx], () => {
       const shard = ctx.shards[shardIdx];
-      for (const { jobId, queueName } of candidates) {
-        if (!shard.getQueue(queueName).has(jobId)) {
-          ctx.jobIndex.delete(jobId);
+      const { jobIds, queueNames } = candidates;
+      for (let i = 0; i < jobIds.length; i++) {
+        if (!shard.getQueue(queueNames[i]).has(jobIds[i])) {
+          ctx.jobIndex.delete(jobIds[i]);
         }
       }
     });

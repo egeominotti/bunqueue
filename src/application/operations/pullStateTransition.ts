@@ -71,6 +71,18 @@ export function tryDequeueNextJob(
 ): DequeueResult {
   const priorityQueue = shard.getQueue(queue);
 
+  if (!shard.hasGroupScheduler(queue)) {
+    // Nothing can be ready or expired: the scan below would park every job and stop
+    // with their earliest runAt, so answer that directly.
+    const idleRunAt = shard.idleRunAt(queue, now);
+    if (idleRunAt !== undefined) {
+      if (idleRunAt !== null) {
+        scan.nextRunAt = scan.nextRunAt === null ? idleRunAt : Math.min(scan.nextRunAt, idleRunAt);
+      }
+      return { status: 'stop' };
+    }
+  }
+
   while (true) {
     const grouped = shard.hasGroupScheduler(queue);
     const candidate = grouped
@@ -78,7 +90,10 @@ export function tryDequeueNextJob(
       : { job: priorityQueue.peek(), nextRunAt: null };
     if (grouped) scan.nextRunAt = candidate.nextRunAt;
     const job = candidate.job;
-    if (!job) return { status: 'stop' };
+    if (!job) {
+      if (!grouped) shard.markExhausted(queue);
+      return { status: 'stop' };
+    }
 
     if (isExpired(job, now)) {
       // Persistence is removed first so a failed durable delete leaves the

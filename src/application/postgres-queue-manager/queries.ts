@@ -4,6 +4,7 @@ import {
   type DlqFilter,
   type DlqStats,
 } from '../../domain/types/dlq';
+import { maxOf, minOf } from '../../shared/arrays';
 import type { Job, JobId } from '../../domain/types/job';
 import type { PostgresCounts } from '../../infrastructure/persistence/postgres';
 import { PostgresQueueManagerGroupQueries } from './groupQueries';
@@ -158,10 +159,8 @@ export class PostgresQueueManagerQueries extends PostgresQueueManagerGroupQuerie
         (entry) => entry.nextRetryAt !== null && entry.nextRetryAt <= now
       ).length,
       expired: entries.filter((entry) => entry.expiresAt !== null && entry.expiresAt <= now).length,
-      oldestEntry:
-        entries.length === 0 ? null : Math.min(...entries.map((entry) => entry.enteredAt)),
-      newestEntry:
-        entries.length === 0 ? null : Math.max(...entries.map((entry) => entry.enteredAt)),
+      oldestEntry: entries.length === 0 ? null : minOf(entries.map((entry) => entry.enteredAt)),
+      newestEntry: entries.length === 0 ? null : maxOf(entries.map((entry) => entry.enteredAt)),
     };
   }
 

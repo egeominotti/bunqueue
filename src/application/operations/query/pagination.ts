@@ -1,5 +1,6 @@
 import type { Job, JobId } from '../../../domain/types/job';
 import type { GetJobsContext } from '../../types/query';
+import { appendAll, sortedPage } from '../../../shared/arrays';
 import {
   collectJobsByState,
   collectTemporalJobs,
@@ -34,13 +35,16 @@ function querySqliteByLogicalState(
   return jobs.filter((job) => !opts.excludedIds.has(job.id)).slice(opts.offset, pageEnd);
 }
 
+/** A createdAt that is not a number (or is NaN) makes the comparator inconsistent: such pages keep the full sort. */
+const hasNoOrder = (job: Job): boolean =>
+  typeof job.createdAt !== 'number' || Number.isNaN(job.createdAt);
+
 function mergePage(sqlJobs: Job[], extras: Job[], start: number, end: number, asc: boolean): Job[] {
   const byId = new Map<JobId, Job>();
   for (const job of sqlJobs) byId.set(job.id, job);
   for (const job of extras) byId.set(job.id, job);
   const merged = Array.from(byId.values());
-  merged.sort((a, b) => compareJobsByCreatedAt(a, b, asc));
-  return merged.slice(start, end);
+  return sortedPage(merged, start, end, (a, b) => compareJobsByCreatedAt(a, b, asc), hasNoOrder);
 }
 
 function querySqlitePage(
@@ -189,9 +193,9 @@ export function getJobs(
         : [];
     const extras: Job[] = [...buffered.jobs];
 
-    if (states.includes('failed')) extras.push(...tagState(shard.getDlq(queue), 'failed'));
+    if (states.includes('failed')) appendAll(extras, tagState(shard.getDlq(queue), 'failed'));
     if (states.includes('waiting-children')) {
-      extras.push(...tagState(parkedJobs, 'waiting-children'));
+      appendAll(extras, tagState(parkedJobs, 'waiting-children'));
     }
     if (states.includes('paused') && isPaused) {
       const pausedJobs = collectTemporalJobs(
@@ -200,7 +204,7 @@ export function getJobs(
         { waiting: true, prioritized: true, delayed: false },
         now
       );
-      extras.push(...tagState(pausedJobs, 'paused'));
+      appendAll(extras, tagState(pausedJobs, 'paused'));
     }
 
     const excludedIds = new Set<JobId>([
@@ -236,6 +240,5 @@ export function getJobs(
   }
 
   const jobs = collectJobsByState(queue, shardIdx, states, ctx, now);
-  jobs.sort((a, b) => compareJobsByCreatedAt(a, b, asc));
-  return jobs.slice(start, end);
+  return sortedPage(jobs, start, end, (a, b) => compareJobsByCreatedAt(a, b, asc), hasNoOrder);
 }

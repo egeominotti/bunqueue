@@ -1,5 +1,6 @@
 import type { Shard } from '../../../domain/queue/shard';
 import type { Job } from '../../../domain/types/job';
+import { appendAll } from '../../../shared/arrays';
 import { compareSqliteBinaryText } from '../../../shared/serialization';
 import type { GetJobsContext } from '../../types/query';
 
@@ -40,35 +41,32 @@ export function collectTemporalJobs(
   shard: Shard,
   queue: string,
   needs: { waiting: boolean; prioritized: boolean; delayed: boolean },
-  now: number = Date.now()
+  now: number = Date.now(),
+  tagTemporal = false
 ): Job[] {
   const { waiting: needWaiting, prioritized: needPrioritized, delayed: needDelayed } = needs;
   const jobs: Job[] = [];
-  for (const job of shard.getQueue(queue).values()) {
+  // One pass over the queue (no intermediate copies); with `tagTemporal`, each collected
+  // job also gets its temporal `_state` here instead of in a second pass.
+  shard.getQueue(queue).forEachJob((job) => {
     const isDelayed = job.runAt > now;
-    if (isDelayed && needDelayed) {
-      jobs.push(job);
-    } else if (!isDelayed && (job.priority > 0 ? needPrioritized : needWaiting)) {
+    if (isDelayed ? needDelayed : job.priority > 0 ? needPrioritized : needWaiting) {
+      if (tagTemporal) {
+        (job as unknown as Record<string, unknown>)._state = isDelayed
+          ? 'delayed'
+          : job.priority > 0
+            ? 'prioritized'
+            : 'waiting';
+      }
       jobs.push(job);
     }
-  }
+  });
   return jobs;
 }
 
 export function tagState(jobs: Job[], state: string): Job[] {
   for (const job of jobs) (job as unknown as Record<string, unknown>)._state = state;
   return jobs;
-}
-
-function tagTemporalState(jobs: Job[], now: number = Date.now()): void {
-  for (const job of jobs) {
-    const isDelayed = job.runAt > now;
-    (job as unknown as Record<string, unknown>)._state = isDelayed
-      ? 'delayed'
-      : job.priority > 0
-        ? 'prioritized'
-        : 'waiting';
-  }
 }
 
 export function collectWaitingChildrenJobs(shard: Shard, queue: string): Job[] {
@@ -126,25 +124,25 @@ export function collectJobsByState(
   now: number = Date.now()
 ): Job[] {
   const shard = ctx.shards[shardIndex];
-  const jobs: Job[] = [];
   const needs = resolveStateNeeds(states, shard.getState(queue).paused);
 
-  if (needs.waiting || needs.prioritized || needs.delayed) {
-    const temporal = collectTemporalJobs(
-      shard,
-      queue,
-      { waiting: needs.waiting, prioritized: needs.prioritized, delayed: needs.delayed },
-      now
-    );
-    tagTemporalState(temporal, now);
-    jobs.push(...temporal);
-  }
-  if (needs.paused) jobs.push(...collectPausedJobs(shard, queue, now));
-  if (needs.active) jobs.push(...tagState(collectActiveJobs(queue, shardIndex, ctx), 'active'));
-  if (needs.failed) jobs.push(...tagState(shard.getDlq(queue), 'failed'));
-  if (needs.completed) jobs.push(...tagState(collectCompletedJobs(queue, ctx), 'completed'));
+  // The temporal jobs come first, so their array is the result array itself.
+  const jobs: Job[] =
+    needs.waiting || needs.prioritized || needs.delayed
+      ? collectTemporalJobs(
+          shard,
+          queue,
+          { waiting: needs.waiting, prioritized: needs.prioritized, delayed: needs.delayed },
+          now,
+          true
+        )
+      : [];
+  if (needs.paused) appendAll(jobs, collectPausedJobs(shard, queue, now));
+  if (needs.active) appendAll(jobs, tagState(collectActiveJobs(queue, shardIndex, ctx), 'active'));
+  if (needs.failed) appendAll(jobs, tagState(shard.getDlq(queue), 'failed'));
+  if (needs.completed) appendAll(jobs, tagState(collectCompletedJobs(queue, ctx), 'completed'));
   if (needs.waitingChildren) {
-    jobs.push(...tagState(collectWaitingChildrenJobs(shard, queue), 'waiting-children'));
+    appendAll(jobs, tagState(collectWaitingChildrenJobs(shard, queue), 'waiting-children'));
   }
   return jobs;
 }

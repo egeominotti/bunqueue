@@ -74,7 +74,7 @@ export class TemporalManager {
    * Clean orphaned temporal index entries.
    * Removes entries for jobs that no longer exist.
    */
-  cleanOrphaned(validJobIds: Set<JobId>): number {
+  cleanOrphaned(validJobIds: { has(jobId: JobId): boolean }): number {
     return this.temporalIndex.cleanOrphaned(validJobIds);
   }
 

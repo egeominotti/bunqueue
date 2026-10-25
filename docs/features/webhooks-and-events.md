@@ -152,7 +152,10 @@ Command shapes: `src/domain/types/commands/monitoring.ts:3-28` (logs and webhook
 - **Webhook events** (`WEBHOOK_EVENTS`, `webhook.ts:16`): `job.pushed`, `job.started`, `job.completed`, `job.failed`, `job.progress`. `job.stalled` is a legacy member of the `WebhookEvent` type kept only for backward compatibility with stored webhooks — it is never emitted and is rejected on new webhooks (`webhook.ts:24`).
 - **Internal `EventType`** (`src/domain/types/queue.ts:140-156`): `pushed`, `pulled`, `completed`, `failed`, `progress`, `stalled`, `removed`, `delayed`, `duplicated`, `retried`, `waiting-children`, `drained`, `paused`, `resumed`.
 - **TCP event envelope**: `{ type: 'event', event: JobEvent }`, sent only to
-  authenticated connections subscribed to `event.queue`.
+  authenticated connections subscribed to `event.queue`. The frame is encoded
+  once per event and written to that queue's subscribers in connection order,
+  looked up through a per-queue index (`tcp/eventSubscriberIndex.ts`) instead
+  of a scan of every connection.
 - **Dashboard events** emitted via `setDashboardEmit`: `webhook:fired`, `webhook:failed`, `webhook:enabled`, `webhook:disabled` (from `WebhookManager`); `webhook:added` / `webhook:removed` are emitted by the handler through `queueManager.emitDashboardEvent` (`handlers/monitoring/webhooks.ts:31-64`).
 
 ## Data Models

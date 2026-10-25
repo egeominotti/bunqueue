@@ -2,6 +2,10 @@ import type { JobId } from '../../types/job';
 import type { ShardStats } from '../shardCounters';
 import { ShardDlq } from './dlq';
 
+/** A number that becomes an array-index property key (ordered numerically by objects). */
+const isArrayIndexKey = (key: number): boolean =>
+  Number.isInteger(key) && key >= 0 && key <= 4_294_967_294;
+
 /** Queue counts, running counters, and temporal-index operations. */
 export class ShardMetrics extends ShardDlq {
   getWaitingCount(queue: string): number {
@@ -14,6 +18,11 @@ export class ShardMetrics extends ShardDlq {
     const priorityQueue = this.queues.get(queue);
     const counts = new Map<number, number>();
     if (!priorityQueue) return counts;
+    // Callers expose these as object keys: array-index keys are ordered numerically
+    // whatever the insertion order, so the tracked counts are the same object. Any other
+    // key keeps its first-seen scan order, so it takes the scan below.
+    const tracked = priorityQueue.countsPerPriority();
+    if ([...tracked.keys()].every(isArrayIndexKey)) return new Map(tracked);
     for (const job of priorityQueue.values()) {
       const count = counts.get(job.priority) ?? 0;
       counts.set(job.priority, count + 1);
@@ -79,6 +88,14 @@ export class ShardMetrics extends ShardDlq {
   }
   cleanOrphanedTemporalEntries(): number {
     if (this.temporalManager.indexSize === 0) return 0;
+    // "Is the job in any queue of this shard": asked of the queues directly when they are
+    // few, instead of copying every queued id into a Set first.
+    if (this.queues.size <= 8) {
+      const queues = Array.from(this.queues.values());
+      return this.temporalManager.cleanOrphaned({
+        has: (jobId) => queues.some((queue) => queue.has(jobId)),
+      });
+    }
     const validJobIds = new Set<JobId>();
     for (const priorityQueue of this.queues.values()) {
       for (const job of priorityQueue.values()) validJobIds.add(job.id);

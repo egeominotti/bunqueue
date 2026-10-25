@@ -71,13 +71,12 @@ export function getStats(
     // both — so the count must include both or it undercounts vs state/list (#95 class).
     waitingChildren += ctx.shards[i].waitingChildren.size + ctx.shards[i].waitingDeps.size;
 
-    // Scan queues to split waiting vs prioritized (BullMQ v5 compat)
+    // Split waiting vs prioritized (BullMQ v5 compat), kept incrementally per queue
     for (const queue of ctx.shards[i].queues.values()) {
-      for (const job of queue.values()) {
-        if (job.runAt > now) delayed++;
-        else if (job.priority > 0) prioritized++;
-        else waiting++;
-      }
+      const states = queue.countStatesAt(now);
+      delayed += states.delayed;
+      prioritized += states.prioritized;
+      waiting += states.waiting;
     }
   }
 

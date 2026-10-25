@@ -163,7 +163,7 @@ export abstract class SqliteJobLifecycle extends SqliteAdmission {
     this.flushIfBuffered(jobId);
     this.safeWrite(() => {
       this.db
-        .prepare('UPDATE jobs SET state = ?, started_at = NULL, timeline = ? WHERE id = ?')
+        .query('UPDATE jobs SET state = ?, started_at = NULL, timeline = ? WHERE id = ?')
         .run('waiting-children', timeline && timeline.length > 0 ? pack(timeline) : null, jobId);
     });
   }

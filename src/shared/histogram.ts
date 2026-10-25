@@ -34,10 +34,19 @@ export class Histogram {
         hi = mid;
       }
     }
-    // Increment all buckets >= value (cumulative)
-    for (let i = lo; i <= this.buckets.length; i++) {
-      this.counts[i]++;
+    // Count the observation in its own bucket; cumulative counts are summed on read
+    this.counts[lo]++;
+  }
+
+  /** Cumulative count of observations <= bucket i (the Prometheus `le` semantics). */
+  private cumulative(): Float64Array {
+    const cumulative = new Float64Array(this.counts.length);
+    let running = 0;
+    for (let i = 0; i < this.counts.length; i++) {
+      running += this.counts[i];
+      cumulative[i] = running;
     }
+    return cumulative;
   }
 
   /** Get sum of all observations */
@@ -54,9 +63,10 @@ export class Histogram {
   percentile(p: number): number {
     if (this.count === 0) return 0;
     const target = (p / 100) * this.count;
+    const counts = this.cumulative();
 
     for (let i = 0; i < this.buckets.length; i++) {
-      if (this.counts[i] >= target) {
+      if (counts[i] >= target) {
         return this.buckets[i];
       }
     }
@@ -66,11 +76,12 @@ export class Histogram {
   /** Generate Prometheus histogram lines, optionally scaling observed values. */
   toPrometheus(name: string, help: string, outputScale = 1): string {
     const lines: string[] = [`# HELP ${name} ${help}`, `# TYPE ${name} histogram`];
+    const counts = this.cumulative();
 
     for (let i = 0; i < this.buckets.length; i++) {
-      lines.push(`${name}_bucket{le="${this.buckets[i] * outputScale}"} ${this.counts[i]}`);
+      lines.push(`${name}_bucket{le="${this.buckets[i] * outputScale}"} ${counts[i]}`);
     }
-    lines.push(`${name}_bucket{le="+Inf"} ${this.counts[this.buckets.length]}`);
+    lines.push(`${name}_bucket{le="+Inf"} ${counts[this.buckets.length]}`);
     lines.push(`${name}_sum ${this.sum * outputScale}`);
     lines.push(`${name}_count ${this.count}`);
 
