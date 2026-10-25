@@ -12,11 +12,14 @@ import { SocketWriteQueue } from '../socketWriteQueue';
 import type { TcpConnectionData } from '../types/tcpServer';
 import { releaseClientJobsWithRetry } from './clientRelease';
 import { MAX_CONCURRENT_PER_CONNECTION } from './constants';
+import { EventSubscriberIndex } from './eventSubscriberIndex';
 
 /** Owns per-client state, slowloris timers, backpressure, and disconnect cleanup. */
 export class TcpConnectionRegistry {
   readonly connections = new Map<string, Socket<TcpConnectionData>>();
   private eventUnsubscribe: (() => void) | null = null;
+  /** Live connections (in `connections`) whose `eventQueue` is set, keyed by that queue. */
+  private readonly eventSubscribers = new EventSubscriberIndex<Socket<TcpConnectionData>>();
   /** Set by a post-drain `closeAll`: jobs still held are abandoned, not released. */
   private abandonJobsOnClose = false;
 
@@ -55,6 +58,7 @@ export class TcpConnectionRegistry {
       eventQueue: null,
     };
     this.connections.set(clientId, socket);
+    this.eventSubscribers.track(socket);
     this.queueManager.emitDashboardEvent('client:connected', { clientId, transport: 'tcp' });
   }
 
@@ -100,7 +104,10 @@ export class TcpConnectionRegistry {
     const clientId = socket.data.state.clientId;
     this.clearStallTimer(socket);
     socket.data.writeQueue.clear();
-    socket.data.eventQueue = null;
+    if (socket.data.eventQueue !== null) {
+      this.eventSubscribers.remove(socket, socket.data.eventQueue);
+      socket.data.eventQueue = null;
+    }
     this.connections.delete(clientId);
     this.releaseEventBridgeIfIdle();
     getRateLimiter().removeClient(clientId);
@@ -137,21 +144,32 @@ export class TcpConnectionRegistry {
   }
 
   subscribeEvents(socket: Socket<TcpConnectionData>, queue: string): void {
+    const previous = socket.data.eventQueue;
     socket.data.eventQueue = queue;
+    // Only live connections receive events, so a socket closed before its subscribe
+    // command ran keeps `eventQueue` but stays out of the index.
+    if (previous !== queue && this.connections.get(socket.data.state.clientId) === socket) {
+      if (previous !== null) this.eventSubscribers.remove(socket, previous);
+      this.eventSubscribers.add(socket, queue);
+    }
     if (!this.eventUnsubscribe) {
       this.eventUnsubscribe = this.queueManager.subscribe((event) => this.broadcastEvent(event));
     }
   }
 
   unsubscribeEvents(socket: Socket<TcpConnectionData>): void {
+    if (socket.data.eventQueue !== null) {
+      this.eventSubscribers.remove(socket, socket.data.eventQueue);
+    }
     socket.data.eventQueue = null;
     this.releaseEventBridgeIfIdle();
   }
 
   private broadcastEvent(event: JobEvent): void {
+    const subscribers = this.eventSubscribers.subscribers(event.queue);
+    if (!subscribers) return;
     let frame: Uint8Array | null = null;
-    for (const socket of this.connections.values()) {
-      if (socket.data.eventQueue !== event.queue) continue;
+    for (const socket of subscribers) {
       frame ??= FrameParser.frame(encodeMessagePack({ type: 'event', event }));
       socket.data.writeQueue.write(socket, frame);
       this.dropForWriteOverflow(socket);
@@ -159,10 +177,7 @@ export class TcpConnectionRegistry {
   }
 
   private releaseEventBridgeIfIdle(): void {
-    if (!this.eventUnsubscribe) return;
-    for (const socket of this.connections.values()) {
-      if (socket.data.eventQueue !== null) return;
-    }
+    if (!this.eventUnsubscribe || !this.eventSubscribers.isEmpty) return;
     this.eventUnsubscribe();
     this.eventUnsubscribe = null;
   }
@@ -175,6 +190,7 @@ export class TcpConnectionRegistry {
     this.abandonJobsOnClose = abandonJobs;
     this.eventUnsubscribe?.();
     this.eventUnsubscribe = null;
+    this.eventSubscribers.clear();
     for (const socket of this.connections.values()) {
       this.clearStallTimer(socket);
       socket.data.eventQueue = null;

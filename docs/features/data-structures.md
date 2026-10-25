@@ -1,6 +1,6 @@
 # Data Structures (PriorityQueue, heaps, maps)
 
-> **Category:** Engine · **Source:** `src/domain/queue/priorityQueue.ts`, `src/domain/queue/temporalManager.ts`, `src/domain/queue/temporalIndex.ts`, `src/shared/minHeap.ts`, `src/shared/skipList.ts`, `src/shared/lruMap.ts`, `src/shared/lruSet.ts`, `src/shared/boundedMap.ts`, `src/shared/boundedSet.ts`, `src/shared/ttlMap.ts`, `src/shared/histogram.ts`, `src/shared/lru.ts`
+> **Category:** Engine · **Source:** `src/domain/queue/priorityQueue.ts`, `src/domain/queue/priorityQueueCounters.ts`, `src/domain/queue/priorityQueueDue.ts`, `src/domain/queue/temporalManager.ts`, `src/domain/queue/temporalIndex.ts`, `src/shared/minHeap.ts`, `src/shared/skipList.ts`, `src/shared/lruMap.ts`, `src/shared/lruSet.ts`, `src/shared/boundedMap.ts`, `src/shared/boundedSet.ts`, `src/shared/ttlMap.ts`, `src/shared/histogram.ts`, `src/shared/arrays.ts`, `src/shared/lru.ts`
 
 ## Purpose
 
@@ -52,15 +52,47 @@ Backed by a 4-ary heap (`D = 4`) of lightweight `HeapEntry` records plus a `Map<
 - `remove(jobId: JobId): Job | null` — O(1); deletes from index only, heap entry left stale
 - `updatePriority(jobId, newPriority, newLifo?): boolean` — O(log n)
 - `updateRunAt(jobId, newRunAt): boolean` — O(log n)
-- `values(): Job[]`, `clear(): void`
+- `values(): Job[]`, `forEachJob(visit): void` (same order as `values()`, no array copies), `clear(): void`
 - `getStaleRatio(): number`, `needsCompaction(threshold = 0.2): boolean`, `compact(): void`
+- `countStatesAt(now): { waiting, prioritized, delayed }` — incremental after the first call (see below)
+- `countsPerPriority(): ReadonlyMap<number, number>` — live jobs per priority, incremental
+- `idleRunAt(now): number | null | undefined` and `markExhausted(): void` — idle-pull shortcut for shard queues (see below)
+
+**Incremental counts** (`priorityQueueCounters.ts`). The first `countStatesAt` or
+`countsPerPriority` call builds a `PriorityQueueCounters` from the index; every
+insert, removal and update keeps it current. A job is delayed when `runAt > now`,
+otherwise prioritized when `priority > 0`, otherwise waiting: the same rule as a
+full scan. Jobs still in the future sit in a runAt min-heap and are counted as due
+when a read reaches their run time. A read whose `now` is earlier than the previous
+one (clock moved backwards), or a NaN `now`, falls back to a full scan. A job whose
+`runAt` is already past at insert time is counted as due at once (the clock
+advances to that time), so only future jobs enter the heap. Heap entries hold the
+job id and run time only, never the job, so a removed job is not kept alive; stale
+entries are dropped when they surface, and the heap is compacted when it exceeds
+twice the highest live count seen.
+
+**Idle-pull shortcut** (`priorityQueueDue.ts`, shard queues only: constructor
+flag `trackDue`). After a pull scan visits every job and finds none due
+(`markExhausted`), the next `idleRunAt(now)` builds a `DueTracker`: a min-heap of
+each job's earliest due time (`min(runAt, createdAt + ttl)`, a lower bound of both
+readiness and TTL expiry) and a min-heap of `runAt`. When nothing can be due at
+`now`, it returns the earliest `runAt` (or `null`), which is exactly what a full
+scan would report after parking every job; otherwise it returns `undefined` and the
+scan runs as before. `pop()` drops the tracker, so queues with ready jobs pay
+nothing; a NaN due time counts as always due. Entries hold job ids only and are
+live while the job is queued with the same time.
+
+**Rule for callers:** a queued `Job` must not be mutated in place (`runAt`,
+`priority`, `ttl`, `createdAt`). The counts and the idle tracker record these
+values when the job is inserted; change them through `updateRunAt` /
+`updatePriority`, or remove the job and push it again (all current code paths do).
 
 ### `TemporalManager` (`src/domain/queue/temporalManager.ts`)
 
 - `addToIndex(createdAt, jobId, queue): void` — O(log n)
 - `getOldJobs(queue, thresholdMs, limit): Array<{ jobId, createdAt }>` — O(log n + k)
 - `removeFromIndex(jobId): void`, `clearIndexForQueue(queue): void`
-- `cleanOrphaned(validJobIds: Set<JobId>): number`
+- `cleanOrphaned(validJobIds: { has(jobId): boolean }): number` — a `Set` or any membership predicate
 - `isDelayed(jobId): boolean`, `addDelayed(jobId, runAt): void`, `removeDelayed(jobId): boolean`
 - `refreshDelayed(now: number): number` — O(k), returns count that became ready
 - `get indexSize`, `get delayedCount`, `clearDelayed()`, `clear()`, `getSizes()`
@@ -86,6 +118,7 @@ Backed by a 4-ary heap (`D = 4`) of lightweight `HeapEntry` records plus a `Map<
 - `insert(value): boolean`, `delete(value): boolean`, `deleteWhere(predicate): T | null`
 - `find(value): T | null`, `has(value): boolean`, `first(): T | null`, `shift(): T | null`
 - `rangeUntil(maxValue, limit?): T[]` — O(log n + k), `takeWhile(predicate, limit?): T[]`
+- Insert of a value strictly greater than the current maximum is O(1): it links behind each level's tail (`tails[]`) instead of searching; the predecessor array is reused across calls
 - `values(): Generator<T>`, `toArray(): T[]`, `clear()`, `removeAll(predicate): T[]`
 - `get size`, `get isEmpty`
 
@@ -100,7 +133,7 @@ Backed by a 4-ary heap (`D = 4`) of lightweight `HeapEntry` records plus a `Map<
 ### `Histogram` (`src/shared/histogram.ts`)
 
 - `constructor(buckets = DEFAULT_BUCKETS)` — buckets sorted ascending, `+Inf` bucket appended.
-- `observe(value): void` — O(log b) bucket find + cumulative increment
+- `observe(value): void` — O(log b) bucket find + one increment (cumulative counts are summed on read)
 - `getSum()`, `getCount()`, `percentile(p)`, `toPrometheus(name, help): string`, `reset()`
 
 This module exposes no TCP commands, HTTP endpoints, CLI commands, or events directly; it is consumed by higher layers that do.
@@ -150,7 +183,7 @@ resource release at `ack/completion.ts:38-45`).
 
 ### Skip list
 
-Probabilistic levels via `randomLevel()` (`skipList.ts:74`), `maxLevel = 16`, `probability = 0.5`. `insert` (`:89`) finds position per level, and when an `equals` fn is supplied scans the run of compare-equal nodes for a true duplicate (`:107`-`:116`), returning `false` if found. `delete` (`:156`) unlinks at each level then lowers `level`. Range/scan helpers (`rangeUntil`, `takeWhile`, `values`) walk level-0 forward pointers.
+Probabilistic levels via `randomLevel()` (`skipList.ts:74`), `maxLevel = 16`, `probability = 0.5`. `insert` (`:89`) finds position per level, and when an `equals` fn is supplied scans the run of compare-equal nodes for a true duplicate (`:107`-`:116`), returning `false` if found. A value that compares strictly after the last node is appended behind each level's tail without a search. `delete` unlinks at each level, moves any tail pointer that referenced the node to its predecessor, then lowers `level`. Range/scan helpers (`rangeUntil`, `takeWhile`, `values`) walk level-0 forward pointers.
 
 ### Eviction containers
 
@@ -160,7 +193,7 @@ Probabilistic levels via `randomLevel()` (`skipList.ts:74`), `maxLevel = 16`, `p
 
 ### Histogram
 
-`observe` (`histogram.ts:22`) binary-searches the bucket boundary then increments every bucket `>= value` (cumulative semantics). `percentile(p)` returns the first bucket whose cumulative count reaches `(p/100)*count`. `toPrometheus` emits `_bucket{le=...}`, `_sum`, `_count` lines including the `+Inf` bucket. Consumed by `LatencyTracker` (`latencyTracker.ts:10`-`:12`) for `bunqueue_push/pull/ack_duration_ms`.
+`observe` binary-searches the bucket boundary and increments that bucket only; `percentile` and `toPrometheus` build the cumulative counts (Prometheus `le` semantics) on read. `percentile(p)` returns the first bucket whose cumulative count reaches `(p/100)*count`. `toPrometheus` emits `_bucket{le=...}`, `_sum`, `_count` lines including the `+Inf` bucket. Consumed by `LatencyTracker` (`latencyTracker.ts:10`-`:12`) for `bunqueue_push/pull/ack_duration_ms`.
 
 ## Concurrency & Locking
 
@@ -215,3 +248,9 @@ Other tunables: `SkipList` `maxLevel = 16`, `probability = 0.5`; `MinHeap`/`Inde
 - [Stats, Metrics & Monitoring](./stats-and-monitoring.md) — `Histogram`/`LatencyTracker` consumers
 - [Persistence (SQLite, WriteBuffer, ReadThrough)](./persistence.md) — durability layer behind these in-memory structures
 - [architecture](../architecture.md) · [data-model](../data-model.md)
+
+## Array helpers (`src/shared/arrays.ts`)
+
+- `appendAll(target, items)`, `minOf(values)`, `maxOf(values)`: the results of
+  `target.push(...items)`, `Math.min(...values)` and `Math.max(...values)` without
+  spreading, which throws `RangeError` past a few hundred thousand elements.

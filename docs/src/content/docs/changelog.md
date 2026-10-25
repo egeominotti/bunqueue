@@ -20,7 +20,157 @@ head:
 
 ## [Unreleased]
 
-### CI
+Algorithmic work on the broker's data structures. Public APIs, options, events,
+error messages and results are unchanged, except that `getJobs` on very large
+queues now returns its page instead of throwing (see Fixed). The existing test
+suite passes unmodified, and a differential check that drives the previous and
+the new engine with the same random operations returned identical answers in
+150,000 comparisons (three runs of 50,000). Workloads with immediate retries are
+excluded from that check: the order of two equal-priority jobs retried in the
+same instant depends on the failure millisecond, so it also differs between two
+runs of the previous engine. Most gains appear with large backlogs, many connections or
+large messages; with small queues the hot path is unchanged to slightly faster.
+
+Figures below are diagnostic measurements (Bun 1.4.4, Linux x64, AMD Ryzen 9
+7950X3D, memory mode unless noted), taken with the same script on the previous
+and the new code. They are not results of the official benchmark suite.
+
+### Fixed
+
+- `getJobs` (and `getWaiting`, `getDelayed` and the other list helpers built on
+  it) no longer throws `RangeError: Maximum call stack size exceeded` on large
+  queues. Collected jobs were appended with `push(...array)`, which passes every
+  element as a call argument and fails past a few hundred thousand jobs. The
+  same pattern is replaced in the paused, waiting-children and failed overlays
+  of SQLite pagination, the cloud snapshot wait-time statistics and the
+  Postgres DLQ statistics.
+
+  | Backlog | State | Before | After |
+  | --- | --- | --- | --- |
+  | 1M | waiting, page 0..20 | crash | 96.9 ms |
+  | 1M | all states, page 0..20 | crash | 111.8 ms |
+
+### Performance
+
+#### Pull and queue structures
+
+- **Idle pulls on queues holding only future jobs.** A pull scan parked every
+  delayed job and restored it, so a worker polling a queue of scheduled jobs
+  paid O(n log n) per poll while holding the shard lock. After a scan finds
+  nothing due, the queue keeps a lower bound of when any job can become ready
+  or expire, plus its earliest run time, and answers the next pulls directly
+  with the same result (no job, same wake-up time). The tracker holds job ids
+  only and is dropped as soon as a scan dequeues again, so queues with ready
+  jobs pay nothing.
+
+  | Queue (only delayed jobs) | Before | After |
+  | --- | --- | --- |
+  | 50k jobs, each pull after the first | 19,597 µs | 5.6 µs |
+  | 10k jobs, each pull after the first | 3,585 µs | 3.7 µs |
+  | 50k jobs, after a new delayed push | 19,545 µs | 0.7 µs |
+
+- **Temporal index appends.** Every push inserted into the per-queue skip list
+  by walking it from the head and allocating a predecessor array. Inserts past
+  the current maximum (the normal case) now link behind each level's tail, and
+  the predecessor array is reused.
+
+  | Backlog | Before | After |
+  | --- | --- | --- |
+  | 1M | 555 ns per job | 192 ns per job |
+  | 100k | 404 ns per job | 252 ns per job |
+
+- Common path, no delayed jobs (median of three runs): `push` 3.33 → 3.11 µs,
+  `pushBatch` 2.18 → 1.83 µs per job, `pull` and `ack` unchanged. With a
+  dashboard reading counts every 10 ms (incremental counters active), `push`,
+  `pushBatch`, `pull` and `ack` stay within ±7% of the previous code.
+
+#### Counts, statistics and dashboards
+
+- **Incremental queue state counts.** Waiting, prioritized and delayed counts
+  were recomputed by scanning every queued job on each request, and the SSE and
+  WebSocket dashboards request them every 10 ms while events flow. Each queue
+  now keeps these counts up to date from its first count read on, with a
+  run-time heap (job ids only) that moves jobs from delayed to waiting as time
+  passes, using the same classification as the scan; a read at an earlier time
+  than the previous one rescans. `getStats`, `getQueuesSummary`,
+  `getPerQueueStats` and the Prometheus exporter use the same counts. Completed
+  counts in memory mode walk the bounded completed set instead of the whole job
+  index.
+- **Incremental per-priority counts.** `getCountsPerPriority` no longer scans the
+  queue. Priorities that are not array-index keys (negative or fractional) keep
+  the previous scan, so the returned object keeps the same key order.
+- **`getJobs` collection.** Temporal jobs are collected and tagged with their
+  state in one pass over the queue, without the intermediate arrays the scan
+  used to build; the page is still sorted with the engine's stable sort, in
+  either direction.
+
+  | Operation (1M jobs) | Before | After |
+  | --- | --- | --- |
+  | Queue state counts (dashboard tick) | 45.1 ms | 0.01 ms |
+  | `getStats` | 41.5 ms | 0.72 ms |
+  | `getQueuesSummary` | 68.2 ms | 0.30 ms |
+  | `getPerQueueStats` | 68.0 ms | 0.26 ms |
+  | `getPrometheusMetrics` | 108.8 ms | 0.31 ms |
+  | `getCountsPerPriority` | 39.1 ms | 0.003 ms |
+  | `getJobs` delayed, page 0..20 | 44.9 ms | 28.2 ms |
+  | `getJobs` waiting, page 0..20 (100k jobs) | 11.4 ms | 8.1 ms |
+
+#### TCP
+
+- **Frame parser.** Server and client copied every buffered byte again on each
+  socket read, so a large frame cost O(size² / chunk). Partial frames now
+  accumulate in a buffer that doubles with the bytes actually received (never
+  with a length announced in a header), and is trimmed back to the pending
+  bytes after a large frame; a read with nothing pending is parsed in place.
+  Frame bodies are still `Uint8Array` copies, also when the socket hands over a
+  `Buffer`, so decoded binary fields keep their type; buffered byte counts and
+  `FrameSizeError` are unchanged.
+
+  | Frame (64 KB reads) | Before | After |
+  | --- | --- | --- |
+  | 64 MB | 5,168.4 ms | 64.8 ms |
+  | 16 MB | 277.2 ms | 15.6 ms |
+  | 1 MB | 1.83 ms | 0.85 ms |
+  | 2,000 × 200 B frames, 512 B reads | 0.171 ms | 0.110 ms |
+
+- **Event fan-out.** Each job event scanned every connection to find the ones
+  subscribed to its queue. Subscribers are now indexed per queue and delivered
+  in connection order, as before.
+
+  | Connections × subscribers | Before | After |
+  | --- | --- | --- |
+  | 10,000 × 1 | 26,258 ns per event | 306 ns |
+  | 10,000 × 100 | 29,940 ns per event | 1,480 ns |
+  | 1,000 × 1 | 2,493 ns per event | 240 ns |
+
+#### Persistence
+
+- **Write buffer index.** Lookups, state overrides and removals of buffered jobs
+  scanned both halves of the double buffer. Each half is now indexed by job id
+  (first match, insertion order and flush contents unchanged).
+
+  | Operation | Before | After |
+  | --- | --- | --- |
+  | Remove, 100k buffered jobs | 491,230 ns | 315 ns |
+  | Lookup, 100k buffered jobs | 120,424 ns | 203 ns |
+  | Pull / ack with flushing stalled, 50k buffered | 269.8 / 283.2 µs | 27.6 / 44.3 µs |
+
+- **Cached SQLite statements.** Statements on the retry, delete, active-dedup,
+  waiting-children and flow-failure paths were compiled on every call
+  (`db.prepare`); they now use the statement cache (`db.query`). `fail()` with a
+  retry goes from 118.8 to 80.7 µs per job.
+
+#### Background maintenance and metrics
+
+- The 10-second cleanup checks temporal-index orphans by asking the shard's
+  queues directly instead of copying every queued id into arrays and a `Set`,
+  and the orphaned job-index sweep no longer allocates one object per entry.
+  With 1M jobs, a cleanup tick goes from 504 to 405 ms and the empty-queue
+  reconciliation from 343 to 184 ms.
+- The latency histogram records one bucket per observation and accumulates on
+  read: `observe` goes from 12.5 to 9.2 ns.
+
+### CI/CD
 
 - Pull requests from this repository get one automatic Claude Code review
   (`claude-code-review.yml`; fork pull requests, drafts and bot events are

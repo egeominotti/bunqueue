@@ -10,54 +10,109 @@ export class FrameSizeError extends Error {
   }
 }
 
+const EMPTY = new Uint8Array(0);
+
 export class FrameParser {
-  private buffer: Uint8Array = new Uint8Array(0);
+  /** Backing storage; bytes [start, end) are the unparsed tail of the stream. */
+  private buffer: Uint8Array = EMPTY;
+  private start = 0;
+  private end = 0;
   private readonly maxFrameSize: number;
 
   constructor(maxFrameSize: number = MAX_FRAME_SIZE) {
     this.maxFrameSize = maxFrameSize;
   }
 
-  addData(data: Uint8Array): Uint8Array[] {
-    const buffer = new Uint8Array(this.buffer.length + data.length);
-    buffer.set(this.buffer);
-    buffer.set(data, this.buffer.length);
+  addData(chunk: Uint8Array): Uint8Array[] {
+    // A plain Uint8Array view, so `slice` copies into a Uint8Array even for a Buffer
+    // (Buffer#slice returns a view of the socket chunk, and decoded binary fields
+    // would become Buffer views instead of Uint8Array copies).
+    const data =
+      chunk.constructor === Uint8Array
+        ? chunk
+        : new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+    // With nothing pending, parse straight from the chunk instead of copying it first.
+    const direct = this.start === this.end;
+    if (!direct) this.append(data);
+    const source = direct ? data : this.buffer;
+    const limit = direct ? data.length : this.end;
+    let offset = direct ? 0 : this.start;
 
     const frames: Uint8Array[] = [];
-    let offset = 0;
-    while (buffer.length - offset >= 4) {
+    while (limit - offset >= 4) {
       const length =
-        ((buffer[offset] << 24) |
-          (buffer[offset + 1] << 16) |
-          (buffer[offset + 2] << 8) |
-          buffer[offset + 3]) >>>
+        ((source[offset] << 24) |
+          (source[offset + 1] << 16) |
+          (source[offset + 2] << 8) |
+          source[offset + 3]) >>>
         0;
 
       if (length > this.maxFrameSize) {
-        this.buffer = new Uint8Array(0);
+        this.clear();
         throw new FrameSizeError(length, this.maxFrameSize);
       }
-      if (buffer.length - offset < 4 + length) break;
-      frames.push(buffer.slice(offset + 4, offset + 4 + length));
+      if (limit - offset < 4 + length) break;
+      frames.push(source.slice(offset + 4, offset + 4 + length));
       offset += 4 + length;
     }
 
-    if (offset >= buffer.length) this.buffer = new Uint8Array(0);
-    else if (offset === 0) this.buffer = buffer;
-    else this.buffer = buffer.slice(offset);
+    if (direct) {
+      this.start = 0;
+      this.end = 0;
+      if (offset < limit) this.append(data.subarray(offset));
+    } else if (offset >= limit) {
+      this.clear();
+    } else {
+      this.start = offset;
+      this.shrinkIfOversized();
+    }
     return frames;
   }
 
   get bufferedBytes(): number {
-    return this.buffer.length;
+    return this.end - this.start;
   }
 
   get hasPartialFrame(): boolean {
-    return this.buffer.length > 0;
+    return this.end > this.start;
   }
 
   clear(): void {
-    this.buffer = new Uint8Array(0);
+    this.buffer = EMPTY;
+    this.start = 0;
+    this.end = 0;
+  }
+
+  /**
+   * Append with amortized O(1) growth by doubling. Growth follows bytes actually
+   * received, never a length announced in a header, so a peer cannot make the parser
+   * reserve a large buffer before sending the data.
+   */
+  private append(data: Uint8Array): void {
+    const pending = this.end - this.start;
+    const needed = pending + data.length;
+    if (this.end + data.length > this.buffer.length) {
+      if (needed <= this.buffer.length) {
+        this.buffer.copyWithin(0, this.start, this.end);
+      } else {
+        const next = new Uint8Array(Math.max(needed, this.buffer.length * 2, 4096));
+        next.set(this.buffer.subarray(this.start, this.end));
+        this.buffer = next;
+      }
+      this.start = 0;
+      this.end = pending;
+    }
+    this.buffer.set(data, this.end);
+    this.end += data.length;
+  }
+
+  /** After a large frame, keep only the pending tail instead of the whole grown buffer. */
+  private shrinkIfOversized(): void {
+    const pending = this.end - this.start;
+    if (this.buffer.length <= 65_536 || pending * 4 >= this.buffer.length) return;
+    this.buffer = this.buffer.slice(this.start, this.end);
+    this.start = 0;
+    this.end = pending;
   }
 
   static frame(data: Uint8Array): Uint8Array {

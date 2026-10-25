@@ -9,14 +9,16 @@ import type { PersistedJobState } from './sqliteSerializer';
 import {
   findPendingJob,
   listPendingJobs,
+  PendingSegment,
   removePendingJob,
   removePendingQueue,
   setPendingJobState,
 } from './writeBufferPending';
 
 export class WriteBuffer {
-  private activeBuffer: Job[] = [];
-  private flushBuffer: Job[] = [];
+  // Indexed segments: id lookups, state overrides and removals do not scan the buffer.
+  private activeBuffer = new PendingSegment();
+  private flushBuffer = new PendingSegment();
   private flushing = false;
   private stopped = false;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -52,14 +54,14 @@ export class WriteBuffer {
 
   add(job: Job): void {
     this.activeBuffer.push(job);
-    if (this.autoFlushDeferrals === 0 && this.activeBuffer.length >= this.bufferSize) {
+    if (this.autoFlushDeferrals === 0 && this.activeBuffer.size >= this.bufferSize) {
       this.flushIfReady();
     }
   }
 
   addBatch(jobs: Job[]): void {
     for (const job of jobs) this.activeBuffer.push(job);
-    if (this.autoFlushDeferrals === 0 && this.activeBuffer.length >= this.bufferSize) {
+    if (this.autoFlushDeferrals === 0 && this.activeBuffer.size >= this.bufferSize) {
       this.flushIfReady();
     }
   }
@@ -82,7 +84,7 @@ export class WriteBuffer {
     if (
       this.autoFlushDeferrals === 0 &&
       !this.stopped &&
-      this.activeBuffer.length >= this.bufferSize
+      this.activeBuffer.size >= this.bufferSize
     ) {
       try {
         this.flushIfReady();
@@ -104,29 +106,29 @@ export class WriteBuffer {
 
   flush(): number {
     if (this.stopped || this.flushing) return 0;
-    if (this.activeBuffer.length === 0) return 0;
+    if (this.activeBuffer.size === 0) return 0;
     this.flushing = true;
     this.flushBuffer = this.activeBuffer;
-    this.activeBuffer = [];
-    const jobCount = this.flushBuffer.length;
+    this.activeBuffer = new PendingSegment();
+    const jobCount = this.flushBuffer.size;
 
     try {
       let result: BatchInsertResult;
       try {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive against a non-conforming test double
-        result = this.batchManager.insertJobsBatch(this.flushBuffer) ?? {
+        result = this.batchManager.insertJobsBatch(this.flushBuffer.toArray()) ?? {
           transient: [],
           conflicts: [],
         };
       } catch (error) {
         result = {
-          transient: this.flushBuffer,
+          transient: this.flushBuffer.toArray(),
           conflicts: [],
           error: error instanceof Error ? error : new Error(String(error)),
         };
       }
       const { transient, conflicts, error } = result;
-      this.flushBuffer = [];
+      this.flushBuffer = new PendingSegment();
 
       if (conflicts.length > 0) {
         this.onError(error ?? new Error('Constraint violation'), conflicts.length);
@@ -136,11 +138,11 @@ export class WriteBuffer {
         const flushError = error ?? new Error('Write buffer flush failed');
         this.lastError = flushError;
         this.retryCount++;
-        this.activeBuffer = transient.concat(this.activeBuffer);
+        this.activeBuffer = PendingSegment.from(transient.concat(this.activeBuffer.toArray()));
 
         if (this.retryCount >= this.maxRetries) {
-          const lostJobs = [...this.activeBuffer];
-          this.activeBuffer = [];
+          const lostJobs = this.activeBuffer.toArray();
+          this.activeBuffer = new PendingSegment();
           this.clearBackoffRetry();
           if (this.onCriticalError) {
             this.onCriticalError(lostJobs, flushError, this.retryCount);
@@ -184,20 +186,16 @@ export class WriteBuffer {
   }
 
   get pendingCount(): number {
-    return this.activeBuffer.length + this.flushBuffer.length;
+    return this.activeBuffer.size + this.flushBuffer.size;
   }
   removePending(jobId: string): void {
-    [this.activeBuffer, this.flushBuffer] = removePendingJob(
-      [this.activeBuffer, this.flushBuffer],
-      jobId as JobId
-    );
+    removePendingJob([this.activeBuffer, this.flushBuffer], jobId as JobId);
     if (this.pendingCount === 0) this.resetRetryState();
   }
   removePendingForQueue(queue: string): JobId[] {
-    const result = removePendingQueue([this.activeBuffer, this.flushBuffer], queue);
-    [this.activeBuffer, this.flushBuffer] = result.buffers;
+    const removed = removePendingQueue([this.activeBuffer, this.flushBuffer], queue);
     if (this.pendingCount === 0) this.resetRetryState();
-    return result.removed;
+    return removed;
   }
   hasPending(jobId: string): boolean {
     return this.getPendingJob(jobId as JobId) !== null;
@@ -278,15 +276,15 @@ export class WriteBuffer {
   }
 
   private reportLostJobs(): void {
-    const remaining = this.activeBuffer.concat(this.flushBuffer);
+    const remaining = this.activeBuffer.toArray().concat(this.flushBuffer.toArray());
     if (remaining.length > 0 && this.onCriticalError) {
       this.onCriticalError(
         remaining,
         this.lastError ?? new Error('Flush failed during shutdown'),
         this.retryCount
       );
-      this.activeBuffer = [];
-      this.flushBuffer = [];
+      this.activeBuffer = new PendingSegment();
+      this.flushBuffer = new PendingSegment();
     }
   }
 

@@ -36,7 +36,7 @@ export abstract class SqliteJobs extends SqliteJobLifecycle {
         }
         if (flowFailure) {
           this.db
-            .prepare(
+            .query(
               `INSERT INTO flow_failures
                (parent_id, child_id, child_queue, mode, error, created_at)
                VALUES (?, ?, ?, ?, ?, ?)

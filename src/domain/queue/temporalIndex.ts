@@ -77,7 +77,7 @@ export class TemporalIndex {
     this.indexesByQueue.delete(queue);
   }
 
-  cleanOrphaned(validJobIds: Set<JobId>): number {
+  cleanOrphaned(validJobIds: { has(jobId: JobId): boolean }): number {
     let removed = 0;
     for (const [jobId, entries] of this.entriesByJobId) {
       if (validJobIds.has(jobId)) continue;

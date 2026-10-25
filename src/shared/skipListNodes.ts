@@ -12,6 +12,12 @@ export function createSkipHead<T>(maxLevel: number): SkipNode<T> {
   return { value: null as unknown as T, forward };
 }
 
+export function createSkipNode<T>(value: T, level: number): SkipNode<T> {
+  const forward: Array<SkipNode<T> | null> = [];
+  for (let i = 0; i <= level; i++) forward.push(null);
+  return { value, forward };
+}
+
 export function collectSkipRange<T>(
   first: SkipNode<T> | null,
   predicate: (value: T) => boolean,

@@ -1,5 +1,6 @@
 import type { Job, JobId } from '../../../domain/types/job';
 import type { GetJobsContext } from '../../types/query';
+import { appendAll } from '../../../shared/arrays';
 import {
   collectJobsByState,
   collectTemporalJobs,
@@ -189,9 +190,9 @@ export function getJobs(
         : [];
     const extras: Job[] = [...buffered.jobs];
 
-    if (states.includes('failed')) extras.push(...tagState(shard.getDlq(queue), 'failed'));
+    if (states.includes('failed')) appendAll(extras, tagState(shard.getDlq(queue), 'failed'));
     if (states.includes('waiting-children')) {
-      extras.push(...tagState(parkedJobs, 'waiting-children'));
+      appendAll(extras, tagState(parkedJobs, 'waiting-children'));
     }
     if (states.includes('paused') && isPaused) {
       const pausedJobs = collectTemporalJobs(
@@ -200,7 +201,7 @@ export function getJobs(
         { waiting: true, prioritized: true, delayed: false },
         now
       );
-      extras.push(...tagState(pausedJobs, 'paused'));
+      appendAll(extras, tagState(pausedJobs, 'paused'));
     }
 
     const excludedIds = new Set<JobId>([

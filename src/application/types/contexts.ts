@@ -94,7 +94,7 @@ export interface StatsContext {
   storage?: SqliteStorage | null;
   shards: Shard[];
   processingShards: Map<JobId, Job>[];
-  completedJobs: SetLike<JobId>;
+  completedJobs: SetLike<JobId> & Iterable<JobId>;
   jobIndex: Map<JobId, JobLocation>;
   jobResults: LRUMap<JobId, unknown>;
   removedResults?: RemovedResults;

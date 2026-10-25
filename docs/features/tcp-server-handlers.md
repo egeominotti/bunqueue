@@ -1,6 +1,6 @@
 # TCP Server Command Handlers
 
-> **Category:** Transport · **Source:** `src/infrastructure/server/handler.ts`, `src/infrastructure/server/errors.ts`, `src/infrastructure/server/handlerRoutes.ts`, `src/infrastructure/server/handlers/`, `src/infrastructure/server/tcp/eventSubscriptions.ts`, `src/infrastructure/server/tcp/connections.ts`, `src/infrastructure/server/bootstrap.ts`, `src/infrastructure/server/types/`
+> **Category:** Transport · **Source:** `src/infrastructure/server/handler.ts`, `src/infrastructure/server/errors.ts`, `src/infrastructure/server/handlerRoutes.ts`, `src/infrastructure/server/handlers/`, `src/infrastructure/server/tcp/eventSubscriptions.ts`, `src/infrastructure/server/tcp/connections.ts`, `src/infrastructure/server/tcp/eventSubscriberIndex.ts`, `src/infrastructure/server/bootstrap.ts`, `src/infrastructure/server/types/`
 
 ## Purpose
 
@@ -24,6 +24,11 @@ Owns:
 - Server bootstrap wiring and lifecycle (`bootstrap.ts`).
 - Transport-owned `SubscribeEvents` / `UnsubscribeEvents` handling, including
   auth, queue validation, per-connection selection and manager-bridge cleanup.
+  `TcpConnectionRegistry` keeps live subscribers in an `EventSubscriberIndex`
+  (queue → sockets, iterated in connection order), so a job event costs
+  O(subscribers of `event.queue`) rather than O(all connections), and the bridge
+  is released when that index is empty. A socket that closed before its
+  `SubscribeEvents` ran is never indexed and never receives events.
 
 Does NOT own:
 

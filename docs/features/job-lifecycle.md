@@ -236,6 +236,14 @@ SQLite restart.
    paying `O(k log n)` for each of the `b` delivered jobs. `nextRunAt` retains
    the minimum deadline across every parked delayed job so long-poll wake-up
    semantics remain unchanged.
+   Idle shortcut: when a non-grouped scan visits every job and finds none due
+   (`Shard.markExhausted`), the next `tryDequeueNextJob` first asks
+   `Shard.idleRunAt(queue, now)`. If no job can be ready or expired at `now`, it
+   stops with the earliest `runAt` as `nextRunAt`, which is what parking every job
+   would have produced, without touching the heap; otherwise the scan runs as
+   above. A queue holding only future jobs therefore costs `O(1)` amortized per
+   idle poll instead of `O(n log n)` (`DueTracker`, see
+   [Data Structures](./data-structures.md)).
 5. `finalizeProcessing` in `pullFinalization.ts` uses
    `storage.markActive(...)` for a single handoff (non-fatal on error —
    in-memory is source of truth), bumps counters, and broadcasts `pulled`. It

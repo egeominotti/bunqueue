@@ -48,11 +48,10 @@ export function getAllQueueJobCounts(
     const counts = createCounts(name, ctx);
     const queue = ctx.shards[shardIndex(name)].queues.get(name);
     if (queue) {
-      for (const job of queue.values()) {
-        if (job.runAt > now) counts.delayed++;
-        else if (job.priority > 0) counts.prioritized++;
-        else counts.waiting++;
-      }
+      const states = queue.countStatesAt(now);
+      counts.waiting += states.waiting;
+      counts.prioritized += states.prioritized;
+      counts.delayed += states.delayed;
     }
     result.set(name, counts);
   }
@@ -73,8 +72,11 @@ export function getAllQueueJobCounts(
   }
 
   if (!ctx.storage) {
-    for (const [jobId, location] of ctx.jobIndex) {
-      if (location.type !== 'completed' || !ctx.completedJobs.has(jobId)) continue;
+    // Same set as scanning jobIndex for completed entries that are in completedJobs, but
+    // walks the bounded completedJobs set instead of every known job.
+    for (const jobId of ctx.completedJobs) {
+      const location = ctx.jobIndex.get(jobId);
+      if (location?.type !== 'completed') continue;
       const counts = result.get(location.queueName);
       if (counts) counts.completed++;
     }

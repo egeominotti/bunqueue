@@ -22,7 +22,7 @@ export abstract class SqliteMutations extends SqliteJobs {
     const dlqRetryState = getDlqRetryState(job);
     this.safeWrite(() => {
       this.db
-        .prepare(
+        .query(
           'UPDATE jobs SET attempts = ?, stall_count = ?, run_at = ?, state = ?, timeline = ?, stacktrace = ?, dlq_retry_state = ? WHERE id = ?'
         )
         .run(
@@ -165,12 +165,12 @@ export abstract class SqliteMutations extends SqliteJobs {
   protected runDeleteJobRows(jobId: JobId): void {
     this.statements.get('deleteJob')!.run(jobId);
     this.statements.get('deleteJobResult')!.run(jobId);
-    this.db.prepare('DELETE FROM flow_failures WHERE parent_id = ?').run(jobId);
+    this.db.query('DELETE FROM flow_failures WHERE parent_id = ?').run(jobId);
   }
 
   protected runClearActiveDedupKey(jobId: JobId): void {
     const result = this.db
-      .prepare("UPDATE jobs SET unique_key = NULL WHERE id = ? AND state = 'active'")
+      .query("UPDATE jobs SET unique_key = NULL WHERE id = ? AND state = 'active'")
       .run(jobId);
     if (result.changes === 0) {
       throw new Error(`Active deduplication owner is not persisted: ${String(jobId)}`);

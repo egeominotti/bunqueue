@@ -12,4 +12,6 @@ export interface HeapEntry {
 export interface IndexedJob {
   job: Job;
   generation: bigint;
+  /** Incremental state counters only: how the job is currently counted. */
+  due?: number;
 }

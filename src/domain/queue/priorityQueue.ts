@@ -1,6 +1,12 @@
 import { copyGroupFifoOrder } from '../job/groupFifoOrder';
-import type { Job, JobId } from '../types/job';
+import { type Job, type JobId, isExpired, isReady } from '../types/job';
 import type { HeapEntry, IndexedJob } from '../types/priorityQueue';
+import {
+  PriorityQueueCounters,
+  scanQueueStates,
+  type QueueStateCounts,
+} from './priorityQueueCounters';
+import { DueTracker } from './priorityQueueDue';
 import { comparePriorityEntries } from './priorityQueueOrder';
 
 export interface PriorityQueueHooks {
@@ -16,13 +22,18 @@ export class IndexedPriorityQueue {
   private static readonly D = 4;
   private heap: HeapEntry[] = [];
   private readonly index: Map<JobId, IndexedJob> = new Map();
+  private counters: PriorityQueueCounters | null = null;
+  /** Built after a pull scan found nothing due, dropped once a scan dequeues again. */
+  private due: DueTracker | null = null;
+  private idleHint = false;
   private generation = 0n;
   private hooksActive = false;
 
   constructor(
     private readonly hooks?: PriorityQueueHooks,
     private readonly compare: PriorityQueueComparator = comparePriorityEntries,
-    private readonly order?: PriorityQueueOrder
+    private readonly order?: PriorityQueueOrder,
+    private readonly trackDue = false
   ) {}
 
   get size(): number {
@@ -34,10 +45,18 @@ export class IndexedPriorityQueue {
   }
 
   push(job: Job): void {
+    this.insert(job);
+  }
+
+  /** Index the job under a new generation and add its heap entry. */
+  private insert(job: Job): void {
     const gen = this.generation++;
-
-    this.index.set(job.id, { job, generation: gen });
-
+    const previous = this.counters ? this.index.get(job.id) : undefined;
+    if (previous) this.counters?.remove(previous);
+    const indexed: IndexedJob = { job, generation: gen };
+    this.index.set(job.id, indexed);
+    this.counters?.add(job.id, indexed);
+    this.due?.add(job, this.index);
     const entry: HeapEntry = {
       jobId: job.id,
       priority: job.priority,
@@ -60,14 +79,15 @@ export class IndexedPriorityQueue {
     while (this.heap.length > 0) {
       const entry = this.heap[0];
       const indexed = this.index.get(entry.jobId);
-
       if (indexed?.generation !== entry.generation) {
         this.removeTop();
         continue;
       }
-
       this.removeTop();
       this.index.delete(entry.jobId);
+      this.counters?.remove(indexed);
+      this.due = null;
+      this.idleHint = false;
       if (this.hooks && this.hooksActive) {
         this.hooksActive = this.hooks.onRemove(indexed.job);
       }
@@ -80,12 +100,10 @@ export class IndexedPriorityQueue {
     while (this.heap.length > 0) {
       const entry = this.heap[0];
       const indexed = this.index.get(entry.jobId);
-
       if (indexed?.generation !== entry.generation) {
         this.removeTop();
         continue;
       }
-
       return indexed.job;
     }
     return null;
@@ -104,6 +122,7 @@ export class IndexedPriorityQueue {
     if (!indexed) return null;
 
     this.index.delete(jobId);
+    this.counters?.remove(indexed);
     if (this.hooks && this.hooksActive) {
       this.hooksActive = this.hooks.onRemove(indexed.job);
     }
@@ -116,73 +135,55 @@ export class IndexedPriorityQueue {
     if (!indexed) return false;
 
     const lifo = newLifo ?? indexed.job.lifo;
-
-    const updatedJob: Job = {
-      ...indexed.job,
-      priority: newPriority,
-      lifo,
-    };
-    copyGroupFifoOrder(indexed.job, updatedJob);
-
-    const gen = this.generation++;
-    this.index.set(jobId, { job: updatedJob, generation: gen });
-
-    const entry: HeapEntry = {
-      jobId: updatedJob.id,
-      priority: newPriority,
-      runAt: updatedJob.runAt,
-      lifo,
-      generation: gen,
-    };
-    if (this.order) {
-      const groupFifoOrder = this.order(updatedJob);
-      if (groupFifoOrder !== null) entry.groupFifoOrder = groupFifoOrder;
-    }
-    this.heap.push(entry);
-    this.bubbleUp(this.heap.length - 1);
-    if (this.hooks && (this.hooksActive || updatedJob.groupId)) {
-      this.hooksActive = this.hooks.onInsert(updatedJob);
-    }
-
-    return true;
+    return this.reinsert(indexed, { ...indexed.job, priority: newPriority, lifo });
   }
 
   /** Update job runAt (for delay changes) - O(log n) */
   updateRunAt(jobId: JobId, newRunAt: number): boolean {
     const indexed = this.index.get(jobId);
     if (!indexed) return false;
+    return this.reinsert(indexed, { ...indexed.job, runAt: newRunAt });
+  }
 
-    const updatedJob: Job = {
-      ...indexed.job,
-      runAt: newRunAt,
-    };
-    copyGroupFifoOrder(indexed.job, updatedJob);
+  /** Live jobs per priority (insertion order of the priorities is not the scan's order). */
+  countsPerPriority(): ReadonlyMap<number, number> {
+    this.counters ??= new PriorityQueueCounters(this.index, Date.now());
+    return this.counters.byPriority;
+  }
 
-    const gen = this.generation++;
-    this.index.set(jobId, { job: updatedJob, generation: gen });
+  /** Waiting/prioritized/delayed counts at `now`, kept incrementally after the first read. */
+  countStatesAt(now: number): QueueStateCounts {
+    this.counters ??= new PriorityQueueCounters(this.index, now);
+    return this.counters.countAt(now, this.index.size) ?? scanQueueStates(this.index.values(), now);
+  }
 
-    const entry: HeapEntry = {
-      jobId: updatedJob.id,
-      priority: updatedJob.priority,
-      runAt: newRunAt,
-      lifo: updatedJob.lifo,
-      generation: gen,
-    };
-    if (this.order) {
-      const groupFifoOrder = this.order(updatedJob);
-      if (groupFifoOrder !== null) entry.groupFifoOrder = groupFifoOrder;
+  /**
+   * See `DueTracker.idleRunAt`. `undefined` (scan normally) unless the last pull scan of a
+   * due-tracking queue found nothing due; the tracker is built then and kept up to date.
+   */
+  idleRunAt(now: number): number | null | undefined {
+    if (!this.due) {
+      if (!this.idleHint) return undefined;
+      const top = this.peek();
+      if (top && (isReady(top, now) || isExpired(top, now))) return undefined;
+      this.due = new DueTracker();
+      this.due.rebuild(this.index);
     }
-    this.heap.push(entry);
-    this.bubbleUp(this.heap.length - 1);
-    if (this.hooks && (this.hooksActive || updatedJob.groupId)) {
-      this.hooksActive = this.hooks.onInsert(updatedJob);
-    }
+    return this.due.idleRunAt(now, this.index);
+  }
 
-    return true;
+  /** A pull scan visited every job and found none due. */
+  markExhausted(): void {
+    this.idleHint = this.trackDue;
   }
 
   values(): Job[] {
     return Array.from(this.index.values()).map((v) => v.job);
+  }
+
+  /** Visit every queued job in `values()` order, without copying them into arrays. */
+  forEachJob(visit: (job: Job) => void): void {
+    for (const indexed of this.index.values()) visit(indexed.job);
   }
 
   clear(): void {
@@ -194,28 +195,23 @@ export class IndexedPriorityQueue {
     }
     this.heap = [];
     this.index.clear();
+    this.counters = null;
+    this.due = null;
+    this.idleHint = false;
     this.generation = 0n;
     this.hooksActive = false;
   }
 
-  /**
-   * Get the ratio of stale entries in the heap
-   * Used to decide when to compact
-   */
+  /** Ratio of stale entries in the heap, used to decide when to compact. */
   getStaleRatio(): number {
     if (this.heap.length === 0) return 0;
     return 1 - this.index.size / this.heap.length;
   }
 
-  /**
-   * Compact the heap by removing stale entries
-   * Call when stale ratio exceeds threshold (e.g., 20%)
-   * O(n) operation but reclaims memory and improves performance
-   */
+  /** Compact the heap by removing stale entries - O(n); called above a stale-ratio threshold. */
   compact(): void {
     if (this.heap.length === 0) return;
 
-    // Filter out stale entries
     const validEntries: HeapEntry[] = [];
     for (const entry of this.heap) {
       const indexed = this.index.get(entry.jobId);
@@ -224,9 +220,17 @@ export class IndexedPriorityQueue {
       }
     }
 
-    // Rebuild heap - O(n) heapify
     this.heap = validEntries;
     this.heapify();
+    this.counters?.compact();
+    this.due?.rebuild(this.index);
+  }
+
+  /** Replace a job with its updated copy: new generation, new heap entry, same hooks. */
+  private reinsert(indexed: IndexedJob, updatedJob: Job): boolean {
+    copyGroupFifoOrder(indexed.job, updatedJob);
+    this.insert(updatedJob);
+    return true;
   }
 
   private heapify(): void {

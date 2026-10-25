@@ -368,6 +368,8 @@ ACK found no `processing` location, returned "Job not found" without releasing
 the job's queue concurrency slot (a queue with concurrency 1 stayed blocked) or
 group slot, and the job was neither completed nor indexed anywhere until a
 restart (`test/repro-orphan-index-cleanup-inflight-ack.test.ts`).
+Candidates are collected into parallel id/queue-name arrays per shard rather
+than one object per index entry.
 
 `pruneEndedClientDeliveries` runs synchronously after the lock sweep and drops
 every client ownership record whose delivery has ended (its `jobIndex` entry is
@@ -393,6 +395,11 @@ state rows are deleted before the remaining runtime is reclaimed. A storage
 failure therefore aborts that removal with the queue still registered. Events
 are emitted only after reconciliation, so a synchronous listener that recreates
 this or another queue cannot be erased by the remainder of the old cleanup.
+In memory mode the completed counts walk the bounded `completedJobs` set and look
+up each `jobIndex` location, instead of walking every index entry. The final
+temporal-orphan pass asks each shard whether a job is in any of its queues: with
+up to 8 queues per shard it queries the queues directly; with more it builds the
+id `Set` as before.
 
 ### `processPendingDependencies` (`dependencyProcessor.ts:16`)
 

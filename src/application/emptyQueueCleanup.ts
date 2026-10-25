@@ -48,14 +48,10 @@ function collectCompletedCounts(
   if (ctx.storage) return ctx.storage.countCompletedJobsByQueue(registered);
   const registeredSet = new Set(registered);
   const counts = new Map<string, number>();
-  for (const [jobId, location] of ctx.jobIndex) {
-    if (
-      location.type !== 'completed' ||
-      !registeredSet.has(location.queueName) ||
-      !ctx.completedJobs.has(jobId)
-    ) {
-      continue;
-    }
+  // Completed index entries that are in completedJobs: walk the bounded set, not the index
+  for (const jobId of ctx.completedJobs) {
+    const location = ctx.jobIndex.get(jobId);
+    if (location?.type !== 'completed' || !registeredSet.has(location.queueName)) continue;
     counts.set(location.queueName, (counts.get(location.queueName) ?? 0) + 1);
   }
   return counts;

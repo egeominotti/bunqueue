@@ -256,6 +256,7 @@ in-memory DLQ, `waiting-children` maps, and the paused view).
 - Dependency-gated jobs in `waitingDeps` may retain their ready-state row, while jobs explicitly moved into `waitingChildren` persist `state='waiting-children'`. In-memory membership is authoritative while running; their IDs are deduplicated against SQL before global pagination, and they appear only when that logical state is requested.
 - Paused semantics: `resolveStateNeeds` (`src/application/operations/query/collect.ts:96-109`) suppresses explicit `waiting`/`prioritized` queries on a paused queue; those jobs are returned only under `paused` (`src/application/operations/query/collect.ts:111-149`). An unfiltered query still lists them by their temporal state.
 - In-memory path (embedded, no storage): `collectJobsByState` gathers every matching source before sorting and slicing; it never truncates insertion order before applying descending order.
+- Sources are appended with `appendAll` (`src/shared/arrays.ts`) rather than `push(...array)`, which threw `RangeError` on queues of several hundred thousand jobs, and temporal jobs are collected and tagged with their `_state` in a single pass over the queue (`forEachJob`) without intermediate copies. The global sort stays the engine's stable `Array.prototype.sort`: gathered jobs are usually already in `createdAt` order (in either direction), which it handles in about linear time.
 
 ### cancelJob (`jobCancel.ts`, `completedRemoval.ts`)
 

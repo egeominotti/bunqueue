@@ -1,4 +1,5 @@
 import type { QueueManager } from '../../../application/queueManager';
+import { maxOf, minOf } from '../../../shared/arrays';
 import type { CloudSnapshot } from '../types';
 import type { CloudSnapshotSource } from '../queueAdapter/types';
 
@@ -96,8 +97,8 @@ export function collectQueueWaitTime(
     const sum = waits.reduce((a, b) => a + b, 0);
     result[queue] = {
       avgMs: Math.round(sum / waits.length),
-      maxMs: Math.max(...waits),
-      minMs: Math.min(...waits),
+      maxMs: maxOf(waits),
+      minMs: minOf(waits),
     };
   }
   return result;
