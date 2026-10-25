@@ -28,10 +28,46 @@ env:
 
 jobs:
   # ============================================
+  # Change detection — a pull request or push that only touches the docs site
+  # (docs/), root Markdown files or .claude/ runs the docs build and the tests
+  # that read the docs, not the product test suites. Manual runs and anything
+  # else run everything.
+  # ============================================
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          code=true
+          if [[ "$EVENT" != workflow_dispatch && -n "$BASE" && ! "$BASE" =~ ^0+$ ]] &&
+            git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            changed=$(git diff --name-only "$BASE" "$GITHUB_SHA")
+            if [[ -n "$changed" ]] && ! grep -qvE '^(docs/|\.claude/|[^/]+\.md$)' <<< "$changed"; then
+              code=false
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "::notice::Product code changed: $code"
+
+  # ============================================
   # Code Quality
   # ============================================
   lint:
     name: Lint & Format
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -56,6 +92,8 @@ jobs:
 
   typecheck:
     name: Type Check
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -75,6 +113,8 @@ jobs:
   # ============================================
   test:
     name: Unit Tests
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -94,6 +134,8 @@ jobs:
 
   test-postgres:
     name: PostgreSQL ${{ matrix.postgres.label }} Integration Tests
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -144,6 +186,8 @@ jobs:
 
   test-tcp:
     name: TCP Integration Tests
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -161,6 +205,8 @@ jobs:
 
   test-embedded:
     name: Embedded Integration Tests
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -178,6 +224,8 @@ jobs:
 
   test-core-e2e:
     name: Core Public API E2E (Embedded + TCP)
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -207,6 +255,7 @@ jobs:
   # ============================================
   docs:
     name: Docs Build
+    needs: [changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -227,6 +276,19 @@ jobs:
 
       - name: Check release blog posts match the changelog
         run: bun docs/scripts/generate-release-posts.ts --check
+
+      # On docs-only changes the unit job is skipped, so the tests that read the
+      # docs, README or agent guides run here instead.
+      - name: Install dependencies for the docs tests
+        if: needs.changes.outputs.code != 'true'
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Run the tests that read the docs
+        if: needs.changes.outputs.code != 'true'
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(grep -lE "docs/src|'docs/|\"docs/|README\.md|CLAUDE\.md|AGENTS\.md|\.claude/|DOCS\b" test/*.test.ts)
+          bun test test/check-docs-data.test.ts "${files[@]}"
 
       - name: Install docs dependencies
         working-directory: docs
@@ -250,6 +312,8 @@ jobs:
 
   test-websocket:
     name: WebSocket/SSE Integration Tests
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -269,6 +333,8 @@ jobs:
   # workflow reports a failure only after artifacts have already been published.
   sdk:
     name: Official SDKs
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/sdk.yml
     with:
       run_soak: false
@@ -278,6 +344,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       [
+        changes,
         lint,
         typecheck,
         test,
@@ -303,13 +370,18 @@ jobs:
           WEBSOCKET_RESULT: ${{ needs.test-websocket.result }}
           DOCS_RESULT: ${{ needs.docs.result }}
           SDK_RESULT: ${{ needs.sdk.result }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          CODE_CHANGED: ${{ needs.changes.outputs.code }}
         run: |
           set -euo pipefail
+          test "$CHANGES_RESULT" = success
+          test "$DOCS_RESULT" = success
+          # Product jobs may only be skipped when the change touched docs alone.
           for result in \
             "$LINT_RESULT" "$TYPECHECK_RESULT" "$TEST_RESULT" "$POSTGRES_RESULT" \
             "$TCP_RESULT" "$EMBEDDED_RESULT" "$CORE_E2E_RESULT" "$WEBSOCKET_RESULT" \
-            "$DOCS_RESULT" "$SDK_RESULT"; do
-            test "$result" = success
+            "$SDK_RESULT"; do
+            test "$result" = success || { test "$CODE_CHANGED" = false && test "$result" = skipped; }
           done
 
   # ============================================

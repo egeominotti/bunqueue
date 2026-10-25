@@ -45,6 +45,13 @@ head:
 
 ### CI/CD
 
+- Pull requests and pushes that only change the docs site (`docs/`), root
+  Markdown files or `.claude/` no longer run the product suites (lint,
+  typecheck, unit, TCP, embedded, core E2E, WebSocket, PostgreSQL and SDK
+  jobs). A new `Detect changes` job classifies the diff; the docs job still
+  builds the site and runs the tests that read the docs, README and agent
+  guides. The quality gate accepts skipped product jobs only for docs-only
+  changes, and manual runs always run everything.
 - The docs job checks that the release posts match the changelog
   (`generate-release-posts.ts --check`).
 - GitHub releases are titled `bunqueue vX.Y.Z` and their notes open with a link
