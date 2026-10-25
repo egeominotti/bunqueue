@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. A late ACK from a timed-out worker could phantom-complete a retrying job, silently skipping the retry (src/application/queueManager.ts, src/application/backgroundTasks.ts): for a job with a per-job timeout and attempts &gt; 1…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 ## Bugfixes
 

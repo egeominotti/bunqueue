@@ -302,7 +302,7 @@ function renderPost(release: Release, meta: VersionMeta, previous: Release | und
   ];
   if (meta.author) {
     out.push(
-      `<p class="bq-release-byline"><img src="https://github.com/${meta.author}.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/${meta.author}">${meta.author}</a></p>`,
+      `<p class="bq-release-byline"><img src="https://github.com/${meta.author}.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/${meta.author}">${meta.author}</a></p>`,
       ''
     );
   }

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Codebase refactoring - Split 6 large files exceeding 300-line limit into smaller focused modules - src/shared/lru.ts (643 lines) → barrel re-export + 5 modules: lruMap.ts, lruSet.ts, boundedSet.ts, boundedMap.ts, ttlMap.ts -…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.4.1
 

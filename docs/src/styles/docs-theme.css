@@ -402,9 +402,10 @@ nav.sidebar ul ul a:hover {
   font-size: 0.78rem;
 }
 
-/* The copy button: a small borderless icon that stays quiet until the pointer is over
-   the block (Expressive Code's default is a framed 2.5rem square). */
-:root[data-has-sidebar] .expressive-code .copy button {
+/* The copy button, on every page with code (docs and the homepage): a small borderless
+   icon that stays quiet until the pointer is over the block (Expressive Code's default
+   is a framed 2.5rem square). */
+:root .expressive-code .copy button {
   width: 30px;
   height: 30px;
   min-width: 30px;
@@ -416,23 +417,23 @@ nav.sidebar ul ul a:hover {
   transition: opacity 120ms ease, background-color 120ms ease;
 }
 
-:root[data-has-sidebar] .expressive-code .copy button::before {
+:root .expressive-code .copy button::before {
   border: 0;
   background: transparent;
 }
 
-:root[data-has-sidebar] .expressive-code .copy button:hover {
+:root .expressive-code .copy button:hover {
   background: color-mix(in srgb, var(--docs-heading) 8%, transparent);
 }
 
-:root[data-has-sidebar] .expressive-code .copy button::after {
+:root .expressive-code .copy button::after {
   width: 15px;
   height: 15px;
   margin: auto;
 }
 
-:root[data-has-sidebar] .expressive-code .frame:hover .copy button,
-:root[data-has-sidebar] .expressive-code .copy button:focus-visible {
+:root .expressive-code .frame:hover .copy button,
+:root .expressive-code .copy button:focus-visible {
   opacity: 1;
 }
 
@@ -564,7 +565,7 @@ nav.sidebar .sl-badge {
   }
   /* Touch: a full 44px target, always visible (there is no hover to reveal it), on
      the code background so it never reads as part of the first line. */
-  :root[data-has-sidebar] .expressive-code .copy button {
+  :root .expressive-code .copy button {
     width: 44px;
     height: 44px;
     min-width: 44px;

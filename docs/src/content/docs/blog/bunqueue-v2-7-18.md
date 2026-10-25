@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 5 bugs. getJobsAsync() (and getWaitingAsync/getDelayedAsync/getActiveAsync/getCompletedAsync/getFailedAsync) dropped job.opts over TCP: listed jobs returned opts: {}, so job.opts.attempts/timeout/etc.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.18
 

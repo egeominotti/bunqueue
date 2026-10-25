@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Completed 39 previously exposed Queue, Worker, QueueGroup, dependency, DLQ, deduplication, retry, limiter and state-query methods or method families that returned sentinels, ignored public options or behaved differently between embedded…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.54
 

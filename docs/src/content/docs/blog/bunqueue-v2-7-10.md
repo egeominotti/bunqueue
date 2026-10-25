@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug and ships 1 addition. clean() left orphan rows in job_results table (Issue #84, follow-up from @jdorner), storage.deleteJob() executed only DELETE FROM jobs, so cleaned completed jobs' result rows persisted forever in…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.10
 

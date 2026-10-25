@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. MCP returns inconsistent numbers across monitoring tools (#87): In TCP mode the MCP TcpBackend parsed several TCP response envelopes at the wrong nesting level, so monitoring tools returned wrong or empty data even though the…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 ## Bugfixes
 

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. Queue.removeAsync() (which backs the BullMQ-style job.remove()) returned before the job was actually removed, on the embedded path (src/client/queue/operations/management.ts): the embedded branch fired…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.20
 

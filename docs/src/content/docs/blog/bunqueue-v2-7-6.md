@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 7 bugs. Systemic silent no-op in ~20 job methods (Issue #82 follow-up), Across 6 factories (processor.ts, jobProxy.ts, flowJobFactory.ts, jobConversion.ts, sandboxed worker, flow), many job methods (retry, moveToWait…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.6
 

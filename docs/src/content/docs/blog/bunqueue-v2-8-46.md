@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. Startup banner regression coverage now validates the runtime shard count against bunqueue's hardware-derived value instead of assuming the 16 shards used by the development machine.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.46
 

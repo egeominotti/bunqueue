@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug and ships 2 performance improvements. Batch push notifyBatch(): Batch push now wakes all waiting workers correctly via notifyBatch(N) instead of a single notify() call.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.6.21
 

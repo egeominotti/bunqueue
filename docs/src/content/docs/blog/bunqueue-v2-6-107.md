@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. Fix contextFactory test: updated getLockContext test to reflect the storage field added in v2.6.103 for cron job cleanup on disconnect (#73).</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.6.107
 

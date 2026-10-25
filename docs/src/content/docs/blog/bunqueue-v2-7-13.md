@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 6 bugs. WriteBuffer silent data loss when retries exhausted: SqliteStorage previously constructed WriteBuffer without an onCriticalError callback, so jobs dropped after maxRetries (10) vanished with no recovery path (the…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.13
 

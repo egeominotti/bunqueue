@@ -41,10 +41,10 @@
 .bq-home .home-used-by-repo {
   color: var(--sl-color-text);
   font-family: var(--home-display);
-  font-size: 1.6rem;
-  font-stretch: 75%;
-  font-weight: 700;
-  line-height: 1.1;
+  font-size: 1.2rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   overflow-wrap: anywhere;
   text-decoration: none;
 }
@@ -203,14 +203,40 @@
   border-top: 1px solid var(--home-line);
 }
 
+/* Questions read as a list with a chevron on the right that turns when open. */
 .home-faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   cursor: pointer;
+  list-style: none;
   color: var(--sl-color-text);
   font-weight: 500;
 }
 
-.home-faq summary::marker {
-  color: var(--home-accent);
+.home-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.home-faq summary::after {
+  content: '';
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-right: 1.5px solid var(--home-muted);
+  border-bottom: 1.5px solid var(--home-muted);
+  transform: rotate(45deg) translateY(-3px);
+  transition: transform 150ms ease;
+}
+
+.home-faq details[open] summary::after {
+  transform: rotate(-135deg) translateY(-1px);
+}
+
+.home-faq summary:hover::after {
+  border-color: var(--sl-color-text);
 }
 
 .bq-home .home-faq details p {
@@ -231,8 +257,8 @@
 }
 
 .bq-home .home-closing h2 {
-  font-size: clamp(2.8rem, 6.5vw, 5.5rem);
-  line-height: 0.95;
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  line-height: 1.04;
 }
 
 .bq-home .home-closing p {

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. Pinned typescript-eslint to exact 8.56.1 (dropped the ^ caret) in package.json so CI no longer floats into a broken or unexpected upstream release.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.22
 

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">SandboxedWorker TCP mode, sandboxedWorker EventEmitter, queueOps adapter, TCP heartbeat for SandboxedWorker.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 ## SandboxedWorker TCP mode
 

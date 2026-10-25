@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 6 bugs. Multi-broker correctness fix.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 > **Multi-broker correctness fix.** PostgreSQL readers no longer keep a stale
 > queue view when event retention removes history they have not consumed. The

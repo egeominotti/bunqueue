@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. Cron job with preventOverlap fires immediately on reconnect: Lock expiration was re-queuing cron jobs instead of discarding them, and batch ACK (ackBatchWithResults) silently skipped stall-retried jobs without recovery.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.6.113
 

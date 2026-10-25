@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 4 bugs. Tests for PUSHB deduplication (same-batch and cross-batch), test for ping response structure validation, E2E TCP deduplication test script (scripts/tcp/test-dedup-tcp.ts).</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.5.2
 

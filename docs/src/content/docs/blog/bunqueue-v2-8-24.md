@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Ships 3 performance improvements. Deterministic micro-benchmark (addData, 111-byte frames coalesced into one read): F=1000 2.78ms → 0.043ms (~65×), F=5000 61.1ms → 0.21ms (~291×).</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.24
 

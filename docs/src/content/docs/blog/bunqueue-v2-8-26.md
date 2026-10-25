@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">A correctness release from an exhaustive feature + extreme-stress audit (every subsystem, embedded and TCP).</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 A correctness release from an exhaustive feature + extreme-stress audit (every subsystem, embedded **and** TCP). Seven fixes; all pre-existing, none data-loss in normal operation, each shipped with a RED→GREEN reproduction test.
 

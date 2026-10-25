@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Ships 3 performance improvements and 2 additions. Event-driven dependency resolution - Replaced 100ms setInterval polling with microtask-coalesced flush triggered on job completion.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.4.6
 

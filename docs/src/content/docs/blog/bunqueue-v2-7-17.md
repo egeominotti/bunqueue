@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 2 bugs. Created job has wrong priority / options not reflected in TCP mode (#88): await queue.add(name, data, { priority: 10 }) returned job.priority === 0 over TCP.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.17
 

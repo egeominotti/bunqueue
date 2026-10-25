@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 2 bugs. Parent-child flow race condition: Resolved race where concurrent ack/fail operations on parent-child flows could cause inconsistent state.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.6.6
 

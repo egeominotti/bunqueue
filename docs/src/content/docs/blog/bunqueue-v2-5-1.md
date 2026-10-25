@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 3 bugs and ships 2 additions. MCP error handling: All 66 tool handlers now wrapped with withErrorHandler that catches backend exceptions and returns structured { error: "message" } responses with isError: true instead of raw stack…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.5.1
 

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">A security + correctness release.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 A security + correctness release. Two TLS fixes reported against 2.8.20 & 2.8.26 (thanks @assantech), plus a client-SDK parity fix. Each ships with a RED→GREEN reproduction test.
 

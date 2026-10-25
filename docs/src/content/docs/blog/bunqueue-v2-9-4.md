@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Deep-profiled queue hot paths and TCP ACK latency.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 > **Deep-profiled queue hot paths and TCP ACK latency.** This change set removes
 > the quadratic completion-evidence eviction path, stops the in-memory telemetry

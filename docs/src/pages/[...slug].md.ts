@@ -1,15 +1,16 @@
 import type { APIRoute, GetStaticPaths } from 'astro';
 import { getCollection } from 'astro:content';
+import { toAgentMarkdown } from '../lib/agent-markdown';
 import { inlineFirstJobCode } from '../lib/llms-full';
 
 /**
- * Raw markdown-source twin of every doc page, served at `/<slug>.md`, for AI
- * crawlers and agents that prefer the source over rendered HTML+nav (GEO). The
- * body is the page's authored markdown/MDX verbatim (imports and JSX included
- * on .mdx pages), except that the shared first-job examples (FirstJobCode and the
- * server commands from src/data/firstJob.ts) are expanded into code fences, since a
- * reader copying the page needs the code itself. Companion to /llms.txt (curated
- * index) and /llms-full.txt.
+ * Markdown twin of every doc page, served at `/<slug>.md`, for AI crawlers and
+ * agents that prefer text over rendered HTML+nav (GEO). The shared first-job
+ * examples (FirstJobCode and the server commands from src/data/firstJob.ts) are
+ * expanded into code fences, since a reader copying the page needs the code itself,
+ * and the body is converted to plain Markdown (lib/agent-markdown.ts): no imports,
+ * JSX or layout HTML, while tabs, asides and cards keep their meaning and code
+ * stays byte-for-byte. Companion to /llms.txt (curated index) and /llms-full.txt.
  */
 const SITE = 'https://bunqueue.dev';
 
@@ -27,7 +28,7 @@ export const GET: APIRoute = async ({ props }) => {
     `# ${e.data.title}\n\n` +
     (e.data.description ? `${e.data.description}\n\n` : '') +
     `Canonical: ${url}\n\n---\n\n`;
-  return new Response(front + inlineFirstJobCode(e.body ?? ''), {
+  return new Response(front + toAgentMarkdown(inlineFirstJobCode(e.body ?? ''), { site: SITE }), {
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
   });
 };

@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 3 bugs. drain() left stale rows in SQLite (embedded): queue.drain() cleared the in-memory index and counts but never deleted the SQLite rows, so drained jobs resurrected via getJobState/getJob/getWaiting/getJobs and would reload on…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.20
 

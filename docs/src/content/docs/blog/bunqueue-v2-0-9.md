@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 4 bugs and ships 1 addition. Critical: Memory leak in EventsManager - Cancelled waiters in waitForJobCompletion() were never removed from the completionWaiters map on timeout.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.0.9
 

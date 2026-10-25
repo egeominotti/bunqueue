@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 2 bugs. Batch push now wakes all waiting workers - pushJobBatch previously called notify() only once, causing only 1 of N waiting workers to wake up immediately.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.4.3
 

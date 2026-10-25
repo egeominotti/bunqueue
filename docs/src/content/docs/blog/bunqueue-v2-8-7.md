@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 18 bugs. GET /queues/:q/jobs/list?status=&lt;state&gt; ignored the filter, only state was read, so it returned the whole queue regardless of the requested state (#95).</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.7
 

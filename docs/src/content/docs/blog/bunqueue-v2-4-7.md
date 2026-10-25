@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Ships 2 performance improvements and 1 addition. Event-driven cron scheduler - Replaced 1s setInterval polling with precise setTimeout that wakes exactly when the next cron is due.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 ## What's new
 

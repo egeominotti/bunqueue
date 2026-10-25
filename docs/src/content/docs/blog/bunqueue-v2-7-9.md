@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 2 bugs and ships 1 addition. clean()/cleanAsync() returned array of empty strings (Issue #84, follow-up from @jdorner), Previously returned new Array(count).fill(''), so the result length was correct but the IDs were empty.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.7.9
 

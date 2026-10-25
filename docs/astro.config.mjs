@@ -167,7 +167,6 @@ export default defineConfig({
       // Expressive Code options live in ec.config.mjs: they use theme-aware functions, which
       // the <Code> component can only load from there.
       customCss: [
-        '@fontsource-variable/bricolage-grotesque',
         '@fontsource/ibm-plex-mono/400.css',
         '@fontsource/ibm-plex-mono/500.css',
         '@fontsource/inter/400.css',

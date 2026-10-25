@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Fixes 1 bug. A Worker leased more jobs than concurrency, inflating the broker's active count and starving other workers (src/client/worker/worker.ts): the #96 fix capped _execution_ (activeJobs) at concurrency, but doPullBatch() computed…</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.8.18
 

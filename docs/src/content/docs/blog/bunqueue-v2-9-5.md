@@ -24,7 +24,7 @@ head:
   <p class="bq-hero-sub">Publish Alpine, Debian 13, Debian slim, and distroless variants to Docker Hub and GHCR for Linux amd64 and arm64.</p>
 </div>
 
-<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a href="https://github.com/egeominotti">egeominotti</a></p>
+<p class="bq-release-byline"><img src="https://github.com/egeominotti.png?size=64" alt="" width="28" height="28" loading="lazy" /> <a class="bq-release-author" href="https://github.com/egeominotti">egeominotti</a></p>
 
 #### To install bunqueue v2.9.5
 
