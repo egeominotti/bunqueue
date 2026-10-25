@@ -225,6 +225,9 @@ jobs:
       - name: Check committed docs data
         run: bun scripts/check-docs-data.ts
 
+      - name: Check release blog posts match the changelog
+        run: bun docs/scripts/generate-release-posts.ts --check
+
       - name: Install docs dependencies
         working-directory: docs
         run: bun install --frozen-lockfile --ignore-scripts
@@ -880,7 +883,12 @@ jobs:
 
       - name: Resolve version
         id: version
-        run: echo "version=${{ needs.version-gate.outputs.version }}" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ needs.version-gate.outputs.version }}
+        run: |
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Release blog posts live at /blog/bunqueue-vX-Y-Z/ (docs/scripts/generate-release-posts.ts).
+          echo "post=bunqueue-v${VERSION//./-}" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -936,7 +944,7 @@ jobs:
           # HEAD when the release finishes, which moves if main advanced during
           # the pipeline. The tag must name the commit the assets were built from.
           target_commitish: ${{ needs.version-gate.outputs.source_sha }}
-          name: Release v${{ steps.version.outputs.version }}
+          name: bunqueue v${{ steps.version.outputs.version }}
           generate_release_notes: true
           draft: false
           prerelease: false
@@ -953,6 +961,8 @@ jobs:
             release/bunqueue-windows-arm64.zip
             release/SHA256SUMS
           body: |
+            ### [Read bunqueue v${{ steps.version.outputs.version }}'s release notes on the blog](https://bunqueue.dev/blog/${{ steps.version.outputs.post }}/)
+
             ## Installation
 
             ### Docker (recommended)

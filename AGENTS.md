@@ -264,6 +264,35 @@ and assert both the returned result and any affected counters/state.
   diagnosis. Never expose profiling as an unauthenticated endpoint; snapshots may
   contain job payloads or secrets. Store outputs only under ignored `artifacts/`.
 
+## Release blog posts
+
+Every release gets a professional blog post at
+`/blog/bunqueue-vX-Y-Z/`, in the style of Bun's release posts (bun.com/blog).
+The release-preparation commit (the one that dates the changelog section) must
+include it:
+
+1. Run `bun docs/scripts/generate-release-posts.ts`. It writes a draft post for
+   every dated changelog section (`docs/src/content/docs/blog/bunqueue-vX-Y-Z.md`)
+   with the install/upgrade box, feature sections, bugfixes and contributors.
+2. Rewrite the new release's draft by hand into a professional article: a
+   description that leads with the user-visible outcome and real numbers; a
+   short intro on why the release matters; one `##` section per notable change,
+   titled as a claim ("Dashboards no longer cost a full scan every 10 ms") with
+   prose plus before/after tables or code; then "Other improvements",
+   "Bugfixes", "Thanks to N contributors!" and the link to the previous
+   release. Every fact and figure must come from the changelog or real
+   measurements; never invent numbers, quotes or features.
+3. Delete the `<!-- Generated from changelog.md ... -->` marker from the
+   rewritten post. The generator never overwrites a post without the marker.
+4. After the release is tagged and published, run
+   `bun docs/scripts/generate-release-posts.ts --refresh` (contributors, npm,
+   Docker and GitHub release data in `docs/src/data/releaseMeta.json`), then
+   regenerate and update the hand-written post's install box and contributors.
+
+CI runs `generate-release-posts.ts --check`: a stale or missing post fails the
+docs job. The GitHub release body links to the post, the blog index and RSS
+list it, and the home page announces the newest release post.
+
 ## Commits and handoff
 
 - Before every authorized `git commit`, update
