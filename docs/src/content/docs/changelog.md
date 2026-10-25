@@ -18,7 +18,7 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## [Unreleased]
+## [2.9.19] - 2026-10-25
 
 Algorithmic work on the broker's data structures. Public APIs, options, events,
 error messages and results are unchanged, except that `getJobs` on very large
