@@ -408,7 +408,8 @@ ordinary request dispatch because they mutate socket-owned state. The TCP
 registry authenticates and records one queue per dedicated subscriber, indexes
 subscribers by queue (so fan-out touches only that queue's subscribers), owns one
 lazy QueueManager bridge for all subscribers, and sends unsolicited
-`type:'event'` envelopes through the same bounded write queues. Clients dispatch
+`type:'event'` envelopes through the same bounded write queues; a batch of
+events is written to each subscriber as one buffer of frames in batch order. Clients dispatch
 those envelopes before `reqId` correlation and resubscribe after reconnect.
 The command path is symmetric: each client socket owns an ordered 64 MiB write
 queue, so a partial Bun TCP write is resumed on `drain` before any later frame.

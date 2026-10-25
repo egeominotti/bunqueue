@@ -20,6 +20,32 @@ head:
 
 ## [Unreleased]
 
+### Performance
+
+- **Throughput falls far less as TCP worker processes are added.** Every TCP
+  Worker subscribes to its queue's events (to report `stalled` jobs), and a
+  pull or ack batch emits one event per job; the server wrote each event to
+  each subscriber with its own socket write, so the writes per job grew with
+  the number of worker processes and took about 64% of the server's CPU with
+  four of them. Each subscriber now receives a batch's frames for its queue as
+  one write, in the same order and with the same bytes. Draining a backlog
+  over TCP (memory mode, 50 concurrency per worker process, `pollTimeout: 5000`,
+  server pinned to two cores, workers on separate cores, median of three runs):
+
+  | Worker processes | 2.9.19 | Now |
+  | --- | --- | --- |
+  | 1 | 33,080 jobs/s | 39,735 jobs/s |
+  | 4 | 18,152 jobs/s | 53,102 jobs/s |
+  | 8 | 10,151 jobs/s | 40,940 jobs/s |
+
+  Single events (outside a batch) are written as before, and an event that
+  cannot be encoded is still skipped alone. A connection whose write queue goes
+  over budget is still closed at the same point; only the byte count in the
+  warning it logs can be larger. Measured in memory mode on a native Linux
+  server (Debian 13, AMD Ryzen 9 7950X3D, Bun 1.4.4); SQLite mode uses the same
+  event path, while the PostgreSQL backend broadcasts events one at a time and
+  is unchanged.
+
 ### Documentation
 
 - Documentation pages use one professional type system: titles, headings and

@@ -153,7 +153,10 @@ export class TcpConnectionRegistry {
       this.eventSubscribers.add(socket, queue);
     }
     if (!this.eventUnsubscribe) {
-      this.eventUnsubscribe = this.queueManager.subscribe((event) => this.broadcastEvent(event));
+      this.eventUnsubscribe = this.queueManager.subscribe(
+        (event) => this.broadcastEvent(event),
+        (events) => this.broadcastEvents(events)
+      );
     }
   }
 
@@ -173,6 +176,45 @@ export class TcpConnectionRegistry {
       frame ??= FrameParser.frame(encodeMessagePack({ type: 'event', event }));
       socket.data.writeQueue.write(socket, frame);
       this.dropForWriteOverflow(socket);
+    }
+  }
+
+  /**
+   * Batch path of the event bridge: a pull or ack batch emits one event per job, and
+   * every TCP worker subscribes to its queue's events (for `stalled`). Each subscriber
+   * gets one write carrying all of the batch's frames for its queue, in batch order,
+   * instead of one write per event: the same bytes on the wire with a fraction of the
+   * syscalls, which dominated the server's CPU with several worker processes. A
+   * connection subscribes to one queue, so per-queue grouping keeps each socket's
+   * frame order, and a socket still drops as soon as its write queue is over budget.
+   */
+  private broadcastEvents(events: readonly JobEvent[]): void {
+    if (events.length === 1) {
+      this.broadcastEvent(events[0]);
+      return;
+    }
+    const framesByQueue = new Map<string, Uint8Array[]>();
+    for (const event of events) {
+      if (!this.eventSubscribers.subscribers(event.queue)) continue;
+      // An event that cannot be encoded is skipped alone, as the per-event path does.
+      let frame: Uint8Array;
+      try {
+        frame = FrameParser.frame(encodeMessagePack({ type: 'event', event }));
+      } catch {
+        continue;
+      }
+      let frames = framesByQueue.get(event.queue);
+      if (!frames) framesByQueue.set(event.queue, (frames = []));
+      frames.push(frame);
+    }
+    for (const [queue, frames] of framesByQueue) {
+      const subscribers = this.eventSubscribers.subscribers(queue);
+      if (!subscribers) continue;
+      const data = frames.length === 1 ? frames[0] : concatFrames(frames);
+      for (const socket of subscribers) {
+        socket.data.writeQueue.write(socket, data);
+        this.dropForWriteOverflow(socket);
+      }
     }
   }
 
@@ -199,4 +241,17 @@ export class TcpConnectionRegistry {
     }
     this.connections.clear();
   }
+}
+
+/** One buffer holding `frames` back to back. */
+function concatFrames(frames: readonly Uint8Array[]): Uint8Array {
+  let length = 0;
+  for (const frame of frames) length += frame.length;
+  const out = new Uint8Array(length);
+  let offset = 0;
+  for (const frame of frames) {
+    out.set(frame, offset);
+    offset += frame.length;
+  }
+  return out;
 }
