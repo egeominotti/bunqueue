@@ -335,13 +335,18 @@ bounded 4.1–4.3 MB WAL and post-GC collection bounds all passed.
   the deployment hardware you intend to use.
 </Aside>
 
-## Historical BullMQ comparison
+## Comparison with BullMQ
 
-The July 8 Apple M1 Max comparison remains available as a dated, separate
-campaign: bunqueue TCP bulk push 85,700 jobs/s versus BullMQ 24,800, while
-individual concurrent push was 52,756 versus 56,736. It used
-`bench/comparison/run.ts`, BullMQ 5.79.3 and Redis 8.8.0. Do not combine those
-values with the Ryzen campaign above.
+The current comparison is its own campaign, on its own page:
+[Benchmark vs BullMQ](/guide/bullmq-benchmark/), measured October 25, 2026 with
+bunqueue 2.9.20, BullMQ 6.4.2 and Redis 8.10.2 on an AMD Ryzen 9 7950X3D server
+(`bench/vs-bullmq`). In memory, bunqueue adds jobs 2.6–4x faster, drains a backlog
+1.1–1.3x faster and starts delayed jobs 8.5x closer to their due time; on disk,
+Redis with AOF drains a backlog about 7x faster than bunqueue on SQLite. Do not
+combine those values with the campaigns above.
 
-Read [bunqueue vs BullMQ](/guide/comparison/) or the
+The July 8 Apple M1 Max comparison remains available as a dated, older campaign:
+bunqueue TCP bulk push 85,700 jobs/s versus BullMQ 24,800, with individual
+concurrent push at 52,756 versus 56,736 (`bench/comparison/run.ts`, BullMQ 5.79.3,
+Redis 8.8.0), described in the
 [original benchmark article](/blog/benchmarks-vs-bullmq/).

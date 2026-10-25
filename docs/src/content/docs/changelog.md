@@ -18,6 +18,40 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## [Unreleased]
+
+### Documentation
+
+- A new [Benchmark vs BullMQ](/guide/bullmq-benchmark/) page reports bunqueue
+  2.9.20 against BullMQ 6.4.2 on Redis 8.10.2 (ioredis 6.0.0; BullMQ on both
+  Node.js 24.22.1 and Bun 1.4.4), in memory and on disk, with the machine (AMD
+  Ryzen 9 7950X3D, 124 GiB, NVMe RAID 5, Debian 13, bare metal), the method and
+  every number as the median of five runs with its range. In memory bunqueue
+  adds jobs 1.3–4x faster, drains a backlog 1.1–1.3x faster, retries 1.3x faster
+  and starts delayed jobs 8.5x (median) closer to their due time; median pickup
+  latency is level and BullMQ has the lower p99 at 5,000 and 10,000 jobs/s. On
+  disk Redis with AOF is ahead: about 7x on draining a backlog, with bulk adds
+  level. With a million queued jobs bunqueue holds about 2.2 GiB and Redis about
+  0.6 GiB.
+- The homepage has a benchmark section right after the hero: the test machine,
+  the four largest measured ratios, one chart per unit (bunqueue and BullMQ bars
+  scaled to the same axis, values at the bar ends, the five-run range on hover or
+  focus), a table view and the on-disk result in the fine print. The bar colors
+  pass the palette validator (CVD separation and contrast) in light and dark.
+- The comparison guide, the benchmarks guide, the July benchmark article (now
+  flagged with the newer results) and `llms.txt` use the new measurement instead
+  of the older BullMQ 5.79.3 figures.
+
+### Benchmarks
+
+- `bench/vs-bullmq` is a reproducible harness for the comparison: pinned
+  package versions, the broker and the clients on separate CPU core complexes,
+  one broker at a time, a warm-up and five measured runs per scenario in fresh
+  client processes, open-loop pickup latency measured from each job's scheduled
+  send time, and an exact-delivery check on every consuming run. `src/export.ts`
+  and `src/page.ts` turn a run into the site's data file and the benchmark page;
+  the raw results of the published run are committed under `results/`.
+
 ## [2.9.20] - 2026-10-25
 
 ### Performance

@@ -7,6 +7,7 @@ Key facts:
 - Production features: retries with backoff, priorities, delayed jobs, cron scheduling, Dead Letter Queue, stall detection, rate limiting, concurrency caps, webhooks (HMAC-signed), SQLite S3 backups, native TLS, OpenTelemetry.
 - Workflow engine: multi-step orchestration with saga compensation, branching, parallel steps, loops, signals (human-in-the-loop), nested sub-workflows.
 - Performance (native 2026-07-30 campaign): ~729K jobs/sec internal in-memory batch push, ~186K public on-disk Embedded addBulk, ~159K TCP PUSHB, ~17K TCP worker drain, and ~2.7K/~3.2K linear workflows/sec Embedded/TCP. Operations and persistence boundaries are reported separately.
+- Against BullMQ 6.4.2 on Redis 8.10.2 (2026-10-25, AMD Ryzen 9 7950X3D): in memory bunqueue 2.9.20 adds jobs 2.6–4x faster, drains a backlog 1.1–1.3x faster and starts delayed jobs 8.5x closer to their due time; on disk, Redis with AOF drains a backlog about 7x faster than bunqueue on SQLite. Details: https://bunqueue.dev/guide/bullmq-benchmark/
 - Install: `bun add bunqueue` — import from `bunqueue/client` (Queue, Worker, FlowProducer, Bunqueue) or `bunqueue/workflow` (Workflow, Engine).
 
 How to read these docs:
@@ -125,6 +126,7 @@ How to read these docs:
 - [Elysia](https://bunqueue.dev/guide/elysia/): Typed routes, plugin pattern, DLQ monitoring in Elysia apps
 - [Migrate from BullMQ](https://bunqueue.dev/guide/migration/): Keep the Queue/Worker API, drop Redis
 - [bunqueue vs BullMQ](https://bunqueue.dev/guide/comparison/): Performance and feature comparison
+- [Benchmark vs BullMQ](https://bunqueue.dev/guide/bullmq-benchmark/): bunqueue against the latest BullMQ on Redis, in memory and on disk: enqueue, drain, pickup latency, delayed jobs, retries and memory, with machine, method and raw runs
 - [Benchmarks](https://bunqueue.dev/guide/benchmarks/): Reproducible throughput tests, embedded and TCP modes
 - [2.9.4 Performance vs Ten Releases](https://bunqueue.dev/guide/version-performance-2-9-4/): Controlled native comparison across Embedded and TCP SQLite job lifecycles
 - [SDK Performance](https://bunqueue.dev/guide/sdk-benchmarks/): Native producer throughput, latency, worker throughput, memory, and bottleneck analysis for all six official SDKs

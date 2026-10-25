@@ -1,0 +1,1820 @@
+{
+  "date": "2026-10-25T16:46:50.682Z",
+  "machine": {
+    "cpu": "AMD Ryzen 9 7950X3D, 16 cores / 32 threads, up to 5.76 GHz, 128 MiB L3 (two CCDs)",
+    "memory": "124 GiB",
+    "disk": "3x Samsung PM9A3 NVMe (MZQL21T9HCJR) in RAID 5, ext4",
+    "os": "Debian GNU/Linux 13 (trixie), Linux 6.12.48+deb13-amd64, bare metal, CPU governor performance",
+    "pinning": "broker on CPUs 2,3,18,19 (two physical cores), clients on 8-15,24-31 (the other CCD)",
+    "shared": "a shared server: other services ran during the run, so each cell reports the median of five runs with its range"
+  },
+  "versions": {
+    "bunqueue": "2.9.20",
+    "bullmq": "6.4.2",
+    "ioredis": "6.0.0",
+    "redis": "8.10.2",
+    "bun": "1.4.4",
+    "node": "24.22.1"
+  },
+  "reps": 5,
+  "memory": [
+    {
+      "key": "add-serial",
+      "title": "Add jobs one at a time",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "enqueue-serial",
+      "bunqueue": {
+        "median": 28890,
+        "min": 27036,
+        "max": 29538,
+        "runs": [
+          29008,
+          27036,
+          28834,
+          28890,
+          29538
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 22730,
+        "min": 22366,
+        "max": 23231,
+        "runs": [
+          23151,
+          23231,
+          22730,
+          22366,
+          22386
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 19450,
+        "min": 18927,
+        "max": 19534,
+        "runs": [
+          19424,
+          19533,
+          19450,
+          19534,
+          18927
+        ]
+      },
+      "bullmqBun": {
+        "median": 22730,
+        "min": 22366,
+        "max": 23231,
+        "runs": [
+          23151,
+          23231,
+          22730,
+          22366,
+          22386
+        ]
+      },
+      "ratio": 1.27
+    },
+    {
+      "key": "add-concurrent",
+      "title": "Add jobs, 64 in flight",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "enqueue-concurrent",
+      "bunqueue": {
+        "median": 202072,
+        "min": 198734,
+        "max": 219865,
+        "runs": [
+          219865,
+          198734,
+          202072,
+          204543,
+          198901
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 77692,
+        "min": 75974,
+        "max": 79439,
+        "runs": [
+          78366,
+          76896,
+          79439,
+          75974,
+          77692
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 68094,
+        "min": 67780,
+        "max": 70096,
+        "runs": [
+          69165,
+          68094,
+          67780,
+          70096,
+          67877
+        ]
+      },
+      "bullmqBun": {
+        "median": 77692,
+        "min": 75974,
+        "max": 79439,
+        "runs": [
+          78366,
+          76896,
+          79439,
+          75974,
+          77692
+        ]
+      },
+      "ratio": 2.6
+    },
+    {
+      "key": "add-bulk",
+      "title": "Add jobs in bulk (100 per call)",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "enqueue-bulk",
+      "bunqueue": {
+        "median": 207601,
+        "min": 186591,
+        "max": 217414,
+        "runs": [
+          214460,
+          204417,
+          217414,
+          186591,
+          207601
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 52503,
+        "min": 51567,
+        "max": 53303,
+        "runs": [
+          52503,
+          52504,
+          53303,
+          52305,
+          51567
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 47831,
+        "min": 47232,
+        "max": 48015,
+        "runs": [
+          47848,
+          47770,
+          48015,
+          47831,
+          47232
+        ]
+      },
+      "bullmqBun": {
+        "median": 52503,
+        "min": 51567,
+        "max": 53303,
+        "runs": [
+          52503,
+          52504,
+          53303,
+          52305,
+          51567
+        ]
+      },
+      "ratio": 3.95
+    },
+    {
+      "key": "drain-1",
+      "title": "Process a backlog, 1 worker process",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "drain-1x50",
+      "bunqueue": {
+        "median": 43335,
+        "min": 43240,
+        "max": 45233,
+        "runs": [
+          43335,
+          45212,
+          43240,
+          43312,
+          45233
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 38402,
+        "min": 38314,
+        "max": 38429,
+        "runs": [
+          38402,
+          38397,
+          38410,
+          38429,
+          38314
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 38402,
+        "min": 38314,
+        "max": 38429,
+        "runs": [
+          38402,
+          38397,
+          38410,
+          38429,
+          38314
+        ]
+      },
+      "bullmqBun": {
+        "median": 38262,
+        "min": 38171,
+        "max": 38306,
+        "runs": [
+          38197,
+          38171,
+          38306,
+          38262,
+          38274
+        ]
+      },
+      "ratio": 1.13
+    },
+    {
+      "key": "drain-4",
+      "title": "Process a backlog, 4 worker processes",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "drain-4x50",
+      "bunqueue": {
+        "median": 53754,
+        "min": 52417,
+        "max": 53920,
+        "runs": [
+          53920,
+          53754,
+          52428,
+          52417,
+          53826
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 40699,
+        "min": 40653,
+        "max": 40714,
+        "runs": [
+          40674,
+          40653,
+          40714,
+          40708,
+          40699
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 40699,
+        "min": 40653,
+        "max": 40714,
+        "runs": [
+          40674,
+          40653,
+          40714,
+          40708,
+          40699
+        ]
+      },
+      "bullmqBun": {
+        "median": 39879,
+        "min": 39837,
+        "max": 40653,
+        "runs": [
+          40653,
+          40652,
+          39879,
+          39838,
+          39837
+        ]
+      },
+      "ratio": 1.32
+    },
+    {
+      "key": "drain-8",
+      "title": "Process a backlog, 8 worker processes",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "drain-8x50",
+      "bunqueue": {
+        "median": 42408,
+        "min": 41534,
+        "max": 42429,
+        "runs": [
+          41534,
+          41535,
+          42428,
+          42429,
+          42408
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 39873,
+        "min": 39856,
+        "max": 39874,
+        "runs": [
+          39873,
+          39874,
+          39862,
+          39856,
+          39873
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 39873,
+        "min": 39856,
+        "max": 39874,
+        "runs": [
+          39873,
+          39874,
+          39862,
+          39856,
+          39873
+        ]
+      },
+      "bullmqBun": {
+        "median": 39830,
+        "min": 39814,
+        "max": 39857,
+        "runs": [
+          39830,
+          39857,
+          39850,
+          39820,
+          39814
+        ]
+      },
+      "ratio": 1.06
+    },
+    {
+      "key": "latency-1k-p50",
+      "title": "Pickup latency p50 at 1,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-1k",
+      "bunqueue": {
+        "median": 0.645,
+        "min": 0.639,
+        "max": 0.651,
+        "runs": [
+          0.651,
+          0.642,
+          0.639,
+          0.646,
+          0.645
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 0.7,
+        "min": 0.698,
+        "max": 0.706,
+        "runs": [
+          0.7,
+          0.698,
+          0.698,
+          0.706,
+          0.706
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 0.781,
+        "min": 0.777,
+        "max": 0.784,
+        "runs": [
+          0.779,
+          0.777,
+          0.784,
+          0.781,
+          0.781
+        ]
+      },
+      "bullmqBun": {
+        "median": 0.7,
+        "min": 0.698,
+        "max": 0.706,
+        "runs": [
+          0.7,
+          0.698,
+          0.698,
+          0.706,
+          0.706
+        ]
+      },
+      "ratio": 1.09
+    },
+    {
+      "key": "latency-1k-p99",
+      "title": "Pickup latency p99 at 1,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-1k",
+      "bunqueue": {
+        "median": 1.182,
+        "min": 1.176,
+        "max": 1.185,
+        "runs": [
+          1.182,
+          1.179,
+          1.176,
+          1.185,
+          1.182
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 1.25,
+        "min": 1.247,
+        "max": 1.253,
+        "runs": [
+          1.25,
+          1.248,
+          1.247,
+          1.253,
+          1.25
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 1.353,
+        "min": 1.352,
+        "max": 1.359,
+        "runs": [
+          1.356,
+          1.352,
+          1.352,
+          1.359,
+          1.353
+        ]
+      },
+      "bullmqBun": {
+        "median": 1.25,
+        "min": 1.247,
+        "max": 1.253,
+        "runs": [
+          1.25,
+          1.248,
+          1.247,
+          1.253,
+          1.25
+        ]
+      },
+      "ratio": 1.06
+    },
+    {
+      "key": "latency-5k-p50",
+      "title": "Pickup latency p50 at 5,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-5k",
+      "bunqueue": {
+        "median": 0.813,
+        "min": 0.803,
+        "max": 0.816,
+        "runs": [
+          0.803,
+          0.811,
+          0.815,
+          0.816,
+          0.813
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 0.88,
+        "min": 0.879,
+        "max": 0.882,
+        "runs": [
+          0.879,
+          0.88,
+          0.879,
+          0.882,
+          0.88
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 1.017,
+        "min": 1.01,
+        "max": 1.034,
+        "runs": [
+          1.017,
+          1.016,
+          1.028,
+          1.034,
+          1.01
+        ]
+      },
+      "bullmqBun": {
+        "median": 0.88,
+        "min": 0.879,
+        "max": 0.882,
+        "runs": [
+          0.879,
+          0.88,
+          0.879,
+          0.882,
+          0.88
+        ]
+      },
+      "ratio": 1.08
+    },
+    {
+      "key": "latency-5k-p99",
+      "title": "Pickup latency p99 at 5,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-5k",
+      "bunqueue": {
+        "median": 2.677,
+        "min": 2.496,
+        "max": 2.962,
+        "runs": [
+          2.496,
+          2.664,
+          2.962,
+          2.826,
+          2.677
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 1.369,
+        "min": 1.356,
+        "max": 1.375,
+        "runs": [
+          1.369,
+          1.359,
+          1.375,
+          1.374,
+          1.356
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 1.559,
+        "min": 1.548,
+        "max": 1.567,
+        "runs": [
+          1.562,
+          1.555,
+          1.559,
+          1.567,
+          1.548
+        ]
+      },
+      "bullmqBun": {
+        "median": 1.369,
+        "min": 1.356,
+        "max": 1.375,
+        "runs": [
+          1.369,
+          1.359,
+          1.375,
+          1.374,
+          1.356
+        ]
+      },
+      "ratio": 0.51
+    },
+    {
+      "key": "latency-10k-p50",
+      "title": "Pickup latency p50 at 10,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-10k",
+      "bunqueue": {
+        "median": 0.935,
+        "min": 0.934,
+        "max": 0.943,
+        "runs": [
+          0.934,
+          0.935,
+          0.942,
+          0.935,
+          0.943
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 1.14,
+        "min": 1.137,
+        "max": 1.141,
+        "runs": [
+          1.137,
+          1.141,
+          1.139,
+          1.14,
+          1.141
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 1.412,
+        "min": 1.404,
+        "max": 1.414,
+        "runs": [
+          1.412,
+          1.404,
+          1.404,
+          1.414,
+          1.413
+        ]
+      },
+      "bullmqBun": {
+        "median": 1.14,
+        "min": 1.137,
+        "max": 1.141,
+        "runs": [
+          1.137,
+          1.141,
+          1.139,
+          1.14,
+          1.141
+        ]
+      },
+      "ratio": 1.22
+    },
+    {
+      "key": "latency-10k-p99",
+      "title": "Pickup latency p99 at 10,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-10k",
+      "bunqueue": {
+        "median": 4.293,
+        "min": 4.102,
+        "max": 5.113,
+        "runs": [
+          4.118,
+          4.102,
+          4.621,
+          4.293,
+          5.113
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 1.842,
+        "min": 1.8,
+        "max": 1.87,
+        "runs": [
+          1.8,
+          1.842,
+          1.851,
+          1.822,
+          1.87
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 2.222,
+        "min": 2.209,
+        "max": 2.241,
+        "runs": [
+          2.241,
+          2.214,
+          2.209,
+          2.222,
+          2.231
+        ]
+      },
+      "bullmqBun": {
+        "median": 1.842,
+        "min": 1.8,
+        "max": 1.87,
+        "runs": [
+          1.8,
+          1.842,
+          1.851,
+          1.822,
+          1.87
+        ]
+      },
+      "ratio": 0.43
+    },
+    {
+      "key": "delayed-p50",
+      "title": "Delayed job lateness p50",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "delayed",
+      "bunqueue": {
+        "median": 4.739,
+        "min": 4.535,
+        "max": 4.862,
+        "runs": [
+          4.535,
+          4.789,
+          4.862,
+          4.739,
+          4.705
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 40.479,
+        "min": 40.24,
+        "max": 40.573,
+        "runs": [
+          40.293,
+          40.24,
+          40.479,
+          40.573,
+          40.509
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 40.479,
+        "min": 40.24,
+        "max": 40.573,
+        "runs": [
+          40.293,
+          40.24,
+          40.479,
+          40.573,
+          40.509
+        ]
+      },
+      "bullmqBun": {
+        "median": 41.046,
+        "min": 40.907,
+        "max": 41.474,
+        "runs": [
+          40.942,
+          40.907,
+          41.132,
+          41.474,
+          41.046
+        ]
+      },
+      "ratio": 8.54
+    },
+    {
+      "key": "delayed-p99",
+      "title": "Delayed job lateness p99",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "delayed",
+      "bunqueue": {
+        "median": 13.123,
+        "min": 12.927,
+        "max": 13.714,
+        "runs": [
+          12.927,
+          12.943,
+          13.714,
+          13.123,
+          13.199
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 83.144,
+        "min": 82.916,
+        "max": 83.42,
+        "runs": [
+          83.144,
+          82.916,
+          83.42,
+          83.225,
+          83.139
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 83.144,
+        "min": 82.916,
+        "max": 83.42,
+        "runs": [
+          83.144,
+          82.916,
+          83.42,
+          83.225,
+          83.139
+        ]
+      },
+      "bullmqBun": {
+        "median": 83.679,
+        "min": 83.336,
+        "max": 84.047,
+        "runs": [
+          83.652,
+          83.336,
+          83.801,
+          84.047,
+          83.679
+        ]
+      },
+      "ratio": 6.34
+    },
+    {
+      "key": "retry",
+      "title": "Retries (fail twice, succeed on the third attempt)",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "retry",
+      "bunqueue": {
+        "median": 7119,
+        "min": 7118,
+        "max": 7129,
+        "runs": [
+          7119,
+          7129,
+          7119,
+          7118,
+          7119
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 5536,
+        "min": 5392,
+        "max": 5544,
+        "runs": [
+          5536,
+          5544,
+          5392,
+          5536,
+          5539
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 4243,
+        "min": 4192,
+        "max": 4284,
+        "runs": [
+          4243,
+          4252,
+          4201,
+          4192,
+          4284
+        ]
+      },
+      "bullmqBun": {
+        "median": 5536,
+        "min": 5392,
+        "max": 5544,
+        "runs": [
+          5536,
+          5544,
+          5392,
+          5536,
+          5539
+        ]
+      },
+      "ratio": 1.29
+    }
+  ],
+  "durable": [
+    {
+      "key": "add-serial",
+      "title": "Add jobs one at a time",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "enqueue-serial",
+      "bunqueue": {
+        "median": 9000,
+        "min": 8924,
+        "max": 9016,
+        "runs": [
+          9016,
+          9011,
+          9000,
+          8924,
+          8987
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 20316,
+        "min": 19738,
+        "max": 20920,
+        "runs": [
+          20136,
+          20316,
+          19738,
+          20649,
+          20920
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 17785,
+        "min": 17661,
+        "max": 18065,
+        "runs": [
+          17755,
+          17785,
+          18028,
+          18065,
+          17661
+        ]
+      },
+      "bullmqBun": {
+        "median": 20316,
+        "min": 19738,
+        "max": 20920,
+        "runs": [
+          20136,
+          20316,
+          19738,
+          20649,
+          20920
+        ]
+      },
+      "ratio": 0.44
+    },
+    {
+      "key": "add-concurrent",
+      "title": "Add jobs, 64 in flight",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "enqueue-concurrent",
+      "bunqueue": {
+        "median": 31773,
+        "min": 31044,
+        "max": 33009,
+        "runs": [
+          33009,
+          32235,
+          31773,
+          31156,
+          31044
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 63431,
+        "min": 63234,
+        "max": 63880,
+        "runs": [
+          63269,
+          63880,
+          63234,
+          63431,
+          63745
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 62238,
+        "min": 61957,
+        "max": 62672,
+        "runs": [
+          62672,
+          61957,
+          62238,
+          62559,
+          61990
+        ]
+      },
+      "bullmqBun": {
+        "median": 63431,
+        "min": 63234,
+        "max": 63880,
+        "runs": [
+          63269,
+          63880,
+          63234,
+          63431,
+          63745
+        ]
+      },
+      "ratio": 0.5
+    },
+    {
+      "key": "add-bulk",
+      "title": "Add jobs in bulk (100 per call)",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "enqueue-bulk",
+      "bunqueue": {
+        "median": 41913,
+        "min": 41137,
+        "max": 42482,
+        "runs": [
+          42482,
+          42160,
+          41627,
+          41137,
+          41913
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 44285,
+        "min": 43834,
+        "max": 45235,
+        "runs": [
+          44228,
+          44285,
+          43834,
+          45235,
+          44554
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 40762,
+        "min": 40464,
+        "max": 40966,
+        "runs": [
+          40464,
+          40918,
+          40966,
+          40602,
+          40762
+        ]
+      },
+      "bullmqBun": {
+        "median": 44285,
+        "min": 43834,
+        "max": 45235,
+        "runs": [
+          44228,
+          44285,
+          43834,
+          45235,
+          44554
+        ]
+      },
+      "ratio": 0.95
+    },
+    {
+      "key": "drain-1",
+      "title": "Process a backlog, 1 worker process",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "drain-1x50",
+      "bunqueue": {
+        "median": 4946,
+        "min": 4874,
+        "max": 5150,
+        "runs": [
+          5150,
+          4946,
+          4946,
+          4874,
+          4896
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 32201,
+        "min": 32180,
+        "max": 32226,
+        "runs": [
+          32226,
+          32201,
+          32222,
+          32199,
+          32180
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 32201,
+        "min": 32180,
+        "max": 32226,
+        "runs": [
+          32226,
+          32201,
+          32222,
+          32199,
+          32180
+        ]
+      },
+      "bullmqBun": {
+        "median": 31114,
+        "min": 31070,
+        "max": 32136,
+        "runs": [
+          32136,
+          32104,
+          31070,
+          31091,
+          31114
+        ]
+      },
+      "ratio": 0.15
+    },
+    {
+      "key": "drain-4",
+      "title": "Process a backlog, 4 worker processes",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "drain-4x50",
+      "bunqueue": {
+        "median": 4491,
+        "min": 4451,
+        "max": 4521,
+        "runs": [
+          4451,
+          4459,
+          4501,
+          4521,
+          4491
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 33242,
+        "min": 33225,
+        "max": 33260,
+        "runs": [
+          33260,
+          33246,
+          33234,
+          33242,
+          33225
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 33242,
+        "min": 33225,
+        "max": 33260,
+        "runs": [
+          33260,
+          33246,
+          33234,
+          33242,
+          33225
+        ]
+      },
+      "bullmqBun": {
+        "median": 33219,
+        "min": 33216,
+        "max": 33259,
+        "runs": [
+          33219,
+          33259,
+          33217,
+          33216,
+          33224
+        ]
+      },
+      "ratio": 0.14
+    },
+    {
+      "key": "drain-8",
+      "title": "Process a backlog, 8 worker processes",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "drain-8x50",
+      "bunqueue": {
+        "median": 4257,
+        "min": 4234,
+        "max": 4288,
+        "runs": [
+          4280,
+          4288,
+          4242,
+          4234,
+          4257
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 33233,
+        "min": 32716,
+        "max": 33240,
+        "runs": [
+          33232,
+          32716,
+          33236,
+          33233,
+          33240
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 33233,
+        "min": 32716,
+        "max": 33240,
+        "runs": [
+          33232,
+          32716,
+          33236,
+          33233,
+          33240
+        ]
+      },
+      "bullmqBun": {
+        "median": 33215,
+        "min": 33196,
+        "max": 33240,
+        "runs": [
+          33200,
+          33196,
+          33225,
+          33240,
+          33215
+        ]
+      },
+      "ratio": 0.13
+    },
+    {
+      "key": "latency-1k-p50",
+      "title": "Pickup latency p50 at 1,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-1k",
+      "bunqueue": {
+        "median": 0.973,
+        "min": 0.968,
+        "max": 0.977,
+        "runs": [
+          0.973,
+          0.971,
+          0.968,
+          0.976,
+          0.977
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 0.716,
+        "min": 0.713,
+        "max": 0.718,
+        "runs": [
+          0.717,
+          0.716,
+          0.716,
+          0.713,
+          0.718
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 0.797,
+        "min": 0.781,
+        "max": 0.804,
+        "runs": [
+          0.804,
+          0.797,
+          0.797,
+          0.781,
+          0.804
+        ]
+      },
+      "bullmqBun": {
+        "median": 0.716,
+        "min": 0.713,
+        "max": 0.718,
+        "runs": [
+          0.717,
+          0.716,
+          0.716,
+          0.713,
+          0.718
+        ]
+      },
+      "ratio": 0.74
+    },
+    {
+      "key": "latency-1k-p99",
+      "title": "Pickup latency p99 at 1,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-1k",
+      "bunqueue": {
+        "median": 5.716,
+        "min": 5.67,
+        "max": 5.782,
+        "runs": [
+          5.708,
+          5.67,
+          5.716,
+          5.721,
+          5.782
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 1.27,
+        "min": 1.266,
+        "max": 1.279,
+        "runs": [
+          1.279,
+          1.266,
+          1.266,
+          1.273,
+          1.27
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 1.375,
+        "min": 1.342,
+        "max": 1.384,
+        "runs": [
+          1.381,
+          1.375,
+          1.374,
+          1.342,
+          1.384
+        ]
+      },
+      "bullmqBun": {
+        "median": 1.27,
+        "min": 1.266,
+        "max": 1.279,
+        "runs": [
+          1.279,
+          1.266,
+          1.266,
+          1.273,
+          1.27
+        ]
+      },
+      "ratio": 0.22
+    },
+    {
+      "key": "latency-5k-p50",
+      "title": "Pickup latency p50 at 5,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-5k",
+      "bunqueue": {
+        "median": 1611.703,
+        "min": 1578.727,
+        "max": 1617.98,
+        "runs": [
+          1592.619,
+          1617.98,
+          1578.727,
+          1611.703,
+          1617.096
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 0.923,
+        "min": 0.921,
+        "max": 0.924,
+        "runs": [
+          0.921,
+          0.921,
+          0.924,
+          0.924,
+          0.923
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 1.106,
+        "min": 1.092,
+        "max": 1.114,
+        "runs": [
+          1.092,
+          1.114,
+          1.097,
+          1.109,
+          1.106
+        ]
+      },
+      "bullmqBun": {
+        "median": 0.923,
+        "min": 0.921,
+        "max": 0.924,
+        "runs": [
+          0.921,
+          0.921,
+          0.924,
+          0.924,
+          0.923
+        ]
+      },
+      "ratio": 0
+    },
+    {
+      "key": "latency-5k-p99",
+      "title": "Pickup latency p99 at 5,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-5k",
+      "bunqueue": {
+        "median": 3589.767,
+        "min": 3547.82,
+        "max": 3668.511,
+        "runs": [
+          3589.767,
+          3668.511,
+          3547.82,
+          3628.281,
+          3587.519
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 1.456,
+        "min": 1.44,
+        "max": 1.464,
+        "runs": [
+          1.464,
+          1.445,
+          1.456,
+          1.458,
+          1.44
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 1.651,
+        "min": 1.646,
+        "max": 1.684,
+        "runs": [
+          1.657,
+          1.651,
+          1.646,
+          1.684,
+          1.649
+        ]
+      },
+      "bullmqBun": {
+        "median": 1.456,
+        "min": 1.44,
+        "max": 1.464,
+        "runs": [
+          1.464,
+          1.445,
+          1.456,
+          1.458,
+          1.44
+        ]
+      },
+      "ratio": 0
+    },
+    {
+      "key": "latency-10k-p50",
+      "title": "Pickup latency p50 at 10,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-10k",
+      "bunqueue": {
+        "median": 13117.306,
+        "min": 13020.73,
+        "max": 13183.075,
+        "runs": [
+          13117.306,
+          13183.075,
+          13082.284,
+          13020.73,
+          13147.556
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 1.237,
+        "min": 1.232,
+        "max": 1.238,
+        "runs": [
+          1.238,
+          1.234,
+          1.237,
+          1.237,
+          1.232
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 1.558,
+        "min": 1.549,
+        "max": 1.579,
+        "runs": [
+          1.558,
+          1.579,
+          1.549,
+          1.57,
+          1.553
+        ]
+      },
+      "bullmqBun": {
+        "median": 1.237,
+        "min": 1.232,
+        "max": 1.238,
+        "runs": [
+          1.238,
+          1.234,
+          1.237,
+          1.237,
+          1.232
+        ]
+      },
+      "ratio": 0
+    },
+    {
+      "key": "latency-10k-p99",
+      "title": "Pickup latency p99 at 10,000 jobs/s",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "latency-10k",
+      "bunqueue": {
+        "median": 22909.802,
+        "min": 22784.461,
+        "max": 22958.858,
+        "runs": [
+          22909.802,
+          22941.193,
+          22817.786,
+          22784.461,
+          22958.858
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 2.703,
+        "min": 2.62,
+        "max": 2.955,
+        "runs": [
+          2.955,
+          2.703,
+          2.664,
+          2.714,
+          2.62
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 2.772,
+        "min": 2.739,
+        "max": 2.963,
+        "runs": [
+          2.739,
+          2.963,
+          2.798,
+          2.766,
+          2.772
+        ]
+      },
+      "bullmqBun": {
+        "median": 2.703,
+        "min": 2.62,
+        "max": 2.955,
+        "runs": [
+          2.955,
+          2.703,
+          2.664,
+          2.714,
+          2.62
+        ]
+      },
+      "ratio": 0
+    },
+    {
+      "key": "delayed-p50",
+      "title": "Delayed job lateness p50",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "delayed",
+      "bunqueue": {
+        "median": 643.965,
+        "min": 623.157,
+        "max": 666.116,
+        "runs": [
+          657.045,
+          638.417,
+          666.116,
+          623.157,
+          643.965
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 39.172,
+        "min": 38.967,
+        "max": 39.477,
+        "runs": [
+          39.172,
+          39.477,
+          38.967,
+          39.309,
+          39.098
+        ]
+      },
+      "bullmqRuntime": "Node.js",
+      "bullmqNode": {
+        "median": 39.172,
+        "min": 38.967,
+        "max": 39.477,
+        "runs": [
+          39.172,
+          39.477,
+          38.967,
+          39.309,
+          39.098
+        ]
+      },
+      "bullmqBun": {
+        "median": 39.452,
+        "min": 39.291,
+        "max": 39.549,
+        "runs": [
+          39.452,
+          39.471,
+          39.291,
+          39.338,
+          39.549
+        ]
+      },
+      "ratio": 0.06
+    },
+    {
+      "key": "delayed-p99",
+      "title": "Delayed job lateness p99",
+      "unit": "ms",
+      "higherIsBetter": false,
+      "longPoll": true,
+      "scenario": "delayed",
+      "bunqueue": {
+        "median": 1180.736,
+        "min": 1151.038,
+        "max": 1220.556,
+        "runs": [
+          1220.556,
+          1180.736,
+          1187.995,
+          1151.038,
+          1166.687
+        ]
+      },
+      "bunqueueConfig": "pollTimeout: 5000",
+      "bullmq": {
+        "median": 81.622,
+        "min": 81.027,
+        "max": 81.854,
+        "runs": [
+          81.623,
+          81.622,
+          81.066,
+          81.027,
+          81.854
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 81.961,
+        "min": 81.683,
+        "max": 82.674,
+        "runs": [
+          81.683,
+          82.61,
+          82.674,
+          81.961,
+          81.716
+        ]
+      },
+      "bullmqBun": {
+        "median": 81.622,
+        "min": 81.027,
+        "max": 81.854,
+        "runs": [
+          81.623,
+          81.622,
+          81.066,
+          81.027,
+          81.854
+        ]
+      },
+      "ratio": 0.07
+    },
+    {
+      "key": "retry",
+      "title": "Retries (fail twice, succeed on the third attempt)",
+      "unit": "jobs/s",
+      "higherIsBetter": true,
+      "scenario": "retry",
+      "bunqueue": {
+        "median": 809,
+        "min": 806,
+        "max": 819,
+        "runs": [
+          809,
+          819,
+          809,
+          806,
+          812
+        ]
+      },
+      "bunqueueConfig": "defaults",
+      "bullmq": {
+        "median": 4985,
+        "min": 4978,
+        "max": 4989,
+        "runs": [
+          4978,
+          4989,
+          4984,
+          4986,
+          4985
+        ]
+      },
+      "bullmqRuntime": "Bun",
+      "bullmqNode": {
+        "median": 4074,
+        "min": 4047,
+        "max": 4141,
+        "runs": [
+          4139,
+          4057,
+          4047,
+          4141,
+          4074
+        ]
+      },
+      "bullmqBun": {
+        "median": 4985,
+        "min": 4978,
+        "max": 4989,
+        "runs": [
+          4978,
+          4989,
+          4984,
+          4986,
+          4985
+        ]
+      },
+      "ratio": 0.16
+    }
+  ],
+  "footprint": {
+    "memory": {
+      "bunqueue": {
+        "idleMiB": 46,
+        "backlogMiB": 2252
+      },
+      "redis": {
+        "idleMiB": 24,
+        "backlogMiB": 618
+      }
+    },
+    "durable": {
+      "bunqueue": {
+        "idleMiB": 49,
+        "backlogMiB": 2415
+      },
+      "redis": {
+        "idleMiB": 24,
+        "backlogMiB": 583
+      }
+    }
+  },
+  "tiles": [
+    {
+      "key": "delayed-p50",
+      "label": "more punctual delayed jobs (median)"
+    },
+    {
+      "key": "add-bulk",
+      "label": "faster bulk adds"
+    },
+    {
+      "key": "add-concurrent",
+      "label": "faster concurrent adds"
+    },
+    {
+      "key": "drain-4",
+      "label": "more jobs processed, 4 worker processes"
+    }
+  ]
+}

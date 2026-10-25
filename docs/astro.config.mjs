@@ -192,6 +192,7 @@ export default defineConfig({
             { label: 'Use Cases & Patterns', link: '/guide/use-cases/' },
             { label: 'Migrate from BullMQ', link: '/guide/migration/' },
             { label: 'bunqueue vs BullMQ', link: '/guide/comparison/' },
+            { label: 'Benchmark vs BullMQ', link: '/guide/bullmq-benchmark/' },
             { label: 'FAQ', link: '/faq/' },
           ],
         },
