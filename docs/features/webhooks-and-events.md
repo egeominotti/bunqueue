@@ -155,7 +155,13 @@ Command shapes: `src/domain/types/commands/monitoring.ts:3-28` (logs and webhook
   authenticated connections subscribed to `event.queue`. The frame is encoded
   once per event and written to that queue's subscribers in connection order,
   looked up through a per-queue index (`tcp/eventSubscriberIndex.ts`) instead
-  of a scan of every connection.
+  of a scan of every connection. A batch of events (one per job of a pull or ack
+  batch) reaches the bridge through the batch subscription path: each subscriber
+  socket gets the batch's frames for its queue concatenated in batch order and
+  written once (`broadcastEvents` in `tcp/connections.ts`), so the number of
+  socket writes no longer grows with events × subscribers. Every TCP Worker
+  subscribes to its queue's events (for `stalled`), so this is the path that
+  scales with the number of worker processes.
 - **Dashboard events** emitted via `setDashboardEmit`: `webhook:fired`, `webhook:failed`, `webhook:enabled`, `webhook:disabled` (from `WebhookManager`); `webhook:added` / `webhook:removed` are emitted by the handler through `queueManager.emitDashboardEvent` (`handlers/monitoring/webhooks.ts:31-64`).
 
 ## Data Models
@@ -224,7 +230,7 @@ interface JobLogEntry {
 5. If webhooks are enabled, `mapEventToWebhook` translates the `EventType` (`pushed→job.pushed`, `pulled→job.started`, `completed→job.completed`, `failed→job.failed`; everything else → `null`/no webhook) and calls `webhookManager.trigger(...)` fire-and-forget (`eventsManager.ts:197`).
 
 The optional batch callback is an internal optimization used by the telemetry
-journal. It receives the array once; regular subscribers are still called once
+journal and by the TCP event bridge. It receives the array once; regular subscribers are still called once
 per event in input order, completion waiters resolve per completed ID, and
 webhook mapping/delivery remains per event. Both callback forms isolate thrown
 subscriber errors. The durable journal batch runs before ordinary subscriber
@@ -232,9 +238,14 @@ fan-out, so callbacks observe the complete batch's telemetry state rather than
 a partially persisted prefix.
 
 The TCP registry is one of those subscribers while at least one remote queue
-subscription exists. It filters by the socket's selected queue, frames the
-event once for all matching sockets, and writes through each socket's bounded
-`SocketWriteQueue`. `QueueEvents` maps that internal shape to its typed public
+subscription exists. It filters by the socket's selected queue and writes
+through each socket's bounded `SocketWriteQueue`. A single event is framed once
+for all matching sockets; a batch arrives through the batch callback, so TCP
+subscribers receive the whole batch before per-event subscribers, completion
+waiters and webhooks see any of it (none of those write to TCP sockets
+synchronously, so no socket's byte order changes). Each socket then gets the
+batch's frames for its queue in one write, in batch order; an event that cannot
+be encoded is skipped alone. `QueueEvents` maps that internal shape to its typed public
 payloads; TCP Workers reuse the same dedicated subscription for `stalled`.
 `failed` is broadcast for every failed attempt with `terminal: !wasRetried`
 (`operations/ack/failure.ts`); the lock-expiry and flow-parent DLQ paths send

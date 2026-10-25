@@ -67,8 +67,13 @@ export class QueueManagerServices extends QueueManagerObservability {
     this.dashboardEmit?.(event, data);
   }
 
-  subscribe(callback: (event: JobEvent) => void): () => void {
-    return this.eventsManager.subscribe(callback);
+  /** `batchCallback`, when given, receives each batch of events in one call instead of
+   *  `callback` once per event (see EventsManager.subscribe). */
+  subscribe(
+    callback: (event: JobEvent) => void,
+    batchCallback?: (events: readonly JobEvent[]) => void
+  ): () => void {
+    return this.eventsManager.subscribe(callback, batchCallback);
   }
 
   waitForJobCompletion(jobId: JobId, timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
