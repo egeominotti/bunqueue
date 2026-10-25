@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-25T16:46:50.682Z",
+  "cpu": "AMD Ryzen 9 7950X3D 16-Core Processor",
+  "logicalCpus": 32,
+  "kernel": "Linux 6.12.48+deb13-amd64",
+  "os": "Debian GNU/Linux 13 (trixie)",
+  "governor": "performance",
+  "bun": "1.4.4",
+  "node": "v24.22.1",
+  "docker": "Docker version 29.9.2, build a82e528",
+  "redis": "redis:8.10.2",
+  "packages": {
+    "bullmq": "6.4.2",
+    "bunqueue": "2.9.20",
+    "ioredis": "6.0.0"
+  },
+  "installed": {
+    "bullmq": "6.4.2",
+    "bunqueue": "2.9.20",
+    "ioredis": "6.0.0"
+  },
+  "brokerCpus": "2,3,18,19",
+  "clientCpus": "8-15,24-31",
+  "reps": 5
+}

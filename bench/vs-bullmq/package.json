@@ -1,0 +1,11 @@
+{
+  "name": "bunqueue-vs-bullmq-benchmark",
+  "private": true,
+  "type": "module",
+  "description": "Reproducible bunqueue vs BullMQ/Redis benchmark: pinned versions, pinned CPUs, open-loop latency, exact-delivery checks.",
+  "dependencies": {
+    "bullmq": "6.4.2",
+    "bunqueue": "2.9.20",
+    "ioredis": "6.0.0"
+  }
+}

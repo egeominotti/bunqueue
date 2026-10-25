@@ -1,0 +1,188 @@
+---
+import '../../styles/home-benchmarks.css';
+import data from '../../data/benchmark-vs-bullmq.json';
+
+/**
+ * Homepage benchmark: bunqueue against BullMQ on Redis, from the measured run in
+ * src/data/benchmark-vs-bullmq.json (written by bench/vs-bullmq/src/export.ts, never
+ * by hand). Headline tiles show bunqueue / BullMQ ratios; each chart groups metrics
+ * that share one unit, so every chart has one scale. BullMQ is always its better
+ * runtime (Node.js or Bun) for that metric. In-memory mode; the full page also covers
+ * the durable stores, including where Redis is ahead.
+ */
+type Stat = { median: number; min: number; max: number };
+type Metric = {
+  key: string;
+  title: string;
+  unit: 'jobs/s' | 'ms';
+  higherIsBetter: boolean;
+  bunqueue: Stat | null;
+  bunqueueConfig: string;
+  bullmq: Stat | null;
+  bullmqRuntime: string;
+  ratio: number | null;
+};
+
+const metrics = data.memory as Metric[];
+const get = (key: string) => metrics.find((m) => m.key === key)!;
+
+const compact = (v: number) =>
+  v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 10_000 ? `${Math.round(v / 1000)}K` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(Math.round(v));
+const ms = (v: number) => (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : String(Math.round(v)));
+const value = (m: Metric, s: Stat) => (m.unit === 'ms' ? `${ms(s.median)} ms` : compact(s.median));
+const exact = (m: Metric, s: Stat) =>
+  m.unit === 'ms' ? `${ms(s.median)} ms (runs ${ms(s.min)}–${ms(s.max)})` : `${Math.round(s.median).toLocaleString('en-US')} jobs/s (runs ${Math.round(s.min).toLocaleString('en-US')}–${Math.round(s.max).toLocaleString('en-US')})`;
+const times = (r: number) => `${r >= 10 ? Math.round(r) : r.toFixed(1)}×`;
+
+// The four strongest results, each a real measured ratio.
+const tiles = (data as any).tiles as { key: string; label: string }[];
+
+const charts: { title: string; note: string; keys: string[] }[] = [
+  { title: 'Adding jobs', note: 'jobs per second · higher is better', keys: ['add-serial', 'add-concurrent', 'add-bulk'] },
+  { title: 'Processing a backlog', note: 'jobs per second · 50 concurrent jobs per worker process · higher is better', keys: ['drain-1', 'drain-4', 'drain-8'] },
+  { title: 'Retries', note: 'jobs per second · every job fails twice and succeeds on its third attempt · higher is better', keys: ['retry'] },
+  { title: 'Pickup latency, p99', note: 'milliseconds from the scheduled send to the processor · lower is better', keys: ['latency-1k-p99', 'latency-5k-p99', 'latency-10k-p99'] },
+  { title: 'Delayed jobs: how late they start', note: 'milliseconds after the due time · lower is better', keys: ['delayed-p50', 'delayed-p99'] },
+];
+
+const short: Record<string, string> = {
+  'add-serial': 'One at a time',
+  'add-concurrent': '64 in flight',
+  'add-bulk': 'Bulk, 100 per call',
+  'drain-1': '1 worker process',
+  'drain-4': '4 worker processes',
+  'drain-8': '8 worker processes',
+  retry: '3 attempts per job',
+  'latency-1k-p99': 'At 1,000 jobs/s',
+  'latency-5k-p99': 'At 5,000 jobs/s',
+  'latency-10k-p99': 'At 10,000 jobs/s',
+  'delayed-p50': 'Median (p50)',
+  'delayed-p99': 'p99',
+};
+
+const v = data.versions;
+// The durable comparison, stated plainly in the fine print (Redis AOF is ahead there).
+const durableDrain = (data.durable as Metric[]).find((m) => m.key === 'drain-4')!;
+const durableBulk = (data.durable as Metric[]).find((m) => m.key === 'add-bulk')!;
+const footprint = data.footprint.memory;
+const date = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(data.date));
+---
+
+<section class="home-section home-bench" id="benchmarks" aria-labelledby="bench-title">
+  <div class="home-bench-head">
+    <span class="home-bench-badge">Benchmark <span>bunqueue {v.bunqueue} vs BullMQ {v.bullmq} on Redis {v.redis}</span></span>
+    <h2 id="bench-title">Faster than BullMQ, in memory. <span>Measured, not claimed.</span></h2>
+    <p>
+      The same jobs, on the same machine, against the latest BullMQ and Redis. The broker gets two pinned
+      cores, producers and workers run on separate ones, and every run checks that each job was processed
+      exactly once. Each number is the median of {data.reps} runs.
+    </p>
+  </div>
+
+  <dl class="home-bench-specs">
+    <div><dt>CPU</dt><dd>AMD Ryzen 9 7950X3D · 16 cores / 32 threads</dd></div>
+    <div><dt>Memory</dt><dd>{data.machine.memory}</dd></div>
+    <div><dt>Disk</dt><dd>3× Samsung PM9A3 NVMe, RAID 5</dd></div>
+    <div><dt>System</dt><dd>Debian 13 · Linux 6.12 · bare metal</dd></div>
+    <div><dt>Runtimes</dt><dd>Bun {v.bun} · Node.js {v.node}</dd></div>
+    <div><dt>Measured</dt><dd>{date}</dd></div>
+  </dl>
+
+  <ul class="home-bench-tiles" role="list">
+    {
+      tiles.map(({ key, label }) => {
+        const m = get(key);
+        return (
+          <li>
+            <strong>{times(m.ratio!)}</strong>
+            <span>{label}</span>
+            <small>
+              {value(m, m.bunqueue!)} vs {value(m, m.bullmq!)}
+            </small>
+          </li>
+        );
+      })
+    }
+  </ul>
+
+  <div class="home-bench-legend" aria-hidden="true">
+    <span><i class="is-bq"></i>bunqueue {v.bunqueue}</span>
+    <span><i class="is-bull"></i>BullMQ {v.bullmq} + Redis {v.redis}</span>
+  </div>
+
+  <div class="home-bench-charts">
+    {
+      charts.map((chart) => {
+        const rows = chart.keys.map(get);
+        const max = Math.max(...rows.flatMap((m) => [m.bunqueue?.median ?? 0, m.bullmq?.median ?? 0]));
+        return (
+          <figure class="home-bench-chart">
+            <figcaption>
+              <span>{chart.title}</span>
+              <small>{chart.note}</small>
+            </figcaption>
+            {rows.map((m) => (
+              <div
+                class="home-bench-row"
+                tabindex="0"
+                aria-label={`${m.title}: bunqueue ${exact(m, m.bunqueue!)}; BullMQ on ${m.bullmqRuntime} ${exact(m, m.bullmq!)}`}
+              >
+                <span class="home-bench-label">{short[m.key]}</span>
+                <span class="home-bench-bars">
+                  <span class="home-bench-bar">
+                    <i class="is-bq" style={`width:calc((100% - 5.5rem) * ${Math.max(0.015, m.bunqueue!.median / max).toFixed(4)})`} />
+                    <b>{value(m, m.bunqueue!)}</b>
+                  </span>
+                  <span class="home-bench-bar">
+                    <i class="is-bull" style={`width:calc((100% - 5.5rem) * ${Math.max(0.015, m.bullmq!.median / max).toFixed(4)})`} />
+                    <b>{value(m, m.bullmq!)}</b>
+                  </span>
+                </span>
+                <span class="home-bench-tip" role="tooltip">
+                  <span><i class="is-bq" />bunqueue ({m.bunqueueConfig}): {exact(m, m.bunqueue!)}</span>
+                  <span><i class="is-bull" />BullMQ on {m.bullmqRuntime}: {exact(m, m.bullmq!)}</span>
+                </span>
+              </div>
+            ))}
+          </figure>
+        );
+      })
+    }
+  </div>
+
+  <details class="home-bench-table">
+    <summary>Every number as a table</summary>
+    <div class="home-bench-table-scroll">
+      <table>
+        <thead>
+          <tr><th>Scenario</th><th>bunqueue</th><th>BullMQ (best runtime)</th><th>Ratio</th></tr>
+        </thead>
+        <tbody>
+          {
+            metrics.map((m) => (
+              <tr>
+                <td>{m.title}</td>
+                <td>{exact(m, m.bunqueue!)}</td>
+                <td>{m.bullmqRuntime}: {exact(m, m.bullmq!)}</td>
+                <td>{m.ratio === null ? '–' : times(m.ratio)}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <p class="home-bench-fine">
+    In-memory mode over TCP, measured {date} on {data.machine.cpu}, {data.machine.memory} RAM, {data.machine.os};
+    Bun {v.bun}, Node.js {v.node}. bunqueue latency and delayed-job rows use <code>pollTimeout: 5000</code>, the
+    long-poll mode BullMQ workers use by default; BullMQ is shown on its faster runtime for each row.
+    On disk (bunqueue on SQLite against Redis with AOF) Redis is ahead today: it processes a backlog
+    {(1 / durableDrain.ratio!).toFixed(1)}× faster ({compact(durableDrain.bullmq!.median)} against
+    {compact(durableDrain.bunqueue!.median)} jobs/s with four worker processes), bulk adds are about level
+    ({compact(durableBulk.bunqueue!.median)} against {compact(durableBulk.bullmq!.median)}), and with a
+    million queued jobs bunqueue holds {(footprint.bunqueue!.backlogMiB / 1024).toFixed(1)} GiB against
+    Redis's {footprint.redis!.backlogMiB} MiB.
+    <a href="/guide/bullmq-benchmark/">Full results, durable mode, method and the harness to reproduce them</a>
+  </p>
+</section>
