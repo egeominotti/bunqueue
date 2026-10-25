@@ -52,6 +52,8 @@ describe('third-party actions are pinned to immutable commits', () => {
   test('the inventory covers every workflow and every uses line', () => {
     expect(files).toEqual([
       'ci.yml',
+      'claude-code-review.yml',
+      'claude.yml',
       'sdk-mutation.yml',
       'sdk-release.yml',
       'sdk-security.yml',
