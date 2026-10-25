@@ -54,6 +54,8 @@
 !.github/
 !.github/workflows/
 !.github/workflows/ci.yml
+!.github/workflows/claude-code-review.yml
+!.github/workflows/claude.yml
 !.github/workflows/sdk-release.yml
 !.github/workflows/sdk-security.yml
 !.github/workflows/sdk-mutation.yml

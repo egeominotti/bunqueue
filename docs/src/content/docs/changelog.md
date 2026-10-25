@@ -170,6 +170,14 @@ and the new code. They are not results of the official benchmark suite.
 - The latency histogram records one bucket per observation and accumulates on
   read: `observe` goes from 12.5 to 9.2 ns.
 
+### CI/CD
+
+- Pull requests from this repository get one automatic Claude Code review
+  (`claude-code-review.yml`; fork pull requests, drafts and bot events are
+  skipped), and repository owners, members and collaborators can ask Claude for
+  help with `@claude` in issues and pull requests (`claude.yml`). Both workflows
+  pin their actions to commit SHAs and have job timeouts.
+
 ## [2.9.18] - 2026-10-23
 
 ### Security
