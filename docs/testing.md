@@ -540,7 +540,8 @@ Markdown, and the Astro documentation content exercised by documentation
 contracts. Copying the documentation is intentional: section coverage,
 language-tab parity, and stale architecture-reference checks must execute in
 the sandbox instead of passing vacuously against an empty tree. The allow-listed
-configuration also includes `docs/vercel.json`, the CI workflow files, and the
+configuration also includes `docs/vercel.json`, every workflow file (the Claude
+Code workflows included, which the action-pinning inventory lists), and the
 two Compose manifests, plus the small per-SDK mutation configuration files
 consumed by structural regressions. The PostgreSQL manifest is required by the
 credential-safety test. The image includes `Dockerfile.test` itself so tests can
@@ -849,6 +850,27 @@ the same pinned Bun version and frozen lockfile as the local sandbox. A CI job i
 the isolation equivalent of one local suite container. The unit job runs
 `bun test --parallel=4`, matching both `bun run test` and the sandbox unit
 container.
+
+Two workflows run Claude Code on pull requests and issues. They need the
+`CLAUDE_CODE_OAUTH_TOKEN` repository secret and the Claude GitHub App.
+`claude-code-review.yml` runs the `code-review` plugin, with comments enabled, on
+same-repository pull requests that are opened, updated, reopened or marked ready.
+Fork pull requests (no secrets), drafts and bot-authored events are skipped, and a
+new human push cancels a review still running for the same pull request (a bot
+push waits instead). The plugin
+reviews a pull request once: when Claude has already commented, later runs stop
+after a short eligibility check. The review is told to follow `CLAUDE.md`, never
+to propose test changes, and to focus on correctness and observable behavior.
+The plugin marketplace is cloned from `anthropics/claude-code` at its default
+branch on every run; only the action itself is pinned. `claude.yml` answers
+`@claude` mentions in issues, pull requests and reviews from repository owners,
+members and collaborators only, because the job spends the maintainer's Claude
+quota; review mentions on fork pull requests are skipped, and runs for the same
+issue or pull request never overlap (GitHub keeps at most one waiting run per
+issue or pull request, so a mention made while two are pending replaces the
+waiting one). Both pin `actions/checkout` and
+`anthropics/claude-code-action` to commit SHAs, as
+`test/repro-workflow-action-pinning.test.ts` requires for every workflow.
 
 `test-core-e2e` runs `bun run test:core-e2e` as a distinct required job. Its
 TypeScript-compiler inventory currently covers 326 public instance methods
