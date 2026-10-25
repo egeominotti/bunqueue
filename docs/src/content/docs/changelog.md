@@ -47,8 +47,8 @@ and the new code. They are not results of the official benchmark suite.
 
   | Backlog | State | Before | After |
   | --- | --- | --- | --- |
-  | 1M | waiting, page 0..20 | crash | 62.1 ms |
-  | 1M | all states, page 0..20 | crash | 80.1 ms |
+  | 1M | waiting, page 0..20 | crash | 96.9 ms |
+  | 1M | all states, page 0..20 | crash | 111.8 ms |
 
 ### Performance
 
@@ -99,10 +99,10 @@ and the new code. They are not results of the official benchmark suite.
 - **Incremental per-priority counts.** `getCountsPerPriority` no longer scans the
   queue. Priorities that are not array-index keys (negative or fractional) keep
   the previous scan, so the returned object keeps the same key order.
-- **`getJobs` pages.** A small page is selected with a bounded heap instead of
-  sorting every collected job (ties keep their original order, as a stable sort
-  does; a job whose `createdAt` is not a number falls back to the full sort).
-  Temporal jobs are collected and tagged in one pass without intermediate copies.
+- **`getJobs` collection.** Temporal jobs are collected and tagged with their
+  state in one pass over the queue, without the intermediate arrays the scan
+  used to build; the page is still sorted with the engine's stable sort, in
+  either direction.
 
   | Operation (1M jobs) | Before | After |
   | --- | --- | --- |
@@ -112,8 +112,8 @@ and the new code. They are not results of the official benchmark suite.
   | `getPerQueueStats` | 68.0 ms | 0.26 ms |
   | `getPrometheusMetrics` | 108.8 ms | 0.31 ms |
   | `getCountsPerPriority` | 39.1 ms | 0.003 ms |
-  | `getJobs` delayed, page 0..20 | 44.0 ms | 25.1 ms |
-  | `getJobs` waiting, page 0..20 (100k jobs) | 11.3 ms | 4.8 ms |
+  | `getJobs` delayed, page 0..20 | 44.9 ms | 28.2 ms |
+  | `getJobs` waiting, page 0..20 (100k jobs) | 11.4 ms | 8.1 ms |
 
 #### TCP
 

@@ -254,8 +254,3 @@ Other tunables: `SkipList` `maxLevel = 16`, `probability = 0.5`; `MinHeap`/`Inde
 - `appendAll(target, items)`, `minOf(values)`, `maxOf(values)`: the results of
   `target.push(...items)`, `Math.min(...values)` and `Math.max(...values)` without
   spreading, which throws `RangeError` past a few hundred thousand elements.
-- `sortedPage(items, start, end, compare, unordered?)`: the result of
-  `items.sort(compare).slice(start, end)` (stable sort). For a page whose `end` is
-  under a quarter of the items it selects the first `end` items with a bounded
-  heap, ties ordered by original index; any item flagged `unordered` (for example a
-  NaN sort key) or any other bound falls back to the full sort.

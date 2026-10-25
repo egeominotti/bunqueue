@@ -1,6 +1,6 @@
 import type { Job, JobId } from '../../../domain/types/job';
 import type { GetJobsContext } from '../../types/query';
-import { appendAll, sortedPage } from '../../../shared/arrays';
+import { appendAll } from '../../../shared/arrays';
 import {
   collectJobsByState,
   collectTemporalJobs,
@@ -35,16 +35,13 @@ function querySqliteByLogicalState(
   return jobs.filter((job) => !opts.excludedIds.has(job.id)).slice(opts.offset, pageEnd);
 }
 
-/** A createdAt that is not a number (or is NaN) makes the comparator inconsistent: such pages keep the full sort. */
-const hasNoOrder = (job: Job): boolean =>
-  typeof job.createdAt !== 'number' || Number.isNaN(job.createdAt);
-
 function mergePage(sqlJobs: Job[], extras: Job[], start: number, end: number, asc: boolean): Job[] {
   const byId = new Map<JobId, Job>();
   for (const job of sqlJobs) byId.set(job.id, job);
   for (const job of extras) byId.set(job.id, job);
   const merged = Array.from(byId.values());
-  return sortedPage(merged, start, end, (a, b) => compareJobsByCreatedAt(a, b, asc), hasNoOrder);
+  merged.sort((a, b) => compareJobsByCreatedAt(a, b, asc));
+  return merged.slice(start, end);
 }
 
 function querySqlitePage(
@@ -240,5 +237,6 @@ export function getJobs(
   }
 
   const jobs = collectJobsByState(queue, shardIdx, states, ctx, now);
-  return sortedPage(jobs, start, end, (a, b) => compareJobsByCreatedAt(a, b, asc), hasNoOrder);
+  jobs.sort((a, b) => compareJobsByCreatedAt(a, b, asc));
+  return jobs.slice(start, end);
 }
