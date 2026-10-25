@@ -39,7 +39,7 @@
 
   /* Fonts */
   --sl-font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --sl-font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --sl-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
   /* Sizing */
   /* Guide content fills the column left over by the sidebar and the on-this-page

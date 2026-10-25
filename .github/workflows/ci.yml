@@ -287,7 +287,8 @@ jobs:
         if: needs.changes.outputs.code != 'true'
         run: |
           set -euo pipefail
-          mapfile -t files < <(grep -lE "docs/src|'docs/|\"docs/|README\.md|CLAUDE\.md|AGENTS\.md|\.claude/|DOCS\b" test/*.test.ts)
+          # Path literals ('docs/...') and path segments (join(root, 'docs', 'src')) both count.
+          mapfile -t files < <(grep -lE "docs/src|'docs/|\"docs/|'docs'|README\.md|CLAUDE\.md|AGENTS\.md|\.claude/|DOCS\b" test/*.test.ts)
           bun test test/check-docs-data.test.ts "${files[@]}"
 
       - name: Install docs dependencies

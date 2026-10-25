@@ -22,6 +22,18 @@ head:
 
 ### Documentation
 
+- Documentation pages use one professional type system: titles, headings and
+  body share Inter (the condensed display face stays on the homepage), with a
+  calmer scale (page title 2-2.6rem, h2 1.55rem, h3 1.2rem), body copy one step
+  below the heading color, a 66ch measure and consistent spacing above headings.
+  Code uses IBM Plex Mono everywhere: inline code and the `--sl-font-mono`
+  stack named JetBrains Mono, which the site never loaded. Heading anchors and
+  code copy buttons stay quiet until hovered or focused, sidebar badges share
+  one style, table headers are small caps, and long "On this page" entries wrap
+  instead of running off the screen (the panel was sized from the 18rem left
+  sidebar). On phones, prose, headings, code and callouts share one 20px
+  gutter; paragraphs and headings used to sit 1rem further in.
+
 - Every release now has its own blog post at `/blog/bunqueue-vX-Y-Z/`, in the
   format of Bun's release posts: a one-line summary, install and upgrade
   commands, one section per new feature, then the remaining changes with
@@ -52,6 +64,9 @@ head:
   builds the site and runs the tests that read the docs, README and agent
   guides. The quality gate accepts skipped product jobs only for docs-only
   changes, and manual runs always run everything.
+- On docs-only changes the docs job also runs tests that locate the docs
+  through path segments (`join(root, 'docs', 'src')`), such as the check that
+  theme rules skip `.not-content` widgets.
 - The docs job checks that the release posts match the changelog
   (`generate-release-posts.ts --check`).
 - GitHub releases are titled `bunqueue vX.Y.Z` and their notes open with a link

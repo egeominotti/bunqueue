@@ -4,85 +4,7 @@
   scroll-margin-top: 100px;
 }
 
-:root[data-has-sidebar] .sl-markdown-content {
-  font-size: 1rem;
-  line-height: 1.75;
-}
-
-/* Prose measure. `ch` is the width of "0" (10.1px in Inter at 16px) while an average
-   character of body text is about 7.5px, so 56ch holds about 75 characters per line,
-   inside the 65-80 range that reads comfortably. Code, tables, asides and diagrams
-   keep the full column. */
-:root[data-has-sidebar] .sl-markdown-content > :is(p, ul, ol, blockquote, dl):not(.not-content) {
-  max-width: 56ch;
-}
-
-:root[data-has-sidebar] .sl-markdown-content :is(p, li):not(:where(.not-content *)) {
-  line-height: 1.75;
-}
-
-:root[data-has-sidebar] :is(.sl-page-title, .sl-markdown-content h1:not(:where(.not-content *))) {
-  font-family: var(--docs-display);
-  font-size: clamp(2rem, 3.1vw, 2.9rem);
-  line-height: 1.15;
-  letter-spacing: -0.045em;
-  font-weight: 650;
-  text-wrap: balance;
-}
-
-:root[data-has-sidebar] .sl-markdown-content h2:not(:where(.not-content *)) {
-  font-family: var(--docs-display);
-  font-size: 1.85rem;
-  line-height: 1.25;
-  letter-spacing: -0.03em;
-  font-weight: 650;
-  text-wrap: balance;
-}
-
-:root[data-has-sidebar] .sl-markdown-content h3:not(:where(.not-content *)) {
-  font-family: var(--docs-display);
-  font-size: 1.3rem;
-  line-height: 1.4;
-  letter-spacing: -0.02em;
-  font-weight: 600;
-}
-
-:root[data-has-sidebar] .sl-markdown-content :is(h2, h3, h4):not(:where(.not-content *)) {
-  scroll-margin-top: 100px;
-}
-
-:root[data-has-sidebar] .bq-hero {
-  padding: 8px 0 28px;
-  margin: 0;
-}
-
-:root[data-has-sidebar] .bq-hero .bq-eyebrow {
-  font-family: var(--sl-font-system);
-  letter-spacing: 0.02em;
-  text-transform: none;
-  font-size: 0.8rem;
-  color: var(--docs-muted);
-  margin-bottom: 12px;
-}
-
-:root[data-has-sidebar] .bq-hero .bq-hero-sub {
-  max-width: 56ch;
-  margin-top: 18px;
-  font-size: 1.05rem;
-  color: var(--docs-muted);
-  line-height: 1.7;
-}
-
-:root[data-has-sidebar] .bq-hero-h1 em {
-  font-style: normal;
-  color: var(--docs-accent);
-}
-
-:root[data-has-sidebar] .sl-markdown-content a:not([class]):not(:where(.not-content *)) {
-  color: var(--docs-accent);
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1px;
-}
+/* Type scale, headings, hero and links: see Typography in docs-theme.css. */
 
 :root[data-has-sidebar] .expressive-code {
   --ec-codeFontSize: 0.85rem;
@@ -93,11 +15,6 @@
 
 :root[data-has-sidebar] .expressive-code pre {
   box-shadow: none;
-}
-
-:root[data-has-sidebar] .expressive-code .copy button {
-  min-width: 36px;
-  min-height: 36px;
 }
 
 :root[data-has-sidebar] starlight-tabs [role='tablist'] {
@@ -185,12 +102,6 @@
 @media (max-width: 49.99rem) {
   :root[data-has-sidebar] main .content-panel {
     padding-inline: 20px !important;
-  }
-  :root[data-has-sidebar] .bq-hero .bq-hero-sub {
-    font-size: 1rem;
-  }
-  :root[data-has-sidebar] .sl-markdown-content h2:not(:where(.not-content *)) {
-    font-size: 1.55rem;
   }
   :root[data-has-sidebar] starlight-tabs [role='tab'] {
     padding-inline: 12px;
