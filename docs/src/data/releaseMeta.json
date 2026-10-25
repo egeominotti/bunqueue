@@ -1,0 +1,2050 @@
+{
+  "versions": {
+    "2.9.19": {
+      "tag": true,
+      "release": true,
+      "docker": true,
+      "previousTag": "v2.9.18",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.18": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.17",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.17": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.16",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.16": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.15",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.15": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.14",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.14": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.13",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.13": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.12",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.12": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.11",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.11": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.10",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.10": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.9",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.9": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.8",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.8": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.7",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.7": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.6",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.6": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.5",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.5": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "docker": true,
+      "previousTag": "v2.9.4",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.4": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.9.3",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.3": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.9.2",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.2": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.9.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.9.1": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.8.61",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti",
+        "mikemikimike"
+      ]
+    },
+    "2.9.0": {
+      "npm": true
+    },
+    "2.8.61": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.8.59",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.60": {
+      "npm": true
+    },
+    "2.8.59": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.57",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.58": {
+      "npm": true
+    },
+    "2.8.57": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.55",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.56": {
+      "npm": true
+    },
+    "2.8.55": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.8.54",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.54": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.53",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.53": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.50"
+    },
+    "2.8.52": {
+      "npm": true
+    },
+    "2.8.51": {
+      "npm": true
+    },
+    "2.8.50": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.49"
+    },
+    "2.8.49": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.48"
+    },
+    "2.8.48": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.46",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.47": {
+      "npm": true
+    },
+    "2.8.46": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.44",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.45": {
+      "npm": true
+    },
+    "2.8.44": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.43",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.43": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.42",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.42": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.41",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.41": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.40",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.40": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.39",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.39": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.38",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.38": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.37",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.37": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.36",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.36": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.35",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.35": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.32",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.34": {
+      "npm": true
+    },
+    "2.8.33": {
+      "npm": true
+    },
+    "2.8.32": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.31",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.31": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.30",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.30": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.29",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.29": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.28",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.28": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.27",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.27": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.26",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.26": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.25",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.25": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.24",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.24": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.23",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.23": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.22",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.22": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.21",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.21": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.20",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.20": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.19",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.19": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.18",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.18": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.17",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.17": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.16",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.16": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.8.15",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.15": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.8.14",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.14": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.8.13",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.13": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.12",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.12": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.11",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.11": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.10",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.10": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.9",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.9": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.8",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.8": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.7",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.7": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.6",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.6": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.5",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.5": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.4",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.4": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.3",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.3": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.8.2",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.2": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.22",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.8.1": {
+      "npm": true
+    },
+    "2.7.22": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.20",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.21": {
+      "npm": true
+    },
+    "2.7.20": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.19",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.19": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.18",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.18": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.17",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.17": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.16",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.16": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.7.15",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.15": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.14",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.14": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.13",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.13": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.12",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.12": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.10",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.11": {
+      "npm": true
+    },
+    "2.7.10": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.9",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.9": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.8",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.8": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.7",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.7": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.6",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.6": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.5",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.5": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.4",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.4": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.3",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.3": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.2",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.2": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.1": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.7.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.7.0": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.116",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.116": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.115",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.115": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.114",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.114": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.113",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.113": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.112",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.112": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.111",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.111": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.110",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.110": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.109",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.109": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.108",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.108": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.107",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.107": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.102",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.106": {
+      "npm": true
+    },
+    "2.6.105": {
+      "npm": true
+    },
+    "2.6.104": {
+      "npm": true
+    },
+    "2.6.103": {
+      "npm": true
+    },
+    "2.6.102": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.101"
+    },
+    "2.6.101": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.100"
+    },
+    "2.6.100": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.98",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.99": {
+      "npm": true
+    },
+    "2.6.98": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.97",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.97": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.95",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.96": {
+      "npm": true
+    },
+    "2.6.95": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.94",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.94": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.92",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.93": {
+      "npm": true
+    },
+    "2.6.92": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.91",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.91": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.90",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.90": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.89",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.89": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.73",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.88": {
+      "npm": true
+    },
+    "2.6.87": {
+      "npm": true
+    },
+    "2.6.85": {
+      "npm": true
+    },
+    "2.6.84": {
+      "npm": true
+    },
+    "2.6.83": {
+      "npm": true
+    },
+    "2.6.82": {
+      "npm": true
+    },
+    "2.6.81": {
+      "npm": true
+    },
+    "2.6.80": {
+      "npm": true
+    },
+    "2.6.79": {
+      "npm": true
+    },
+    "2.6.78": {
+      "npm": true
+    },
+    "2.6.77": {
+      "npm": true
+    },
+    "2.6.76": {
+      "npm": true
+    },
+    "2.6.75": {},
+    "2.6.74": {
+      "npm": true
+    },
+    "2.6.73": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.72",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.72": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.71",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.71": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.67",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.67": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.65",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.66": {
+      "npm": true
+    },
+    "2.6.65": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.64",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.64": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.62",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.63": {
+      "npm": true
+    },
+    "2.6.62": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.49",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.60": {
+      "npm": true
+    },
+    "2.6.49": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.48",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.48": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.47",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.47": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.46",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.46": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.45",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.45": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.44",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.44": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.43",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.43": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.42",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.42": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.41",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.41": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.40",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.40": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.39",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.39": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.37",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.38": {
+      "npm": true
+    },
+    "2.6.37": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.36",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.36": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.35",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.35": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.26",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti",
+        "simontong"
+      ]
+    },
+    "2.6.34": {
+      "npm": true
+    },
+    "2.6.33": {
+      "npm": true
+    },
+    "2.6.32": {
+      "npm": true
+    },
+    "2.6.31": {
+      "npm": true
+    },
+    "2.6.30": {
+      "npm": true
+    },
+    "2.6.29": {
+      "npm": true
+    },
+    "2.6.28": {
+      "npm": true
+    },
+    "2.6.27": {
+      "npm": true
+    },
+    "2.6.26": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.25",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.25": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.24"
+    },
+    "2.6.24": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.23",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.23": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.22",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.22": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.21",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.21": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.19",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.20": {
+      "npm": true
+    },
+    "2.6.19": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.17",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.18": {
+      "npm": true
+    },
+    "2.6.17": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.16",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.16": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.15"
+    },
+    "2.6.15": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.14",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.14": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.9",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.9": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.7",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.7": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.6",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.6": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.5",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.5": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.4",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.4": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.2",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.2": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.1": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.6.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.6.0": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.5.8",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.5.8": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.5.7",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.5.7": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.5.6",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.5.6": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.5.5",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.5.5": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.5.4",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.5.4": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.5.3",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.5.3": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.5.2",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.5.2": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.5.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti",
+        "motopods"
+      ]
+    },
+    "2.5.1": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.5.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.5.0": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.4.8",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.4.8": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.4.7",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.4.7": {
+      "tag": true,
+      "release": true,
+      "previousTag": "v2.4.6",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.4.6": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.4.5",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.4.5": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.4.3",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.4.3": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.4.2",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.4.2": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.4.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.4.1": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.4.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.4.0": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.3.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.3.1": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.3.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.3.0": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.1.8",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.1.8": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.1.6",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.1.7": {
+      "npm": true
+    },
+    "2.1.6": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.1.4",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.1.5": {
+      "npm": true
+    },
+    "2.1.4": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.1.3",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.1.3": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.1.2",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.1.2": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.1.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.1.1": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.1.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.1.0": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.0.9",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.0.9": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.0.3",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.0.3": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.0.2",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.0.2": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.0.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.0.1": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v2.0.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "2.0.0": {
+      "tag": true,
+      "release": true,
+      "npm": true,
+      "previousTag": "v1.9.1",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "1.9.9": {
+      "npm": true
+    },
+    "1.9.8": {
+      "npm": true
+    },
+    "1.9.6": {
+      "npm": true
+    },
+    "1.9.4": {
+      "npm": true
+    },
+    "1.9.3": {
+      "npm": true
+    },
+    "1.9.2": {
+      "npm": true
+    },
+    "1.9.1": {
+      "tag": true,
+      "npm": true,
+      "previousTag": "v1.9.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "1.9.0": {
+      "tag": true,
+      "npm": true,
+      "previousTag": "v1.4.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "1.6.8": {
+      "npm": true
+    },
+    "1.6.7": {
+      "npm": true
+    },
+    "1.6.6": {
+      "npm": true
+    },
+    "1.6.5": {
+      "npm": true
+    },
+    "1.6.4": {
+      "npm": true
+    },
+    "1.6.3": {
+      "npm": true
+    },
+    "1.6.2": {
+      "npm": true
+    },
+    "1.6.1": {
+      "npm": true
+    },
+    "1.6.0": {
+      "npm": true
+    },
+    "1.5.0": {
+      "npm": true
+    },
+    "1.4.0": {
+      "tag": true,
+      "npm": true,
+      "previousTag": "v1.3.0",
+      "author": "egeominotti",
+      "contributors": [
+        "egeominotti"
+      ]
+    },
+    "1.3.0": {
+      "tag": true,
+      "npm": true
+    },
+    "1.2.0": {
+      "npm": true
+    },
+    "1.1.0": {
+      "npm": true
+    },
+    "1.0.0": {
+      "npm": true
+    }
+  }
+}

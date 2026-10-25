@@ -56,8 +56,22 @@ try {
 // sitemap lastmod we deliberately avoid above).
 const latestDocsDate = Object.values(gitLastmod).sort().pop();
 
+// A release post describes one release, so its lastmod is the release date
+// (article:published_time), not the date its file was last regenerated.
+function releasePostDate(rel) {
+  if (!/^blog\/bunqueue-v\d+-\d+-\d+$/.test(rel)) return undefined;
+  try {
+    const source = readFileSync(path.resolve(__dirname, `src/content/docs/${rel}.md`), 'utf-8');
+    return /property: article:published_time\s+content: "(\d{4}-\d{2}-\d{2})"/.exec(source)?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
 function lastmodForUrl(url) {
   const rel = url.replace('https://bunqueue.dev', '').replace(/^\//, '').replace(/\/$/, '');
+  const released = releasePostDate(rel);
+  if (released) return released;
   const base = rel === '' ? 'index' : rel;
   for (const candidate of [`${base}.mdx`, `${base}.md`, `${rel}/index.mdx`, `${rel}/index.md`]) {
     const date = gitLastmod[`docs/src/content/docs/${candidate}`];

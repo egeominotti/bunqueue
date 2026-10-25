@@ -2,10 +2,11 @@
 import { getCollection } from 'astro:content';
 
 /**
- * Dynamic blog listing: reads every blog post from the docs collection,
- * pulls the publish date and topic out of its frontmatter/body, computes
- * reading time, and renders newest-first cards. New posts appear here
- * with zero manual listing work.
+ * Dynamic blog listing, laid out like Bun's blog: the newest post as a
+ * featured card, Everything / Articles / Releases filters, then every post
+ * grouped by year. Release posts (generated from the changelog, see
+ * docs/scripts/generate-release-posts.ts) and articles share one list, so
+ * new posts appear here with zero manual listing work.
  */
 const entries = await getCollection('docs', (e) => e.id.startsWith('blog/') && e.id !== 'blog');
 
@@ -15,7 +16,8 @@ type Post = {
   description: string;
   date: Date | null;
   topic: string;
-  minutes: number;
+  release: boolean;
+  version: number[];
 };
 
 function headContent(entry: any, property: string): string | undefined {
@@ -29,35 +31,98 @@ const posts: Post[] = entries.map((e) => {
   const body = e.body ?? '';
   const topicMatch = body.match(/bq-eyebrow">blog(?:\s*·\s*([^<]+))?</);
   const published = headContent(e, 'article:published_time');
-  const words = body.split(/\s+/).length;
+  const topic = (topicMatch?.[1] ?? 'engineering').trim();
+  const version = /bunqueue-v(\d+)-(\d+)-(\d+)$/.exec(e.id)?.slice(1).map(Number) ?? [];
   return {
     href: `/${e.id}/`,
     title: String(e.data.title).replace(/^"|"$/g, ''),
     description: String(e.data.description ?? ''),
     date: published ? new Date(published) : null,
-    topic: (topicMatch?.[1] ?? 'engineering').trim(),
-    minutes: Math.max(2, Math.round(words / 230)),
+    topic,
+    release: topic === 'release',
+    version,
   };
 });
 
-posts.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+// Newest first; releases shipped on the same day are ordered by version.
+const byVersion = (a: number[], b: number[]) =>
+  (b[0] ?? 0) - (a[0] ?? 0) || (b[1] ?? 0) - (a[1] ?? 0) || (b[2] ?? 0) - (a[2] ?? 0);
+posts.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0) || byVersion(a.version, b.version));
 
-const fmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const [latest, ...rest] = posts;
+const years = new Map<string, Post[]>();
+for (const post of rest) {
+  const year = post.date ? String(post.date.getUTCFullYear()) : 'Undated';
+  years.set(year, [...(years.get(year) ?? []), post]);
+}
+const releaseCount = posts.filter((p) => p.release).length;
+
+const long = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const short = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 ---
 
-<div class="bq-blog-grid">
+{
+  latest && (
+    <a class="bq-blog-latest" href={latest.href} data-kind={latest.release ? 'release' : 'article'}>
+      <p class="bq-blog-meta">
+        <span class="bq-blog-badge">Latest</span>
+        {latest.date && <time datetime={latest.date.toISOString().slice(0, 10)}>{long.format(latest.date)}</time>}
+        <span>{latest.release ? 'Release' : latest.topic}</span>
+      </p>
+      <h2>{latest.title}</h2>
+      <p class="bq-blog-desc">{latest.description}</p>
+      <span class="bq-blog-more">{latest.release ? 'Read the release notes →' : 'Read the article →'}</span>
+    </a>
+  )
+}
+
+<div class="bq-blog-toolbar">
+  <div class="bq-blog-filters" role="group" aria-label="Filter posts">
+    <button type="button" data-filter="all" aria-pressed="true">Everything</button>
+    <button type="button" data-filter="article" aria-pressed="false">Articles</button>
+    <button type="button" data-filter="release" aria-pressed="false">Releases</button>
+  </div>
+  <p class="bq-blog-count">
+    {posts.length} posts · {releaseCount} releases
+  </p>
+</div>
+
+<div class="bq-blog-years">
   {
-    posts.map((p) => (
-      <a class="bq-blog-card" href={p.href}>
-        <p class="bq-blog-meta">
-          <span class="bq-blog-topic">{p.topic}</span>
-          {p.date && <span>{fmt.format(p.date)}</span>}
-          <span>{p.minutes} min read</span>
-        </p>
-        <h2>{p.title}</h2>
-        <p class="bq-blog-desc">{p.description}</p>
-        <span class="bq-blog-more">Read the article →</span>
-      </a>
+    [...years].map(([year, list]) => (
+      <section class="bq-blog-year">
+        <h2>{year}</h2>
+        <ul class="bq-blog-list">
+          {list.map((p) => (
+            <li data-kind={p.release ? 'release' : 'article'}>
+              <a href={p.href}>
+                {p.date ? <time datetime={p.date.toISOString().slice(0, 10)}>{short.format(p.date)}</time> : <span />}
+                <span class="bq-blog-row">
+                  <span class="bq-blog-title">
+                    {p.title}
+                    {p.release ? <span class="bq-blog-tag">Release</span> : <span class="bq-blog-tag bq-blog-tag-article">{p.topic}</span>}
+                  </span>
+                  <span class="bq-blog-desc">{p.description}</span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
     ))
   }
 </div>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.bq-blog-filters button');
+  function apply(filter: string) {
+    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.filter === filter));
+    for (const li of document.querySelectorAll<HTMLElement>('.bq-blog-list li')) {
+      li.hidden = filter !== 'all' && li.dataset.kind !== filter;
+    }
+    for (const year of document.querySelectorAll<HTMLElement>('.bq-blog-year')) {
+      year.hidden = !year.querySelector('li:not([hidden])');
+    }
+  }
+  for (const b of buttons) b.addEventListener('click', () => apply(b.dataset.filter ?? 'all'));
+</script>

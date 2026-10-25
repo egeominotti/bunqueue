@@ -43,10 +43,20 @@ export function documentationSitemap(lastmodForUrl: (url: string) => string | un
         item.priority = 0.6;
         item.changefreq = ChangeFreqEnum.MONTHLY;
       }
-      // Blog posts - good for SEO, frequent updates
+      // Blog index: every release adds a post
+      else if (url === '/blog/') {
+        item.priority = 0.8;
+        item.changefreq = ChangeFreqEnum.WEEKLY;
+      }
+      // Release posts describe a shipped version and do not change afterwards
+      else if (url.match(/^\/blog\/bunqueue-v\d+-\d+-\d+\/$/)) {
+        item.priority = 0.6;
+        item.changefreq = ChangeFreqEnum.YEARLY;
+      }
+      // Articles
       else if (url.match(/^\/blog\//)) {
         item.priority = 0.7;
-        item.changefreq = ChangeFreqEnum.WEEKLY;
+        item.changefreq = ChangeFreqEnum.MONTHLY;
       }
       // Changelog, security, contributing - lower priority
       else {

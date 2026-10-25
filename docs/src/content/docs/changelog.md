@@ -18,6 +18,45 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## [Unreleased]
+
+### Documentation
+
+- Every release now has its own blog post at `/blog/bunqueue-vX-Y-Z/`, in the
+  format of Bun's release posts: a one-line summary, install and upgrade
+  commands, one section per new feature, then the remaining changes with
+  bugfixes last, the contributors and a link to the previous release. All 256
+  dated releases have a post, generated from this changelog by
+  `docs/scripts/generate-release-posts.ts`; contributors, GitHub releases, npm
+  versions and Docker images come from `docs/src/data/releaseMeta.json`
+  (`--refresh`). The 2.9.19 post is written by hand, and the generator never
+  overwrites a post without its generated marker.
+- The blog index follows Bun's layout: the latest post as a featured card,
+  Everything / Articles / Releases filters, and posts grouped by year. The home
+  page announces the newest release post.
+- Release posts use the release date as their sitemap `lastmod` (not the date
+  their file was regenerated), with their own priority and change frequency;
+  the blog index is listed at a higher priority. Every post has its own
+  description.
+- `CLAUDE.md`, `AGENTS.md` and the `bunqueue-dev` skill require a professional,
+  hand-written blog post for every release. The skill's outdated publishing
+  steps (`bun publish` after every commit) are replaced with the trusted
+  publishing rules.
+
+### CI/CD
+
+- Pull requests and pushes that only change the docs site (`docs/`), root
+  Markdown files or `.claude/` no longer run the product suites (lint,
+  typecheck, unit, TCP, embedded, core E2E, WebSocket, PostgreSQL and SDK
+  jobs). A new `Detect changes` job classifies the diff; the docs job still
+  builds the site and runs the tests that read the docs, README and agent
+  guides. The quality gate accepts skipped product jobs only for docs-only
+  changes, and manual runs always run everything.
+- The docs job checks that the release posts match the changelog
+  (`generate-release-posts.ts --check`).
+- GitHub releases are titled `bunqueue vX.Y.Z` and their notes open with a link
+  to the release's blog post.
+
 ## [2.9.19] - 2026-10-25
 
 Algorithmic work on the broker's data structures. Public APIs, options, events,
