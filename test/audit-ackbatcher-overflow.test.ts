@@ -130,7 +130,6 @@ describe('AUDIT BUG H4 — AckBatcher overflow must not silently drop ACKs', () 
     const droppedAndNeverSent = neverSent.filter((id) => rejectedIds.has(id));
 
     if (neverSent.length > 0) {
-      // eslint-disable-next-line no-console
       console.error(
         `[H4] ${neverSent.length} acks were accepted but NEVER sent to the sink ` +
           `(${droppedAndNeverSent.length} of them were rejected/dropped). ` +

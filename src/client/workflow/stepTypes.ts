@@ -36,7 +36,6 @@ export interface StepContext<
 
 /** Step handler function (type-erased for internal storage) */
 export type StepHandler<TInput = unknown, TResult = unknown> = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: StepContext<TInput, any>
 ) => Promise<TResult> | TResult;
 
@@ -47,7 +46,6 @@ export type TypedStepHandler<TInput, TSteps extends Record<string, unknown>, TRe
 
 /** Compensate handler (type-erased for internal storage) */
 export type CompensateHandler<TInput = unknown> = (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: StepContext<TInput, any>
 ) => Promise<void> | void;
 
@@ -138,7 +136,6 @@ export type BranchCondition<
 
 /** Internal branch definition (type-erased) */
 export interface BranchDefinition {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   condition: BranchCondition<any, any>;
   paths: Map<string, StepDefinition[]>;
 }
@@ -170,7 +167,6 @@ export type LoopCondition<
 
 /** Definition of a doUntil/doWhile loop (type-erased) */
 export interface LoopDefinition {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   condition: LoopCondition<any, any>;
   steps: StepDefinition[];
   maxIterations: number;
@@ -184,7 +180,6 @@ export type ForEachItemsExtractor<
 
 /** Definition of a forEach loop (type-erased) */
 export interface ForEachDefinition {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   items: ForEachItemsExtractor<any, any>;
   step: StepDefinition;
   maxIterations: number;
@@ -199,7 +194,6 @@ export type MapTransformFn<
 /** Definition of a map node (type-erased) */
 export interface MapDefinition {
   name: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transform: MapTransformFn<any, any>;
 }
 
@@ -209,7 +203,6 @@ export type WorkflowNode =
   | { type: 'branch'; def: BranchDefinition }
   | { type: 'waitFor'; event: string; timeout?: number }
   | { type: 'parallel'; def: ParallelDefinition }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | {
       type: 'subWorkflow';
       name: string;

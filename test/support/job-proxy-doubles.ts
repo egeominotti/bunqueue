@@ -15,7 +15,6 @@ export function createMockTcp() {
   return { calls, tcp: tcp as typeof tcp & TcpConnectionPool };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createMockCtx(overrides: Record<string, any> = {}) {
   const { tcp, calls } = createMockTcp();
   return {
@@ -31,7 +30,6 @@ export function createMockCtx(overrides: Record<string, any> = {}) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createSimpleCtx(overrides: Record<string, any> = {}) {
   return {
     queueName: overrides.queueName ?? 'test-queue',

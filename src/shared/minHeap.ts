@@ -117,7 +117,6 @@ export class MinHeap<T> {
     const heap = this.heap;
     const compare = this.compare;
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       const firstChild = D * idx + 1;
       if (firstChild >= length) break;

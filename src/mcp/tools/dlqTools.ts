@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated */
 /**
  * MCP Tools - Dead Letter Queue Operations
  */

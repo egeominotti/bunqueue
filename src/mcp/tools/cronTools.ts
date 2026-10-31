@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated */
 /**
  * MCP Tools - Cron Job Management
  */

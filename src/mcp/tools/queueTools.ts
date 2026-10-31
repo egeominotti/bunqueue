@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated */
 /**
  * MCP Tools - Queue Control
  * List, count, pause, resume, drain, obliterate, clean, get jobs

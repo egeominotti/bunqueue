@@ -38,6 +38,9 @@ head:
   to `Uint8Array<ArrayBuffer>` before `WebSocket.send`, a type-only fix for an
   error that `bun check` reports and `tsc` 5.9 did not. There is no copy and no
   runtime change.
+- The 46 leftover `eslint-disable` / `eslint-enable` directives in `src/` and
+  `test/` are removed too: no ESLint runs in this repository. The two that
+  explained the code keep their explanation as a plain comment.
 
 ### Documentation
 

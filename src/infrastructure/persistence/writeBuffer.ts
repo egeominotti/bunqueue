@@ -115,7 +115,7 @@ export class WriteBuffer {
     try {
       let result: BatchInsertResult;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive against a non-conforming test double
+        // Defensive against a non-conforming test double
         result = this.batchManager.insertJobsBatch(this.flushBuffer.toArray()) ?? {
           transient: [],
           conflicts: [],

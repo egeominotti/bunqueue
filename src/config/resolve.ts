@@ -80,10 +80,9 @@ export interface ResolvedConfig {
   configWarnings: string[];
 }
 
-/* eslint-disable complexity -- pure config mapping, no real branching logic */
-
 /**
- * Resolve server config: config file > env vars > defaults. Throws a `ConfigError`
+ * Resolve server config: config file > env vars > defaults. A pure config mapping,
+ * with no real branching logic beyond each setting's own fallbacks. Throws a `ConfigError`
  * when a setting the server would use is invalid, including the env-only settings of
  * the webhook, monitoring, TCP and rate-limit components, so a bad value stops startup
  * before anything binds. Settings of PostgreSQL, Cloud and S3 backup only stop it when
@@ -211,8 +210,6 @@ export function resolveServerConfig(
   issues.throwIfAny();
   return resolved;
 }
-
-/* eslint-enable complexity */
 
 /**
  * Resolve server TLS options from resolved config. Returns null when TLS is

@@ -238,7 +238,7 @@ describe('processJob', () => {
 
     const { tcp } = mockTcp();
     const processor: Processor<unknown, void> = async () => {
-      throw 'string-error'; // eslint-disable-line no-throw-literal
+      throw 'string-error';
     };
     const config = makeConfig(processor, { emitter, tcp });
 

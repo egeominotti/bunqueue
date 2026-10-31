@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated */
 /**
  * MCP Tools - Flow Operations
  * Create and retrieve job workflows: chains, fan-out/fan-in, and tree flows.

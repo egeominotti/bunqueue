@@ -39,14 +39,12 @@ export class ReconnectManager extends EventEmitter {
 
   on(event: 'maxReconnectAttemptsReached', listener: () => void): this;
   on(event: 'reconnecting', listener: (data: { attempt: number; delay: number }) => void): this;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   on(event: string, listener: (...args: any[]) => void): this {
     return super.on(event, listener);
   }
 
   once(event: 'maxReconnectAttemptsReached', listener: () => void): this;
   once(event: 'reconnecting', listener: (data: { attempt: number; delay: number }) => void): this;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   once(event: string, listener: (...args: any[]) => void): this {
     return super.once(event, listener);
   }

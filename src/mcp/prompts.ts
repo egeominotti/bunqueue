@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated */
 /**
  * MCP Prompts
  * Pre-built prompt templates for AI agents: health reports, queue debugging, incident response.

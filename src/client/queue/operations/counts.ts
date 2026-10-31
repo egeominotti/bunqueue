@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /**
  * Queue Count Operations
  * getJobCounts, getWaitingCount, getDelayedCount, etc.

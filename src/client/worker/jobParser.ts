@@ -26,7 +26,6 @@ function parseBackoffConfig(value: unknown): BackoffConfig | null {
 /**
  * Parse job from TCP response data
  */
-// eslint-disable-next-line complexity
 export function parseJobFromResponse(
   jobData: Record<string, unknown>,
   queueName: string

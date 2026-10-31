@@ -6,7 +6,6 @@
  * so subsequent steps can access previous results without casting.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return */
 // Type erasure via `any` is required for the generic accumulator pattern.
 // Each builder method narrows the return type but stores handlers in type-erased form.
 

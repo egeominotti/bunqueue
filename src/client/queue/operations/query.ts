@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/switch-exhaustiveness-check */
-
 import { getSharedManager } from '../../manager';
 import type { TcpConnectionPool } from '../../tcpPool';
 import type {

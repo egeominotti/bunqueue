@@ -174,7 +174,6 @@ export async function releaseResources(
 /**
  * Finalize batch ack - update indexes, metrics, broadcast, notify
  */
-// eslint-disable-next-line complexity
 export function finalizeBatchAck<T>(
   extractedJobs: Array<ExtractedJob<T>>,
   ctx: FinalizeContext,

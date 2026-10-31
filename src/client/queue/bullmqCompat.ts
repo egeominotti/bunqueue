@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await */
 /**
  * BullMQ v5 Compatibility Operations
  */

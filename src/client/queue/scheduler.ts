@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /**
  * Job Scheduler Operations (BullMQ v5 repeatable jobs)
  */

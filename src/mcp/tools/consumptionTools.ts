@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated */
 /**
  * MCP Tools - Job Consumption (Pull/Ack/Fail cycle)
  * Heartbeat, lock management. A pull with an `owner` locks each job and returns its

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated, @typescript-eslint/require-await */
 /**
  * MCP Tools - HTTP Handler Management
  * Register, unregister, list HTTP handlers that auto-process jobs.

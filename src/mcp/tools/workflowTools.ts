@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated */
 /**
  * MCP Tools - Workflow engine executions (opt-in: BUNQUEUE_MCP_WORKFLOW_DB)
  * List and inspect runs from the Engine's execution store, and deliver a

@@ -73,7 +73,6 @@ export interface ForwardedInfo {
 export class Forwarder extends EventEmitter {
   on(event: 'forwarded', listener: (info: ForwardedInfo) => void): this;
   on(event: 'error', listener: (error: Error) => void): this;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   on(event: string, listener: (...args: any[]) => void): this {
     return super.on(event, listener);
   }

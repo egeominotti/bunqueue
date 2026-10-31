@@ -208,7 +208,6 @@ export class FlowProducer extends EventEmitter {
   }
 
   /** Get the result of a completed parent job in embedded or TCP mode. */
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
   getParentResult<R = unknown>(parentId: string): RuntimeResult<R | undefined> {
     return readParentResult<R>({ embedded: this.embedded, tcp: this.tcp }, parentId);
   }

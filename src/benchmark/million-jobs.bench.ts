@@ -61,8 +61,8 @@ async function runBenchmark() {
   console.log(`✅ Registered ${workers.length} workers for ${QUEUE_COUNT} queues\n`);
 
   // Stats tracking
-  let pushed = 0; // eslint-disable-line no-useless-assignment
-  let completed = 0; // eslint-disable-line no-useless-assignment
+  let pushed = 0;
+  let completed = 0;
   const startTime = Date.now();
 
   // Phase 1: Push all jobs (distributed across queues)
