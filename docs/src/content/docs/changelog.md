@@ -18,7 +18,7 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## [Unreleased]
+## [2.9.21] - 2026-10-31
 
 ### Performance
 
@@ -56,7 +56,9 @@ head:
   20, Apple M5 Max, macOS 27.2, Bun 1.4.4, four alternating fresh-process
   samples per version) went from 4,712–4,757 to 4,942–4,969 jobs/s, about 4%
   faster; memory mode is unchanged. These are diagnostic host results, not
-  publication benchmarks.
+  publication benchmarks. On the final 2.9.21 code (with the typed-array fix
+  below) the same embedded SQLite drain moved by -0.9% to +5.8% at 10,000 to
+  1,000,000 jobs, with overlapping ranges.
 
 ### Bugfixes
 
@@ -75,13 +77,14 @@ head:
   `cancelAllJobs()` can open the circuit. (`test/repro-bunqueue-worker-signal.test.ts`,
   `test/bunqueue-cancellation-parent-signal.test.ts`)
 - **Typed arrays in job data no longer arrive corrupted.** A `Float32Array`,
-  `Uint16Array`, `Float64Array` or any other non-byte TypedArray (and a
-  `DataView`) in job data, results, progress or events reached workers over TCP,
-  and SQLite readers after a restart, as a Uint8Array of the wrong bytes, and a
-  `BigInt64Array` made a TCP or durable add throw (an embedded buffered add
-  succeeded, then its write-buffer flush failed). msgpackr writes such a view as a msgpack
-  `bin` of its byte length but copies it element by element, leaving stale bytes
-  of its shared output buffer in the frame (the bytes changed from run to run).
+  `Uint16Array`, `Float64Array` or any other non-byte TypedArray in job data,
+  results, progress or events reached workers over TCP, and SQLite readers after
+  a restart, as a Uint8Array of the wrong bytes; a `DataView` arrived as an empty
+  one, and a `BigInt64Array` made a TCP or durable add throw (an embedded buffered
+  add succeeded, then its write-buffer flush failed). msgpackr writes such a view
+  as a msgpack `bin` of its byte length but copies it element by element, leaving
+  stale bytes of its shared output buffer in the frame (the bytes changed from run
+  to run).
   `encodeMessagePack` now writes such a view as a `bin` of exactly its own
   bytes wherever it sits in plain objects (including `Object.create(...)`
   objects), arrays, Maps, Sets and Errors, so readers get exactly those bytes (a
