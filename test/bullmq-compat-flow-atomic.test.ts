@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { FlowProducer, Queue, Worker } from '../src/client';
+import { FlowProducer, Queue } from '../src/client';
 
 describe('FlowProducer atomicity (BullMQ v5 compat)', () => {
   it('should cleanup children if parent creation fails', async () => {

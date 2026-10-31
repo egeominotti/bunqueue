@@ -94,7 +94,7 @@ describe('server infrastructure-error boundaries', () => {
 
     // A held WaitJob released without a `completed` event (shutdown) has no result to
     // carry, so it reads the result through the async port, never the sync cache.
-    completed.completedAt = undefined;
+    (completed as { completedAt?: number | null }).completedAt = undefined;
     const held = waitJob(30_000);
     while (events.completionWaiterCount === 0) await Bun.sleep(1);
     events.clear();

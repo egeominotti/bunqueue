@@ -28,7 +28,7 @@ test('DLQ retry restores live custom-ID idempotency', async () => {
     });
     const lease = await manager.pullWithLock(queue, 'model-worker', 0, 60_000);
     expect(lease.job?.id).toBe(original.id);
-    expect(await manager.discard(original.id, lease.token)).toBe(true);
+    expect(await manager.discard(original.id, lease.token!)).toBe(true);
     expect(manager.retryDlq(queue)).toBe(1);
 
     expect(manager.getJobByCustomId(customId)?.id).toBe(original.id);
@@ -70,7 +70,7 @@ test('completed retry restores live custom-ID idempotency', async () => {
     });
     const lease = await manager.pullWithLock(queue, 'model-worker', 0, 60_000);
     expect(lease.job?.id).toBe(original.id);
-    await manager.ack(original.id, { done: true }, lease.token);
+    await manager.ack(original.id, { done: true }, lease.token!);
     expect(await manager.getJobState(original.id)).toBe('completed');
     expect(manager.retryCompleted(queue)).toBe(1);
 
@@ -159,7 +159,7 @@ test('failed SQLite DLQ retry leaves memory and disk terminal', async () => {
       throw new Error('injected retry persistence failure');
     };
     try {
-      expect(() => manager.retryDlq(queue, terminal.id)).toThrow(
+      expect(() => manager!.retryDlq(queue, terminal.id)).toThrow(
         'injected retry persistence failure'
       );
     } finally {

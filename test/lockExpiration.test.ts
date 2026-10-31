@@ -7,9 +7,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
-import { checkExpiredLocks } from '../src/application/lockManager';
 import { shardIndex } from '../src/shared/hash';
-import type { JobId } from '../src/domain/types/job';
 
 describe('Lock Expiration', () => {
   let qm: QueueManager;
@@ -302,9 +300,7 @@ describe('Lock Expiration', () => {
       }
 
       // Pull all with short lock TTL
-      const pulled: Array<{
-        job: ReturnType<typeof qm.pullWithLock> extends Promise<infer T> ? T : never;
-      }> = [];
+      const pulled: Array<Awaited<ReturnType<typeof pullWithLock>>> = [];
       for (let i = 0; i < pushCount; i++) {
         const result = await pullWithLock(queue, 50);
         pulled.push(result);

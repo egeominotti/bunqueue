@@ -85,7 +85,7 @@ describe('Bug #60: upsertJobScheduler should respect deduplication', () => {
     expect(cron).toBeDefined();
 
     // The cron job should carry deduplication info so pushJob can use it
-    const cronAny = cron as Record<string, unknown>;
+    const cronAny = cron!;
     expect(cronAny.uniqueKey).toBe('my-dedup-key');
   });
 

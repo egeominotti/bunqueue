@@ -10,6 +10,9 @@ import { Engine, Workflow } from '../src/client/workflow';
 import { shutdownManager } from '../src/client/manager';
 import { AgentJournal, runAgentEffect, AgentTurnError } from '../src/agents';
 
+// Test double: the mock returns a legacy finish-reason shape (no `unified`).
+type GenerateResult = Awaited<ReturnType<MockLanguageModelV3['doGenerate']>>;
+
 test('documented Mastra effects remain owned by each concurrent handler', async () => {
   shutdownManager();
   let release!: () => void;
@@ -40,7 +43,7 @@ test('documented Mastra effects remain owned by each concurrent handler', async 
           finishReason: { type: 'stop' as const, raw: 'stop' },
           usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
           warnings: [],
-        };
+        } as unknown as GenerateResult;
       }
       return {
         content: [
@@ -54,7 +57,7 @@ test('documented Mastra effects remain owned by each concurrent handler', async 
         finishReason: { type: 'tool-calls' as const, raw: 'tool_calls' },
         usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
         warnings: [],
-      };
+      } as unknown as GenerateResult;
     },
   });
   const guide = readFileSync(

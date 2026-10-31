@@ -6,7 +6,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
-import { jobId, type JobId } from '../src/domain/types/job';
+import type { JobId } from '../src/domain/types/job';
 
 describe('Push Operations', () => {
   let qm: QueueManager;
@@ -409,7 +409,7 @@ describe('Push Operations', () => {
         data: { msg: 'hello' },
         customId: 'my-custom-id',
       });
-      expect(job.id).toBe('my-custom-id');
+      expect(job.id).toBe('my-custom-id' as JobId);
       expect(job.customId).toBe('my-custom-id');
     });
 
@@ -444,7 +444,7 @@ describe('Push Operations', () => {
     });
 
     test('should allow reuse of customId after job is completed', async () => {
-      const job1 = await qm.push('test-q', {
+      await qm.push('test-q', {
         data: { msg: 'first' },
         customId: 'reuse-id',
       });
@@ -460,7 +460,7 @@ describe('Push Operations', () => {
         customId: 'reuse-id',
       });
 
-      expect(job2.id).toBe('reuse-id');
+      expect(job2.id).toBe('reuse-id' as JobId);
       expect(job2.data).toEqual({ msg: 'second' });
     });
 
@@ -748,7 +748,7 @@ describe('Push Operations', () => {
         eventJobIds.push(event.jobId);
       });
 
-      const job1 = await qm.push('test-q', {
+      await qm.push('test-q', {
         data: {},
         uniqueKey: 'dup-event-key',
       });

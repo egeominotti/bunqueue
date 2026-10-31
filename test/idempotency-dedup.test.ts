@@ -8,6 +8,7 @@
 
 import { describe, test, expect, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 describe('Idempotency & Deduplication - Embedded', () => {
   afterEach(() => {
@@ -25,7 +26,7 @@ describe('Idempotency & Deduplication - Embedded', () => {
     expect(job2.id).toBe(job1.id);
 
     // Only 1 job should exist in the queue
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(1);
 
     queue.close();
@@ -46,7 +47,7 @@ describe('Idempotency & Deduplication - Embedded', () => {
     expect(uniqueIds.size).toBe(1);
 
     // Only 1 job in the queue
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(1);
 
     // Process it and verify only 1 execution
@@ -105,8 +106,8 @@ describe('Idempotency & Deduplication - Embedded', () => {
     expect(jobB.id).toBe(jobA.id);
     expect(jobB.data).toEqual({ source: 'A' });
 
-    const countsA = queueA.getJobCounts();
-    const countsB = queueB.getJobCounts();
+    const countsA = queueA.getJobCounts() as JobCounts;
+    const countsB = queueB.getJobCounts() as JobCounts;
     expect(countsA.waiting).toBe(1);
     expect(countsB.waiting).toBe(0);
     expect((await queueA.getJob(jobA.id))?.data).toEqual({ source: 'A' });
@@ -206,7 +207,7 @@ describe('Idempotency & Deduplication - Embedded', () => {
     expect(allIds.size).toBe(4);
 
     // Queue should have exactly 4 waiting jobs
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(4);
 
     queue.close();

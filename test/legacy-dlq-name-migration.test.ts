@@ -28,7 +28,7 @@ test('a pre-name-column DLQ blob restores and retries without losing its job nam
     const database = new Database(dataPath);
     try {
       const row = database
-        .query<{ entry: Uint8Array }, []>('SELECT entry FROM dlq WHERE job_id = ?')
+        .query<{ entry: Uint8Array }, [string]>('SELECT entry FROM dlq WHERE job_id = ?')
         .get(String(job.id));
       expect(row).not.toBeNull();
       const entry = unpack(row!.entry) as {

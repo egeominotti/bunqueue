@@ -11,7 +11,7 @@ describe('PostgreSQL value codec contract', () => {
       nestedObject: { value: -0 },
       nestedArray: [0, -0],
     };
-    const decoded = decodePostgresValue(
+    const decoded = decodePostgresValue<typeof original | null>(
       encodePostgresValue(original),
       null,
       'nested-negative-zero'

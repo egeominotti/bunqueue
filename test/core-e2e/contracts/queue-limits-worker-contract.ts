@@ -4,11 +4,11 @@ import { CoverageTracker, ensure, ensureEqual, eventually } from '../support/tra
 export async function runQueueLimitsWorkerContract(mode: CoreE2eMode): Promise<CoverageTracker> {
   const harness = await CoreE2eHarness.start(mode, 'queue-limits-worker');
   const tracker = new CoverageTracker(mode, 'queue-limits-worker-contract');
-  let release = () => undefined;
+  let release: () => void = () => undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  let releaseGroups = () => undefined;
+  let releaseGroups: () => void = () => undefined;
   const groupGate = new Promise<void>((resolve) => {
     releaseGroups = resolve;
   });

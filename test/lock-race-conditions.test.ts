@@ -8,7 +8,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { shardIndex } from '../src/shared/hash';
-import type { JobId } from '../src/domain/types/job';
 
 describe('Lock Race Conditions', () => {
   let qm: QueueManager;

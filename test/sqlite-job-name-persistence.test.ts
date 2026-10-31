@@ -56,7 +56,7 @@ describe('SqliteStorage job name persistence', () => {
       .get(single.id);
     database.close();
     expect(row?.name).toBe('send-email');
-    expect(unpack(row?.data ?? null, null, 'named-single')).toEqual(single.data);
+    expect(unpack<unknown>(row?.data ?? null, null, 'named-single')).toEqual(single.data);
 
     storage = new SqliteStorage({ path: databasePath });
     const recoveredSingle = storage.getJob(single.id) as NamedJob | null;
@@ -114,7 +114,9 @@ describe('SqliteStorage job name persistence', () => {
       .get();
     database.close();
     expect(row?.name).toBe('legacy-operation');
-    expect(unpack(row?.data ?? null, null, 'legacy-name-envelope')).toEqual({ customerId: 42 });
+    expect(unpack<unknown>(row?.data ?? null, null, 'legacy-name-envelope')).toEqual({
+      customerId: 42,
+    });
     expect(version?.version).toBeGreaterThan(30);
 
     storage = new SqliteStorage({ path: databasePath });

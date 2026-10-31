@@ -137,12 +137,9 @@ describe('Job - State Check Methods', () => {
     });
 
     test('should return true after job completes', async () => {
-      let processedJob: typeof job | null = null;
-
       worker = new Worker(
         'job-state-test',
         async (j) => {
-          processedJob = j;
           return j.data.value * 2;
         },
         { embedded: true, autorun: true }

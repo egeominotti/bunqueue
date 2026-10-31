@@ -8,6 +8,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QueueManager } from '../../src/application/queueManager';
+import type { JobCounts } from '../../src/client/queue/operations/counts';
 import {
   type CoreE2eHarness,
   MODES,
@@ -157,7 +158,7 @@ for (const mode of MODES) {
 
       if (mode === 'embedded') {
         expect(queue.count()).toBe(2);
-        expect(queue.getJobCounts().paused).toBe(2);
+        expect((queue.getJobCounts() as JobCounts).paused).toBe(2);
         expect(queue.getJobs({ end: -1 })).toHaveLength(2);
         expect(queue.getCountsPerPriority()).toMatchObject({ 0: 1, 3: 1 });
         expect(queue.isPaused()).toBe(true);

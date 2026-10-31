@@ -167,7 +167,7 @@ describe('Recovery Logic', () => {
       let queue = new Queue(QUEUE, { embedded: true });
       queue.obliterate();
 
-      const job1 = await queue.add(
+      await queue.add(
         'task',
         { value: 1 },
         {
@@ -176,7 +176,7 @@ describe('Recovery Logic', () => {
           durable: true, // Ensure immediate disk write for recovery test
         }
       );
-      const job2 = await queue.add(
+      await queue.add(
         'task',
         { value: 2 },
         {
@@ -211,7 +211,7 @@ describe('Recovery Logic', () => {
       let queue = new Queue(QUEUE, { embedded: true });
       queue.obliterate();
 
-      const parentJob = await queue.add('parent', { value: 'parent' });
+      await queue.add('parent', { value: 'parent' });
 
       // Process parent job to completion
       const worker = new Worker(QUEUE, async () => ({ result: 'done' }), {

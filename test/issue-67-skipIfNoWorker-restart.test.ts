@@ -34,7 +34,7 @@ function makeCronJob(overrides: Partial<CronJob> & { name: string; queue: string
     skipMissedOnRestart: false,
     skipIfNoWorker: false,
     ...overrides,
-  };
+  } as CronJob;
 }
 
 describe('Issue #67: skipIfNoWorker on restart', () => {

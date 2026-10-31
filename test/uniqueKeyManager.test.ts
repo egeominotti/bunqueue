@@ -27,7 +27,7 @@ describe('UniqueKeyManager', () => {
 
       const entry = manager.getEntry('q1', 'key-a');
       expect(entry).not.toBeNull();
-      expect(entry!.jobId).toBe('job-1');
+      expect(entry!.jobId).toBe('job-1' as JobId);
       expect(entry!.expiresAt).toBeNull();
       expect(entry!.registeredAt).toBeGreaterThan(0);
     });
@@ -39,7 +39,7 @@ describe('UniqueKeyManager', () => {
       await sleep(50);
       const entry = manager.getEntry('q1', 'key-a');
       expect(entry).not.toBeNull();
-      expect(entry!.jobId).toBe('job-1');
+      expect(entry!.jobId).toBe('job-1' as JobId);
     });
 
     test('re-registering the same key updates it', () => {
@@ -48,7 +48,7 @@ describe('UniqueKeyManager', () => {
 
       const entry = manager.getEntry('q1', 'key-a');
       expect(entry).not.toBeNull();
-      expect(entry!.jobId).toBe('job-2');
+      expect(entry!.jobId).toBe('job-2' as JobId);
     });
   });
 
@@ -61,7 +61,7 @@ describe('UniqueKeyManager', () => {
 
       const entry = manager.getEntry('q1', 'key-a');
       expect(entry).not.toBeNull();
-      expect(entry!.jobId).toBe('job-1');
+      expect(entry!.jobId).toBe('job-1' as JobId);
       expect(entry!.expiresAt).toBeGreaterThan(Date.now());
     });
 
@@ -91,7 +91,7 @@ describe('UniqueKeyManager', () => {
 
       const entry = manager.getEntry('q1', 'key-a');
       expect(entry).not.toBeNull();
-      expect(entry!.jobId).toBe('job-2');
+      expect(entry!.jobId).toBe('job-2' as JobId);
     });
 
     test('creates queue map on first registration', () => {
@@ -121,7 +121,7 @@ describe('UniqueKeyManager', () => {
 
       const entry = manager.getEntry('q1', 'key-a');
       expect(entry).not.toBeNull();
-      expect(entry!.jobId).toBe('job-1');
+      expect(entry!.jobId).toBe('job-1' as JobId);
     });
 
     test('returns null for expired key and auto-cleans it', async () => {
@@ -433,8 +433,8 @@ describe('UniqueKeyManager', () => {
       const entry1 = manager.getEntry('q1', 'shared-key');
       const entry2 = manager.getEntry('q2', 'shared-key');
 
-      expect(entry1!.jobId).toBe('job-1');
-      expect(entry2!.jobId).toBe('job-2');
+      expect(entry1!.jobId).toBe('job-1' as JobId);
+      expect(entry2!.jobId).toBe('job-2' as JobId);
     });
 
     test('releasing key in one queue does not affect another', () => {
@@ -502,8 +502,8 @@ describe('UniqueKeyManager', () => {
       expect(manager.getMap().get('q1')!.size).toBe(100);
 
       // Spot check
-      expect(manager.getEntry('q1', 'key-0')!.jobId).toBe('job-0');
-      expect(manager.getEntry('q1', 'key-99')!.jobId).toBe('job-99');
+      expect(manager.getEntry('q1', 'key-0')!.jobId).toBe('job-0' as JobId);
+      expect(manager.getEntry('q1', 'key-99')!.jobId).toBe('job-99' as JobId);
     });
 
     test('many queues', () => {

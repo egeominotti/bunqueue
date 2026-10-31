@@ -29,7 +29,7 @@ describe('Workflow Engine - Realistic Scenarios', () => {
       })
       .step(
         'reserve-stock',
-        async (ctx) => {
+        async (_ctx) => {
           events.push('reserve-stock');
           db['stock-reserved'] = true;
           return { reserved: true };
@@ -43,7 +43,7 @@ describe('Workflow Engine - Realistic Scenarios', () => {
       )
       .step(
         'charge-payment',
-        async (ctx) => {
+        async (_ctx) => {
           events.push('charge');
           db['payment-charged'] = true;
           return { transactionId: 'tx_123' };

@@ -7,6 +7,7 @@
 
 import { describe, test, expect, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 describe('Job Removal & Cleanup - Embedded', () => {
   afterEach(() => {
@@ -24,7 +25,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
 
     const worker = new Worker(
       'removal-on-complete',
-      async (job) => {
+      async (_job) => {
         completed = true;
         return { done: true };
       },
@@ -140,7 +141,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
     );
 
     // Verify waiting jobs exist
-    const countsBefore = queue.getJobCounts();
+    const countsBefore = queue.getJobCounts() as JobCounts;
     expect(countsBefore.waiting).toBe(10);
 
     // Clean all jobs with 0 grace period (no state filter cleans waiting/delayed)
@@ -149,7 +150,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
     // Give time for clean to take effect
     await Bun.sleep(100);
 
-    const countsAfter = queue.getJobCounts();
+    const countsAfter = queue.getJobCounts() as JobCounts;
     expect(countsAfter.waiting).toBe(0);
 
     queue.close();
@@ -196,7 +197,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
     await worker.close();
 
     // Verify failed jobs exist in DLQ
-    const countsBefore = queue.getJobCounts();
+    const countsBefore = queue.getJobCounts() as JobCounts;
     expect(countsBefore.failed).toBeGreaterThanOrEqual(5);
 
     // Purge DLQ to clean failed jobs
@@ -205,7 +206,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
     // Give time for purge to take effect
     await Bun.sleep(100);
 
-    const countsAfter = queue.getJobCounts();
+    const countsAfter = queue.getJobCounts() as JobCounts;
     expect(countsAfter.failed).toBe(0);
 
     queue.close();
@@ -224,7 +225,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
     );
 
     // Verify waiting jobs exist
-    const countsBefore = queue.getJobCounts();
+    const countsBefore = queue.getJobCounts() as JobCounts;
     expect(countsBefore.waiting).toBe(10);
 
     // Also push 5 jobs that will fail to DLQ
@@ -269,7 +270,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
     // Obliterate the queue
     queue.obliterate();
 
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(0);
     expect(counts.failed).toBe(0);
 
@@ -289,14 +290,14 @@ describe('Job Removal & Cleanup - Embedded', () => {
     );
 
     // Verify waiting jobs exist
-    const countsBefore = queue.getJobCounts();
+    const countsBefore = queue.getJobCounts() as JobCounts;
     expect(countsBefore.waiting).toBe(5);
 
     // Clean with 5s grace period -- jobs were just added, should NOT be cleaned
     const resultWithGrace = queue.clean(5000, 100);
     await Bun.sleep(100);
 
-    const countsWithGrace = queue.getJobCounts();
+    const countsWithGrace = queue.getJobCounts() as JobCounts;
     expect(countsWithGrace.waiting).toBe(5);
     expect(resultWithGrace.length).toBe(0);
 
@@ -304,7 +305,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
     const resultNoGrace = queue.clean(0, 100);
     await Bun.sleep(100);
 
-    const countsAfterClean = queue.getJobCounts();
+    const countsAfterClean = queue.getJobCounts() as JobCounts;
     expect(countsAfterClean.waiting).toBe(0);
     expect(resultNoGrace.length).toBe(5);
 

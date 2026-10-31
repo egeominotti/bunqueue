@@ -10,9 +10,7 @@
  */
 
 import { describe, test, expect, afterAll } from 'bun:test';
-import { SandboxedWorker } from '../src/client';
 import { QueueManager } from '../src/application/queueManager';
-import { jobId } from '../src/domain/types/job';
 import { shardIndex } from '../src/shared/hash';
 
 describe('Issue #32 - Regular Worker embedded heartbeats', () => {
@@ -49,7 +47,7 @@ describe('Issue #32 - Regular Worker embedded heartbeats', () => {
 
     const worker = new Worker(
       queueName,
-      async (job) => {
+      async (_job) => {
         // Long-running job (3s) - no progress() calls
         await Bun.sleep(3000);
         return { processed: true };

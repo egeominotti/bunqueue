@@ -116,7 +116,7 @@ try {
       } as unknown as Queue<unknown>;
       const ager = new PriorityAger({ interval: 60_000 }, queue);
       ager.start();
-      const staleCallback = lastIntervalCallback;
+      const staleCallback = lastIntervalCallback as TimerCallback | null;
       ager.destroy();
       staleCallback?.();
       await Promise.resolve();
@@ -138,8 +138,8 @@ try {
       };
       manager.start();
       manager.start();
-      const staleInitialBackup = lastTimeoutCallback;
-      const stalePeriodicBackup = lastIntervalCallback;
+      const staleInitialBackup = lastTimeoutCallback as TimerCallback | null;
+      const stalePeriodicBackup = lastIntervalCallback as TimerCallback | null;
       const timeoutsAfterRepeatedStart = timeouts.size;
       const intervalsAfterRepeatedStart = intervals.size;
       manager.stop();
@@ -211,7 +211,7 @@ try {
       agent.start();
       agent.start();
       await Promise.resolve();
-      const staleSnapshotTimer = lastTimeoutCallback;
+      const staleSnapshotTimer = lastTimeoutCallback as TimerCallback | null;
       const timeoutsAfterRepeatedStart = timeouts.size;
       const subscriptionsAfterRepeatedStart = subscriptions;
       await agent.stop();

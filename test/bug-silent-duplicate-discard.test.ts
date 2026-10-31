@@ -11,7 +11,7 @@
 
 import { describe, test, expect, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
-import { shardIndex, processingShardIndex } from '../src/shared/hash';
+import { shardIndex } from '../src/shared/hash';
 
 interface QueueManagerProbe {
   jobIndex: ReadonlyMap<string, { type: string }>;

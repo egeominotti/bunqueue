@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QueueManager } from '../src/application/queueManager';
-import type { Job } from '../src/domain/types/job';
+import type { Job, JobId } from '../src/domain/types/job';
 
 interface MutableStorage {
   insertJob(job: Job, durable?: boolean, admission?: unknown): void;
@@ -51,7 +51,7 @@ describe('durable persistence rejection is not an in-memory acceptance', () => {
       ).rejects.toThrow('injected durable insert failure');
 
       expect(manager.getQueueJobCounts(queue).waiting).toBe(0);
-      expect(await manager.getJobState('durable-rejection-single-id')).toBe('unknown');
+      expect(await manager.getJobState('durable-rejection-single-id' as JobId)).toBe('unknown');
       expect(manager.getMemoryStats().jobIndex).toBe(0);
     } finally {
       storage.insertJob = insertJob;
@@ -128,7 +128,7 @@ describe('durable persistence rejection is not an in-memory acceptance', () => {
       expect(manager.getQueueJobCounts(queue).waiting).toBe(0);
       expect(manager.getMemoryStats().jobIndex).toBe(0);
       for (const input of inputs) {
-        expect(await manager.getJobState(input.customId)).toBe('unknown');
+        expect(await manager.getJobState(input.customId as JobId)).toBe('unknown');
       }
     } finally {
       storage.insertJob = insertJob;
@@ -139,7 +139,7 @@ describe('durable persistence rejection is not an in-memory acceptance', () => {
       queue,
       inputs.map((input) => ({ ...input, data: { ...input.data, retried: true } }))
     );
-    expect(ids).toEqual(inputs.map((input) => input.customId));
+    expect<string[]>(ids).toEqual(inputs.map((input) => input.customId));
     expect(manager.getQueueJobCounts(queue).waiting).toBe(3);
   });
 
@@ -173,13 +173,13 @@ describe('durable persistence rejection is not an in-memory acceptance', () => {
     }
 
     expect(manager.getQueueJobCounts(queue).waiting).toBe(1);
-    expect(await manager.getJobState('durable-rejection-prefix-ok')).toBe('waiting');
-    expect(await manager.getJobState('durable-rejection-prefix-fail')).toBe('unknown');
+    expect(await manager.getJobState('durable-rejection-prefix-ok' as JobId)).toBe('waiting');
+    expect(await manager.getJobState('durable-rejection-prefix-fail' as JobId)).toBe('unknown');
 
     manager.shutdown();
     manager = new QueueManager({ dataPath });
-    expect(await manager.getJobState('durable-rejection-prefix-ok')).toBe('waiting');
-    expect(await manager.getJobState('durable-rejection-prefix-fail')).toBe('unknown');
+    expect(await manager.getJobState('durable-rejection-prefix-ok' as JobId)).toBe('waiting');
+    expect(await manager.getJobState('durable-rejection-prefix-fail' as JobId)).toBe('unknown');
     expect(manager.getQueueJobCounts(queue).waiting).toBe(1);
   });
 
@@ -216,14 +216,14 @@ describe('durable persistence rejection is not an in-memory acceptance', () => {
     expect(await manager.getJobState(parent.id)).toBe('waiting');
     expect((await manager.getJob(parent.id))?.dependsOn).toEqual([]);
     expect((await manager.getJob(parent.id))?.childrenIds).toEqual([]);
-    expect(await manager.getJobState('durable-rejection-child-id')).toBe('unknown');
+    expect(await manager.getJobState('durable-rejection-child-id' as JobId)).toBe('unknown');
     expect(manager.getQueueJobCounts(queue)['waiting-children']).toBe(0);
 
     manager.shutdown();
     manager = new QueueManager({ dataPath });
     expect(await manager.getJobState(parent.id)).toBe('waiting');
     expect((await manager.getJob(parent.id))?.dependsOn).toEqual([]);
-    expect(await manager.getJobState('durable-rejection-child-id')).toBe('unknown');
+    expect(await manager.getJobState('durable-rejection-child-id' as JobId)).toBe('unknown');
   });
 
   test('failed waiting-dependency admission does not leak completion pins or reverse edges', async () => {
@@ -261,7 +261,7 @@ describe('durable persistence rejection is not an in-memory acceptance', () => {
       storage.insertJob = insertJob;
     }
 
-    expect(await manager.getJobState('durable-rejection-dependent')).toBe('unknown');
+    expect(await manager.getJobState('durable-rejection-dependent' as JobId)).toBe('unknown');
     expect(manager.getQueueJobCounts(queue)['waiting-children']).toBe(0);
     const db = new Database(dataPath, { readonly: true });
     try {

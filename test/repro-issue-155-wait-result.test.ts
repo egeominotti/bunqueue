@@ -20,7 +20,7 @@ import { EventsManager } from '../src/application/eventsManager';
 import { QueueManager } from '../src/application/queueManager';
 import { WebhookManager } from '../src/application/webhookManager';
 import { jobId, type JobId } from '../src/domain/types/job';
-import { EventType, type JobEvent } from '../src/domain/types/queue';
+import { EventType } from '../src/domain/types/queue';
 import type { Response } from '../src/domain/types/response';
 import { handleCommand } from '../src/infrastructure/server/handler';
 import type { HandlerContext } from '../src/infrastructure/server/types';
@@ -32,8 +32,16 @@ afterEach(() => {
   qm = null;
 });
 
-function completedEvent(id: string, data: unknown): JobEvent {
-  return { eventType: EventType.Completed, queue: 'q', jobId: id, timestamp: Date.now(), data };
+type BroadcastEvent = Parameters<EventsManager['broadcast']>[0];
+
+function completedEvent(id: string, data: unknown): BroadcastEvent {
+  return {
+    eventType: EventType.Completed,
+    queue: 'q',
+    jobId: id as JobId,
+    timestamp: Date.now(),
+    data,
+  };
 }
 
 function eventsOf(manager: QueueManager): EventsManager {

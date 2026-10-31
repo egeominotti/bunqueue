@@ -76,7 +76,7 @@ describe('CI flaky: SQLITE_IOERR on PRAGMA mmap_size must not crash SqliteStorag
         throw err;
       }
       return (realRun as (...a: unknown[]) => unknown).apply(this, args);
-    });
+    } as typeof realRun);
 
     try {
       // BUG (pre-fix): this throws SQLITE_IOERR_FSTAT out of `new SqliteStorage`,

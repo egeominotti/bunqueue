@@ -29,7 +29,7 @@ describe('TTL and Expiration', () => {
 
     test('should not pull expired TTL job', async () => {
       // Push job with very short TTL (already expired)
-      const job = await qm.push('test', {
+      await qm.push('test', {
         data: { msg: 'test' },
         ttl: 1, // 1ms TTL
       });
@@ -54,7 +54,7 @@ describe('TTL and Expiration', () => {
 
     test('should respect TTL with delayed jobs', async () => {
       // Push delayed job with TTL shorter than delay
-      const job = await qm.push('test', {
+      await qm.push('test', {
         data: { msg: 'test' },
         delay: 100,
         ttl: 50, // TTL expires before delay
@@ -80,7 +80,7 @@ describe('TTL and Expiration', () => {
     });
 
     test('should track job with timeout', async () => {
-      const job = await qm.push('test', {
+      await qm.push('test', {
         data: { msg: 'test' },
         timeout: 5000,
       });

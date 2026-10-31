@@ -41,6 +41,7 @@
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { JobId } from '../src/domain/types/job';
 import { QueueManager } from '../src/application/queueManager';
 import { TcpClient } from '../src/client/tcp/client';
 
@@ -135,7 +136,9 @@ const capable = tiny !== null;
 if (!capable) {
   console.log(`[repro-disk-full] SKIP: ${skipReason}`);
 } else {
-  console.log(`[repro-disk-full] using tiny fs at ${tiny?.dir} (${tiny?.kind})`);
+  console.log(
+    `[repro-disk-full] using tiny fs at ${(tiny as TinyFs | null)?.dir} (${(tiny as TinyFs | null)?.kind})`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -757,7 +760,7 @@ describe('DISK-FULL — real ENOSPC/SQLITE_FULL against the real server', () => 
       cleanVolume();
       const db = join(dir, 'bunq-df9.db');
       const queue = 'df9-embedded-completed';
-      const customId = 'df9-completed-id';
+      const customId = 'df9-completed-id' as JobId;
       let manager = new QueueManager({ dataPath: db });
       activeManager = manager;
       await manager.push(queue, { customId, data: { generation: 1 }, durable: true });

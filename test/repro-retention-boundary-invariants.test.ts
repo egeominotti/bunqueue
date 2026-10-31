@@ -4,6 +4,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QueueManager } from '../src/application/queueManager';
+import type { JobId } from '../src/domain/types/job';
 
 const databasePaths: string[] = [];
 const managers: QueueManager[] = [];
@@ -82,7 +83,7 @@ describe('retention-boundary invariants', () => {
 
 async function assertDurableObservability(manager: QueueManager, total: number): Promise<void> {
   for (let index = 0; index < total; index++) {
-    const id = `retained-${index}`;
+    const id = `retained-${index}` as JobId;
     expect(await manager.getJobState(id), `state after eviction for ${id}`).toBe('completed');
     const job = await manager.getJob(id);
     expect((job?.data as { index?: number })?.index, `payload after eviction for ${id}`).toBe(

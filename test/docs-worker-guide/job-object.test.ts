@@ -5,6 +5,7 @@
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { Job } from '../../src/client';
+import type { JobId } from '../../src/domain/types/job';
 import {
   type CoreE2eHarness,
   MODES,
@@ -156,7 +157,7 @@ for (const mode of MODES) {
 
       const added = await queue.add('calculate', { value: 21 }, { durable: true });
       const job = await worker.getNextJob();
-      expect(job?.id).toBe(added.id);
+      expect(job?.id).toBe(added.id as JobId);
       expect(job?.name).toBe('calculate');
       expect(job?.data).toEqual({ value: 21 });
       expect(job?.token).toBeString();

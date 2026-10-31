@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { Database } from 'bun:sqlite';
+import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import { randomUUID } from 'crypto';
 import { existsSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { jobId } from '../src/domain/types/job';
+import { jobId, type Job } from '../src/domain/types/job';
 import { MIGRATION_TABLE, SCHEMA } from '../src/infrastructure/persistence/schema';
 import { SqliteStorage } from '../src/infrastructure/persistence/sqlite';
 import { pack } from '../src/infrastructure/persistence/sqliteSerializer';
@@ -75,7 +75,7 @@ describe('stall count persistence', () => {
       debounceId: null,
       debounceTtl: null,
       timeline: [],
-    });
+    } as unknown as Job);
 
     const job = storage.getJob(id)!;
     job.attempts = 2;
@@ -92,7 +92,11 @@ describe('stall count persistence', () => {
     const raw = new Database(path, { create: true });
     raw.run(SCHEMA.replace('    stall_count INTEGER NOT NULL DEFAULT 0,\\n', ''));
     raw.run(MIGRATION_TABLE);
-    raw.run('INSERT INTO migrations (version, applied_at) VALUES (16, ?)', Date.now());
+    raw.run(
+      'INSERT INTO migrations (version, applied_at) VALUES (16, ?)',
+      // bun-types types each variadic binding as an array; bun:sqlite binds scalars.
+      Date.now() as unknown as SQLQueryBindings[]
+    );
     raw
       .prepare('INSERT INTO jobs (id, queue, data, created_at, run_at) VALUES (?, ?, ?, ?, ?)')
       .run('legacy-active', 'recovery', pack({ legacy: true }), Date.now(), Date.now());

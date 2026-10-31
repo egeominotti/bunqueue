@@ -33,7 +33,7 @@ for (const mode of MODES) {
       const added = await queue.add('calculate', { value: 21 }, { durable: true });
       const pulled = await worker.getNextJob();
 
-      expect(pulled?.id).toBe(added.id);
+      expect(pulled?.id as string | undefined).toBe(added.id);
       expect(pulled?.name).toBe('calculate');
       expect(pulled?.data).toEqual({ value: 21 });
       expect(pulled?.token).toBeString();

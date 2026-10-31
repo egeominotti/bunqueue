@@ -4,6 +4,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { getSharedManager, shutdownManager } from '../src/client/manager';
+import type { JobId } from '../src/domain/types/job';
 
 describe('MCP Server Tools', () => {
   beforeEach(() => {
@@ -57,7 +58,7 @@ describe('MCP Server Tools', () => {
 
     test('get job returns null for non-existent ID', async () => {
       const manager = getSharedManager();
-      const job = await manager.getJob(BigInt(999999));
+      const job = await manager.getJob(BigInt(999999) as unknown as JobId);
       expect(job).toBeNull();
     });
 

@@ -404,7 +404,9 @@ for (const mode of MODES) {
       expect(currentLease.token).not.toBe(firstLease.token);
       expectTokenError(await transport.discard(job.id, firstLease.token));
       await expectActive(transport.manager, job.id);
-      expect(transport.manager.getLockInfo(jobId(job.id))?.token).toBe(currentLease.token);
+      expect(transport.manager.getLockInfo(jobId(job.id))?.token).toBe<string | undefined>(
+        currentLease.token
+      );
 
       expect((await transport.discard(job.id, currentLease.token)).ok).toBe(true);
       expect(await queue.getJobState(job.id)).toBe('failed');

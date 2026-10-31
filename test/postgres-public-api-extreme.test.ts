@@ -134,7 +134,7 @@ describe(`PostgreSQL ${expectedPostgresVersionPrefix} extreme public API concurr
       const leafQueue = current.unique('extreme-flow-leaf');
       const rootQueue = current.unique('extreme-flow-root');
       const executions = new Map<string, number>();
-      const mark = (id: string): void => executions.set(id, (executions.get(id) ?? 0) + 1);
+      const mark = (id: string) => executions.set(id, (executions.get(id) ?? 0) + 1);
       const leafProcessor = async (job: { id: string; data: { value: number } }) => {
         mark(job.id);
         return job.data.value;
@@ -159,7 +159,7 @@ describe(`PostgreSQL ${expectedPostgresVersionPrefix} extreme public API concurr
       const batch = crypto.randomUUID();
       const roots = await Promise.all(
         Array.from({ length: 32 }, (_, flow) =>
-          producer.add({
+          producer.add<{ value: number } | { flow: number }>({
             children: Array.from({ length: 8 }, (_, leaf) => ({
               data: { value: leaf + 1 },
               name: 'leaf',

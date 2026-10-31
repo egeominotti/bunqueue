@@ -78,7 +78,7 @@ describe('Deduplication Recovery', () => {
       const manager = getSharedManager();
       const jobFromManager = manager.getJobByCustomId(customId);
       expect(jobFromManager).not.toBeNull();
-      expect(jobFromManager?.id).toBe(originalJob.id);
+      expect(jobFromManager?.id as string | undefined).toBe(originalJob.id);
       expect(await queue.getDeduplicationJobId(customId)).toBeNull();
     });
 

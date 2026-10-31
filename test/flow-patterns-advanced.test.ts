@@ -166,7 +166,7 @@ describe('Advanced Flow Patterns - Embedded', () => {
       data: { task: `worker-${i}`, value: i + 1 },
     }));
 
-    await flow.addBulkThen(parallelSteps, {
+    await flow.addBulkThen<{ task: string; value?: number }>(parallelSteps, {
       name: 'aggregate',
       queueName: 'flow-fanout5',
       data: { task: 'aggregate' },
@@ -256,7 +256,7 @@ describe('Advanced Flow Patterns - Embedded', () => {
     const chainResults = new Map<number, number[]>();
     let completedChains = 0;
     let resolve: () => void;
-    const done = new Promise<void>((r) => (resolve = r));
+    new Promise<void>((r) => (resolve = r));
 
     const worker = new Worker(
       'flow-multi-chains',
@@ -402,7 +402,7 @@ describe('Advanced Flow Patterns - Embedded', () => {
       data: { task: `parallel-${i}`, index: i },
     }));
 
-    await flow.addBulkThen(parallelSteps, {
+    await flow.addBulkThen<{ task: string; index?: number }>(parallelSteps, {
       name: 'final-merge',
       queueName: 'flow-fanout20',
       data: { task: 'final' },

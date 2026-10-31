@@ -203,7 +203,7 @@ describe('Queue/Worker SDK over TLS', () => {
     open.push(q);
 
     await q.add('job', { n: 42 });
-    const waiting = await q.getWaitingAsync<{ n: number }>();
+    const waiting = await q.getWaitingAsync();
     expect(waiting.length).toBe(1);
     expect(waiting[0].data.n).toBe(42);
   });
@@ -254,7 +254,6 @@ describe('Queue/Worker SDK over TLS', () => {
 describe('HTTP server with TLS', () => {
   test('https /health responds', async () => {
     const resp = await fetch(`https://127.0.0.1:${TLS_HTTP_PORT}/health`, {
-      // @ts-expect-error Bun-specific fetch option
       tls: { rejectUnauthorized: false },
       signal: AbortSignal.timeout(3000),
     });

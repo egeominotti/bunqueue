@@ -40,7 +40,10 @@ test.each<[string, PoolOptions]>([
   const first = getSharedPool({ ...HOST });
   const second = getSharedPool({ ...HOST, ...options });
   const name = key as keyof ConnectionOptions;
-  expect({ same: second === first, value: clientOptions(second)[name] }).toEqual({
+  expect<{ same: boolean; value: unknown }>({
+    same: second === first,
+    value: clientOptions(second)[name],
+  }).toEqual({
     same: false,
     value: options[name],
   });

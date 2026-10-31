@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { SQL } from 'bun';
 import { PostgresQueueManager } from '../src/application/postgresQueueManager';
-import { jobId } from '../src/domain/types/job';
+import { jobId, type JobId } from '../src/domain/types/job';
 import {
   cleanupPostgresNamespace,
   eventually,
@@ -130,10 +130,12 @@ describe('PostgreSQL completion tombstone lifecycle', () => {
         expect(row.count).toBe(0);
         const stream = postgresEventStream(second);
         await stream.drain();
-        expect(await eventually(() => second.getResult('removed') === undefined)).toBe(true);
-        await expect(second.push('consumer', { data: {}, dependsOn: ['removed'] })).rejects.toThrow(
-          'Dependency job not found: removed'
+        expect(await eventually(() => second.getResult('removed' as JobId) === undefined)).toBe(
+          true
         );
+        await expect(
+          second.push('consumer', { data: {}, dependsOn: ['removed' as JobId] })
+        ).rejects.toThrow('Dependency job not found: removed');
       } finally {
         await Promise.allSettled([
           first.shutdownPostgres(),

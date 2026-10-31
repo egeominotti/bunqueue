@@ -152,8 +152,8 @@ describe('TemporalManager', () => {
       // Get jobs older than 3000ms
       const oldJobs = tm.getOldJobs('emails', 3000, 100);
       expect(oldJobs.length).toBe(2);
-      expect(oldJobs[0].jobId).toBe('old1');
-      expect(oldJobs[1].jobId).toBe('old2');
+      expect(oldJobs[0].jobId).toBe('old1' as JobId);
+      expect(oldJobs[1].jobId).toBe('old2' as JobId);
     });
 
     test('should only return jobs for the specified queue', () => {
@@ -163,7 +163,7 @@ describe('TemporalManager', () => {
 
       const oldJobs = tm.getOldJobs('emails', 3000, 100);
       expect(oldJobs.length).toBe(1);
-      expect(oldJobs[0].jobId).toBe('j1');
+      expect(oldJobs[0].jobId).toBe('j1' as JobId);
     });
 
     test('should respect the limit parameter', () => {
@@ -729,11 +729,11 @@ describe('TemporalManager', () => {
 
       const emailJobs = tm.getOldJobs('emails', 5000, 100);
       expect(emailJobs.length).toBe(1);
-      expect(emailJobs[0].jobId).toBe('e1');
+      expect(emailJobs[0].jobId).toBe('e1' as JobId);
 
       const paymentJobs = tm.getOldJobs('payments', 5000, 100);
       expect(paymentJobs.length).toBe(1);
-      expect(paymentJobs[0].jobId).toBe('p1');
+      expect(paymentJobs[0].jobId).toBe('p1' as JobId);
     });
 
     test('cleanOrphaned works across all queues at once', () => {

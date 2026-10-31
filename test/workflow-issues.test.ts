@@ -9,7 +9,6 @@
 import { describe, test, expect, afterEach, setDefaultTimeout } from 'bun:test';
 import { Workflow, Engine } from '../src/client/workflow';
 import { waitForWorkflowState } from './workflowTestUtils';
-import type { WorkflowEvent, StepEvent } from '../src/client/workflow';
 import { WorkflowEmitter } from '../src/client/workflow/emitter';
 import { WorkflowStore } from '../src/client/workflow/store';
 import {
@@ -17,7 +16,7 @@ import {
   executeStepWithRetry,
   buildContext,
 } from '../src/client/workflow/runner';
-import { executeMap, executeForEach } from '../src/client/workflow/loops';
+import { executeMap } from '../src/client/workflow/loops';
 import type { Execution, StepDefinition, StepContext } from '../src/client/workflow/types';
 
 setDefaultTimeout(30_000);
@@ -354,7 +353,7 @@ describe('Loop step results are kept per iteration', () => {
     let iteration = 0;
 
     const flow = new Workflow('loop-overwrite').doUntil(
-      (ctx) => iteration >= 3,
+      (_ctx) => iteration >= 3,
       (w) =>
         w.step('counter', async () => {
           iteration++;
@@ -814,7 +813,7 @@ describe('Parallel step compensation', () => {
 describe('Duplicate branch-path step names', () => {
   test('the same step name in two paths is rejected at registration', async () => {
     const flow = new Workflow('dup-branch')
-      .branch((ctx) => 'a')
+      .branch((_ctx) => 'a')
       .path('a', (w) => w.step('handler', async () => ({ from: 'path-a' })))
       .path('b', (w) => w.step('handler', async () => ({ from: 'path-b' })));
 
@@ -838,7 +837,7 @@ describe('Map node events', () => {
 
     // executeMap should accept an emitter and emit events
     await executeMap(
-      { name: 'transform', transform: (ctx) => ({ result: 42 }) },
+      { name: 'transform', transform: (_ctx) => ({ result: 42 }) },
       exec,
       emitter,
       () => undefined

@@ -140,7 +140,7 @@ describe('Repeatable Jobs', () => {
     const queue = new Queue<{ value: number }>('repeat-test');
     const executions: number[] = [];
 
-    const worker = new Worker('repeat-test', async (job) => {
+    const worker = new Worker<{ value: number }>('repeat-test', async (job) => {
       executions.push(job.data.value);
       return { done: true };
     });
@@ -230,7 +230,7 @@ describe('FlowProducer', () => {
       const flow = new FlowProducer();
       const order: number[] = [];
 
-      const worker = new Worker('chain-order', async (job) => {
+      const worker = new Worker<{ step: number }>('chain-order', async (job) => {
         order.push(job.data.step);
         await Bun.sleep(30);
         return { step: job.data.step };

@@ -111,7 +111,7 @@ async function openRaw(h: Harness): Promise<RawPeer> {
   // and flush it on `drain`, mirroring how a real client must behave. Without
   // this a 2MB frame is truncated on the wire and the server sees a permanent
   // partial frame (slowloris timer kills it) — a harness bug, not a server bug.
-  let pending = new Uint8Array(0);
+  let pending: Uint8Array = new Uint8Array(0);
   const pump = (sock: { write: (b: Uint8Array) => number; flush?: () => void }) => {
     if (pending.length === 0) return;
     const written = sock.write(pending);

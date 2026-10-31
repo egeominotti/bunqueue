@@ -110,7 +110,7 @@ describe('Durable Jobs', () => {
         durable: true,
         customId: 'durable-custom-123',
       });
-      expect(job.id).toBe('durable-custom-123');
+      expect<string>(job.id).toBe('durable-custom-123');
       expect(jobExistsInSqlite('durable-custom-123')).toBe(true);
     });
 

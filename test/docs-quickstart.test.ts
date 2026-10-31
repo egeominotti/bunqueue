@@ -4,7 +4,8 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { Queue, Worker, shutdownManager } from '../src/client';
+import { Queue, Worker } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 import { getSharedManager } from '../src/client/manager';
 
 const sleep = (ms: number) => Bun.sleep(ms);
@@ -162,7 +163,7 @@ describe('Quickstart Documentation Examples', () => {
 
       const worker = new Worker<EmailJob, { sent: boolean }>(
         'emails',
-        async (job) => {
+        async (_job) => {
           return { sent: true };
         },
         { embedded: true }
@@ -238,7 +239,7 @@ describe('Quickstart Documentation Examples', () => {
         { embedded: true }
       );
 
-      worker.on('progress', (job, progress) => {
+      worker.on('progress', (_job, progress) => {
         progressUpdates.push(progress);
       });
 
@@ -264,7 +265,7 @@ describe('Quickstart Documentation Examples', () => {
 
       const worker = new Worker<EmailJob>(
         'emails',
-        async (job) => {
+        async (_job) => {
           return { done: true };
         },
         { embedded: true }
@@ -383,7 +384,7 @@ describe('Common Mistake Scenarios', () => {
     // Drain first to ensure clean state
     queue.drain();
 
-    const countsBefore = queue.getJobCounts();
+    const countsBefore = queue.getJobCounts() as JobCounts;
     const startTime = Date.now();
 
     // Add 10 jobs - should be fast
@@ -396,7 +397,7 @@ describe('Common Mistake Scenarios', () => {
     // Should complete in under 500ms (not timeout at 30s)
     expect(elapsed).toBeLessThan(500);
 
-    const countsAfter = queue.getJobCounts();
+    const countsAfter = queue.getJobCounts() as JobCounts;
     expect(countsAfter.waiting).toBe(countsBefore.waiting + 10);
 
     queue.drain();

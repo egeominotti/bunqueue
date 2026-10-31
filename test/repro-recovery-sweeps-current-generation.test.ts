@@ -85,7 +85,7 @@ describe('recovery sweeps act only on the current delivery', () => {
       await handleStalledJob(processingJob(background, id), StallAction.Retry, background)
     ).toBe(true);
     const oldLease = background.jobLocks.get(id) as MutableLock;
-    expect(oldLease.token).toBe(first.token!);
+    expect<string>(oldLease.token).toBe(first.token!);
 
     // The job is delivered again without a lease; the old lease predates it and lapses.
     expect((await qm.pull('old-lease-expiry'))?.id).toBe(id);

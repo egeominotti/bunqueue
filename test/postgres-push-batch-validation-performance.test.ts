@@ -61,7 +61,7 @@ describe('PostgreSQL PUSHB validation hot path', () => {
         }));
         const error = await validatePushBatchJobs(jobs, {
           queueManager: manager,
-        } as HandlerContext);
+        } as unknown as HandlerContext);
 
         expect(error).toBeNull();
         expect(snapshotViews).toBe(0);

@@ -17,6 +17,7 @@ import { handleCommand } from '../src/infrastructure/server/handler';
 import type { HandlerContext } from '../src/infrastructure/server/types';
 import type { Command } from '../src/domain/types/command';
 import type { Response } from '../src/domain/types/response';
+import type { JobState } from '../src/domain/types/job';
 
 /** Create a HandlerContext for embedded testing (no auth required) */
 function createCtx(qm: QueueManager): HandlerContext {
@@ -1406,7 +1407,7 @@ describe('Advanced Handlers', () => {
         cmd: 'Clean',
         queue: 'clean-test',
         grace: 0,
-        state: 'completed',
+        state: 'completed' as JobState,
       });
 
       expect(res.ok).toBe(true);

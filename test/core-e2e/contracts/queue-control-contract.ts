@@ -5,7 +5,7 @@ import { CoverageTracker, ensure, eventually } from '../support/tracker';
 export async function runQueueControlContract(mode: CoreE2eMode): Promise<CoverageTracker> {
   const harness = await CoreE2eHarness.start(mode, 'queue-control');
   const tracker = new CoverageTracker(mode, 'queue-control-contract');
-  let unlock = () => undefined;
+  let unlock: () => void = () => undefined;
   const lockGate = new Promise<void>((resolve) => {
     unlock = resolve;
   });
@@ -83,7 +83,7 @@ export async function runQueueControlContract(mode: CoreE2eMode): Promise<Covera
       (job) => job !== null,
       'worker did not expose active job'
     );
-    const token = activeJob?.token;
+    const token = (activeJob as Job<{ value: number }> | null)?.token;
     ensure(typeof token === 'string' && token.length > 0, 'active job has no lock token');
     const extended = await tracker.invoke('Queue', 'extendJobLock', () =>
       lockQueue.extendJobLock(locked.id, token, 30_000)

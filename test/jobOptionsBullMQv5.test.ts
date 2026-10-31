@@ -114,7 +114,7 @@ describe('JobOptions - LIFO', () => {
 
     const processedOrder: number[] = [];
 
-    const worker = new Worker(
+    const worker = new Worker<{ order: number }>(
       'lifo-test',
       async (job) => {
         processedOrder.push(job.data.order);

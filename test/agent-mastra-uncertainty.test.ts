@@ -15,6 +15,9 @@ import {
   runAgentEffect,
 } from '../src/agents';
 
+// The mock replies use a simplified result shape that the V3 result type does not describe.
+type MockGenerateResult = Awaited<ReturnType<MockLanguageModelV3['doGenerate']>>;
+
 test('documented Mastra turn preserves original effect uncertainty when its SDK handles a tool error', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'bq-mastra-uncertainty-'));
   const agentJournal = new AgentJournal(join(directory, 'journal.db'));
@@ -35,7 +38,7 @@ test('documented Mastra turn preserves original effect uncertainty when its SDK 
           finishReason: { type: 'stop' as const, raw: 'stop' },
           usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
           warnings: [],
-        };
+        } as unknown as MockGenerateResult;
       }
       return {
         content: [
@@ -49,7 +52,7 @@ test('documented Mastra turn preserves original effect uncertainty when its SDK 
         finishReason: { type: 'tool-calls' as const, raw: 'tool_calls' },
         usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
         warnings: [],
-      };
+      } as unknown as MockGenerateResult;
     },
   });
   try {

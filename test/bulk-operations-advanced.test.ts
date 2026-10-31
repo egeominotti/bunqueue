@@ -7,6 +7,7 @@
 
 import { describe, test, expect, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 describe('Bulk Operations Advanced - Embedded', () => {
   afterEach(() => {
@@ -30,7 +31,7 @@ describe('Bulk Operations Advanced - Embedded', () => {
     expect(ids.size).toBe(1000);
 
     // Verify counts
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(1000);
 
     queue.close();
@@ -238,7 +239,7 @@ describe('Bulk Operations Advanced - Embedded', () => {
     }
 
     // Verify total count
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(500);
 
     const completedGlobalIndices: number[] = [];

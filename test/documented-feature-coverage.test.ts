@@ -321,9 +321,9 @@ const PARITY_CONTRACTS = [
 describe('documented Queue, Worker, Cron, and DLQ feature coverage', () => {
   test('contains every requested documentation section exactly once', () => {
     for (const [area, expected] of Object.entries(EXPECTED_SECTIONS)) {
-      expect(COVERAGE.filter((entry) => entry.area === area).map((entry) => entry.section)).toEqual(
-        expected
-      );
+      expect(COVERAGE.filter((entry) => entry.area === area).map((entry) => entry.section)).toEqual<
+        readonly string[]
+      >(expected);
     }
     expect(new Set(COVERAGE.map((entry) => `${entry.area}:${entry.section}`)).size).toBe(
       COVERAGE.length

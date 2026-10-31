@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { Queue, Worker } from '../src/client';
+import { Queue } from '../src/client';
 import { shutdownManager } from '../src/client';
 
 describe('Job Advanced Methods - BullMQ v5', () => {

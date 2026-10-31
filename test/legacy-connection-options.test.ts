@@ -19,7 +19,7 @@ import { Engine } from '../src/client/workflow';
 
 // The portable bunqueue-client bundle is built from the same canonical source.
 const portable =
-  (await import('../sdk/typescript/dist/index.js')) as typeof import('../src/client');
+  (await import('../sdk/typescript/dist/index.js')) as unknown as typeof import('../src/client');
 
 const MIGRATE = /connection: \{ host, port, token, tls \}/;
 const processor = async () => 'ok';

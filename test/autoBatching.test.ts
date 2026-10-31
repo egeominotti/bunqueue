@@ -214,7 +214,7 @@ describe('Auto-Batching: Batcher Integration', () => {
 
     resolveHandle(calls[0], 'f1-');
     resolveHandle(calls[1], 'f2-');
-    const [j1, j2, j3, j4] = await Promise.all([p1, p2, p3, p4]);
+    const [j1, j2] = await Promise.all([p1, p2, p3, p4]);
     expect(j1.id).toBe('f1-1');
     expect(j2.id).toBe('f2-1');
   });

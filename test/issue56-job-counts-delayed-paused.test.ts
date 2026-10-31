@@ -7,6 +7,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { Queue } from '../src/client/queue/queue';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 import { getSharedManager } from '../src/client/manager';
 
 describe('Issue #56: getJobCounts should include delayed and paused', () => {
@@ -24,7 +25,7 @@ describe('Issue #56: getJobCounts should include delayed and paused', () => {
     await queue.add('delayed1', { msg: 'later' }, { delay: 60000 });
     await queue.add('delayed2', { msg: 'later2' }, { delay: 120000 });
 
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
 
     expect(counts.waiting).toBe(1);
     // Issue #56: delayed is missing from JobCounts
@@ -36,7 +37,7 @@ describe('Issue #56: getJobCounts should include delayed and paused', () => {
 
     await queue.add('job1', { msg: 'test' });
 
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
 
     // paused should be 0 when queue is not paused
     expect((counts as any).paused).toBe(0);
@@ -49,7 +50,7 @@ describe('Issue #56: getJobCounts should include delayed and paused', () => {
     await queue.add('job2', { msg: 'test2' });
 
     queue.pause();
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
 
     // BullMQ semantics (#92): when paused, ready jobs are reported under `paused`
     // and `waiting` drops to 0 (a job is never counted in both at once).

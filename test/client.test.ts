@@ -126,7 +126,7 @@ describe('Worker', () => {
       const queue = new Queue<{ x: number }>('worker-test');
       const results: number[] = [];
 
-      const worker = new Worker('worker-test', async (job) => {
+      const worker = new Worker<{ x: number }>('worker-test', async (job) => {
         results.push(job.data.x);
         return { doubled: job.data.x * 2 };
       });
@@ -194,7 +194,7 @@ describe('Worker', () => {
       const queue = new Queue<{ val: number }>('events-completed');
       let completedResult: unknown = null;
 
-      const worker = new Worker('events-completed', async (job) => {
+      const worker = new Worker<{ val: number }>('events-completed', async (job) => {
         return { result: job.data.val * 2 };
       });
 
@@ -402,7 +402,7 @@ describe('Integration', () => {
     const processed: string[] = [];
     const progressUpdates: number[] = [];
 
-    const worker = new Worker(
+    const worker = new Worker<{ email: string }>(
       'integration',
       async (job) => {
         await job.log('Starting');

@@ -34,7 +34,7 @@ const diskFull = (): Error => new Error('SQLITE_FULL: database or disk is full')
 
 // Internal handles used to inject storage failures.
 type Internals = {
-  storage: SqliteStorage & {
+  storage: Omit<SqliteStorage, 'batchManager'> & {
     batchManager: { insertJobsBatch: (jobs: unknown[]) => unknown };
     statements: Map<string, unknown>;
     writeBuffer: { flush: () => number };
@@ -242,7 +242,7 @@ describe('telemetry writes keep 2.9.11 behavior', () => {
       result.status = 'MUTATED';
       await nextTurn();
       const row = db.query<{ payload: Uint8Array }, []>('SELECT payload FROM queue_events').get();
-      expect(decodeMessagePack(row!.payload)).toEqual({ data: { status: 'done' } });
+      expect(decodeMessagePack<unknown>(row!.payload)).toEqual({ data: { status: 'done' } });
     } finally {
       storage.close();
     }

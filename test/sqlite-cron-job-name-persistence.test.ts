@@ -54,7 +54,7 @@ describe('SqliteStorage cron job name persistence', () => {
       .get(cron.name);
     database.close();
     expect(row?.job_name).toBe('deliver-report');
-    expect(unpack(row?.data ?? null, null, 'named-cron')).toEqual(cron.data);
+    expect(unpack<unknown>(row?.data ?? null, null, 'named-cron')).toEqual(cron.data);
 
     storage = new SqliteStorage({ path: databasePath });
     const recovered = storage.loadCronJobs().find((candidate) => candidate.name === cron.name);
@@ -105,7 +105,7 @@ describe('SqliteStorage cron job name persistence', () => {
       .get();
     database.close();
     expect(row?.job_name).toBe('legacy-deliver-report');
-    expect(unpack(row?.data ?? null, null, 'legacy-cron')).toEqual({ tenantId: 7 });
+    expect(unpack<unknown>(row?.data ?? null, null, 'legacy-cron')).toEqual({ tenantId: 7 });
     expect(version?.version).toBeGreaterThan(30);
 
     storage = new SqliteStorage({ path: databasePath });

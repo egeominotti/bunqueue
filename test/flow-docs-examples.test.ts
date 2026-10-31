@@ -5,7 +5,7 @@
  */
 
 import { afterEach, describe, expect, test } from 'bun:test';
-import { FlowProducer, Queue, Worker, shutdownManager } from '../src/client';
+import { FlowProducer, Worker, shutdownManager } from '../src/client';
 import { getSharedManager } from '../src/client/manager';
 import { closeAllSharedPools } from '../src/client/tcpPool';
 import { jobId } from '../src/domain/types/job';

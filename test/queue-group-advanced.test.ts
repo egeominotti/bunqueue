@@ -6,7 +6,8 @@
  */
 
 import { describe, test, expect, afterEach } from 'bun:test';
-import { Queue, Worker, QueueGroup, shutdownManager } from '../src/client';
+import { QueueGroup, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 describe('QueueGroup Advanced - Embedded', () => {
   afterEach(() => {
@@ -144,15 +145,15 @@ describe('QueueGroup Advanced - Embedded', () => {
       await q2.add('task', { idx: i + 10 });
     }
 
-    const counts1Before = q1.getJobCounts();
-    const counts2Before = q2.getJobCounts();
+    const counts1Before = q1.getJobCounts() as JobCounts;
+    const counts2Before = q2.getJobCounts() as JobCounts;
     expect(counts1Before.waiting).toBe(10);
     expect(counts2Before.waiting).toBe(10);
 
     group.drainAll();
 
-    const counts1After = q1.getJobCounts();
-    const counts2After = q2.getJobCounts();
+    const counts1After = q1.getJobCounts() as JobCounts;
+    const counts2After = q2.getJobCounts() as JobCounts;
     expect(counts1After.waiting).toBe(0);
     expect(counts2After.waiting).toBe(0);
   }, 20000);
@@ -168,13 +169,13 @@ describe('QueueGroup Advanced - Embedded', () => {
     await q2.add('task', { v: 3 });
     await q2.add('task', { v: 4 });
 
-    expect(q1.getJobCounts().waiting).toBe(2);
-    expect(q2.getJobCounts().waiting).toBe(2);
+    expect((q1.getJobCounts() as JobCounts).waiting).toBe(2);
+    expect((q2.getJobCounts() as JobCounts).waiting).toBe(2);
 
     group.obliterateAll();
 
-    expect(q1.getJobCounts().waiting).toBe(0);
-    expect(q2.getJobCounts().waiting).toBe(0);
+    expect((q1.getJobCounts() as JobCounts).waiting).toBe(0);
+    expect((q2.getJobCounts() as JobCounts).waiting).toBe(0);
 
     // Queues should no longer appear in listQueues
     const remaining = group.listQueues();
@@ -221,7 +222,7 @@ describe('QueueGroup Advanced - Embedded', () => {
     // Group A should still be paused with its job queued. BullMQ semantics (#92):
     // a paused queue reports its job under `paused`, not `waiting`.
     expect(qA.isPaused()).toBe(true);
-    const countsA = qA.getJobCounts();
+    const countsA = qA.getJobCounts() as JobCounts;
     expect(countsA.waiting).toBe(0);
     expect(countsA.paused).toBe(1);
   }, 20000);
@@ -248,7 +249,7 @@ describe('QueueGroup Advanced - Embedded', () => {
     expect(results).toContain('world');
 
     // Verify worker was created for the correctly prefixed queue
-    const counts = q.getJobCounts();
+    const counts = q.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(0);
   }, 20000);
 });

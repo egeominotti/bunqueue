@@ -8,6 +8,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QueueManager } from '../../src/application/queueManager';
+import type { JobStateType } from '../../src/client/types';
+import type { ExtendedJobOptions } from '../../src/client/queue/types/add';
 import {
   type CoreE2eHarness,
   MODES,
@@ -43,7 +45,7 @@ for (const mode of MODES) {
       harness = await startHarness('deduplication', mode);
       const queue = harness.queue('orders');
 
-      const cases: Array<[string, { delay?: number; priority?: number }, string]> = [
+      const cases: Array<[string, { delay?: number; priority?: number }, JobStateType]> = [
         ['waiting', {}, 'waiting'],
         ['delayed', { delay: 60_000 }, 'delayed'],
         ['prioritized', { priority: 5 }, 'prioritized'],
@@ -278,24 +280,16 @@ for (const mode of MODES) {
       const key = `dependent-${crypto.randomUUID()}`;
       const dependency = await dependencies.add('dependency', {}, { durable: true });
 
-      const first = await queue.add(
-        'latest-data',
-        { version: 1 },
-        {
-          dependsOn: [dependency.id],
-          deduplication: { id: key, ttl: 300_000, replace: true },
-          durable: true,
-        }
-      );
-      const replacement = await queue.add(
-        'latest-data',
-        { version: 2 },
-        {
-          dependsOn: [dependency.id],
-          deduplication: { id: key, ttl: 300_000, replace: true },
-          durable: true,
-        }
-      );
+      const first = await queue.add('latest-data', { version: 1 }, {
+        dependsOn: [dependency.id],
+        deduplication: { id: key, ttl: 300_000, replace: true },
+        durable: true,
+      } as ExtendedJobOptions);
+      const replacement = await queue.add('latest-data', { version: 2 }, {
+        dependsOn: [dependency.id],
+        deduplication: { id: key, ttl: 300_000, replace: true },
+        durable: true,
+      } as ExtendedJobOptions);
 
       expect(await queue.getJobState(first.id)).toBe('unknown');
       expect(await queue.getJobState(replacement.id)).toBe('waiting-children');

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QueueManager } from '../src/application/queueManager';
+import type { JobId } from '../src/domain/types/job';
 import { createTcpServer } from '../src/infrastructure/server/tcp';
 import { Queue } from '../src/client/queue/queue';
 
@@ -92,8 +93,8 @@ test('packaged Queue shares native TCP query, group, scheduler and DLQ contracts
     expect(await network.removeJobScheduler('schedule')).toBe(true);
 
     for (const job of bulk) await network.removeAsync(job.id);
-    expect((await manager.pull(prefixKey + name))?.id).toBe(added.id);
-    await manager.fail(added.id, 'contract failure');
+    expect<string | undefined>((await manager.pull(prefixKey + name))?.id).toBe(added.id);
+    await manager.fail(added.id as JobId, 'contract failure');
     const entries = await network.getDlqAsync({ limit: 1 });
     expect(entries.length).toBe(1);
     expect(entries[0].job.id).toBe(added.id);

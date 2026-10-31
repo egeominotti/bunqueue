@@ -64,7 +64,7 @@ async function completeIntoPausedSuccessor<T>(
         state: ['waiting', 'prioritized', 'delayed', 'paused'],
         end: -1,
       });
-      successor = pending.find((job) => job.id !== original.id);
+      successor = pending.find((job) => job.id !== original.id) as Job<T> | undefined;
       return successor !== undefined;
     },
     'the paused repeat successor',

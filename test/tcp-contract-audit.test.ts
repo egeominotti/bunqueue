@@ -101,7 +101,7 @@ describe('TCP contract audit (#95 class)', () => {
     const state = await qm.getJobState(blocked.id);
     expect(state).toBe('waiting-children');
 
-    const counts = qm.getQueueJobCounts('q') as Record<string, number>;
+    const counts = qm.getQueueJobCounts('q');
     const listed = qm.getJobs('q', { state: 'waiting-children' });
     // count must agree with state + list (the #95-class consistency requirement)
     expect(counts['waiting-children']).toBeGreaterThanOrEqual(1);

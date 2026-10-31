@@ -197,7 +197,7 @@ test.skipIf(!postgresUrl)(
       await Bun.sleep(50);
       const internals = manager as unknown as {
         postgresStore: PostgresQueueStore;
-        refreshJobs(ids: typeof ids): Promise<void>;
+        refreshJobs(jobIds: typeof ids): Promise<void>;
         onStoreEvent(event: PostgresDeliveredStoreEvent): void;
       };
       const originalLoadProjections = internals.postgresStore.loadJobProjections;

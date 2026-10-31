@@ -21,7 +21,7 @@ import type { Job, JobId } from '../src/domain/types/job';
 // Helper to create a mock job
 function createMockJob(id: number): Job {
   return {
-    id: BigInt(id) as JobId,
+    id: BigInt(id) as unknown as JobId,
     queue: 'test-queue',
     data: { test: id },
     priority: 0,
@@ -50,7 +50,7 @@ function createMockJob(id: number): Job {
     lastHeartbeat: null,
     lockToken: null,
     lockExpiresAt: null,
-  };
+  } as unknown as Job;
 }
 
 describe('WriteBuffer Fixes', () => {
@@ -115,13 +115,13 @@ describe('WriteBuffer Fixes', () => {
         },
       } as unknown as BatchInsertManager;
 
-      const onError: WriteBufferErrorCallback = (err, jobCount, retryInfo) => {
+      const onError: WriteBufferErrorCallback = (_err, jobCount, retryInfo) => {
         console.log(
           `Error callback: jobs=${jobCount}, retry=${retryInfo?.retryCount}/${retryInfo?.maxRetries}`
         );
       };
 
-      const onCriticalError: CriticalErrorCallback = (jobs, lastError, totalAttempts) => {
+      const onCriticalError: CriticalErrorCallback = (jobs, _lastError, totalAttempts) => {
         criticalErrorCalled = true;
         lostJobCount = jobs.length;
         console.log(`CRITICAL: ${jobs.length} jobs lost after ${totalAttempts} attempts`);
@@ -294,7 +294,7 @@ describe('WriteBuffer Fixes', () => {
         },
       } as unknown as BatchInsertManager;
 
-      const onError: WriteBufferErrorCallback = (err, jobCount, retryInfo) => {
+      const onError: WriteBufferErrorCallback = (_err, _jobCount, retryInfo) => {
         if (retryInfo) {
           errorInfos.push(retryInfo);
         }
@@ -584,8 +584,8 @@ describe('WriteBuffer Fixes', () => {
         });
 
         expect(buffer.pendingCount).toBe(2);
-        expect(buffer.getPendingJobs('test-queue').map((job) => job.id)).toEqual([1n]);
-        expect(buffer.getPendingJobs('other-queue').map((job) => job.id)).toEqual([2n]);
+        expect<unknown[]>(buffer.getPendingJobs('test-queue').map((job) => job.id)).toEqual([1n]);
+        expect<unknown[]>(buffer.getPendingJobs('other-queue').map((job) => job.id)).toEqual([2n]);
       } finally {
         buffer.stop();
       }

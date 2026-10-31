@@ -50,7 +50,7 @@ function makeCronJob(overrides: Partial<CronJob> & { name: string; queue: string
     executions: 0,
     maxLimit: null,
     ...overrides,
-  };
+  } as CronJob;
 }
 
 describe('CronScheduler Execution Logic', () => {
@@ -81,7 +81,7 @@ describe('CronScheduler Execution Logic', () => {
   describe('tick()', () => {
     test('should execute a due cron job and push it', async () => {
       // Add a cron with repeatEvery that is already due
-      const cron = scheduler.add({
+      scheduler.add({
         name: 'due-job',
         queue: 'tasks',
         data: { action: 'cleanup' },
@@ -862,7 +862,6 @@ describe('CronScheduler Execution Logic', () => {
         repeatEvery: 150,
       });
 
-      const startTime = Date.now();
       preciseScheduler.start();
 
       // Wait for execution (should happen at ~150ms, not at 1s intervals)

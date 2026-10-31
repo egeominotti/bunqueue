@@ -36,7 +36,7 @@ function fakeContext(execute: () => Promise<unknown[]>): PostgresContext {
       pollIntervalMs: 25,
       maxQueueEvents: 100,
       maxMetricDataPoints: 100,
-    },
+    } as PostgresContext['config'],
   };
 }
 

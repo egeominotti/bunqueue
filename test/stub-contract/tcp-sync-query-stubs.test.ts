@@ -38,9 +38,9 @@ describe('TCP query async companions are authoritative', () => {
       fc.asyncProperty(fc.integer({ min: 1, max: 6 }), async (count) => {
         const queue = makeTcpQueue<{ index: number }>(h, name('get-jobs'));
         for (let index = 0; index < count; index++) await queue.add('task', { index });
-        expect((await queue.getJobsAsync()).map((job) => job.data.index)).toEqual(
-          Array.from({ length: count }, (_, index) => index)
-        );
+        expect(
+          (await queue.getJobsAsync()).map((job) => (job.data as { index: number }).index)
+        ).toEqual(Array.from({ length: count }, (_, index) => index));
         await closeQueue(queue);
       }),
       { numRuns: runs }

@@ -112,7 +112,7 @@ describe('Issue #29 - SandboxedWorker log method', () => {
       if (completedJobId) break;
     }
 
-    expect(completedJobId).toBe(String(job.id));
+    expect(completedJobId as string | null).toBe(String(job.id));
 
     // Logs should have been stored via addLog
     const logs = manager.getLogs(job.id);

@@ -20,7 +20,7 @@ describe('FlowProducer sequential creation', () => {
 
     // Measure creating a flow with N children
     const start = Bun.nanoseconds();
-    const result = await flow.add({
+    const result = await flow.add<{ role?: string; index?: number }>({
       name: 'parent',
       queueName: 'flow-perf-test',
       data: { role: 'parent' },
@@ -59,7 +59,7 @@ describe('FlowProducer sequential creation', () => {
     const parallelCount = 10;
 
     const start = Bun.nanoseconds();
-    const result = await flow.addBulkThen(
+    const result = await flow.addBulkThen<{ index?: number }>(
       Array.from({ length: parallelCount }, (_, i) => ({
         name: `parallel-${i}`,
         queueName: 'flow-bulk-perf',

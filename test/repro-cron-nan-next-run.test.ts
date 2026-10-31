@@ -122,7 +122,7 @@ describe('REPRO: a cron whose nextRun is not a finite number', () => {
     const hopeless = s.add({ name: 'hopeless', queue: 'hopeless-q', data: {}, repeatEvery: HOUR });
     // Neither a schedule nor an interval: validation never lets this in, so only an
     // in-place corruption can produce it.
-    hopeless.repeatEvery = null;
+    (hopeless as { repeatEvery: number | null }).repeatEvery = null;
     hopeless.nextRun = NaN;
     await Bun.sleep(300);
 

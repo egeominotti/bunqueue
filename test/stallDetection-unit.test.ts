@@ -12,7 +12,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { checkStalledJobs } from '../src/application/stallDetection';
-import { shardIndex, processingShardIndex, SHARD_COUNT } from '../src/shared/hash';
+import { shardIndex, processingShardIndex } from '../src/shared/hash';
 import type { Job, JobId } from '../src/domain/types/job';
 import type { BackgroundContext } from '../src/application/types';
 

@@ -528,14 +528,16 @@ describe('Advanced Flow - Embedded', () => {
         }
 
         if (data.stage === 'transform') {
-          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!);
+          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!) as
+            { records: number[] } | undefined;
           // Double each value
           const transformed = parentResult!.records.map((r) => r * 2);
           return { records: transformed };
         }
 
         if (data.stage === 'load') {
-          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!);
+          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!) as
+            { records: number[] } | undefined;
           // Sum all values
           const total = parentResult!.records.reduce((a, b) => a + b, 0);
           finalResult = { total, count: parentResult!.records.length };

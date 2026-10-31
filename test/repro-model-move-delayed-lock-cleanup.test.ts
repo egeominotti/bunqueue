@@ -19,7 +19,7 @@ test('moving an active job to delayed releases its live lease exactly once', asy
       queue: real.queue,
       timeout: 0,
     });
-    expect((pulled.job as { id: string }).id).toBe(pushed.id);
+    expect((pulled.job as { id: string }).id).toBe(pushed.id as string);
     expect(await liveOwnership(real.port)).toEqual({
       clientJobs: 1,
       clientJobsTotal: 1,

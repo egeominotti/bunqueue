@@ -3,7 +3,7 @@
  * After restart, parent-child relationships are lost.
  */
 
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { existsSync, unlinkSync } from 'fs';
 

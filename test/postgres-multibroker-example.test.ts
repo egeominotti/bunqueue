@@ -29,10 +29,9 @@ async function runExampleCli(selection: string) {
 }
 
 function fakeRunners(calls: Scenario[]): Record<Scenario, () => void> {
-  return Object.fromEntries(scenarioNames.map((name) => [name, () => calls.push(name)])) as Record<
-    Scenario,
-    () => void
-  >;
+  return Object.fromEntries(
+    scenarioNames.map((name) => [name, () => calls.push(name)])
+  ) as unknown as Record<Scenario, () => void>;
 }
 
 describe('PostgreSQL multi-broker example runner', () => {
@@ -48,15 +47,15 @@ describe('PostgreSQL multi-broker example runner', () => {
   test('selects every valid scenario and all in documented order', async () => {
     expect(scenarioNames).toEqual(['topology', 'multi-queue', 'reliability', 'flow']);
     for (const name of scenarioNames) expect(selectScenarioNames(name)).toEqual([name]);
-    expect(selectScenarioNames('all')).toEqual(scenarioNames);
+    expect(selectScenarioNames('all')).toEqual<readonly Scenario[]>(scenarioNames);
 
     const calls: Scenario[] = [];
     const reports: Scenario[] = [];
     await runSelectedScenarios('all', fakeRunners(calls), 100, ({ scenario }) => {
       reports.push(scenario);
     });
-    expect(calls).toEqual(scenarioNames);
-    expect(reports).toEqual(scenarioNames);
+    expect(calls).toEqual<readonly Scenario[]>(scenarioNames);
+    expect(reports).toEqual<readonly Scenario[]>(scenarioNames);
   });
 
   test('bounds a hung scenario and validates the configured deadline', async () => {
@@ -87,8 +86,8 @@ describe('PostgreSQL multi-broker example deadlines and cleanup', () => {
           throw 'second cleanup failed';
         },
       ],
-      [() => order.push('phase-two')],
-      [() => order.push('phase-three')]
+      [(() => order.push('phase-two')) as () => void],
+      [(() => order.push('phase-three')) as () => void]
     );
 
     const failure = await cleanup.catch((error: unknown) => error);

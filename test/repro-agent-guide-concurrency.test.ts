@@ -71,7 +71,7 @@ test('documented OpenAI tool effects belong to their own concurrent workflow run
     },
   };
   class DocumentedAgent extends Agent {
-    constructor(options: ConstructorParameters<typeof Agent>[0]) {
+    constructor(options: ConstructorParameters<typeof Agent<unknown, 'text'>>[0]) {
       super({ ...options, model });
     }
   }

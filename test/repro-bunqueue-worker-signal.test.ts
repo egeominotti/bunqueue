@@ -24,7 +24,7 @@ async function waitFor(check: () => boolean, timeoutMs = 3_000): Promise<boolean
 }
 
 function startApp(name: string, onAbort: () => void, onStart: (jobId: string) => void) {
-  const instance: Bunqueue<unknown, unknown> = new Bunqueue(name, {
+  const instance: Bunqueue<unknown, unknown> = new Bunqueue<unknown, unknown>(name, {
     embedded: true,
     processor: async (job) => {
       instance.getSignal(job.id)?.addEventListener('abort', onAbort, { once: true });

@@ -1,6 +1,5 @@
 import { describe, test, expect, afterEach } from 'bun:test';
 import { Workflow, Engine } from '../src/client/workflow';
-import type { StepContext } from '../src/client/workflow';
 
 let engine: Engine;
 
@@ -149,7 +148,7 @@ describe('type-safe workflow steps', () => {
   test('backward compatibility: untyped workflow still works', async () => {
     // No generics, uses `as` casts — should work the same as before
     const flow = new Workflow('untyped')
-      .step('a', async (ctx) => {
+      .step('a', async (_ctx) => {
         return { value: 42 };
       })
       .step('b', async (ctx) => {

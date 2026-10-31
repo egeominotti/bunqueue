@@ -57,7 +57,7 @@ function createMinimalLockContext(overrides?: Partial<LockContext>): LockContext
     shardLocks,
     eventsManager,
     ...overrides,
-  };
+  } as LockContext;
 }
 
 describe('Client Tracking', () => {
@@ -287,8 +287,8 @@ describe('Client Tracking', () => {
       const c1Jobs = ctx.clientJobs.get('c1');
       expect(c1Jobs).toBeDefined();
       expect(c1Jobs!.size).toBe(2);
-      expect(Array.from(c1Jobs!)).toContain('j1');
-      expect(Array.from(c1Jobs!)).toContain('j2');
+      expect(Array.from(c1Jobs!)).toContain('j1' as JobId);
+      expect(Array.from(c1Jobs!)).toContain('j2' as JobId);
     });
 
     test('get total job count across all clients', () => {
@@ -418,7 +418,7 @@ describe('Client Tracking', () => {
     });
 
     test('registerClientJob and unregisterClientJob through QueueManager', async () => {
-      const job = await qm.push('track-queue', { data: { v: 1 } });
+      await qm.push('track-queue', { data: { v: 1 } });
       const pulled = await qm.pull('track-queue');
       expect(pulled).not.toBeNull();
 

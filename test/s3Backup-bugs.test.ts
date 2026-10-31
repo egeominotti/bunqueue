@@ -8,7 +8,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { unlink } from 'fs/promises';
 import { validateConfig, DEFAULTS } from '../src/infrastructure/backup/s3BackupConfig';
-import type { S3BackupConfig, BackupMetadata } from '../src/infrastructure/backup/s3BackupConfig';
+import type { S3BackupConfig } from '../src/infrastructure/backup/s3BackupConfig';
 import {
   performBackup,
   listBackups,

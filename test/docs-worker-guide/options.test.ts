@@ -84,7 +84,6 @@ for (const mode of MODES) {
       expect(build({ heartbeatInterval: 0.5 })).toThrow(RangeError);
       expect(build({ lockDuration: 0 })).toThrow(RangeError);
       expect(build({ heartbeatInterval: 'often' })).toThrow(TypeError);
-
       // Documented: -1 means no long-poll, drainDelay is checked only without one, NaN
       // disables heartbeats and a numeric string is a number.
       expect(build({ pollTimeout: -1, drainDelay: 0, heartbeatInterval: 0 })).toThrow(RangeError);
@@ -94,7 +93,8 @@ for (const mode of MODES) {
           autorun: false,
           heartbeatInterval: Number.NaN,
           pollTimeout: Number.POSITIVE_INFINITY,
-          drainDelay: '1',
+          // Deliberately invalid input: a numeric string checks runtime coercion.
+          drainDelay: '1' as unknown as number,
           lockDuration: 1,
         })
       );

@@ -140,7 +140,7 @@ describe('Logger', () => {
       // All should go to console.log in JSON mode
       expect(consoleLogSpy).toHaveBeenCalledTimes(4);
 
-      const levels = consoleLogSpy.mock.calls.map((call) => JSON.parse(call[0]).level);
+      const levels = consoleLogSpy.mock.calls.map((call: [string]) => JSON.parse(call[0]).level);
       expect(levels).toEqual(['debug', 'info', 'warn', 'error']);
     });
 
@@ -150,8 +150,8 @@ describe('Logger', () => {
       logger.infoToStderr('info diagnostic');
 
       expect(consoleLogSpy).not.toHaveBeenCalled();
-      const entries = consoleErrorSpy.mock.calls.map((call) => JSON.parse(call[0]));
-      expect(entries.map((entry) => entry.level)).toEqual(['debug', 'info']);
+      const entries = consoleErrorSpy.mock.calls.map((call: [string]) => JSON.parse(call[0]));
+      expect(entries.map((entry: { level: string }) => entry.level)).toEqual(['debug', 'info']);
     });
   });
 

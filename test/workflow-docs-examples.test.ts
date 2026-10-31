@@ -23,6 +23,9 @@ import { join } from 'node:path';
 import { shutdownManager } from '../src/client';
 import { Engine, Workflow } from '../src/client/workflow';
 
+// Test double: the mocks return a legacy finish-reason shape (no `unified`).
+type GenerateResult = Awaited<ReturnType<MockLanguageModelV3['doGenerate']>>;
+
 let engine: Engine | undefined;
 beforeEach(() => {
   shutdownManager();
@@ -720,25 +723,26 @@ describe('docs: Vercel AI SDK examples', () => {
   /** Stands in for `anthropic('claude-sonnet-5')` so the example runs offline. */
   function planningModel() {
     return new MockLanguageModelV3({
-      doGenerate: async () => ({
-        content: [
-          {
-            type: 'tool-call' as const,
-            toolCallId: 'c1',
-            toolName: 'provision_database',
-            input: '{"region":"eu-central"}',
-          },
-          {
-            type: 'tool-call' as const,
-            toolCallId: 'c2',
-            toolName: 'provision_bucket',
-            input: '{"region":"eu-central"}',
-          },
-        ],
-        finishReason: { type: 'tool-calls' as const, raw: 'tool_calls' },
-        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-        warnings: [],
-      }),
+      doGenerate: async () =>
+        ({
+          content: [
+            {
+              type: 'tool-call' as const,
+              toolCallId: 'c1',
+              toolName: 'provision_database',
+              input: '{"region":"eu-central"}',
+            },
+            {
+              type: 'tool-call' as const,
+              toolCallId: 'c2',
+              toolName: 'provision_bucket',
+              input: '{"region":"eu-central"}',
+            },
+          ],
+          finishReason: { type: 'tool-calls' as const, raw: 'tool_calls' },
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+          warnings: [],
+        }) as unknown as GenerateResult,
     });
   }
 
@@ -814,7 +818,7 @@ describe('docs: Vercel AI SDK examples', () => {
           finishReason: { type: 'stop' as const, raw: 'stop' },
           usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
           warnings: [],
-        };
+        } as unknown as GenerateResult;
       },
     });
 
@@ -920,7 +924,7 @@ describe('docs: Loops and rollback', () => {
           w.step(
             'charge',
             async (ctx) => {
-              const settled = await provider.charge(ctx.idempotencyKey, 10);
+              const settled = await provider.charge(ctx.idempotencyKey!, 10);
               if (turn++ === 2) throw new Error('provider timeout after the charge settled');
               return settled;
             },

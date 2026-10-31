@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { QueueManager } from '../src/application/queueManager';
 import { TcpClient } from '../src/client/tcp/client';
 import type { JobId } from '../src/domain/types/job';
-import { createHttpServer, type HttpServer } from '../src/infrastructure/server/http';
+import { createHttpServer } from '../src/infrastructure/server/http';
 import { createTcpServer, type TcpServer } from '../src/infrastructure/server/tcp';
 
 const QUEUE = 'drain-intake';

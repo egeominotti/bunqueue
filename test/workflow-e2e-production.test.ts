@@ -70,7 +70,7 @@ class FakePaymentGateway {
     this.failCount = 0;
   }
 
-  async charge(amount: number, currency: string): Promise<string> {
+  async charge(amount: number, _currency: string): Promise<string> {
     await new Promise((r) => setTimeout(r, 30 + Math.random() * 50));
     if (this.shouldFail && this.failCount < this.maxFails) {
       this.failCount++;

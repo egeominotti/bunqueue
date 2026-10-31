@@ -36,7 +36,12 @@ describe('createJobProxy', () => {
 
   test('TCP mutation methods send correct commands', async () => {
     const { ctx, calls } = createMockCtx();
-    const job = createJobProxy('j1', 'task', { old: true }, ctx);
+    const job = createJobProxy<{ old?: boolean; updated?: boolean }>(
+      'j1',
+      'task',
+      { old: true },
+      ctx
+    );
     await job.updateProgress(75, 'msg');
     expect(calls[0]).toEqual({ cmd: 'Progress', id: 'j1', progress: 75, message: 'msg' });
     await job.log('step 1');
@@ -108,8 +113,8 @@ describe('createJobProxy', () => {
   });
 
   test('context delegation: remove, retry, getChildrenValues', async () => {
-    let removedId: string | null = null;
-    let retriedId: string | null = null;
+    let removedId = null as string | null;
+    let retriedId = null as string | null;
     const { ctx } = createMockCtx({
       removeAsync: async (id: string) => {
         removedId = id;

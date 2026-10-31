@@ -12,6 +12,7 @@ import { QueueManager } from '../src/application/queueManager';
 import { createHttpServer } from '../src/infrastructure/server/http';
 import { createTcpServer } from '../src/infrastructure/server/tcp';
 import { resolveServerConfig } from '../src/config';
+import type { JobInput } from '../src/domain/types/job';
 
 describe('Startup & Shutdown', () => {
   let qm: QueueManager;
@@ -448,7 +449,7 @@ describe('Startup & Shutdown', () => {
     });
 
     test('failing a job also removes it from active', async () => {
-      await qm.push('shutdown-test', { data: { id: 1 }, attempts: 1 });
+      await qm.push('shutdown-test', { data: { id: 1 }, attempts: 1 } as JobInput);
       const job = await qm.pull('shutdown-test');
       expect(job).not.toBeNull();
 

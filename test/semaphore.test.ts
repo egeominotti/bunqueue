@@ -308,7 +308,7 @@ describe('Semaphore', () => {
       let concurrentCount = 0;
       let maxConcurrent = 0;
 
-      const task = async (id: number) => {
+      const task = async (_id: number) => {
         await sem.acquire();
         concurrentCount++;
         maxConcurrent = Math.max(maxConcurrent, concurrentCount);

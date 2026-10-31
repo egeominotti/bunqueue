@@ -106,7 +106,7 @@ for (const mode of MODES) {
       const all = await queue.getJobsAsync({ state: 'waiting', end: -1 });
       const waiting = await queue.getWaitingAsync(0, -1);
       expectPayload(
-        all.find((job) => job.id === single.id),
+        all.find((job) => job.id === single.id) as Job<NamedData> | undefined,
         'single-job',
         singleData
       );
@@ -226,11 +226,11 @@ for (const mode of MODES) {
         (job) => job.id === root.job.id
       );
       expect(listedParent?.name).toBe('parent-job');
-      expect(listedParent?.data).toEqual({ ...parentData, __childrenIds: [childId] });
+      expect(listedParent?.data as unknown).toEqual({ ...parentData, __childrenIds: [childId] });
 
       const queriedChild = await queue.getJob(childId);
       expect(queriedChild?.name).toBe('child-job');
-      expect(queriedChild?.data).toEqual({
+      expect(queriedChild?.data as unknown).toEqual({
         ...childData,
         __parentId: root.job.id,
         __parentQueue: queue.name,
@@ -252,7 +252,7 @@ for (const mode of MODES) {
       const repeatData = { name: 'user-repeat', marker: 'repeat' };
       const executions: Job<NamedData>[] = [];
       harness.worker(repeatQueue.name, async (current) => {
-        executions.push(current);
+        executions.push(current as Job<NamedData>);
         return true;
       });
       await repeatQueue.add('repeat-job', repeatData, {

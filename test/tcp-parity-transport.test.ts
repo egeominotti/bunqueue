@@ -26,7 +26,7 @@ describe('portable canonical TCP transport', () => {
         socket.on('close', () => sockets.delete(socket));
         const parser = new FrameParser();
         socket.on('data', (data) => {
-          for (const payload of parser.addData(data)) {
+          for (const payload of parser.addData(data as Buffer)) {
             const command = unpack(payload);
             const response = FrameParser.frame(
               pack({ ok: false, reqId: command.reqId, error: 'denied' })

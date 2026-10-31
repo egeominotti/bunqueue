@@ -66,8 +66,8 @@ test('TCP DLQ and QueueGroup reads never initialize an embedded client database'
     });
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
+      new Response(child.stdout as ReadableStream<Uint8Array>).text(),
+      new Response(child.stderr as ReadableStream<Uint8Array>).text(),
     ]);
     expect({ exitCode, stderr, stdout }).toEqual({ exitCode: 0, stderr: '', stdout: '' });
     expect(manager.getDlqStats(queueName).total).toBe(1);

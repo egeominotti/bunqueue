@@ -22,7 +22,7 @@ import { Queue, FlowProducer, shutdownManager, type JobOptions } from '../src/cl
 import { getSharedManager } from '../src/client/manager';
 import { QueueManager } from '../src/application/queueManager';
 import { createTcpServer, type TcpServer } from '../src/infrastructure/server/tcp';
-import { jobId } from '../src/domain/types/job';
+import { jobId, type JobId } from '../src/domain/types/job';
 
 const PORT = 17899;
 const DB = './test-issue90.db';
@@ -74,7 +74,7 @@ describe('#1 getJobsAsync reflects full opts (TCP)', () => {
   test('getWaitingAsync reflects opts.attempts / opts.timeout', async () => {
     const q = freshTcp('issue90-list');
     await q.add('task', { x: 1 }, { attempts: 9, timeout: 12345 });
-    const waiting = await q.getWaitingAsync<{ x: number }>();
+    const waiting = await q.getWaitingAsync();
     expect(waiting.length).toBeGreaterThan(0);
     const j = waiting.find((w) => (w.data as { x: number }).x === 1) ?? waiting[0];
     expect(j.opts.attempts).toBe(9);
@@ -266,8 +266,8 @@ describe('#5 changePriority forwards lifo', () => {
     const first = await mgr.pull('issue90-lifo-emb');
     const second = await mgr.pull('issue90-lifo-emb');
     // b was added after a → larger UUID7 → comes first under LIFO tie-break.
-    expect(first?.id).toBe(b.id);
-    expect(second?.id).toBe(a.id);
+    expect(first?.id).toBe(b.id as JobId);
+    expect(second?.id).toBe(a.id as JobId);
   });
 
   test('TCP: lifo reaches the server and reorders', async () => {
@@ -278,8 +278,8 @@ describe('#5 changePriority forwards lifo', () => {
     await b.changePriority({ priority: 5, lifo: true });
     const first = await qm.pull('issue90-lifo-tcp');
     const second = await qm.pull('issue90-lifo-tcp');
-    expect(first?.id).toBe(b.id);
-    expect(second?.id).toBe(a.id);
+    expect(first?.id).toBe(b.id as JobId);
+    expect(second?.id).toBe(a.id as JobId);
   });
 
   test('FlowProducer job node forwards lifo through changePriority', async () => {
@@ -302,8 +302,8 @@ describe('#5 changePriority forwards lifo', () => {
     const mgr = getSharedManager();
     const first = await mgr.pull('issue90-flow-lifo');
     const second = await mgr.pull('issue90-flow-lifo');
-    expect(first?.id).toBe(fb.job.id);
-    expect(second?.id).toBe(fa.job.id);
+    expect(first?.id).toBe(fb.job.id as JobId);
+    expect(second?.id).toBe(fa.job.id as JobId);
   });
 });
 

@@ -131,7 +131,7 @@ describe('DLQ Patterns - Embedded', () => {
     expect(retried).toBeGreaterThanOrEqual(1);
 
     // Second worker: succeeds
-    let processedJobId: string | null = null;
+    let processedJobId = null as string | null;
     const worker2 = new Worker(
       'dlq-pat-retry',
       async (j) => {

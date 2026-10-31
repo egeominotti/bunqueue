@@ -211,7 +211,8 @@ describe('bunqueue start --auth-tokens: the AUTH_TOKENS rule, errors name the fl
     const statuses = await withRunningServer(['start', '--auth-tokens', 'a, b'], (base) =>
       Promise.all(
         [undefined, 'Bearer a', 'Bearer b'].map(async (authorization) => {
-          const headers = authorization === undefined ? {} : { Authorization: authorization };
+          const headers: Record<string, string> =
+            authorization === undefined ? {} : { Authorization: authorization };
           return (await fetch(`${base}/stats`, { headers })).status;
         })
       )

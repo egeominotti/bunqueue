@@ -263,7 +263,10 @@ for (const mode of MODES) {
       expect((await queue.getJob(childId))?.data).toMatchObject({ name: 'user-name' });
       const countBeforeRejection = await queue.countAsync();
 
-      for (const data of [{ __parentId: 'nope' }, { __custom: 'reserved-in-flow' }]) {
+      for (const data of [{ __parentId: 'nope' }, { __custom: 'reserved-in-flow' }] as Record<
+        string,
+        string
+      >[]) {
         await expect(
           flow.add({
             name: 'rejected-parent',

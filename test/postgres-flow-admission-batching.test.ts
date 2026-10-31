@@ -13,7 +13,7 @@ test.skipIf(!postgresUrl)(
     const leafQueue = 'flow-admission-leaf';
     const rootQueue = 'flow-admission-root';
     const suffix = crypto.randomUUID();
-    const plan = planFlows([
+    const plan = planFlows<{ value?: number; kind?: string }>([
       {
         children: Array.from({ length: 8 }, (_, index) => ({
           data: { value: index },
@@ -54,7 +54,9 @@ test.skipIf(!postgresUrl)(
       expect(events.map(({ event_type }) => event_type)).toEqual(Array(9).fill('pushed'));
       expect(events.map(({ job_id }) => job_id)).toEqual(plan.jobs.map(({ id }) => String(id)));
       expect(new Set(events.map(({ occurred_at }) => Number(occurred_at))).size).toBe(1);
-      expect(Number(events[0]?.occurred_at)).toBe(jobs[0]?.timeline.at(-1)?.timestamp);
+      expect(Number(events[0]?.occurred_at) as number | undefined).toBe(
+        jobs[0]?.timeline.at(-1)?.timestamp
+      );
 
       const [durable] = await observer<
         Array<{

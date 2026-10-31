@@ -70,7 +70,10 @@ export async function runFlowProducerContract(mode: CoreE2eMode): Promise<Covera
     ensure(legacyTree.jobIds.length === 2, 'addTree did not create root and child');
 
     const resultQueue = harness.queue<{ result: unknown }>('results');
-    const resultWorker = harness.worker(resultQueue.name, async (job) => job.data.result);
+    const resultWorker = harness.worker<{ result: unknown }>(
+      resultQueue.name,
+      async (job) => job.data.result
+    );
     const resultValues = [42, 0, false, '', null] as const;
     const resultJobs = await Promise.all(
       resultValues.map((result, index) =>

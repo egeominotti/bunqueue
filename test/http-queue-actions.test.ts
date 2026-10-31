@@ -77,13 +77,13 @@ describe('HTTP Queue Endpoints', () => {
       expect(pause.ok).toBe(true);
 
       const isPaused = await handleCommand({ cmd: 'IsPaused', queue: 'q-pr' }, ctx);
-      expect((isPaused as { paused: boolean }).paused).toBe(true);
+      expect((isPaused as unknown as { paused: boolean }).paused).toBe(true);
 
       const resume = await handleCommand({ cmd: 'Resume', queue: 'q-pr' }, ctx);
       expect(resume.ok).toBe(true);
 
       const isResumed = await handleCommand({ cmd: 'IsPaused', queue: 'q-pr' }, ctx);
-      expect((isResumed as { paused: boolean }).paused).toBe(false);
+      expect((isResumed as unknown as { paused: boolean }).paused).toBe(false);
     });
   });
 
@@ -106,7 +106,7 @@ describe('HTTP Queue Endpoints', () => {
 
       const r = await handleCommand({ cmd: 'ListQueues' }, ctx);
       expect(r.ok).toBe(true);
-      const queues = (r as { queues: string[] }).queues;
+      const queues = (r as unknown as { queues: string[] }).queues;
       expect(queues).toContain('alpha');
       expect(queues).toContain('beta');
     });

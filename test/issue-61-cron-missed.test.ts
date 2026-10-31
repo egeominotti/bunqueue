@@ -28,7 +28,7 @@ function makeCronJob(overrides: Partial<CronJob> & { name: string; queue: string
     dedup: null,
     skipMissedOnRestart: false,
     ...overrides,
-  };
+  } as CronJob;
 }
 
 describe('Issue #61: cron missed jobs on restart', () => {

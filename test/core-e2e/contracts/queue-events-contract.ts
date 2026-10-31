@@ -8,7 +8,7 @@ export async function runQueueEventsContract(mode: CoreE2eMode): Promise<Coverag
 
   try {
     const queue = harness.queue<{ value: number }>('events');
-    const events = new QueueEvents(queue.name, harness.queueOptions());
+    const events = new QueueEvents<number>(queue.name, harness.queueOptions());
     harness.addCleanup(() => events.close());
     let observedErrors = 0;
     tracker.call('QueueEvents', 'on', () =>
@@ -32,11 +32,14 @@ export async function runQueueEventsContract(mode: CoreE2eMode): Promise<Coverag
     events.once('waiting', ({ jobId }) => {
       waitingId = jobId;
     });
-    let completedEvent: { jobId: string; returnvalue: number } | null = null;
+    let completedEvent = null as { jobId: string; returnvalue: number } | null;
     events.once('completed', (event) => {
       completedEvent = event;
     });
-    const worker = harness.worker(queue.name, async (job) => job.data.value * 2);
+    const worker = harness.worker<{ value: number }, number>(
+      queue.name,
+      async (job) => job.data.value * 2
+    );
     const added = await queue.add('event', { value: 21 }, { durable: true });
     await eventually(
       () => waitingId,

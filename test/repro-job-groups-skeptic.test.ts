@@ -7,6 +7,7 @@ import { QueueManager } from '../src/application/queueManager';
 import type { BackgroundContext } from '../src/application/types';
 import { validateAtomicFlowBatch } from '../src/application/operations/flowValidation';
 import { Queue, shutdownManager } from '../src/client';
+import type { JobId } from '../src/domain/types/job';
 import { shardIndex } from '../src/shared/hash';
 
 function queueName(label: string): string {
@@ -444,7 +445,7 @@ describe('job group regressions', () => {
         validateAtomicFlowBatch({
           jobs: [
             {
-              id: 'flow-job',
+              id: 'flow-job' as JobId,
               queue: 'flow-queue',
               input: { data: {}, groupId },
             },

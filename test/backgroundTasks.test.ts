@@ -4,7 +4,7 @@
  * interval-based task execution, error handling, and edge cases.
  */
 
-import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import {
   startBackgroundTasks,
@@ -15,7 +15,6 @@ import {
 import { CronScheduler } from '../src/infrastructure/scheduler/cronScheduler';
 import type { BackgroundContext } from '../src/application/types';
 import type { Job } from '../src/domain/types/job';
-import { processingShardIndex, SHARD_COUNT } from '../src/shared/hash';
 import { JobTimeoutScheduler } from '../src/application/background/timeouts';
 import { safeInterval } from '../src/shared/timers';
 

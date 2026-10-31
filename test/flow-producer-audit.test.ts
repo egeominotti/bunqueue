@@ -440,7 +440,10 @@ describe('FlowProducer.getParentResult(s)', () => {
 
     expect(flow.getParentResult<{ echo: number }>(node.job.id)).toEqual({ echo: 42 });
 
-    const many = flow.getParentResults<{ echo: number }>([node.job.id, 'missing-id']);
+    const many = flow.getParentResults<{ echo: number }>([node.job.id, 'missing-id']) as Map<
+      string,
+      { echo: number }
+    >;
     expect(many.size).toBe(1);
     expect(many.get(node.job.id)).toEqual({ echo: 42 });
 

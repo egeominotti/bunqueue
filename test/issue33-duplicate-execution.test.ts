@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { checkStalledJobs } from '../src/application/stallDetection';
 import type { BackgroundContext } from '../src/application/types';
+import type { JobId } from '../src/domain/types/job';
 import { FlowProducer, Queue, Worker, shutdownManager } from '../src/client';
 import { getSharedManager } from '../src/client/manager';
 
@@ -86,12 +87,12 @@ describe('Issue #33 - stalled processing generations', () => {
       expect(tokens[1]).not.toBe(tokens[0]);
 
       await waitUntil(async () => (await queue.getJobState(job.id)) === 'completed', 'completion');
-      expect(getSharedManager().getResult(job.id)).toEqual({ generation: 2 });
+      expect(getSharedManager().getResult(job.id as JobId)).toEqual({ generation: 2 });
 
       releaseFirst();
       await Bun.sleep(50);
       expect(await queue.getJobState(job.id)).toBe('completed');
-      expect(getSharedManager().getResult(job.id)).toEqual({ generation: 2 });
+      expect(getSharedManager().getResult(job.id as JobId)).toEqual({ generation: 2 });
       expect(deliveries).toBe(2);
     } finally {
       releaseFirst();

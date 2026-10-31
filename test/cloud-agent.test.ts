@@ -8,7 +8,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { CircuitBreaker } from '../src/infrastructure/cloud/circuitBreaker';
 import { SnapshotBuffer } from '../src/infrastructure/cloud/buffer';
 import { loadCloudConfig } from '../src/infrastructure/cloud/config';
-import type { CloudSnapshot } from '../src/infrastructure/cloud/types';
+import type { CloudConfig, CloudSnapshot } from '../src/infrastructure/cloud/types';
 
 // ─── Config ───────────────────────────────────────────────────────
 
@@ -189,6 +189,7 @@ describe('CircuitBreaker', () => {
 
 // ─── Snapshot Buffer ──────────────────────────────────────────────
 
+// Partial snapshot fixture: only the fields the buffer tests read are populated.
 function makeSnapshot(seq: number): CloudSnapshot {
   return {
     instanceId: 'test',
@@ -240,7 +241,7 @@ function makeSnapshot(seq: number): CloudSnapshot {
     crons: [],
     storage: { diskFull: false, error: null },
     taskErrors: {},
-  };
+  } as unknown as CloudSnapshot;
 }
 
 describe('SnapshotBuffer', () => {
@@ -343,7 +344,7 @@ describe('HttpSender', () => {
       useWebSocket: false,
       useHttp: true,
       dataPath: null,
-    });
+    } as unknown as CloudConfig);
 
     const snapshot = makeSnapshot(1);
     await sender.send(snapshot);
@@ -375,7 +376,7 @@ describe('HttpSender', () => {
       useWebSocket: false,
       useHttp: true,
       dataPath: null,
-    });
+    } as unknown as CloudConfig);
 
     // Cause failures
     statusCode = 500;
@@ -411,7 +412,7 @@ describe('HttpSender', () => {
       useWebSocket: false,
       useHttp: true,
       dataPath: null,
-    });
+    } as unknown as CloudConfig);
 
     await sender.send(makeSnapshot(1));
 
@@ -439,7 +440,7 @@ describe('HttpSender', () => {
       useWebSocket: false,
       useHttp: true,
       dataPath: null,
-    });
+    } as unknown as CloudConfig);
 
     statusCode = 500;
     await sender.send(makeSnapshot(1)); // failure 1

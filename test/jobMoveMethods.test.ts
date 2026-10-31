@@ -174,7 +174,7 @@ describe('Job waitUntilFinished', () => {
       'wait-test',
       async (job) => {
         await Bun.sleep(100);
-        return { result: job.data.value * 2 };
+        return { result: (job.data as { value: number }).value * 2 };
       },
       { embedded: true, autorun: true }
     );

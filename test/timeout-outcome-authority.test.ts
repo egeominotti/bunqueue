@@ -113,7 +113,7 @@ describe('timeout outcome authority', () => {
       applied: false,
       reason: 'already-finalized',
     });
-    expect(manager.getLockInfo(queued.id)?.token).toBe(current.token);
+    expect<string | null | undefined>(manager.getLockInfo(queued.id)?.token).toBe(current.token);
     expect(await manager.getJobState(queued.id)).toBe('active');
     await expect(manager.ack(queued.id, 'wrong', 'wrong-token')).rejects.toThrow(
       'Invalid or expired lock token'
@@ -145,7 +145,7 @@ describe('timeout outcome authority', () => {
         applied: false,
         reason: 'already-finalized',
       });
-      expect(manager.getLockInfo(queued.id)?.token).toBe(current.token);
+      expect<string | null | undefined>(manager.getLockInfo(queued.id)?.token).toBe(current.token);
     }
     await manager.ack(queued.id, 'accepted', current.token ?? undefined);
     expect(manager.getResult(queued.id)).toBe('accepted');

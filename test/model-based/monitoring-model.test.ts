@@ -34,7 +34,7 @@ const EMPTY_STATS: QueueStats = {
   cronPending: 0,
 };
 
-const action = fc.oneof<Action>(
+const action: fc.Arbitrary<Action> = fc.oneof(
   fc.record({
     type: fc.constant('register'),
     id: fc.integer({ min: 0, max: 7 }),

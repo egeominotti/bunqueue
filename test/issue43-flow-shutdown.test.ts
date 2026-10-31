@@ -56,7 +56,7 @@ describe('Issue #43: Flow job dependency during shutdown', () => {
       data: { step: 'parse' },
       dependsOn: [jobA.id],
     });
-    const jobC = await qm.push('flow-shutdown', {
+    await qm.push('flow-shutdown', {
       data: { step: 'handle' },
       dependsOn: [jobB.id],
     });

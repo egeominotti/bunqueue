@@ -816,7 +816,7 @@ describe('AckBatcher', () => {
     });
 
     const rejected: string[] = [];
-    const promises: Array<Promise<void>> = [];
+    const promises: Array<Promise<unknown>> = [];
 
     // Queue MAX_PENDING_ACKS items (10000)
     for (let i = 0; i < 10_000; i++) {

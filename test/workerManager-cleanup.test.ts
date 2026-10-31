@@ -127,7 +127,7 @@ describe('WorkerManager - cleanupStale', () => {
   test('cleanup of multiple stale workers with mixed active jobs adjusts counters correctly', () => {
     const w1 = manager.register('w1', ['q1']);
     const w2 = manager.register('w2', ['q2']);
-    const w3 = manager.register('w3', ['q3']);
+    manager.register('w3', ['q3']);
 
     // w1: 2 active jobs
     manager.incrementActive(w1.id);

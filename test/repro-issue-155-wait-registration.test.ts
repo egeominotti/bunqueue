@@ -28,7 +28,7 @@ function createManager(config?: QueueManagerConfig): QueueManager {
 }
 
 function expectClean(queueManager: QueueManager): void {
-  expect(eventsOf(queueManager).subscriberCount).toBe(subscriberBaselines.get(queueManager));
+  expect(eventsOf(queueManager).subscriberCount).toBe(subscriberBaselines.get(queueManager)!);
   expect(eventsOf(queueManager).completionWaiterCount).toBe(0);
 }
 
@@ -84,7 +84,7 @@ test('the capture hands off to the completion waiter without retaining subscribe
     if (attempt > 500) throw new Error('WaitJob hold was not registered');
     await Bun.sleep(1);
   }
-  expect(eventsOf(qm).subscriberCount).toBe(subscriberBaselines.get(qm));
+  expect(eventsOf(qm).subscriberCount).toBe(subscriberBaselines.get(qm)!);
 
   await qm.ack(job.id, { answer: 6 });
 

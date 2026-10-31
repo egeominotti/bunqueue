@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { SQL } from 'bun';
 import { PostgresQueueManager } from '../src/application/postgresQueueManager';
-import { jobId } from '../src/domain/types/job';
+import { jobId, type JobId } from '../src/domain/types/job';
 import { cleanupPostgresNamespace } from './support/postgres-event-race';
 
 const postgresUrl = Bun.env.BUNQUEUE_TEST_POSTGRES_URL;
@@ -60,7 +60,7 @@ describe('PostgreSQL completion retention', () => {
         const consumer = await first.push('consumers', {
           customId: 'consumer',
           data: {},
-          dependsOn: ['pinned'],
+          dependsOn: ['pinned' as JobId],
         });
         for (let index = 0; index < 5; index++) {
           await complete(first, second, 'source', `unpinned-${index}`, true);
@@ -101,7 +101,7 @@ describe('PostgreSQL completion retention', () => {
         const consumer = await bootstrap.push('consumers', {
           customId: 'consumer',
           data: {},
-          dependsOn: ['pinned'],
+          dependsOn: ['pinned' as JobId],
         });
         await sql`
           INSERT INTO bunqueue_completions
@@ -175,7 +175,7 @@ describe('PostgreSQL completion retention', () => {
     const limits = { maxCompletedJobs: 2, maxJobResults: 2 };
     const writer = manager(value, 'snapshot-writer', limits);
     const worker = manager(value, 'snapshot-worker', limits);
-    const ids = Array.from({ length: 5 }, (_, index) => `completed-${index}`);
+    const ids = Array.from({ length: 5 }, (_, index) => `completed-${index}` as JobId);
     try {
       await Promise.all([writer.waitUntilReady(), worker.waitUntilReady()]);
       for (const id of ids) await complete(writer, worker, 'completed', id, false);
@@ -211,11 +211,11 @@ describe('PostgreSQL completion retention', () => {
         const consumer = await first.push('consumers', {
           customId: 'consumer',
           data: {},
-          dependsOn: ['producer'],
+          dependsOn: ['producer' as JobId],
         });
 
-        expect(first.getResult('producer')).toBeUndefined();
-        expect(second.getResult('producer')).toBeUndefined();
+        expect(first.getResult('producer' as JobId)).toBeUndefined();
+        expect(second.getResult('producer' as JobId)).toBeUndefined();
         expect(await second.getResultAsync(jobId('producer'))).toEqual({ id: 'producer' });
         expect(await first.waitForJobCompletion(jobId('producer'), 100)).toBe(true);
         expect(await second.getChildrenValues(consumer.id)).toEqual({

@@ -18,7 +18,7 @@ type Job = {
     matrix?: {
       variant?: string[];
       arch?: string[];
-      include?: Array<{ target: string; artifact: string; arch?: string; runner?: string }>;
+      include?: Array<{ target?: string; artifact?: string; arch?: string; runner?: string }>;
     };
   };
   if?: string;

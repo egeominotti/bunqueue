@@ -8,7 +8,7 @@ import { QueueManager } from '../src/application/queueManager';
 import type { BackgroundContext, QueueManagerConfig } from '../src/application/types';
 import { normalizeCompletedRetentionMs } from '../src/application/types/config';
 import { resolveServerConfig } from '../src/config/resolve';
-import { jobId } from '../src/domain/types/job';
+import { jobId, type JobId } from '../src/domain/types/job';
 import { processingShardIndex, shardIndex } from '../src/shared/hash';
 import type { RWLock } from '../src/shared/lock';
 
@@ -58,12 +58,8 @@ function suspendWriteBuffer(manager: QueueManager): { readonly pendingCount: num
   return buffer;
 }
 
-async function completeJobs(
-  manager: QueueManager,
-  queue: string,
-  count: number
-): Promise<string[]> {
-  const ids: string[] = [];
+async function completeJobs(manager: QueueManager, queue: string, count: number): Promise<JobId[]> {
+  const ids: JobId[] = [];
   for (let index = 0; index < count; index++) {
     const id = `issue118-${index.toString().padStart(4, '0')}`;
     const pushed = await manager.push(queue, {
@@ -74,7 +70,7 @@ async function completeJobs(
     const pulled = await manager.pull(queue, 0);
     expect(pulled?.id).toBe(pushed.id);
     await manager.ack(pushed.id, { value: index });
-    ids.push(String(pushed.id));
+    ids.push(String(pushed.id) as JobId);
   }
   return ids;
 }
@@ -146,7 +142,7 @@ describe('issue #118 SQLite completed retention', () => {
     const memory = new QueueManager({ maxCompletedJobs: 10 });
     const sqlite = createHarness({ maxCompletedJobs: 10 }).manager;
     const ids = ['tie-a', 'tie-_', 'tie-A', 'tie--'];
-    const expected = ['tie--', 'tie-A', 'tie-_', 'tie-a'];
+    const expected = ['tie--', 'tie-A', 'tie-_', 'tie-a'] as JobId[];
     const now = Date.now();
     setSystemTime(new Date(now));
     try {
@@ -323,14 +319,14 @@ describe('issue #118 SQLite completed retention', () => {
   test('memory-only obliterate clears logs whose completed jobs left the hot cache', async () => {
     const manager = new QueueManager({ maxCompletedJobs: 1, maxJobLogs: 10 });
     const queue = 'issue118-memory-obliterate-cold-logs';
-    const ids: string[] = [];
+    const ids: JobId[] = [];
     try {
       for (let index = 0; index < 3; index++) {
         const pushed = await manager.push(queue, { data: { index } });
         expect((await manager.pull(queue, 0))?.id).toBe(pushed.id);
         expect(manager.addLog(pushed.id, `log-${index}`)).toBe(true);
         await manager.ack(pushed.id);
-        ids.push(String(pushed.id));
+        ids.push(String(pushed.id) as JobId);
       }
 
       manager.obliterate(queue);
@@ -924,7 +920,7 @@ describe('issue #118 SQLite completed retention', () => {
       recoveredDatabase.close();
     }
 
-    expect(recovered.clean(staleQueue, 0, 'completed', 100)).toEqual([sharedId]);
+    expect(recovered.clean(staleQueue, 0, 'completed', 100)).toEqual([sharedId as JobId]);
 
     expect(recovered.getDlq(currentQueue).map((job) => job.id)).toEqual([failed.id]);
     expect(recovered.getJobIndex().get(failed.id)).toMatchObject({
@@ -1258,7 +1254,7 @@ describe('issue #118 SQLite completed retention', () => {
     expect(await manager.getJobState(dependency.id)).toBe('completed');
 
     expect(await manager.cancel(consumer.id)).toBe(true);
-    expect(manager.clean(queue, 0, 'completed', 100)).toEqual([String(dependency.id)]);
+    expect(manager.clean(queue, 0, 'completed', 100)).toEqual([String(dependency.id) as JobId]);
     expect(persistedCounts(path, queue)).toEqual({ jobs: 0, results: 0 });
   });
 });

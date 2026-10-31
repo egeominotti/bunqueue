@@ -23,7 +23,6 @@ import { describe, test, expect, afterEach } from 'bun:test';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { unlinkSync, existsSync } from 'fs';
-import { sleep } from 'bun';
 import { QueueManager } from '../src/application/queueManager';
 
 const TEST_DB_PATH = join(tmpdir(), `bunqueue-issue73-restart-${Date.now()}.db`);

@@ -187,10 +187,10 @@ export async function runCrossQueueInvariantCampaign(): Promise<void> {
 function operationArbitrary(): fc.Arbitrary<Operation> {
   const queue = fc.integer({ min: 0, max: 3 });
   return fc.oneof(
-    { weight: 5, arbitrary: queue.map((value) => ({ kind: 'push', queue: value })) },
-    { weight: 4, arbitrary: queue.map((value) => ({ kind: 'complete', queue: value })) },
-    { weight: 1, arbitrary: queue.map((value) => ({ kind: 'pause', queue: value })) },
-    { weight: 1, arbitrary: queue.map((value) => ({ kind: 'resume', queue: value })) },
+    { weight: 5, arbitrary: queue.map((value): Operation => ({ kind: 'push', queue: value })) },
+    { weight: 4, arbitrary: queue.map((value): Operation => ({ kind: 'complete', queue: value })) },
+    { weight: 1, arbitrary: queue.map((value): Operation => ({ kind: 'pause', queue: value })) },
+    { weight: 1, arbitrary: queue.map((value): Operation => ({ kind: 'resume', queue: value })) },
     { weight: 1, arbitrary: fc.constant({ kind: 'compact' }) },
     { weight: 1, arbitrary: fc.constant({ kind: 'restart' }) }
   );

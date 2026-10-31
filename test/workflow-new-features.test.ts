@@ -542,7 +542,8 @@ describe('Workflow Engine - Nested Workflows', () => {
 
     const parent = new Workflow('parent-with-bad-child')
       .step('setup', async () => ({ ready: true }), {
-        compensate: async () => compensations.push('undo-setup'),
+        compensate: (async () =>
+          compensations.push('undo-setup')) as unknown as () => Promise<void>,
       })
       .subWorkflow('bad-child', () => ({}));
 
@@ -576,7 +577,10 @@ describe('Workflow Engine - Combined Features', () => {
         async () => {
           return { orderId: 'ORD-777' };
         },
-        { compensate: async () => compensations.push('cancel-order') }
+        {
+          compensate: (async () =>
+            compensations.push('cancel-order')) as unknown as () => Promise<void>,
+        }
       )
       .step(
         'charge-payment',
@@ -587,7 +591,7 @@ describe('Workflow Engine - Combined Features', () => {
         },
         {
           retry: 3,
-          compensate: async () => compensations.push('refund'),
+          compensate: (async () => compensations.push('refund')) as unknown as () => Promise<void>,
         }
       )
       .parallel((w) =>

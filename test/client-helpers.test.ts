@@ -6,7 +6,7 @@
  * - queueGroup.ts: QueueGroup class
  */
 
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach } from 'bun:test';
 import {
   extractUserData,
   extractParent,
@@ -16,13 +16,22 @@ import {
   buildParentKey,
   buildRepeatJobKey,
 } from '../src/client/jobHelpers';
-import { createPublicJob, toPublicJob, toDlqEntry } from '../src/client/jobConversion';
+import {
+  createPublicJob,
+  toPublicJob,
+  toDlqEntry as toDlqEntryWithMethods,
+} from '../src/client/jobConversion';
 import { QueueEvents } from '../src/client/events';
 import { QueueGroup } from '../src/client/queueGroup';
 import { Queue, Worker, shutdownManager } from '../src/client';
 import type { Job as InternalJob } from '../src/domain/types/job';
 import type { DlqEntry as InternalDlqEntry } from '../src/domain/types/dlq';
 import { jobId } from '../src/domain/types/job';
+
+/** The toDlqEntry tests call it without a method context (it is spread, so undefined is safe). */
+const toDlqEntry = toDlqEntryWithMethods as (
+  entry: InternalDlqEntry
+) => ReturnType<typeof toDlqEntryWithMethods<unknown>>;
 
 // ============================================================================
 // Test Helpers
@@ -78,7 +87,7 @@ function makeInternalJob(overrides: Partial<InternalJob> = {}): InternalJob {
     debounceTtl: null,
     timeline: [],
     ...overrides,
-  };
+  } as InternalJob;
 }
 
 // ============================================================================
@@ -197,7 +206,8 @@ describe('jobHelpers', () => {
   describe('buildRepeatOpts', () => {
     test('should return undefined when repeat is null/undefined', () => {
       expect(buildRepeatOpts(null)).toBeUndefined();
-      expect(buildRepeatOpts(undefined)).toBeUndefined();
+      // Deliberately invalid input: checks the runtime null/undefined guard.
+      expect(buildRepeatOpts(undefined as never)).toBeUndefined();
     });
 
     test('should convert repeat config with "every" option', () => {
@@ -811,7 +821,7 @@ describe('jobConversion', () => {
     });
 
     test('remove should call callback', async () => {
-      let removedId: string | null = null;
+      let removedId = null as string | null;
       const internalJob = makeInternalJob({ id: jobId('job-to-remove') });
 
       const publicJob = createPublicJob({
@@ -842,7 +852,7 @@ describe('jobConversion', () => {
     });
 
     test('retry should call callback', async () => {
-      let retriedId: string | null = null;
+      let retriedId = null as string | null;
       const internalJob = makeInternalJob({ id: jobId('job-retry') });
 
       const publicJob = createPublicJob({
@@ -1047,7 +1057,7 @@ describe('jobConversion', () => {
     // BullMQ v5 mutation method delegation
 
     test('updateData should delegate to callback', async () => {
-      let calledWith: { id: string; data: unknown } | null = null;
+      let calledWith = null as { id: string; data: unknown } | null;
       const internalJob = makeInternalJob({ id: jobId('ud-job') });
 
       const publicJob = createPublicJob({
@@ -1065,7 +1075,7 @@ describe('jobConversion', () => {
     });
 
     test('promote should delegate to callback', async () => {
-      let promotedId: string | null = null;
+      let promotedId = null as string | null;
       const internalJob = makeInternalJob({ id: jobId('promo-job') });
 
       const publicJob = createPublicJob({
@@ -1083,7 +1093,7 @@ describe('jobConversion', () => {
     });
 
     test('changeDelay should delegate to callback', async () => {
-      let calledWith: { id: string; delay: number } | null = null;
+      let calledWith = null as { id: string; delay: number } | null;
       const internalJob = makeInternalJob({ id: jobId('cd-job') });
 
       const publicJob = createPublicJob({
@@ -1101,7 +1111,7 @@ describe('jobConversion', () => {
     });
 
     test('changePriority should delegate to callback', async () => {
-      let calledWith: { id: string; opts: { priority: number; lifo?: boolean } } | null = null;
+      let calledWith = null as { id: string; opts: { priority: number; lifo?: boolean } } | null;
       const internalJob = makeInternalJob({ id: jobId('cp-job') });
 
       const publicJob = createPublicJob({
@@ -1148,7 +1158,7 @@ describe('jobConversion', () => {
     });
 
     test('discard should call callback synchronously', () => {
-      let discardedId: string | null = null;
+      let discardedId = null as string | null;
       const internalJob = makeInternalJob({ id: jobId('disc-job') });
 
       const publicJob = createPublicJob({
@@ -1209,7 +1219,7 @@ describe('jobConversion', () => {
     });
 
     test('moveToFailed should delegate to callback', async () => {
-      let calledError: Error | null = null;
+      let calledError = null as Error | null;
       const internalJob = makeInternalJob({ id: jobId('mtf-job') });
 
       const publicJob = createPublicJob({
@@ -1476,7 +1486,7 @@ describe('jobConversion', () => {
     });
 
     test('discard should call callback when provided', () => {
-      let discardedId: string | null = null;
+      let discardedId = null as string | null;
       const internalJob = makeInternalJob({ id: jobId('disc-simple') });
 
       const publicJob = toPublicJob({
@@ -1776,10 +1786,14 @@ describe('QueueEvents', () => {
         completedValue = returnvalue;
       });
 
-      const worker = new Worker('events-completed-test', async (job) => job.data.value * 2, {
-        embedded: true,
-        autorun: true,
-      });
+      const worker = new Worker<{ value: number }>(
+        'events-completed-test',
+        async (job) => job.data.value * 2,
+        {
+          embedded: true,
+          autorun: true,
+        }
+      );
 
       await queue.add('task', { value: 21 });
       await Bun.sleep(500);
@@ -1795,7 +1809,7 @@ describe('QueueEvents', () => {
     test('should emit error events', () => {
       queueEvents = new QueueEvents('error-test');
 
-      let receivedError: Error | null = null;
+      let receivedError = null as Error | null;
       queueEvents.on('error', (err) => {
         receivedError = err;
       });
@@ -1914,7 +1928,7 @@ describe('QueueGroup', () => {
       const queue = group.getQueue<{ amount: number }>('payments');
       queue.obliterate();
 
-      let processedJobQueue: string | null = null;
+      let processedJobQueue = null as string | null;
       const worker = group.getWorker<{ amount: number }, boolean>(
         'payments',
         async (job) => {

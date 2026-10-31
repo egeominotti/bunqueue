@@ -37,7 +37,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Queue, shutdownManager } from '../src/client';
 import { getSharedManager } from '../src/client/manager';
-import { createJob, jobId } from '../src/domain/types/job';
+import { createJob, jobId, type JobId } from '../src/domain/types/job';
 
 const DB = join(tmpdir(), `bunq-repro-idem-active-${process.pid}.db`);
 function cleanDb() {
@@ -68,7 +68,7 @@ describe('REPRO: re-add customId/jobId while job is ACTIVE must be idempotent', 
     const manager = getSharedManager();
     const pulled = await manager.pull(queueName);
     expect(pulled).not.toBeNull();
-    expect(pulled?.id).toBe(j1.id);
+    expect(pulled?.id).toBe<string | undefined>(j1.id);
 
     // Re-add the SAME jobId while j1 is active. Must be an idempotent no-op.
     let threw = '';
@@ -95,7 +95,7 @@ describe('REPRO: re-add customId/jobId while job is ACTIVE must be idempotent', 
     const j1 = await q.add('charge', { v: 1 }, { jobId: 'pay-Y' });
     const manager = getSharedManager();
     const pulled = await manager.pull(queueName);
-    expect(pulled?.id).toBe(j1.id);
+    expect(pulled?.id).toBe<string | undefined>(j1.id);
 
     // Re-add (buffered). On buggy code this reaches the reuse path and the write
     // buffer rejects the colliding insert; assert idempotent dedup semantics hold.
@@ -107,7 +107,7 @@ describe('REPRO: re-add customId/jobId while job is ACTIVE must be idempotent', 
     expect(counts.waiting).toBe(0);
 
     // The original active job must still be ackable (not corrupted by the collision).
-    await manager.ack(j1.id);
+    await manager.ack(j1.id as JobId);
     const after = manager.getQueueJobCounts(queueName);
     expect(after.completed).toBe(1);
   });

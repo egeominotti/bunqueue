@@ -108,7 +108,7 @@ describe('Bug: completed jobs listing returns empty', () => {
 
     const found = completedJobs.find((j) => j.id === job.id);
     expect(found).toBeDefined();
-    expect(found!.data.value).toBe(123);
+    expect((found!.data as { value: number }).value).toBe(123);
   });
 
   it('getJobs with no state filter should include completed jobs', async () => {

@@ -246,7 +246,7 @@ describe('cancel()', () => {
     );
     await instance.add('job', {});
     await until(() => cancelledAtOnce !== null);
-    expect(cancelledAtOnce).toBe(true);
+    expect(cancelledAtOnce as boolean | null).toBe(true);
   });
 
   test('NaN cancels at once and a numeric string is a grace period; Infinity throws', () => {

@@ -63,7 +63,7 @@ import { jobId } from '../src/domain/types/job';
 
 function mockJob(id: number, queue = 'q'): Job {
   return {
-    id: BigInt(id) as JobId,
+    id: BigInt(id) as unknown as JobId,
     queue,
     data: { i: id },
     priority: 0,
@@ -228,7 +228,7 @@ describe('BUG H3: corrupt dependsOn blob must not silently become an empty-deps 
   test('rowToJob must NOT swallow a corrupt depends_on blob into dependsOn: []', () => {
     // Build a job row exactly as it would be read back from SQLite, but with
     // a corrupt depends_on BLOB. The real dependency metadata is unrecoverable.
-    const row: DbJob = {
+    const row = {
       id: '3001',
       queue: 'orders',
       data: pack({ step: 'charge' }),
@@ -259,7 +259,7 @@ describe('BUG H3: corrupt dependsOn blob must not silently become an empty-deps 
       last_heartbeat: null,
       stall_count: 0,
       timeline: null,
-    };
+    } as DbJob;
 
     // CORRECT BEHAVIOR (asserted): converting a row with corrupt dependency
     // metadata must NOT yield a job that silently looks "ready with no deps".

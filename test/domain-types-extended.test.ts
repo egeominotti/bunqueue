@@ -11,7 +11,7 @@ import {
   isUniqueKeyExpired,
   calculateExpiration,
 } from '../src/domain/types/deduplication';
-import type { DeduplicationOptions, UniqueKeyEntry } from '../src/domain/types/deduplication';
+import type { UniqueKeyEntry } from '../src/domain/types/deduplication';
 import { createWorker, createLogEntry } from '../src/domain/types/worker';
 
 /** Helper to create a UniqueKeyEntry for testing */

@@ -31,6 +31,9 @@ import { handleCommand as handleCloud } from '../src/infrastructure/cloud/comman
 import { closeHarness, MODES, startHarness, type CoreE2eHarness } from './docs-guide-support';
 import { startMcp } from './mcp-harness';
 
+// describe.each only accepts a mutable array; MODES is a readonly tuple.
+type Modes = (typeof MODES)[number][];
+
 const PAST = -5_000;
 const YEAR = 365 * 86_400_000;
 
@@ -100,7 +103,7 @@ describe('job options validator', () => {
   });
 });
 
-describe.each(MODES)('negative delay runs now [%s]', (mode) => {
+describe.each(MODES as unknown as Modes)('negative delay runs now [%s]', (mode) => {
   test('Queue.add: waiting, pulled at once, ahead of an earlier delay-0 job', async () => {
     harness = await startHarness('negative-delay-add', mode);
     const queue = harness.queue('negative-delay-add');
@@ -188,7 +191,7 @@ describe('HTTP job routes accept a negative delay (ready at once)', () => {
   });
 });
 
-describe.each(MODES)('MCP add tools accept a negative delay [%s]', (mode) => {
+describe.each(MODES as unknown as Modes)('MCP add tools accept a negative delay [%s]', (mode) => {
   test('add_job, add_jobs_bulk, add_flow and add_cron', async () => {
     const m = await startMcp({ mode });
     try {

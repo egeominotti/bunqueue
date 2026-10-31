@@ -21,6 +21,7 @@ import { QueueManager } from '../src/application/queueManager';
 import { routeQueueRoutes } from '../src/infrastructure/server/httpRouteQueues';
 import { handleCommand } from '../src/infrastructure/server/handler';
 import type { HandlerContext } from '../src/infrastructure/server/types';
+import type { JobCountsResponse } from '../src/domain/types/response';
 
 let qm: QueueManager | null = null;
 
@@ -88,9 +89,10 @@ describe('Issue #95: HTTP /jobs/list status filter', () => {
     const ctx = ctxFor(qm);
     await seed(qm);
 
-    const counts = (await handleCommand({ cmd: 'GetJobCounts', queue: QUEUE }, ctx)) as {
-      counts: Record<string, number>;
-    };
+    const counts = (await handleCommand(
+      { cmd: 'GetJobCounts', queue: QUEUE },
+      ctx
+    )) as JobCountsResponse;
     expect(counts.counts.failed).toBe(3);
     expect(counts.counts.completed).toBe(2);
     expect(counts.counts.waiting).toBe(4);

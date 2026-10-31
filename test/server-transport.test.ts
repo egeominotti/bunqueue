@@ -10,7 +10,8 @@ import type { JobEvent } from '../src/domain/types/queue';
 import { EventType } from '../src/domain/types/queue';
 
 // SSE Handler
-import { SseHandler, type SseClient } from '../src/infrastructure/server/sseHandler';
+import { SseHandler } from '../src/infrastructure/server/sseHandler';
+import type { Response as CommandResponse } from '../src/domain/types/response';
 
 // WS Handler
 import { WsHandler, type WsData } from '../src/infrastructure/server/wsHandler';
@@ -1035,43 +1036,43 @@ describe('Handler Routes', () => {
     test('should route Pause command', () => {
       const result = routeQueueControlCommand({ cmd: 'Pause', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route Resume command', () => {
       const result = routeQueueControlCommand({ cmd: 'Resume', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route IsPaused command', () => {
       const result = routeQueueControlCommand({ cmd: 'IsPaused', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route Drain command', () => {
       const result = routeQueueControlCommand({ cmd: 'Drain', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route Obliterate command', () => {
       const result = routeQueueControlCommand({ cmd: 'Obliterate', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route ListQueues command', () => {
       const result = routeQueueControlCommand({ cmd: 'ListQueues' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route Clean command', () => {
       const result = routeQueueControlCommand({ cmd: 'Clean', queue: 'test', grace: 60000 }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should return null for unknown command', () => {
@@ -1085,7 +1086,7 @@ describe('Handler Routes', () => {
         ctx,
         'req-pause'
       );
-      expect(result!.reqId).toBe('req-pause');
+      expect((result as CommandResponse).reqId).toBe('req-pause');
     });
   });
 
@@ -1095,25 +1096,25 @@ describe('Handler Routes', () => {
     test('should route Dlq command', () => {
       const result = routeDlqCommand({ cmd: 'Dlq', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route RetryDlq command', () => {
       const result = routeDlqCommand({ cmd: 'RetryDlq', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route PurgeDlq command', () => {
       const result = routeDlqCommand({ cmd: 'PurgeDlq', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route RemoveDlqJob command', () => {
       const result = routeDlqCommand({ cmd: 'RemoveDlqJob', queue: 'test', jobId: 'missing' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
       expect((result as any).data.removed).toBe(false);
     });
 
@@ -1134,13 +1135,13 @@ describe('Handler Routes', () => {
     test('should route RateLimit command', () => {
       const result = routeRateLimitCommand({ cmd: 'RateLimit', queue: 'test', limit: 100 }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route RateLimitClear command', () => {
       const result = routeRateLimitCommand({ cmd: 'RateLimitClear', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route SetConcurrency command', () => {
@@ -1149,13 +1150,13 @@ describe('Handler Routes', () => {
         ctx
       );
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route ClearConcurrency command', () => {
       const result = routeRateLimitCommand({ cmd: 'ClearConcurrency', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should return null for unknown command', () => {
@@ -1173,7 +1174,7 @@ describe('Handler Routes', () => {
         ctx
       );
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route CronDelete command', () => {
@@ -1184,13 +1185,13 @@ describe('Handler Routes', () => {
       );
       const result = routeCronCommand({ cmd: 'CronDelete', name: 'delete-me' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route CronList command', () => {
       const result = routeCronCommand({ cmd: 'CronList' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should return null for unknown command', () => {
@@ -1205,33 +1206,33 @@ describe('Handler Routes', () => {
     test('should route Stats command', () => {
       const result = routeMonitoringCommand({ cmd: 'Stats' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
       expect((result as any).stats).toBeDefined();
     });
 
     test('should route Metrics command', () => {
       const result = routeMonitoringCommand({ cmd: 'Metrics' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
       expect((result as any).metrics).toBeDefined();
     });
 
     test('should route Prometheus command', () => {
       const result = routeMonitoringCommand({ cmd: 'Prometheus' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route Ping command', () => {
       const result = routeMonitoringCommand({ cmd: 'Ping' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route Hello command', () => {
       const result = routeMonitoringCommand({ cmd: 'Hello', protocolVersion: 1 }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route RegisterWorker command', () => {
@@ -1240,7 +1241,7 @@ describe('Handler Routes', () => {
         ctx
       );
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route UnregisterWorker command', () => {
@@ -1253,13 +1254,13 @@ describe('Handler Routes', () => {
 
       const result = routeMonitoringCommand({ cmd: 'UnregisterWorker', workerId }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route ListWorkers command', () => {
       const result = routeMonitoringCommand({ cmd: 'ListWorkers' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route Heartbeat command', () => {
@@ -1272,7 +1273,7 @@ describe('Handler Routes', () => {
 
       const result = routeMonitoringCommand({ cmd: 'Heartbeat', id: workerId }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route AddLog command', async () => {
@@ -1281,7 +1282,7 @@ describe('Handler Routes', () => {
 
       const result = routeMonitoringCommand({ cmd: 'AddLog', id: jobId, message: 'test log' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route GetLogs command', async () => {
@@ -1290,13 +1291,13 @@ describe('Handler Routes', () => {
 
       const result = routeMonitoringCommand({ cmd: 'GetLogs', id: jobId }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should route ListWebhooks command', () => {
       const result = routeMonitoringCommand({ cmd: 'ListWebhooks' }, ctx);
       expect(result).not.toBeNull();
-      expect(result!.ok).toBe(true);
+      expect((result as CommandResponse).ok).toBe(true);
     });
 
     test('should return null for unknown command', () => {
@@ -1306,7 +1307,7 @@ describe('Handler Routes', () => {
 
     test('should propagate reqId', () => {
       const result = routeMonitoringCommand({ cmd: 'Ping', reqId: 'req-ping' }, ctx, 'req-ping');
-      expect(result!.reqId).toBe('req-ping');
+      expect((result as CommandResponse).reqId).toBe('req-ping');
     });
   });
 

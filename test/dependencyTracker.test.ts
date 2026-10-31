@@ -334,7 +334,7 @@ describe('DependencyTracker', () => {
   describe('complex scenarios', () => {
     test('diamond dependency: C depends on A and B, both depend on D', () => {
       // D has no dependencies, A and B depend on D, C depends on A and B
-      const jobD = makeJob(4);
+      makeJob(4);
       const jobA = makeJob(1, { dependsOn: [jid(4)] });
       const jobB = makeJob(2, { dependsOn: [jid(4)] });
       const jobC = makeJob(3, { dependsOn: [jid(1), jid(2)] });
@@ -373,8 +373,8 @@ describe('DependencyTracker', () => {
 
     test('parent waits for children to complete then proceeds', () => {
       const parent = makeJob(100);
-      const child1 = makeJob(1, { parentId: jid(100) });
-      const child2 = makeJob(2, { parentId: jid(100) });
+      makeJob(1, { parentId: jid(100) });
+      makeJob(2, { parentId: jid(100) });
 
       tracker.addWaitingParent(parent);
 

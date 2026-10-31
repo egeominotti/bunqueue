@@ -32,7 +32,7 @@ describe('Worker Scaling - Embedded', () => {
       const workerId = w;
       const worker = new Worker(
         'ws-share-load',
-        async (job) => {
+        async (_job) => {
           workerCounts[workerId]++;
           totalCompleted++;
           await Bun.sleep(50); // simulate work to allow distribution
@@ -86,7 +86,7 @@ describe('Worker Scaling - Embedded', () => {
     // Start with 1 worker
     const worker1 = new Worker(
       'ws-dynamic-add',
-      async (job) => {
+      async (_job) => {
         await Bun.sleep(JOB_DURATION);
         totalCompleted++;
         return { ok: true };
@@ -106,7 +106,7 @@ describe('Worker Scaling - Embedded', () => {
     // Add 2 more workers
     const worker2 = new Worker(
       'ws-dynamic-add',
-      async (job) => {
+      async (_job) => {
         await Bun.sleep(JOB_DURATION);
         totalCompleted++;
         return { ok: true };
@@ -116,7 +116,7 @@ describe('Worker Scaling - Embedded', () => {
 
     const worker3 = new Worker(
       'ws-dynamic-add',
-      async (job) => {
+      async (_job) => {
         await Bun.sleep(JOB_DURATION);
         totalCompleted++;
         return { ok: true };
@@ -223,7 +223,7 @@ describe('Worker Scaling - Embedded', () => {
     // Worker1: concurrency 1 (slow throughput)
     const worker1 = new Worker(
       'ws-diff-concurrency',
-      async (job) => {
+      async (_job) => {
         await Bun.sleep(100); // simulate work
         worker1Count++;
         totalCompleted++;
@@ -235,7 +235,7 @@ describe('Worker Scaling - Embedded', () => {
     // Worker2: concurrency 5 (high throughput)
     const worker2 = new Worker(
       'ws-diff-concurrency',
-      async (job) => {
+      async (_job) => {
         await Bun.sleep(100); // same work duration
         worker2Count++;
         totalCompleted++;

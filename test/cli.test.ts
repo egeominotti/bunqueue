@@ -2,7 +2,7 @@
  * CLI Tests
  */
 
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
+import { describe, test, expect } from 'bun:test';
 
 describe('CLI', () => {
   describe('Command Types', () => {

@@ -211,7 +211,7 @@ describe('Issue #34 - Parent result data missing', () => {
           // Wait for fillers to complete (evict children results)
           // Push fillers from here to ensure children completed first
           for (let batch = 0; batch < FILLER_COUNT / 50; batch++) {
-            const jobs = Array.from({ length: 50 }, (_, i) => ({
+            const jobs = Array.from({ length: 50 }, (_, _i) => ({
               name: 'filler',
               data: { filler: true, role: 'filler' },
             }));

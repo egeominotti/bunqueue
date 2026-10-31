@@ -7,7 +7,7 @@ import { pullJob } from '../src/application/operations/pull';
 import { Shard } from '../src/domain/queue/shard';
 import { createJob, jobId } from '../src/domain/types/job';
 import { SqliteStorage } from '../src/infrastructure/persistence/sqlite';
-import { processingShardIndex, shardIndex, SHARD_COUNT } from '../src/shared/hash';
+import { shardIndex, SHARD_COUNT } from '../src/shared/hash';
 import { RWLock } from '../src/shared/lock';
 import { RealQueue } from './model-based/queue-model-harness';
 

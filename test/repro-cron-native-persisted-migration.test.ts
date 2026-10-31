@@ -179,7 +179,9 @@ describe('persisted Croner schedule migration to Bun.cron', () => {
       throw new Error('simulated SQLite cron read failure');
     });
     const originalClose = SqliteStorage.prototype.close;
-    const close = spyOn(SqliteStorage.prototype, 'close').mockImplementation(function () {
+    const close = spyOn(SqliteStorage.prototype, 'close').mockImplementation(function (
+      this: SqliteStorage
+    ) {
       originalClose.call(this);
       throw new Error('simulated cleanup failure');
     });

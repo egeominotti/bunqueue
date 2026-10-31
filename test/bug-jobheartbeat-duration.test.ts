@@ -44,7 +44,6 @@ describe('JobHeartbeat duration support', () => {
     // Get initial lock info
     const lockBefore = qm.getLockInfo(job!.id);
     expect(lockBefore).not.toBeNull();
-    const ttlBefore = lockBefore!.expiresAt - Date.now();
 
     // Send heartbeat with a much longer duration (60s)
     const res = await handleCommand(

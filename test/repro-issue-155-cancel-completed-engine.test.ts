@@ -68,7 +68,7 @@ test('one transaction deletes row and result, keeps the proof with the original 
   expect(row(dataPath, 'SELECT id FROM jobs WHERE id = ?', job.id)).toBeNull();
   expect(row(dataPath, 'SELECT job_id FROM job_results WHERE job_id = ?', job.id)).toBeNull();
   expect(
-    row(
+    row<Record<string, unknown>>(
       dataPath,
       'SELECT queue, completed_at, pinned FROM dependency_completions WHERE job_id = ?',
       job.id
@@ -96,7 +96,9 @@ test('a failed write changes nothing: the job, its result and its counters stay'
   expect(await qm.getJobState(job.id)).toBe('completed');
   expect(qm.getResult(job.id)).toEqual({ answer: 7 });
   expect(qm.getQueueJobCounts('atomic').completed).toBe(1);
-  expect(row(dataPath, 'SELECT state FROM jobs WHERE id = ?', job.id)).toEqual({
+  expect(
+    row<Record<string, unknown>>(dataPath, 'SELECT state FROM jobs WHERE id = ?', job.id)
+  ).toEqual({
     state: 'completed',
   });
   expect(
@@ -122,7 +124,11 @@ test('the proof is pinned while a dependent waits, and still releases that depen
 
   expect(await qm.cancel(first.id)).toBe(true);
   expect(
-    row(dataPath, 'SELECT pinned FROM dependency_completions WHERE job_id = ?', first.id)
+    row<Record<string, unknown>>(
+      dataPath,
+      'SELECT pinned FROM dependency_completions WHERE job_id = ?',
+      first.id
+    )
   ).toEqual({ pinned: 1 });
 
   expect((await qm.pull('pinned-deps'))?.id).toBe(second.id);

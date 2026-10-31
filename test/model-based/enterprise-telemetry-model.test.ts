@@ -15,7 +15,7 @@ type BackupAction =
   | { type: 'failure'; durationMs: number; nowMs: number }
   | { type: 'scheduler'; running: boolean };
 
-const backupAction = fc.oneof<BackupAction>(
+const backupAction: fc.Arbitrary<BackupAction> = fc.oneof(
   fc.record({ type: fc.constant('start') }),
   fc.record({
     type: fc.constant('success'),

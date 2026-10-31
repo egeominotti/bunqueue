@@ -193,11 +193,11 @@ describe('PostgreSQL lease renewal batching', () => {
           return rows;
         };
 
-        const heartbeat = manager.heartbeatDurable(id, claim.token);
+        const heartbeat = manager.heartbeatDurable(id, claim.token!);
         try {
           await renewalCommitted.promise;
           await manager.ackBatchWithResults([
-            { id, token: claim.token, result: { completed: true } },
+            { id, token: claim.token!, result: { completed: true } },
           ]);
           expect(manager.getJobIndex().get(id)?.type).toBe('completed');
         } finally {
@@ -247,13 +247,13 @@ describe('PostgreSQL lease renewal batching', () => {
           return rows;
         };
 
-        const heartbeat = manager.heartbeatDurable(id, claim.token);
+        const heartbeat = manager.heartbeatDurable(id, claim.token!);
         try {
           await renewalCommitted.promise;
           await manager.ackBatchWithResults([
             {
               id,
-              token: claim.token,
+              token: claim.token!,
               result: { removed: true },
               removeOnComplete: true,
             },

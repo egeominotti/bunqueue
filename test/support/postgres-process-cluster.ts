@@ -1,4 +1,4 @@
-import { SQL } from 'bun';
+import { SQL, type TCPSocketListener } from 'bun';
 import { TcpClient } from '../../src/client/tcp/client';
 import {
   capturePostgresProcessOutput,
@@ -274,8 +274,8 @@ function reservePortPair(): number {
   for (let attempt = 0; attempt < 100; attempt++) {
     const port = 20_000 + Math.floor(Math.random() * 20_000);
     if (leasedPorts.has(port) || leasedPorts.has(port + 1)) continue;
-    let tcp: ReturnType<typeof Bun.listen> | null = null;
-    let http: ReturnType<typeof Bun.listen> | null = null;
+    let tcp: TCPSocketListener<undefined> | null = null;
+    let http: TCPSocketListener<undefined> | null = null;
     try {
       tcp = probePort(port);
       http = probePort(port + 1);
@@ -292,7 +292,7 @@ function reservePortPair(): number {
   throw new Error('unable to reserve an adjacent TCP/HTTP port pair');
 }
 
-function probePort(port: number): ReturnType<typeof Bun.listen> {
+function probePort(port: number): TCPSocketListener<undefined> {
   return Bun.listen({
     hostname: '127.0.0.1',
     port,

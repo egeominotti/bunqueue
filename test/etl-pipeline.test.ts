@@ -33,13 +33,15 @@ describe('ETL Pipeline - Embedded', () => {
         }
 
         if (data.stage === 'transform') {
-          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!);
+          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!) as
+            { records: number[] } | undefined;
           const doubled = parentResult!.records.map((v) => v * 2);
           return { records: doubled };
         }
 
         if (data.stage === 'load') {
-          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!);
+          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!) as
+            { records: number[] } | undefined;
           loadedData = { records: parentResult!.records, count: parentResult!.records.length };
           resolve!();
           return loadedData;
@@ -139,7 +141,7 @@ describe('ETL Pipeline - Embedded', () => {
     const RECORD_COUNT = 20;
     const completedRecords: Array<{ id: number; tags: string[] }> = [];
     let resolve: () => void;
-    const done = new Promise<void>((r) => (resolve = r));
+    new Promise<void>((r) => (resolve = r));
 
     const worker = new Worker(
       'etl-multi-record',
@@ -153,7 +155,7 @@ describe('ETL Pipeline - Embedded', () => {
         if (data.stage === 'enrich') {
           const parentResult = flow.getParentResult<{ recordId: number; tags: string[] }>(
             (job.data as any).__flowParentId
-          );
+          ) as { recordId: number; tags: string[] } | undefined;
           return {
             recordId: parentResult!.recordId,
             tags: [...parentResult!.tags, 'enriched'],
@@ -163,7 +165,7 @@ describe('ETL Pipeline - Embedded', () => {
         if (data.stage === 'store') {
           const parentResult = flow.getParentResult<{ recordId: number; tags: string[] }>(
             (job.data as any).__flowParentId
-          );
+          ) as { recordId: number; tags: string[] } | undefined;
           const finalRecord = {
             id: parentResult!.recordId,
             tags: [...parentResult!.tags, 'stored'],
@@ -229,7 +231,7 @@ describe('ETL Pipeline - Embedded', () => {
     const completedIds: number[] = [];
     const failedIds: number[] = [];
     let resolve: () => void;
-    const done = new Promise<void>((r) => (resolve = r));
+    new Promise<void>((r) => (resolve = r));
 
     const extractWorker = new Worker(
       'etl-validate-extract',
@@ -323,7 +325,7 @@ describe('ETL Pipeline - Embedded', () => {
 
         const parentResult = flow.getParentResult<{ value: number; steps: string[] }>(
           data.__flowParentId!
-        );
+        ) as { value: number; steps: string[] } | undefined;
 
         if (data.stage === 'validate') {
           return {
@@ -395,7 +397,7 @@ describe('ETL Pipeline - Embedded', () => {
     const pipelineResults = new Map<number, string[]>();
     let completedPipelines = 0;
     let resolve: () => void;
-    const done = new Promise<void>((r) => (resolve = r));
+    new Promise<void>((r) => (resolve = r));
 
     const PIPELINE_COUNT = 5;
 
@@ -490,12 +492,14 @@ describe('ETL Pipeline - Embedded', () => {
           if (transformAttempts < 2) {
             throw new Error(`Transient DB error on attempt ${transformAttempts}`);
           }
-          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!);
+          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!) as
+            { records: number[] } | undefined;
           return { records: parentResult!.records.map((v) => v * 10) };
         }
 
         if (data.stage === 'load') {
-          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!);
+          const parentResult = flow.getParentResult<{ records: number[] }>(data.__flowParentId!) as
+            { records: number[] } | undefined;
           chainCompleted = true;
           resolve!();
           return { loaded: parentResult!.records };

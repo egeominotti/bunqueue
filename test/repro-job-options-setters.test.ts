@@ -115,7 +115,12 @@ describe('engine entry points', () => {
     const job = await manager.push('setters-cloud', { data: {}, priority: 7 });
     const adapter = new LocalCloudQueueAdapter(manager);
     const run = (command: Partial<CloudCommand>) =>
-      outcome(COMMANDS['job:priority']!(adapter, { id: 'c', ...command } as CloudCommand));
+      outcome(
+        COMMANDS['job:priority']!(adapter, {
+          id: 'c',
+          ...command,
+        } as CloudCommand) as Promise<unknown>
+      );
     expect(await run({ jobId: String(job.id), priority: Number.NaN })).toBe(
       'error: priority must be a finite number'
     );

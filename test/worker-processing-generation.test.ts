@@ -108,7 +108,7 @@ for (const mode of MODES) {
       await waitUntil(
         () => {
           const lock = harness?.brokerManager().getLockInfo(jobId(job.id));
-          return lock?.token === currentToken && lock.renewalCount > 0;
+          return lock?.token === currentToken && lock!.renewalCount > 0;
         },
         'the current generation heartbeat',
         5_000
@@ -156,11 +156,13 @@ for (const mode of MODES) {
 
       const job = await queue.add('manual-generation', {}, { attempts: 10, durable: true });
       const first = await worker.getNextJob();
-      expect(first?.id).toBe(job.id);
+      expect(first?.id).toBe<string | undefined>(job.id);
       if (!first) throw new Error('Expected the first manual delivery');
       const firstToken = first.token;
       expect(firstToken).toBeString();
-      expect(harness.brokerManager().getLockInfo(jobId(job.id))?.token).toBe(firstToken);
+      expect(harness.brokerManager().getLockInfo(jobId(job.id))?.token).toBe<string | undefined>(
+        firstToken
+      );
       const firstProcessing = worker.processJobManually(first);
       await waitUntil(() => deliveries === 1, 'the first manual generation', 5_000);
 
@@ -178,14 +180,18 @@ for (const mode of MODES) {
       const secondToken = second.token;
       expect(secondToken).toBeString();
       expect(secondToken).not.toBe(firstToken);
-      expect(harness.brokerManager().getLockInfo(jobId(job.id))?.token).toBe(secondToken);
+      expect(harness.brokerManager().getLockInfo(jobId(job.id))?.token).toBe<string | undefined>(
+        secondToken
+      );
       const secondProcessing = worker.processJobManually(second);
       await waitUntil(() => deliveries === 2, 'the second manual generation', 5_000);
 
       finishFirst();
       await firstProcessing;
       expect(await queue.getJobState(job.id)).toBe('active');
-      expect(harness.brokerManager().getLockInfo(jobId(job.id))?.token).toBe(secondToken);
+      expect(harness.brokerManager().getLockInfo(jobId(job.id))?.token).toBe<string | undefined>(
+        secondToken
+      );
 
       finishSecond();
       await secondProcessing;

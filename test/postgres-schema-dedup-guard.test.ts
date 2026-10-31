@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { SQL } from 'bun';
 import type { PostgresContext } from '../src/infrastructure/persistence/postgres/context';
+import type { ResolvedPostgresStorageConfig } from '../src/infrastructure/persistence/postgres/types';
 import { initializePostgresSchema } from '../src/infrastructure/persistence/postgres/schemaInitialization';
 
 const postgresUrl = Bun.env.BUNQUEUE_TEST_POSTGRES_URL;
@@ -22,7 +23,7 @@ function context(sql: SQL, url: string): PostgresContext {
       maxMetricDataPoints: 100,
       maxCompletedJobs: 100,
       maxJobResults: 100,
-    },
+    } as ResolvedPostgresStorageConfig,
   };
 }
 

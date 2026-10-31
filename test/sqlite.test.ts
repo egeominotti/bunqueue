@@ -5,10 +5,14 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { SqliteStorage } from '../src/infrastructure/persistence/sqlite';
-import { jobId } from '../src/domain/types/job';
+import { jobId, type Job } from '../src/domain/types/job';
+import type { CronJob } from '../src/domain/types/cron';
 import { unlink } from 'fs/promises';
 
 const TEST_DB_PATH = './test-storage.db';
+
+/** A mutable Job; the fixtures below set only the fields SqliteStorage persists. */
+type JobFixture = { -readonly [K in keyof Job]: Job[K] };
 
 describe('SqliteStorage', () => {
   let storage: SqliteStorage;
@@ -54,38 +58,39 @@ describe('SqliteStorage', () => {
   });
 
   describe('Job Operations', () => {
-    const createTestJob = (id: string, queue = 'test') => ({
-      id: jobId(id),
-      queue,
-      data: { test: 'data' },
-      priority: 0,
-      createdAt: Date.now(),
-      runAt: Date.now(),
-      startedAt: null,
-      completedAt: null,
-      attempts: 0,
-      maxAttempts: 3,
-      backoff: 1000,
-      ttl: null,
-      timeout: null,
-      uniqueKey: null,
-      customId: null,
-      dependsOn: [],
-      parentId: null,
-      childrenIds: [],
-      childrenCompleted: 0,
-      tags: [],
-      lifo: false,
-      groupId: null,
-      progress: 0,
-      progressMessage: null,
-      removeOnComplete: false,
-      removeOnFail: false,
-      lastHeartbeat: Date.now(),
-      stallTimeout: null,
-      stallCount: 0,
-      timeline: [],
-    });
+    const createTestJob = (id: string, queue = 'test') =>
+      ({
+        id: jobId(id),
+        queue,
+        data: { test: 'data' },
+        priority: 0,
+        createdAt: Date.now(),
+        runAt: Date.now(),
+        startedAt: null,
+        completedAt: null,
+        attempts: 0,
+        maxAttempts: 3,
+        backoff: 1000,
+        ttl: null,
+        timeout: null,
+        uniqueKey: null,
+        customId: null,
+        dependsOn: [],
+        parentId: null,
+        childrenIds: [],
+        childrenCompleted: 0,
+        tags: [],
+        lifo: false,
+        groupId: null,
+        progress: 0,
+        progressMessage: null,
+        removeOnComplete: false,
+        removeOnFail: false,
+        lastHeartbeat: Date.now(),
+        stallTimeout: null,
+        stallCount: 0,
+        timeline: [],
+      }) as Partial<JobFixture> as JobFixture;
 
     test('should insert and retrieve job', () => {
       const job = createTestJob('test-job-1');
@@ -152,38 +157,39 @@ describe('SqliteStorage', () => {
   });
 
   describe('Batch Operations', () => {
-    const createTestJob = (id: string) => ({
-      id: jobId(id),
-      queue: 'test',
-      data: { id },
-      priority: 0,
-      createdAt: Date.now(),
-      runAt: Date.now(),
-      startedAt: null,
-      completedAt: null,
-      attempts: 0,
-      maxAttempts: 3,
-      backoff: 1000,
-      ttl: null,
-      timeout: null,
-      uniqueKey: null,
-      customId: null,
-      dependsOn: [],
-      parentId: null,
-      childrenIds: [],
-      childrenCompleted: 0,
-      tags: [],
-      lifo: false,
-      groupId: null,
-      progress: 0,
-      progressMessage: null,
-      removeOnComplete: false,
-      removeOnFail: false,
-      lastHeartbeat: Date.now(),
-      stallTimeout: null,
-      stallCount: 0,
-      timeline: [],
-    });
+    const createTestJob = (id: string) =>
+      ({
+        id: jobId(id),
+        queue: 'test',
+        data: { id },
+        priority: 0,
+        createdAt: Date.now(),
+        runAt: Date.now(),
+        startedAt: null,
+        completedAt: null,
+        attempts: 0,
+        maxAttempts: 3,
+        backoff: 1000,
+        ttl: null,
+        timeout: null,
+        uniqueKey: null,
+        customId: null,
+        dependsOn: [],
+        parentId: null,
+        childrenIds: [],
+        childrenCompleted: 0,
+        tags: [],
+        lifo: false,
+        groupId: null,
+        progress: 0,
+        progressMessage: null,
+        removeOnComplete: false,
+        removeOnFail: false,
+        lastHeartbeat: Date.now(),
+        stallTimeout: null,
+        stallCount: 0,
+        timeline: [],
+      }) as Partial<JobFixture> as JobFixture;
 
     test('should insert batch of jobs', () => {
       const jobs = Array.from({ length: 10 }, (_, i) => createTestJob(`batch-${i}`));
@@ -217,38 +223,39 @@ describe('SqliteStorage', () => {
   });
 
   describe('Result Storage', () => {
-    const createTestJob = (id: string) => ({
-      id: jobId(id),
-      queue: 'test',
-      data: { id },
-      priority: 0,
-      createdAt: Date.now(),
-      runAt: Date.now(),
-      startedAt: null,
-      completedAt: null,
-      attempts: 0,
-      maxAttempts: 3,
-      backoff: 1000,
-      ttl: null,
-      timeout: null,
-      uniqueKey: null,
-      customId: null,
-      dependsOn: [],
-      parentId: null,
-      childrenIds: [],
-      childrenCompleted: 0,
-      tags: [],
-      lifo: false,
-      groupId: null,
-      progress: 0,
-      progressMessage: null,
-      removeOnComplete: false,
-      removeOnFail: false,
-      lastHeartbeat: Date.now(),
-      stallTimeout: null,
-      stallCount: 0,
-      timeline: [],
-    });
+    const createTestJob = (id: string) =>
+      ({
+        id: jobId(id),
+        queue: 'test',
+        data: { id },
+        priority: 0,
+        createdAt: Date.now(),
+        runAt: Date.now(),
+        startedAt: null,
+        completedAt: null,
+        attempts: 0,
+        maxAttempts: 3,
+        backoff: 1000,
+        ttl: null,
+        timeout: null,
+        uniqueKey: null,
+        customId: null,
+        dependsOn: [],
+        parentId: null,
+        childrenIds: [],
+        childrenCompleted: 0,
+        tags: [],
+        lifo: false,
+        groupId: null,
+        progress: 0,
+        progressMessage: null,
+        removeOnComplete: false,
+        removeOnFail: false,
+        lastHeartbeat: Date.now(),
+        stallTimeout: null,
+        stallCount: 0,
+        timeline: [],
+      }) as Partial<JobFixture> as JobFixture;
 
     test('should store and retrieve result', () => {
       const job = createTestJob('result-job');
@@ -285,37 +292,38 @@ describe('SqliteStorage', () => {
   });
 
   describe('DLQ Operations', () => {
-    const createTestJob = (id: string) => ({
-      id: jobId(id),
-      queue: 'test',
-      data: { id },
-      priority: 0,
-      createdAt: Date.now(),
-      runAt: Date.now(),
-      startedAt: null,
-      completedAt: null,
-      attempts: 3,
-      maxAttempts: 3,
-      backoff: 1000,
-      ttl: null,
-      timeout: null,
-      uniqueKey: null,
-      customId: null,
-      dependsOn: [],
-      parentId: null,
-      childrenIds: [],
-      childrenCompleted: 0,
-      tags: [],
-      lifo: false,
-      groupId: null,
-      progress: 0,
-      progressMessage: null,
-      removeOnComplete: false,
-      removeOnFail: false,
-      lastHeartbeat: Date.now(),
-      stallTimeout: null,
-      stallCount: 0,
-    });
+    const createTestJob = (id: string) =>
+      ({
+        id: jobId(id),
+        queue: 'test',
+        data: { id },
+        priority: 0,
+        createdAt: Date.now(),
+        runAt: Date.now(),
+        startedAt: null,
+        completedAt: null,
+        attempts: 3,
+        maxAttempts: 3,
+        backoff: 1000,
+        ttl: null,
+        timeout: null,
+        uniqueKey: null,
+        customId: null,
+        dependsOn: [],
+        parentId: null,
+        childrenIds: [],
+        childrenCompleted: 0,
+        tags: [],
+        lifo: false,
+        groupId: null,
+        progress: 0,
+        progressMessage: null,
+        removeOnComplete: false,
+        removeOnFail: false,
+        lastHeartbeat: Date.now(),
+        stallTimeout: null,
+        stallCount: 0,
+      }) as Partial<JobFixture> as JobFixture;
 
     test('should store job in DLQ', () => {
       const job = createTestJob('dlq-job');
@@ -339,7 +347,7 @@ describe('SqliteStorage', () => {
         nextRun: Date.now() + 3600000,
         executions: 0,
         maxLimit: null,
-      };
+      } as CronJob;
 
       storage.saveCron(cron);
 
@@ -363,7 +371,7 @@ describe('SqliteStorage', () => {
         nextRun: Date.now(),
         executions: 0,
         maxLimit: null,
-      };
+      } as CronJob;
 
       storage.saveCron(cron);
       storage.deleteCron('delete-cron');
@@ -375,38 +383,39 @@ describe('SqliteStorage', () => {
   });
 
   describe('Load Operations', () => {
-    const createTestJob = (id: string, state: string, runAt: number) => ({
-      id: jobId(id),
-      queue: 'test',
-      data: { id },
-      priority: 0,
-      createdAt: Date.now(),
-      runAt,
-      startedAt: state === 'active' ? Date.now() : null,
-      completedAt: null,
-      attempts: 0,
-      maxAttempts: 3,
-      backoff: 1000,
-      ttl: null,
-      timeout: null,
-      uniqueKey: null,
-      customId: null,
-      dependsOn: [],
-      parentId: null,
-      childrenIds: [],
-      childrenCompleted: 0,
-      tags: [],
-      lifo: false,
-      groupId: null,
-      progress: 0,
-      progressMessage: null,
-      removeOnComplete: false,
-      removeOnFail: false,
-      lastHeartbeat: Date.now(),
-      stallTimeout: null,
-      stallCount: 0,
-      timeline: [],
-    });
+    const createTestJob = (id: string, state: string, runAt: number) =>
+      ({
+        id: jobId(id),
+        queue: 'test',
+        data: { id },
+        priority: 0,
+        createdAt: Date.now(),
+        runAt,
+        startedAt: state === 'active' ? Date.now() : null,
+        completedAt: null,
+        attempts: 0,
+        maxAttempts: 3,
+        backoff: 1000,
+        ttl: null,
+        timeout: null,
+        uniqueKey: null,
+        customId: null,
+        dependsOn: [],
+        parentId: null,
+        childrenIds: [],
+        childrenCompleted: 0,
+        tags: [],
+        lifo: false,
+        groupId: null,
+        progress: 0,
+        progressMessage: null,
+        removeOnComplete: false,
+        removeOnFail: false,
+        lastHeartbeat: Date.now(),
+        stallTimeout: null,
+        stallCount: 0,
+        timeline: [],
+      }) as Partial<JobFixture> as JobFixture;
 
     test('should load pending jobs', () => {
       const job1 = createTestJob('pending-1', 'waiting', Date.now());
@@ -430,38 +439,39 @@ describe('SqliteStorage', () => {
   });
 
   describe('Data Serialization', () => {
-    const createTestJob = (id: string, data: any) => ({
-      id: jobId(id),
-      queue: 'test',
-      data,
-      priority: 0,
-      createdAt: Date.now(),
-      runAt: Date.now(),
-      startedAt: null,
-      completedAt: null,
-      attempts: 0,
-      maxAttempts: 3,
-      backoff: 1000,
-      ttl: null,
-      timeout: null,
-      uniqueKey: null,
-      customId: null,
-      dependsOn: [],
-      parentId: null,
-      childrenIds: [],
-      childrenCompleted: 0,
-      tags: ['tag1', 'tag2'],
-      lifo: false,
-      groupId: null,
-      progress: 0,
-      progressMessage: null,
-      removeOnComplete: false,
-      removeOnFail: false,
-      lastHeartbeat: Date.now(),
-      stallTimeout: null,
-      stallCount: 0,
-      timeline: [],
-    });
+    const createTestJob = (id: string, data: any) =>
+      ({
+        id: jobId(id),
+        queue: 'test',
+        data,
+        priority: 0,
+        createdAt: Date.now(),
+        runAt: Date.now(),
+        startedAt: null,
+        completedAt: null,
+        attempts: 0,
+        maxAttempts: 3,
+        backoff: 1000,
+        ttl: null,
+        timeout: null,
+        uniqueKey: null,
+        customId: null,
+        dependsOn: [],
+        parentId: null,
+        childrenIds: [],
+        childrenCompleted: 0,
+        tags: ['tag1', 'tag2'],
+        lifo: false,
+        groupId: null,
+        progress: 0,
+        progressMessage: null,
+        removeOnComplete: false,
+        removeOnFail: false,
+        lastHeartbeat: Date.now(),
+        stallTimeout: null,
+        stallCount: 0,
+        timeline: [],
+      }) as Partial<JobFixture> as JobFixture;
 
     test('should serialize and deserialize complex job data', () => {
       const complexData = {

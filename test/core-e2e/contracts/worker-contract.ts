@@ -89,7 +89,7 @@ export async function runWorkerContract(mode: CoreE2eMode): Promise<CoverageTrac
     ensure(extended === 1, `extendJobLocks returned ${extended}`);
 
     const cancellationQueue = harness.queue<{ value: number }>('cancel');
-    let release = () => undefined;
+    let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });

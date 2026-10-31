@@ -98,7 +98,7 @@ describe('EmbeddedBackend - Job Operations', () => {
   });
 
   test('updateProgress works for active job', async () => {
-    const added = await backend.addJob('progress-q', 'prog-test', {});
+    await backend.addJob('progress-q', 'prog-test', {});
     const pulled = await backend.pullJob('progress-q');
     expect(pulled).not.toBeNull();
 
@@ -581,7 +581,7 @@ describe('EmbeddedBackend - Progress', () => {
   });
 
   test('getProgress returns progress after update', async () => {
-    const added = await backend.addJob('prog-q', 'prog-test', {});
+    await backend.addJob('prog-q', 'prog-test', {});
     const pulled = await backend.pullJob('prog-q');
     expect(pulled).not.toBeNull();
 
@@ -672,7 +672,7 @@ describe('EmbeddedBackend - End-to-end flows', () => {
   });
 
   test('full job lifecycle: add, pull, heartbeat, progress, ack, verify completed', async () => {
-    const added = await backend.addJob('e2e-lifecycle', 'full-cycle', { step: 'start' });
+    await backend.addJob('e2e-lifecycle', 'full-cycle', { step: 'start' });
     const pulled = await backend.pullJob('e2e-lifecycle');
     expect(pulled).not.toBeNull();
 

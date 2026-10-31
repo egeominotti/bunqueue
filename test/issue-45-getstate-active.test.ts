@@ -17,7 +17,7 @@ describe('Issue #45: job.getState() inside active event', () => {
 
     const worker = new Worker<{ value: number }>(
       'issue-45-test',
-      async (job) => {
+      async (_job) => {
         await Bun.sleep(50);
         return { done: true };
       },

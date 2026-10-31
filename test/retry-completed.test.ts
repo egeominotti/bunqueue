@@ -3,6 +3,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Queue, shutdownManager } from '../src/client';
 import { getSharedManager } from '../src/client/manager';
+import type { JobCounts } from '../src/client/queue/operations/counts';
+import type { JobId } from '../src/domain/types/job';
 
 describe('retryCompleted', () => {
   const QUEUE_NAME = 'test-retry-completed';
@@ -26,14 +28,14 @@ describe('retryCompleted', () => {
     const job = await queue.add('test-job', { msg: 'hello' }, { removeOnComplete: false });
     const manager = getSharedManager();
     const pulled = await manager.pull(QUEUE_NAME);
-    expect(pulled?.id).toBe(job.id);
-    await manager.ack(job.id, { ok: true });
-    expect(await manager.getJobState(job.id)).toBe('completed');
+    expect(pulled?.id).toBe(job.id as JobId);
+    await manager.ack(job.id as JobId, { ok: true });
+    expect(await manager.getJobState(job.id as JobId)).toBe('completed');
 
     const retryCount = queue.retryCompleted(job.id);
     expect(retryCount).toBe(1);
-    expect(await manager.getJobState(job.id)).toBe('waiting');
-    expect((await manager.pull(QUEUE_NAME))?.id).toBe(job.id);
+    expect(await manager.getJobState(job.id as JobId)).toBe('waiting');
+    expect((await manager.pull(QUEUE_NAME))?.id).toBe(job.id as JobId);
     await queue.close();
   });
 
@@ -41,9 +43,9 @@ describe('retryCompleted', () => {
     const queue = new Queue<{ msg: string }>(QUEUE_NAME, { embedded: true });
     const job = await queue.add('disposable', { msg: 'bye' }, { removeOnComplete: true });
     const manager = getSharedManager();
-    expect((await manager.pull(QUEUE_NAME))?.id).toBe(job.id);
-    await manager.ack(job.id, { ok: true });
-    expect(await manager.getJobState(job.id)).toBe('unknown');
+    expect((await manager.pull(QUEUE_NAME))?.id).toBe(job.id as JobId);
+    await manager.ack(job.id as JobId, { ok: true });
+    expect(await manager.getJobState(job.id as JobId)).toBe('unknown');
 
     expect(queue.retryCompleted(job.id)).toBe(0);
     await queue.close();
@@ -53,11 +55,11 @@ describe('retryCompleted', () => {
     const queue = new Queue<{ msg: string }>(QUEUE_NAME, { embedded: true });
     const job = await queue.add('job1', { msg: 'test' }, { removeOnComplete: false });
     const manager = getSharedManager();
-    expect((await manager.pull(QUEUE_NAME))?.id).toBe(job.id);
-    await manager.ack(job.id, { ok: true });
+    expect((await manager.pull(QUEUE_NAME))?.id).toBe(job.id as JobId);
+    await manager.ack(job.id as JobId, { ok: true });
 
-    expect(await manager.getJobState(job.id)).toBe('completed');
-    expect(queue.getJobCounts().completed).toBe(1);
+    expect(await manager.getJobState(job.id as JobId)).toBe('completed');
+    expect((queue.getJobCounts() as JobCounts).completed).toBe(1);
     await queue.close();
   });
 });

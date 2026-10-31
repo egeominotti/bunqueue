@@ -29,7 +29,7 @@ import { unlinkSync } from 'fs';
 
 function mockJob(id: number): Job {
   return {
-    id: BigInt(id) as JobId,
+    id: BigInt(id) as unknown as JobId,
     queue: 'q',
     data: { i: id },
     priority: 0,
@@ -173,7 +173,7 @@ describe('WriteBuffer critical-loss handling at SqliteStorage', () => {
 
     expect(captured.length).toBe(1);
     expect(captured[0].jobs.length).toBe(1);
-    expect(captured[0].jobs[0].id).toBe(BigInt(42) as JobId);
+    expect(captured[0].jobs[0].id).toBe(BigInt(42) as unknown as JobId);
     expect(captured[0].error.message).toBe('Boom');
 
     (storage as unknown as { db: { close: (b: boolean) => void } }).db.close(false);

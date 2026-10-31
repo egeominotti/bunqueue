@@ -3,7 +3,7 @@
  * LRUMap, LRUSet, and TTLMap implementations
  */
 
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach } from 'bun:test';
 import { LRUMap, LRUSet, TTLMap } from '../src/shared/lru';
 
 describe('LRUMap', () => {

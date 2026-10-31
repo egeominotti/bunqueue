@@ -6,6 +6,7 @@
 
 import { describe, test, expect, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 describe('Graceful Shutdown - Embedded', () => {
   afterEach(() => {
@@ -38,7 +39,7 @@ describe('Graceful Shutdown - Embedded', () => {
     // Wait for the worker to pick up the job
     for (let i = 0; i < 20; i++) {
       await Bun.sleep(100);
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
       if (counts.active > 0) break;
     }
 
@@ -98,7 +99,7 @@ describe('Graceful Shutdown - Embedded', () => {
     // Wait for all jobs to become active
     for (let i = 0; i < 30; i++) {
       await Bun.sleep(100);
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
       if (counts.active >= 3) break;
     }
 
@@ -165,7 +166,7 @@ describe('Graceful Shutdown - Embedded', () => {
     // Wait for worker2 to process remaining jobs
     for (let i = 0; i < 50; i++) {
       await Bun.sleep(100);
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
       if (counts.waiting === 0 && counts.active === 0) break;
     }
 
@@ -212,8 +213,7 @@ describe('Graceful Shutdown - Embedded', () => {
     expect(phase1Count).toBeGreaterThanOrEqual(1);
 
     // Check remaining
-    const countsAfterClose = queue.getJobCounts();
-    const remaining = countsAfterClose.waiting;
+    queue.getJobCounts();
 
     // Start new worker for remaining jobs
     const processedPhase2: string[] = [];
@@ -229,7 +229,7 @@ describe('Graceful Shutdown - Embedded', () => {
     // Wait for all remaining to be processed
     for (let i = 0; i < 50; i++) {
       await Bun.sleep(100);
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
       if (counts.waiting === 0 && counts.active === 0) break;
     }
 
@@ -275,7 +275,7 @@ describe('Graceful Shutdown - Embedded', () => {
     const finalCompleted = completedCount;
 
     // Check remaining waiting jobs
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     const remainingWaiting = counts.waiting;
 
     // No jobs should be lost: completed + waiting should equal total

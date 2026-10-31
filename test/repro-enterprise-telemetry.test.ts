@@ -3,6 +3,7 @@ import { QueueManager } from '../src/application/queueManager';
 import { resolveServerConfig } from '../src/config/resolve';
 import { BackupTelemetry } from '../src/infrastructure/backup/backupTelemetry';
 import { S3BackupManager } from '../src/infrastructure/backup/s3Backup';
+import type { JobInput } from '../src/domain/types/job';
 
 const managers: QueueManager[] = [];
 
@@ -27,9 +28,9 @@ describe('enterprise telemetry regressions', () => {
   test('bounds per-queue series and reports omitted queues', async () => {
     const manager = new QueueManager({ maxPrometheusQueues: 2 });
     managers.push(manager);
-    await manager.push('alpha', { id: 1 });
-    await manager.push('beta', { id: 2 });
-    await manager.push('gamma', { id: 3 });
+    await manager.push('alpha', { id: 1 } as unknown as JobInput);
+    await manager.push('beta', { id: 2 } as unknown as JobInput);
+    await manager.push('gamma', { id: 3 } as unknown as JobInput);
 
     const output = manager.getPrometheusMetrics();
     const waitingSeries = output

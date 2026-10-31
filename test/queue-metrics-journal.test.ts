@@ -54,12 +54,12 @@ for (const mode of MODES) {
       const epoch = Math.floor(Date.now() / MINUTE) * MINUTE;
       setSystemTime(new Date(epoch));
 
-      harness.worker(queue.name, async (job) => {
+      harness.worker<{ minute: number; fail?: boolean }>(queue.name, async (job) => {
         setSystemTime(new Date(epoch + job.data.minute * MINUTE + 1_000));
         if (job.data.fail) throw new Error('expected failure');
         return true;
       });
-      harness.worker(other.name, async (job) => {
+      harness.worker<{ minute: number }>(other.name, async (job) => {
         setSystemTime(new Date(epoch + job.data.minute * MINUTE + 1_000));
         return true;
       });

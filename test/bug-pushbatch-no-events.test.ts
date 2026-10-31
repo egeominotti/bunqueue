@@ -36,7 +36,7 @@ describe('Bug: pushJobBatch missing "pushed" events', () => {
     const job = await qm.push('events-q', { data: { msg: 'single' } });
 
     expect(events.length).toBe(1);
-    expect(events[0].eventType).toBe('pushed');
+    expect(events[0].eventType as string).toBe('pushed');
     expect(events[0].queue).toBe('events-q');
     expect(events[0].jobId).toBe(job.id);
     expect(events[0].timestamp).toBeGreaterThan(0);
@@ -59,7 +59,7 @@ describe('Bug: pushJobBatch missing "pushed" events', () => {
 
     // Each job in the batch should emit a "pushed" event
     expect(events.length).toBe(3);
-    expect(events[0].eventType).toBe('pushed');
+    expect(events[0].eventType as string).toBe('pushed');
     expect(events[0].queue).toBe('events-q');
 
     // All job IDs from the batch should appear in events

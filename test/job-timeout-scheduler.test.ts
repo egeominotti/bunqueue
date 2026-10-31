@@ -50,7 +50,7 @@ describe('job timeout deadline scheduler', () => {
 
     expect(delivery.job?.id).toBe(job.id);
     expect(delivery.token).toBeString();
-    expect(manager.getLockInfo(job.id)?.token).toBe(delivery.token);
+    expect<string | null | undefined>(manager.getLockInfo(job.id)?.token).toBe(delivery.token);
     await waitForState(job.id, 'failed');
     expect(pendingTimeouts(manager)).toBe(0);
   });

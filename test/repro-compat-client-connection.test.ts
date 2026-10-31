@@ -31,7 +31,10 @@ const internals = (pool: TcpConnectionPool) => pool as unknown as PoolInternals;
 describe('a numeric-string port (process.env.PORT) is a port', () => {
   test('TcpConnectionPool connects to it', async () => {
     const broker = startBroker();
-    const pool = track(new TcpConnectionPool({ host: HOST, port: String(broker.port) }));
+    const pool = track(
+      // Deliberately invalid input: a numeric-string port checks runtime coercion.
+      new TcpConnectionPool({ host: HOST, port: String(broker.port) as unknown as number })
+    );
     const reply = await pool.send({ cmd: 'Ping' });
     expect(reply.ok).toBe(true);
     expect(broker.count('Ping')).toBe(1);

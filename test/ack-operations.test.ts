@@ -181,7 +181,7 @@ describe('Ack Operations', () => {
       });
       const pulled = await qm.pull('test-q');
       // The job ID should be the customId value
-      expect(pulled!.id).toBe('unique-job-1');
+      expect(pulled!.id).toBe('unique-job-1' as JobId);
 
       await qm.ack(pulled!.id);
 
@@ -466,7 +466,7 @@ describe('Ack Operations', () => {
       });
       const pulled = await qm.pull('test-q');
       // customId is used as the job ID
-      expect(pulled!.id).toBe('my-custom-id');
+      expect(pulled!.id).toBe('my-custom-id' as JobId);
       await qm.fail(pulled!.id, 'Error');
 
       // Job should be completely gone (removeOnFail + max attempts exceeded)
@@ -795,9 +795,9 @@ describe('Ack Operations', () => {
     });
 
     test('should handle ack and fail interleaved', async () => {
-      const pushed1 = await qm.push('test-q', { data: { id: 1 }, maxAttempts: 1 });
-      const pushed2 = await qm.push('test-q', { data: { id: 2 } });
-      const pushed3 = await qm.push('test-q', { data: { id: 3 }, maxAttempts: 1 });
+      await qm.push('test-q', { data: { id: 1 }, maxAttempts: 1 });
+      await qm.push('test-q', { data: { id: 2 } });
+      await qm.push('test-q', { data: { id: 3 }, maxAttempts: 1 });
 
       const p1 = await qm.pull('test-q');
       const p2 = await qm.pull('test-q');
@@ -868,7 +868,7 @@ describe('Ack Operations', () => {
 
     test('should handle rapid push-pull-ack cycle', async () => {
       for (let i = 0; i < 50; i++) {
-        const pushed = await qm.push('test-q', { data: { id: i } });
+        await qm.push('test-q', { data: { id: i } });
         const pulled = await qm.pull('test-q');
         await qm.ack(pulled!.id, { processed: i });
       }

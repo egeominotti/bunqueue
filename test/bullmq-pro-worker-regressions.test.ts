@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { Queue, shutdownManager, Worker } from '../src/client';
 import { resolveProcessorResult } from '../src/client/worker/processorResult';
+import type { Job, Processor, ProcessorContext } from '../src/client/types';
 
 const queues: Queue<unknown>[] = [];
 const workers: Worker<unknown, unknown>[] = [];
@@ -174,13 +175,13 @@ describe('BullMQ Pro Worker regressions', () => {
     let outcomes = 0;
     const worker = new Worker(
       name,
-      async (_job, { signal }) => {
+      (async (_job: Job, { signal }: ProcessorContext) => {
         started.resolve(undefined);
         await release.promise;
         signalObserved = signal.aborted;
         if (signal.aborted) throw signal.reason;
         return 'completed without cancellation';
-      },
+      }) as Processor<unknown, string>,
       { autorun: false, batch: { size: 2, minSize: 2 }, embedded: true }
     );
     workers.push(worker as Worker<unknown, unknown>);

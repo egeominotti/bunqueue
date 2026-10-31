@@ -4,6 +4,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { CronScheduler } from '../src/infrastructure/scheduler/cronScheduler';
+import type { CronJob } from '../src/domain/types/cron';
 import {
   validateCronExpression,
   getNextCronRun,
@@ -224,7 +225,7 @@ describe('CronScheduler', () => {
         nextRun: Date.now() + 60000,
         executions: 0,
         maxLimit: null,
-      },
+      } as CronJob,
     ]);
 
     expect(scheduler.list().length).toBe(1);

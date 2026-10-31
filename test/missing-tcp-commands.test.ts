@@ -10,6 +10,7 @@ import { QueueManager } from '../src/application/queueManager';
 import type { HandlerContext } from '../src/infrastructure/server/types';
 import { handleCommand } from '../src/infrastructure/server/handler';
 import type { Command } from '../src/domain/types/command';
+import type { CountResponse } from '../src/domain/types/response';
 
 function createContext(qm: QueueManager): HandlerContext {
   return {
@@ -148,7 +149,7 @@ describe('ExtendLocks command', () => {
     );
 
     expect(res.ok).toBe(true);
-    const data = res as Record<string, unknown>;
+    const data = res as CountResponse;
     expect(data.count).toBe(2);
   });
 });
@@ -312,7 +313,7 @@ describe('PromoteJobs command', () => {
     const res = await handleCommand({ cmd: 'PromoteJobs', queue: 'test-queue' } as Command, ctx);
 
     expect(res.ok).toBe(true);
-    const data = res as Record<string, unknown>;
+    const data = res as CountResponse;
     expect(typeof data.count).toBe('number');
     expect(data.count).toBeGreaterThanOrEqual(0);
   });

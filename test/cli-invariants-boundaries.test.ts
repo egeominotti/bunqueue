@@ -50,7 +50,7 @@ describe('CLI pure boundaries and generated inputs', () => {
         const normalized = JSON.parse(JSON.stringify(data));
         const command = await buildCommand('push', [queue, JSON.stringify(data)]);
         expect(command).toEqual({ cmd: 'PUSH', queue, name: 'default', data: normalized });
-        expect(decodeMessagePack(encodeMessagePack(command))).toEqual(command);
+        expect(decodeMessagePack<typeof command>(encodeMessagePack(command))).toEqual(command);
       }),
       { numRuns: 2_000 }
     );
@@ -58,7 +58,7 @@ describe('CLI pure boundaries and generated inputs', () => {
     for (const text of UNICODE_TEXT) {
       const command = await buildCommand('job', ['log', 'id', text]);
       expect(command).toEqual({ cmd: 'AddLog', id: 'id', message: text, level: 'info' });
-      expect(decodeMessagePack(encodeMessagePack(command))).toEqual(command);
+      expect(decodeMessagePack<typeof command>(encodeMessagePack(command))).toEqual(command);
     }
     await expect(buildCommand('job', ['log', 'id', ''])).rejects.toThrow(
       'Missing required argument: message'

@@ -173,11 +173,11 @@ test('reference build integration updates only built current pages and preserves
     const { integration } = referenceSeo(files.publicRoot, current, SITE);
     const hook = integration.hooks['astro:build:done']!;
     const context = { dir: pathToFileURL(`${files.distRoot}/`), logger: { info: () => {} } };
-    await hook(context as Parameters<typeof hook>[0]);
+    await hook(context as unknown as Parameters<typeof hook>[0]);
     const result = readFileSync(join(files.distRoot, 'reference', current, page.file), 'utf8');
     expect(readSeoHead(result).canonicals).toEqual([page.url]);
     expect(readSeoHead(result).noindex).toBe(true);
-    await hook(context as Parameters<typeof hook>[0]);
+    await hook(context as unknown as Parameters<typeof hook>[0]);
     expect(readFileSync(join(files.distRoot, 'reference', current, page.file), 'utf8')).toBe(
       result
     );

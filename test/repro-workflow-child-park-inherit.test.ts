@@ -264,7 +264,7 @@ describe('a live child is never rolled back under its own feet', () => {
       parentWf,
       store,
       null,
-      new Map([
+      new Map<string, Workflow>([
         ['live-parent', parentWf],
         ['live-child', childWf],
       ])
@@ -320,7 +320,7 @@ describe('a live child is never rolled back under its own feet', () => {
       parentWf,
       store,
       null,
-      new Map([
+      new Map<string, Workflow>([
         ['done-parent', parentWf],
         ['done-child', childWf],
       ])
@@ -383,7 +383,7 @@ describe('the operator exits the guide names actually work', () => {
       update() {},
       get: (id: string) => (id === 'exit-c1' ? child : parent),
     } as never;
-    const registry = new Map([
+    const registry = new Map<string, Workflow>([
       ['exit-parent', parentWf],
       ['exit-child', childWf],
     ]);

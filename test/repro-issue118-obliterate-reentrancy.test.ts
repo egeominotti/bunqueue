@@ -222,8 +222,10 @@ describe('issue #118 obliterate admission fences', () => {
       data: { valid: true },
       durable: true,
     });
-    expect(replacement.id).toBe('\uFFFD');
-    expect(manager.getJobs(queue, { start: 0, end: 3 }).map(({ id }) => id)).toEqual(['\uFFFD']);
+    expect(replacement.id).toBe('\uFFFD' as JobId);
+    expect(manager.getJobs(queue, { start: 0, end: 3 }).map(({ id }) => id)).toEqual([
+      '\uFFFD',
+    ] as JobId[]);
   });
 
   test('pushBatch preserves an explicitly thrown undefined storage failure', async () => {

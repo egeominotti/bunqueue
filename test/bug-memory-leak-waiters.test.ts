@@ -19,6 +19,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { EventsManager } from '../src/application/eventsManager';
 import { WebhookManager } from '../src/application/webhookManager';
+import type { JobId } from '../src/domain/types/job';
 
 type CompletionWaiterState = { cancelled: boolean };
 type CompletionWaiterRegistry = Map<string, Set<CompletionWaiterState>>;
@@ -124,7 +125,9 @@ describe('Fix Verified: Memory Leak in Waiters (eventsManager.ts:56-82)', () => 
     }
 
     // Create waiters for non-existent jobs
-    const waitPromises = fakeJobIds.map((jobId) => qm.waitForJobCompletion(jobId, TIMEOUT_MS));
+    const waitPromises = fakeJobIds.map((jobId) =>
+      qm.waitForJobCompletion(jobId as unknown as JobId, TIMEOUT_MS)
+    );
 
     const mapSizeBefore = completionWaiters.size;
     console.log(`Map size during wait: ${mapSizeBefore}`);
@@ -204,7 +207,7 @@ describe('Fix Verified: Memory Leak in Waiters (eventsManager.ts:56-82)', () => 
       const waitPromises = [];
       for (let i = 0; i < WAITERS_PER_ITERATION; i++) {
         const fakeId = BigInt(iter * 1000000 + i);
-        waitPromises.push(qm.waitForJobCompletion(fakeId, TIMEOUT_MS));
+        waitPromises.push(qm.waitForJobCompletion(fakeId as unknown as JobId, TIMEOUT_MS));
       }
 
       await Promise.all(waitPromises);
@@ -248,7 +251,10 @@ describe('EventsManager Isolated Tests', () => {
     const TIMEOUT_MS = 10;
 
     // Wait for non-existent job
-    const result = await eventsManager.waitForJobCompletion(fakeJobId, TIMEOUT_MS);
+    const result = await eventsManager.waitForJobCompletion(
+      fakeJobId as unknown as JobId,
+      TIMEOUT_MS
+    );
 
     expect(result).toBe(false); // Timed out
 

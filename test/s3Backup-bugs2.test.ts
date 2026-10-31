@@ -220,7 +220,7 @@ describe('BUG: compression should be non-blocking', () => {
     // Patch gzipSync to detect if it's called
     const originalGzipSync = Bun.gzipSync;
     let syncCalled = false;
-    (Bun as any).gzipSync = (...args: any[]) => {
+    (Bun as any).gzipSync = (...args: Parameters<typeof Bun.gzipSync>) => {
       syncCalled = true;
       return originalGzipSync(...args);
     };

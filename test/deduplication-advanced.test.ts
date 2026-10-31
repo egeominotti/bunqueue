@@ -43,7 +43,7 @@ describe('Advanced Deduplication', () => {
 
   describe('TTL-based deduplication', () => {
     test('unique key expires after TTL', async () => {
-      const queue = new Queue<{ msg: string }>(QUEUE_NAME, { embedded: true });
+      new Queue<{ msg: string }>(QUEUE_NAME, { embedded: true });
 
       // Add job with uniqueKey that has 100ms TTL using dedup option
       const manager = getSharedManager();

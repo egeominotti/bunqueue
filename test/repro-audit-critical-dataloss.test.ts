@@ -34,7 +34,7 @@
  */
 
 import { describe, test, expect, afterEach, beforeEach } from 'bun:test';
-import { Database } from 'bun:sqlite';
+import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import { existsSync, rmSync } from 'node:fs';
 import { Queue, Worker, shutdownManager } from '../src/client';
 
@@ -51,7 +51,7 @@ function rowsInJobsTable(dbPath: string, where: string, params: unknown[]): numb
   const db = new Database(dbPath, { readonly: true });
   try {
     const row = db
-      .query<{ c: number }, unknown[]>(`SELECT count(*) AS c FROM jobs WHERE ${where}`)
+      .query<{ c: number }, SQLQueryBindings[]>(`SELECT count(*) AS c FROM jobs WHERE ${where}`)
       .get(...(params as never[]));
     return row?.c ?? 0;
   } finally {

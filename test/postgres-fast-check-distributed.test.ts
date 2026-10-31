@@ -230,7 +230,7 @@ describe('PostgreSQL fast-check distributed invariants', () => {
             let accepted = 0;
             let paused = false;
             for (const [step, action] of actions.entries()) {
-              const store = action.broker === true ? b : a;
+              const store = (action as { broker?: boolean }).broker === true ? b : a;
               if (action.kind === 'push') {
                 const id = jobId(`${name}-${String(accepted).padStart(3, '0')}`);
                 await store.insert(
@@ -253,7 +253,9 @@ describe('PostgreSQL fast-check distributed invariants', () => {
                 paused = action.kind === 'pause';
                 await store.pause(name, paused);
               } else if (active.size > 0) {
-                const selected = [...active.values()][action.index % active.size];
+                const selected = [...active.values()][
+                  (action as { index: number }).index % active.size
+                ];
                 if (action.kind === 'stale-ack') {
                   expect(
                     (await store.complete(selected.claim.job.id, 'invalid-token')).applied

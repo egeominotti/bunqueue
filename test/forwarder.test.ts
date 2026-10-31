@@ -14,6 +14,7 @@ import { unlink } from 'fs/promises';
 import { QueueManager } from '../src/application/queueManager';
 import { createTcpServer, type TcpServer } from '../src/infrastructure/server/tcp';
 import { Queue, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 const REMOTE_PORT = 18871;
 const DB = './test-forwarder.db';
@@ -83,13 +84,13 @@ describe('queue.forward() basics', () => {
     open.push(fwd);
 
     await waitFor(async () => (await remote.getJobCountsAsync()).waiting >= 5);
-    const waiting = await remote.getWaitingAsync<{ n: number }>();
+    const waiting = await remote.getWaitingAsync();
     expect(waiting.length).toBe(5);
     expect(new Set(waiting.map((j) => j.data.n))).toEqual(new Set([0, 1, 2, 3, 4]));
     expect(waiting.every((j) => j.name === 'reading')).toBe(true);
 
     // Local queue fully drained (jobs completed locally after remote accept)
-    const counts = local.getJobCounts();
+    const counts = local.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(0);
     expect(counts.active).toBe(0);
   });
@@ -106,7 +107,7 @@ describe('queue.forward() basics', () => {
     open.push(fwd);
 
     await waitFor(async () => (await remote.getJobCountsAsync()).waiting >= 1);
-    const waiting = await remote.getWaitingAsync<{ v: string }>();
+    const waiting = await remote.getWaitingAsync();
     expect(waiting.length).toBe(1);
     expect(waiting[0].data.v).toBe('mapped');
   });
@@ -159,7 +160,7 @@ describe('queue.forward() TCP source → TCP remote', () => {
       const fwd = source.forward({ to: { host: '127.0.0.1', port: REMOTE_PORT } });
 
       await waitFor(async () => (await remote.getJobCountsAsync()).waiting >= 1);
-      const waiting = await remote.getWaitingAsync<{ s: number }>();
+      const waiting = await remote.getWaitingAsync();
       expect(waiting.length).toBe(1);
       expect(waiting[0].data.s).toBe(7);
 
@@ -196,12 +197,12 @@ describe('queue.forward() failure handling', () => {
 
     // Wait until all attempts are burned
     await waitFor(() => {
-      const c = local.getJobCounts();
+      const c = local.getJobCounts() as JobCounts;
       return c.waiting + c.active + c.delayed === 0;
     }, 12000);
 
     // Nothing lost: every job is accounted for locally (DLQ after attempts)
-    const counts = local.getJobCounts();
+    const counts = local.getJobCounts() as JobCounts;
     const dlq = local.getDlq();
     expect(dlq.length + counts.waiting + counts.delayed + counts.active).toBe(3);
     expect(counts.completed).toBe(0); // nothing falsely marked as forwarded
@@ -216,6 +217,6 @@ describe('queue.forward() failure handling', () => {
     await Bun.sleep(300);
 
     // Forwarder stopped: job remains local
-    expect(local.getJobCounts().waiting).toBe(1);
+    expect((local.getJobCounts() as JobCounts).waiting).toBe(1);
   });
 });

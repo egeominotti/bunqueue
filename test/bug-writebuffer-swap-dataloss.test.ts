@@ -31,7 +31,7 @@ import type { Job, JobId } from '../src/domain/types/job';
 /** Helper to create a mock job */
 function createMockJob(id: number): Job {
   return {
-    id: BigInt(id) as JobId,
+    id: BigInt(id) as unknown as JobId,
     queue: 'test-queue',
     data: { test: id },
     priority: 0,
@@ -60,7 +60,7 @@ function createMockJob(id: number): Job {
     lastHeartbeat: null,
     lockToken: null,
     lockExpiresAt: null,
-  };
+  } as unknown as Job;
 }
 
 describe('WriteBuffer Data Loss Bugs', () => {
@@ -130,7 +130,7 @@ describe('WriteBuffer Data Loss Bugs', () => {
       errorMessages.push(err.message);
     };
 
-    const onCriticalError: CriticalErrorCallback = (jobs, lastError) => {
+    const onCriticalError: CriticalErrorCallback = (jobs, _lastError) => {
       lostJobs.push(...jobs);
     };
 

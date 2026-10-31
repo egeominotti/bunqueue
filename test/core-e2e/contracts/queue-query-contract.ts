@@ -5,7 +5,7 @@ import { CoverageTracker, ensure, eventually } from '../support/tracker';
 export async function runQueueQueryContract(mode: CoreE2eMode): Promise<CoverageTracker> {
   const harness = await CoreE2eHarness.start(mode, 'queue-query');
   const tracker = new CoverageTracker(mode, 'queue-query-contract');
-  let releaseActive = () => undefined;
+  let releaseActive: () => void = () => undefined;
   const activeGate = new Promise<void>((resolve) => {
     releaseActive = resolve;
   });

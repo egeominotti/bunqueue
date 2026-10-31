@@ -40,7 +40,7 @@ describe('Protocol Parser', () => {
     });
 
     test('should parse all command types', () => {
-      const commands = ['PUSH', 'PULL', 'ACK', 'FAIL', 'PUSHB', 'PULLB', 'ACKB'];
+      const commands = ['PUSH', 'PULL', 'ACK', 'FAIL', 'PUSHB', 'PULLB', 'ACKB'] as const;
       for (const cmd of commands) {
         const parsed = parseCommand(`{"cmd":"${cmd}","queue":"test"}`);
         expect(parsed?.cmd).toBe(cmd);

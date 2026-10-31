@@ -15,6 +15,7 @@ import {
   toDomainDlqConfig,
   toDomainFilter,
 } from '../src/client/queue/helpers';
+import type { DlqFilter } from '../src/client/types';
 
 /**
  * Helper: add a job, pull it to make it active, then return the pulled job's ID.
@@ -1005,15 +1006,15 @@ describe('Queue Helpers', () => {
     });
 
     it('should pass through a filter object', () => {
-      const filter = { reason: 'timeout', limit: 10 };
+      const filter: DlqFilter = { reason: 'timeout', limit: 10 };
       const result = toDomainFilter(filter);
       expect(result).toBeDefined();
-      expect(result.reason).toBe('timeout');
-      expect(result.limit).toBe(10);
+      expect(result!.reason as string).toBe('timeout');
+      expect(result!.limit).toBe(10);
     });
 
     it('should pass through filter with all fields', () => {
-      const filter = {
+      const filter: DlqFilter = {
         reason: 'stalled',
         olderThan: 1000,
         newerThan: 500,
@@ -1023,10 +1024,10 @@ describe('Queue Helpers', () => {
         offset: 10,
       };
       const result = toDomainFilter(filter);
-      expect(result.reason).toBe('stalled');
-      expect(result.olderThan).toBe(1000);
-      expect(result.limit).toBe(50);
-      expect(result.offset).toBe(10);
+      expect(result!.reason as string).toBe('stalled');
+      expect(result!.olderThan).toBe(1000);
+      expect(result!.limit).toBe(50);
+      expect(result!.offset).toBe(10);
     });
   });
 

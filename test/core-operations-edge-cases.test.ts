@@ -5,7 +5,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
-import type { Job } from '../src/domain/types/job';
+import type { Job, JobId } from '../src/domain/types/job';
 import { unlink } from 'node:fs/promises';
 
 const TEST_DB = './test-core-edge.db';
@@ -61,7 +61,7 @@ describe('Push Operation Edge Cases', () => {
     // Push child with dependency on completed parent
     const child = await qm.push(QUEUE, {
       data: { child: true },
-      dependsOn: [String(parent.id)],
+      dependsOn: [String(parent.id) as JobId],
     });
 
     expect(child).toBeDefined();
@@ -200,7 +200,7 @@ describe('Ack Operation Edge Cases', () => {
   test('ack already completed job should throw', async () => {
     const QUEUE = 'double-ack-queue';
 
-    const job = await qm.push(QUEUE, { data: { test: true } });
+    await qm.push(QUEUE, { data: { test: true } });
     const pulled = await qm.pull(QUEUE, 0);
 
     // First ack succeeds
@@ -308,7 +308,7 @@ describe('Query Operation Edge Cases', () => {
     expect((waitingJob?.data as { state: string }).state).toBe('waiting');
 
     // Active job
-    const active = await qm.push(QUEUE, { data: { state: 'active' } });
+    await qm.push(QUEUE, { data: { state: 'active' } });
     await qm.pull(QUEUE, 0); // pulls 'waiting' first
     const pulledActive = await qm.pull(QUEUE, 0);
     const activeJob = await qm.getJob(pulledActive!.id);
@@ -534,7 +534,7 @@ describe('Job Management Edge Cases', () => {
     const QUEUE = 'priority-change-queue';
 
     const lowJob = await qm.push(QUEUE, { data: { type: 'low' }, priority: 1 });
-    const highJob = await qm.push(QUEUE, { data: { type: 'high' }, priority: 10 });
+    await qm.push(QUEUE, { data: { type: 'high' }, priority: 10 });
 
     // High priority pulled first
     const first = await qm.pull(QUEUE, 0);
@@ -630,7 +630,7 @@ describe('Boundary Condition Tests', () => {
   });
 
   test('push with zero delay should be immediately ready', async () => {
-    const job = await qm.push('zero-delay-queue', {
+    await qm.push('zero-delay-queue', {
       data: { test: true },
       delay: 0,
     });
@@ -640,7 +640,7 @@ describe('Boundary Condition Tests', () => {
   });
 
   test('push with negative delay should be treated as zero', async () => {
-    const job = await qm.push('negative-delay-queue', {
+    await qm.push('negative-delay-queue', {
       data: { test: true },
       delay: -1000,
     });
@@ -790,9 +790,9 @@ describe('FIFO Group Blocking', () => {
     const QUEUE = 'fifo-group-queue';
 
     // Push jobs in same group
-    const job1 = await qm.push(QUEUE, { data: { order: 1 }, groupId: 'group-a' });
-    const job2 = await qm.push(QUEUE, { data: { order: 2 }, groupId: 'group-a' });
-    const job3 = await qm.push(QUEUE, { data: { order: 3 }, groupId: 'group-a' });
+    await qm.push(QUEUE, { data: { order: 1 }, groupId: 'group-a' });
+    await qm.push(QUEUE, { data: { order: 2 }, groupId: 'group-a' });
+    await qm.push(QUEUE, { data: { order: 3 }, groupId: 'group-a' });
 
     // First pull should get job1
     const group = { concurrency: 1 };
@@ -1032,7 +1032,7 @@ describe('Query Operations Extended', () => {
     expect(qm.getStats().dlq).toBe(1);
 
     // getJob should still find it via storage
-    const foundJob = await qm.getJob(job.id);
+    await qm.getJob(job.id);
     // Note: DLQ jobs may or may not be retrievable via getJob depending on implementation
     // This tests the dlq branch in queryOperations
     const state = await qm.getJobState(job.id);
@@ -1142,9 +1142,9 @@ describe('Dependency Waiting', () => {
     const parent = await qm.push(QUEUE, { data: { parent: true } });
 
     // Create child with dependency
-    const child = await qm.push(QUEUE, {
+    await qm.push(QUEUE, {
       data: { child: true },
-      dependsOn: [String(parent.id)],
+      dependsOn: [String(parent.id) as JobId],
     });
 
     // Pull should get parent, not child

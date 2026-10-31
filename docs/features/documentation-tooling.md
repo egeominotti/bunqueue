@@ -81,10 +81,16 @@ The root project and the TypeScript SDK use only Bun's built-in tools; there is
 no separate linter.
 
 - **Type checking**: `bun run typecheck` runs `bun check --no-script` on the
-  root `tsconfig.json` (all of `src`, including `src/mcp`). `sdk/conformance`
-  imports the built SDK (`sdk/typescript/dist`, gitignored), so the SDK
-  workflow type-checks it after building the SDK. `test/` is not type-checked yet: it has about 1,000
-  pre-existing type errors. The checker follows TypeScript 7, so it can report
+  root `tsconfig.json` (all of `src`, including `src/mcp`), then the test tree
+  with `bun check --no-script -p tsconfig.test.json` (about 2,000 files with
+  their imports). That project excludes, by name, the 15 test files whose
+  remaining 31 type errors are real test defects (an ignored option, an array
+  passed to `getJobs`, write-only locals, a public type narrower than the
+  runtime); fixing them would change what those tests do, and
+  `test/tsconfig-test-exclusions.test.ts` fails if the list grows.
+  `sdk/conformance` imports the built SDK (`sdk/typescript/dist`, gitignored),
+  so the SDK workflow type-checks it after building the SDK. The checker
+  follows TypeScript 7, so it can report
   errors `tsc` 5.9 accepts (for example the `Uint8Array<ArrayBuffer>` cast in
   `src/infrastructure/cloud/wsSender.ts`); `build:lib` still compiles with
   `tsc`, so both must stay clean.

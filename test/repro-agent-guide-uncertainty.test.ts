@@ -106,7 +106,7 @@ test('documented OpenAI turn cannot succeed after an uncertain remote tool effec
     },
   };
   class DocumentedAgent extends Agent {
-    constructor(options: ConstructorParameters<typeof Agent>[0]) {
+    constructor(options: ConstructorParameters<typeof Agent<unknown, 'text'>>[0]) {
       super({ ...options, model });
     }
   }
@@ -172,7 +172,7 @@ test('documented OpenAI tool propagation preserves the operator idempotency key 
     },
   };
   class DocumentedAgent extends Agent {
-    constructor(options: ConstructorParameters<typeof Agent>[0]) {
+    constructor(options: ConstructorParameters<typeof Agent<unknown, 'text'>>[0]) {
       super({ ...options, model });
     }
   }

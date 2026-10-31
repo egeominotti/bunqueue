@@ -168,7 +168,7 @@ describe('Worker - Cancel Methods', () => {
     });
 
     test('should emit cancelled event when job is cancelled', async () => {
-      let cancelledJobId: string | null = null;
+      let cancelledJobId = null as string | null;
 
       worker = new Worker(
         'worker-cancel-test',

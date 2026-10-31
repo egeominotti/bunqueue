@@ -83,7 +83,7 @@ describe('FlowProducer API parity', () => {
       expect(node.job.delay).toBe(fetched!.delay);
       expect(node.job.timestamp).toBe(fetched!.timestamp);
       expect(node.job.opts).toEqual(fetched!.opts);
-      expect(node.job.toJSON()).toEqual(fetched!.toJSON());
+      expect<unknown>(node.job.toJSON()).toEqual(fetched!.toJSON());
 
       const tree = await producer.add({
         name: 'tree-parent',

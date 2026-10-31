@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events';
-import { jobId } from '../../../src/domain/types/job';
 import { CoreE2eHarness, type CoreE2eMode } from '../support/harness';
-import { activateFailedJob, createFailedJob, retryFailedJob } from '../support/job-fixtures';
+import { activateFailedJob, createFailedJob } from '../support/job-fixtures';
 import { CoverageTracker, ensure, ensureEqual, eventually } from '../support/tracker';
 
 export async function runJobContract(mode: CoreE2eMode): Promise<CoverageTracker> {

@@ -5,7 +5,7 @@
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { jobId, type JobId, type Job } from '../src/domain/types/job';
-import type { JobLocation, EventType } from '../src/domain/types/queue';
+import type { JobLocation } from '../src/domain/types/queue';
 import { RWLock } from '../src/shared/lock';
 import { SHARD_COUNT, processingShardIndex, shardIndex } from '../src/shared/hash';
 import { DependencyCompletionTracker } from '../src/application/dependencyCompletions';

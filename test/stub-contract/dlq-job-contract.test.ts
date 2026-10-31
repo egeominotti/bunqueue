@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { createDlqEntry } from '../../src/domain/types/dlq';
+import { createDlqEntry, type FailureReason } from '../../src/domain/types/dlq';
 import { createJob, jobId } from '../../src/domain/types/job';
 import { toDlqEntry } from '../../src/client/jobConversion';
 import type { PublicJobMethodContext } from '../../src/client/jobConversion';
-import type { DlqEntry, Job, JobStateType } from '../../src/client/types';
+import type { Job, JobStateType } from '../../src/client/types';
 
 type Call = { method: string; args: unknown[] };
 
@@ -85,7 +85,7 @@ function makeJob(state: JobStateType = 'failed'): { job: Job<{ value: number }>;
     data: { name: 'task', value: 7 },
     uniqueKey: 'dedup-key',
   });
-  const entry = createDlqEntry(internal, 'explicit_fail', 'boom');
+  const entry = createDlqEntry(internal, 'explicit_fail' as FailureReason, 'boom');
   return { job: toDlqEntry<{ value: number }>(entry, context).job, calls };
 }
 

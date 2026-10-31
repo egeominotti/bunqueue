@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { type JobOptions, Queue, shutdownManager } from '../../src/client';
+import { Queue, shutdownManager } from '../../src/client';
+import type { ExtendedJobOptions } from '../../src/client/queue/types/add';
 import { getSharedManager } from '../../src/client/manager';
 import { closeTcpHarness, makeTcpQueue, startTcpHarness, type TcpHarness } from './tcp-harness';
 
@@ -13,7 +14,7 @@ function name(prefix: string): string {
 async function addInChunks(
   queue: Queue<{ index: number }>,
   total: number,
-  options: (index: number) => JobOptions
+  options: (index: number) => ExtendedJobOptions
 ): Promise<string[]> {
   const ids: string[] = [];
   const chunkSize = 500;
@@ -102,7 +103,9 @@ describe('unbounded public state queries', () => {
             end: -1,
             asc: false,
           });
-          expect(jobs.map((job) => job.data.timestamp)).toEqual(expected);
+          expect(jobs.map((job) => (job.data as { timestamp: number }).timestamp)).toEqual(
+            expected
+          );
         }
       ),
       { numRuns: 3 }
@@ -162,7 +165,7 @@ describe('unbounded public state queries', () => {
         expect(new Set(generic.map((job) => job.id)).size).toBe(total);
         expect(alias).toHaveLength(total);
         expect(tail).toHaveLength(total - 7);
-        expect(descending.map((job) => job.data.index)).toEqual(
+        expect(descending.map((job) => (job.data as { index: number }).index)).toEqual(
           Array.from({ length: total }, (_, index) => total - index - 1)
         );
         expect(await queue.getWaitingAsync(5, 15)).toHaveLength(10);

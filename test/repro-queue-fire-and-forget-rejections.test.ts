@@ -63,7 +63,7 @@ function deadPool(): TcpConnectionPool {
 }
 
 function deadApp(name: string): Bunqueue {
-  const app = new Bunqueue(name, {
+  const app = new Bunqueue<unknown, unknown>(name, {
     embedded: false,
     connection: connection(),
     autorun: false,

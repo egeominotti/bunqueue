@@ -50,7 +50,7 @@ function dlqContext(manager: QueueManager): DlqContext {
     customIdMap: new Map(),
     jobLogs: new Map(),
     storage: internals.storage,
-  };
+  } as unknown as DlqContext;
 }
 
 async function failOnce(manager: QueueManager, queue: string, error: string): Promise<void> {

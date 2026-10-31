@@ -8,6 +8,7 @@
 
 import { describe, test, expect, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 describe('Pause/Resume Patterns - Embedded', () => {
   afterEach(() => {
@@ -336,7 +337,7 @@ describe('Pause/Resume Patterns - Embedded', () => {
 
     // Verify all 10 are queued. BullMQ semantics (#92): a paused queue reports
     // its ready jobs under `paused`, not `waiting` (no double-count).
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(0);
     expect(counts.paused).toBe(10);
     expect(counts.active).toBe(0);

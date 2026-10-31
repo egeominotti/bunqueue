@@ -12,8 +12,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { unlink, stat } from 'fs/promises';
-import { existsSync } from 'fs';
+import { unlink } from 'fs/promises';
 import type { S3BackupConfig, BackupMetadata } from '../src/infrastructure/backup/s3BackupConfig';
 import { DEFAULTS } from '../src/infrastructure/backup/s3BackupConfig';
 import { performBackup, restoreBackup } from '../src/infrastructure/backup/s3BackupOperations';
@@ -386,9 +385,7 @@ describe('CRITICAL BUG 4: No retry/backoff on transient failures', () => {
     db.close();
 
     // Track backup attempts
-    let backupCallCount = 0;
-    const originalPerformBackup = (await import('../src/infrastructure/backup/s3BackupOperations'))
-      .performBackup;
+    await import('../src/infrastructure/backup/s3BackupOperations');
 
     const manager = new S3BackupManager({
       enabled: true,
@@ -403,7 +400,7 @@ describe('CRITICAL BUG 4: No retry/backoff on transient failures', () => {
     (manager as any).client = failClient;
 
     // Call backup - should retry at least once
-    const result = await manager.backup();
+    await manager.backup();
 
     // BUG: No retry logic, single failure = immediate return
     // The manager should have retried at least once

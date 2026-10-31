@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { Worker } from '../src/client';
+import type { JobId } from '../src/domain/types/job';
 import {
   type CoreE2eHarness,
   MODES,
@@ -72,7 +73,7 @@ for (const mode of MODES) {
 
       await expect(changed.promise).resolves.toBeUndefined();
       await waitForState(queue, job.id, 'delayed');
-      expect(harness.brokerManager().getLockInfo(job.id)).toBeNull();
+      expect(harness.brokerManager().getLockInfo(job.id as JobId)).toBeNull();
       expect((await queue.getJob(job.id))?.delay).toBeGreaterThan(0);
       await worker.close();
       expect(signals).toEqual({ errors: [], completed: [], failed: [] });
@@ -107,7 +108,7 @@ for (const mode of MODES) {
 
       await expect(retried.promise).resolves.toBeUndefined();
       await waitForState(queue, job.id, 'waiting');
-      expect(harness.brokerManager().getLockInfo(job.id)).toBeNull();
+      expect(harness.brokerManager().getLockInfo(job.id as JobId)).toBeNull();
       expect(await queue.getJobState(job.id)).not.toBe('completed');
       await worker.close();
       expect(signals).toEqual({ errors: [], completed: [], failed: [] });
@@ -137,7 +138,7 @@ for (const mode of MODES) {
 
       await transitioned.promise;
       await waitForState(queue, job.id, 'waiting');
-      expect(harness.brokerManager().getLockInfo(job.id)).toBeNull();
+      expect(harness.brokerManager().getLockInfo(job.id as JobId)).toBeNull();
       await worker.close();
       expect(signals).toEqual({ errors: [], completed: [], failed: [] });
       expect(await queue.getJobCountsAsync()).toMatchObject({ completed: 0, failed: 0 });
@@ -164,7 +165,7 @@ for (const mode of MODES) {
 
       await transitioned.promise;
       await waitForState(queue, job.id, 'delayed');
-      expect(harness.brokerManager().getLockInfo(job.id)).toBeNull();
+      expect(harness.brokerManager().getLockInfo(job.id as JobId)).toBeNull();
       await worker.close();
       expect(signals).toEqual({ errors: [], completed: [], failed: [] });
       expect(await queue.getJobCountsAsync()).toMatchObject({ completed: 0, failed: 0 });
@@ -191,7 +192,7 @@ for (const mode of MODES) {
 
       await transitioned.promise;
       await waitForState(queue, job.id, 'waiting-children');
-      expect(harness.brokerManager().getLockInfo(job.id)).toBeNull();
+      expect(harness.brokerManager().getLockInfo(job.id as JobId)).toBeNull();
       await worker.close();
       expect(signals).toEqual({ errors: [], completed: [], failed: [] });
       expect(await queue.getJobCountsAsync()).toMatchObject({ completed: 0, failed: 0 });

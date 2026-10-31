@@ -6,7 +6,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { parseJobFromResponse } from '../src/client/worker/jobParser';
-import { jobId } from '../src/domain/types/job';
+import { jobId, type JobId } from '../src/domain/types/job';
 
 // ============================================================================
 // Helpers
@@ -95,14 +95,14 @@ describe('parseJobFromResponse', () => {
       expect(result.uniqueKey).toBe('unique-abc');
       expect(result.customId).toBe('custom-xyz');
       expect(result.progressMessage).toBe('Processing...');
-      expect(result.parentId).toBe('parent-1');
+      expect(result.parentId).toBe('parent-1' as JobId);
       expect(result.groupId).toBe('group-alpha');
     });
 
     test('should parse array fields from response', () => {
       const result = parseJobFromResponse(makeFullResponse(), 'q');
-      expect(result.dependsOn).toEqual(['dep-1', 'dep-2']);
-      expect(result.childrenIds).toEqual(['child-a', 'child-b']);
+      expect(result.dependsOn).toEqual(['dep-1', 'dep-2'] as JobId[]);
+      expect(result.childrenIds).toEqual(['child-a', 'child-b'] as JobId[]);
       expect(result.tags).toEqual(['urgent', 'billing']);
     });
 
@@ -277,25 +277,25 @@ describe('parseJobFromResponse', () => {
     test('dependsOn falls back to empty array for non-array', () => {
       const resp = { id: 'arr1', dependsOn: 'not-an-array' };
       const result = parseJobFromResponse(resp, 'q');
-      expect(result.dependsOn).toEqual([]);
+      expect(result.dependsOn).toEqual([] as JobId[]);
     });
 
     test('dependsOn falls back to empty array for null', () => {
       const resp = { id: 'arr2', dependsOn: null };
       const result = parseJobFromResponse(resp, 'q');
-      expect(result.dependsOn).toEqual([]);
+      expect(result.dependsOn).toEqual([] as JobId[]);
     });
 
     test('dependsOn falls back to empty array for number', () => {
       const resp = { id: 'arr3', dependsOn: 42 };
       const result = parseJobFromResponse(resp, 'q');
-      expect(result.dependsOn).toEqual([]);
+      expect(result.dependsOn).toEqual([] as JobId[]);
     });
 
     test('childrenIds falls back to empty array for non-array', () => {
       const resp = { id: 'arr4', childrenIds: 'not-an-array' };
       const result = parseJobFromResponse(resp, 'q');
-      expect(result.childrenIds).toEqual([]);
+      expect(result.childrenIds).toEqual([] as JobId[]);
     });
 
     test('tags falls back to empty array for non-array', () => {
@@ -307,13 +307,13 @@ describe('parseJobFromResponse', () => {
     test('dependsOn preserves valid array', () => {
       const resp = { id: 'arr6', dependsOn: ['a', 'b'] };
       const result = parseJobFromResponse(resp, 'q');
-      expect(result.dependsOn).toEqual(['a', 'b']);
+      expect(result.dependsOn).toEqual(['a', 'b'] as JobId[]);
     });
 
     test('childrenIds preserves valid array', () => {
       const resp = { id: 'arr7', childrenIds: ['c1'] };
       const result = parseJobFromResponse(resp, 'q');
-      expect(result.childrenIds).toEqual(['c1']);
+      expect(result.childrenIds).toEqual(['c1'] as JobId[]);
     });
 
     test('tags preserves valid array', () => {
@@ -325,8 +325,8 @@ describe('parseJobFromResponse', () => {
     test('empty arrays are preserved', () => {
       const resp = { id: 'arr9', dependsOn: [], childrenIds: [], tags: [] };
       const result = parseJobFromResponse(resp, 'q');
-      expect(result.dependsOn).toEqual([]);
-      expect(result.childrenIds).toEqual([]);
+      expect(result.dependsOn).toEqual([] as JobId[]);
+      expect(result.childrenIds).toEqual([] as JobId[]);
       expect(result.tags).toEqual([]);
     });
   });
@@ -361,7 +361,7 @@ describe('parseJobFromResponse', () => {
       expect(result.queue).toBe('q');
       expect(result.priority).toBe(0);
       expect(result.attempts).toBe(0);
-      expect(result.dependsOn).toEqual([]);
+      expect(result.dependsOn).toEqual([] as JobId[]);
     });
 
     test('data can be null', () => {
@@ -398,7 +398,7 @@ describe('parseJobFromResponse', () => {
 
     test('id is passed through jobId branded constructor', () => {
       const result = parseJobFromResponse({ id: 'branded-test' }, 'q');
-      expect(result.id).toBe('branded-test');
+      expect(result.id).toBe('branded-test' as JobId);
       expect(typeof result.id).toBe('string');
     });
 
@@ -416,7 +416,7 @@ describe('parseJobFromResponse', () => {
       const resp = { id: 12345 };
       const result = parseJobFromResponse(resp, 'q');
       // jobId casts to string, so the branded type wraps whatever is passed
-      expect(result.id).toBe(12345 as unknown as string);
+      expect(result.id).toBe(12345 as unknown as JobId);
     });
   });
 
@@ -453,9 +453,9 @@ describe('parseJobFromResponse', () => {
       expect(result.customId).toBe('custom-xyz');
       expect(result.progress).toBe(75);
       expect(result.progressMessage).toBe('Processing...');
-      expect(result.dependsOn).toEqual(['dep-1', 'dep-2']);
-      expect(result.parentId).toBe('parent-1');
-      expect(result.childrenIds).toEqual(['child-a', 'child-b']);
+      expect(result.dependsOn).toEqual(['dep-1', 'dep-2'] as JobId[]);
+      expect(result.parentId).toBe('parent-1' as JobId);
+      expect(result.childrenIds).toEqual(['child-a', 'child-b'] as JobId[]);
       expect(result.childrenCompleted).toBe(1);
       expect(result.tags).toEqual(['urgent', 'billing']);
       expect(result.groupId).toBe('group-alpha');

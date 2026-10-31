@@ -76,7 +76,7 @@ for (const mode of MODES) {
             'SELECT state, started_at, completed_at, progress, progress_msg, last_heartbeat FROM jobs WHERE id = ?'
           )
           .get(job.id);
-        expect(row).toEqual({
+        expect<unknown>(row).toEqual({
           state: 'waiting',
           started_at: null,
           completed_at: null,

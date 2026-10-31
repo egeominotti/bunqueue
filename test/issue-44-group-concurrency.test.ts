@@ -227,7 +227,7 @@ describe('Worker - Group Concurrency (Issue #44)', () => {
           duration: 0,
         },
       }
-    ) as Worker<Record<string, unknown>, string>;
+    ) as unknown as Worker<{ domain: string; value: number }, string>;
 
     // Add jobs WITH domain (group limited)
     for (let i = 0; i < 4; i++) {

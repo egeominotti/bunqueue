@@ -9,7 +9,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { DlqShard, type DlqStatsCallback } from '../src/domain/queue/dlqShard';
-import { type DlqConfig, DEFAULT_DLQ_CONFIG, FailureReason } from '../src/domain/types/dlq';
+import { DEFAULT_DLQ_CONFIG, FailureReason } from '../src/domain/types/dlq';
 import { createJob, jobId, type Job, type JobId } from '../src/domain/types/job';
 import { DEFAULT_STALL_CONFIG } from '../src/domain/types/stall';
 import { processPendingDependencies } from '../src/application/dependencyProcessor';

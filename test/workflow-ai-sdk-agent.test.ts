@@ -83,7 +83,7 @@ function scriptedModel(rec: Recorder) {
         warnings: [],
       };
     },
-  });
+  } as unknown as ConstructorParameters<typeof MockLanguageModelV3>[0]);
 }
 
 const provisionTool = (log: string[]) => ({

@@ -210,7 +210,7 @@ describe('dlq guide · automatic retry [broker timing]', () => {
 
     const after = restarted.getDlqEntries(queue)[0];
     expect(String(after.job.id)).toBe(id);
-    expect(after.enteredAt).toBe(before?.enteredAt);
+    expect(after.enteredAt).toBe<number | undefined>(before?.enteredAt);
     expect(after.nextRetryAt).toBe(before?.nextRetryAt ?? null);
     expect(after.expiresAt).toBe(before?.expiresAt ?? null);
     expect(after.retryCount).toBe(before?.retryCount ?? 0);

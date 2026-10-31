@@ -60,7 +60,7 @@ afterEach(async () => {
 describe('Bunqueue synchronous processor cancellation cleanup', () => {
   test('a terminal synchronous throw releases every cancellation generation', async () => {
     shutdownManager();
-    app = new Bunqueue(`sync-throw-cancellation-${process.pid}`, {
+    app = new Bunqueue<unknown, unknown>(`sync-throw-cancellation-${process.pid}`, {
       embedded: true,
       heartbeatInterval: 0,
       processor: () => {
@@ -75,7 +75,7 @@ describe('Bunqueue synchronous processor cancellation cleanup', () => {
 
   test('a throwing circuit-breaker hook cannot bypass cancellation cleanup', async () => {
     shutdownManager();
-    app = new Bunqueue(`throwing-circuit-hook-${process.pid}`, {
+    app = new Bunqueue<unknown, unknown>(`throwing-circuit-hook-${process.pid}`, {
       embedded: true,
       heartbeatInterval: 0,
       processor: () => {
@@ -97,7 +97,7 @@ describe('Bunqueue synchronous processor cancellation cleanup', () => {
   test('Simple Mode retry handles synchronous throws and releases its generation', async () => {
     shutdownManager();
     let processorCalls = 0;
-    app = new Bunqueue(`sync-throw-retry-${process.pid}`, {
+    app = new Bunqueue<unknown, unknown>(`sync-throw-retry-${process.pid}`, {
       embedded: true,
       heartbeatInterval: 0,
       processor: () => {
@@ -117,7 +117,7 @@ describe('Bunqueue synchronous processor cancellation cleanup', () => {
   test('closing during retry backoff prevents processor calls after close', async () => {
     shutdownManager();
     let processorCalls = 0;
-    app = new Bunqueue(`close-during-sync-retry-${process.pid}`, {
+    app = new Bunqueue<unknown, unknown>(`close-during-sync-retry-${process.pid}`, {
       embedded: true,
       heartbeatInterval: 0,
       processor: () => {
@@ -143,7 +143,7 @@ describe('Bunqueue synchronous processor cancellation cleanup', () => {
   test('cancelling during retry backoff clears the pending attempt', async () => {
     shutdownManager();
     let processorCalls = 0;
-    app = new Bunqueue(`cancel-during-retry-${process.pid}`, {
+    app = new Bunqueue<unknown, unknown>(`cancel-during-retry-${process.pid}`, {
       embedded: true,
       heartbeatInterval: 0,
       processor: async () => {
@@ -172,7 +172,7 @@ describe('Bunqueue synchronous processor cancellation cleanup', () => {
     shutdownManager();
     let processorCalls = 0;
     let openHookCalls = 0;
-    app = new Bunqueue(`close-during-circuit-retry-${process.pid}`, {
+    app = new Bunqueue<unknown, unknown>(`close-during-circuit-retry-${process.pid}`, {
       embedded: true,
       heartbeatInterval: 0,
       processor: async () => {
@@ -218,7 +218,7 @@ describe('Bunqueue synchronous processor cancellation cleanup', () => {
       releaseSuccess = resolve;
     });
     let closeHookCalls = 0;
-    app = new Bunqueue(`cancelled-circuit-success-${process.pid}`, {
+    app = new Bunqueue<unknown, unknown>(`cancelled-circuit-success-${process.pid}`, {
       embedded: true,
       heartbeatInterval: 0,
       processor: async (job) => {

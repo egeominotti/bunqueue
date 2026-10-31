@@ -10,7 +10,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
-import type { JobId, JobLock } from '../src/domain/types/job';
+import type { JobId, LockToken } from '../src/domain/types/job';
 
 describe('Lock Manager & Lock Operations', () => {
   let qm: QueueManager;
@@ -306,7 +306,7 @@ describe('Lock Manager & Lock Operations', () => {
       const info = qm.getLockInfo(job!.id);
       expect(info).not.toBeNull();
       expect(info!.jobId).toBe(job!.id);
-      expect(info!.token).toBe(token);
+      expect(info!.token).toBe(token as LockToken);
       expect(info!.owner).toBe('test-worker');
       expect(info!.renewalCount).toBe(0);
       expect(info!.ttl).toBe(60_000);

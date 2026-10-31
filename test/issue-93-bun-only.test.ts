@@ -34,7 +34,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {

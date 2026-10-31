@@ -29,7 +29,7 @@ describe('Issue #82: moveToFailed inside processor', () => {
 
     const job = await queue.add('test', { syncId: 's' }, { attempts: 1 });
 
-    const worker = new Worker(
+    const worker = new Worker<{ syncId?: string }>(
       'issue-82',
       async (j) => {
         // This is the exact pattern from the issue reporter:
@@ -88,7 +88,7 @@ describe('Issue #82: moveToFailed inside processor', () => {
   test('moveToFailed prevents auto-ACK (no double state transition)', async () => {
     const events: string[] = [];
 
-    const job = await queue.add('test', { syncId: 'x' }, { attempts: 1 });
+    await queue.add('test', { syncId: 'x' }, { attempts: 1 });
 
     const worker = new Worker(
       'issue-82',

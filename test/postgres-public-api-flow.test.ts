@@ -120,7 +120,7 @@ describe(`PostgreSQL ${expectedPostgresVersionPrefix} public FlowProducer API`, 
 
       const observer = current.queue(rootQueue, 1);
       expect(await observer.getJobState(rootId)).toBe('completed');
-      expect(await observer.getChildrenValues<number>(rootId)).toEqual({
+      expect(await observer.getChildrenValues(rootId)).toEqual({
         [`${transformQueue}:${transformId}`]: 10,
         [`${leafQueue}:${root.children![1].job.id}`]: 5,
       });

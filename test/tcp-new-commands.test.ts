@@ -10,6 +10,7 @@ import { handleGetChildrenValues } from '../src/infrastructure/server/handlers/q
 import { handleStorageStatus } from '../src/infrastructure/server/handlers/management';
 import { handleCommand } from '../src/infrastructure/server/handler';
 import type { Command } from '../src/domain/types/command';
+import type { Response } from '../src/domain/types/response';
 
 function createContext(qm: QueueManager): HandlerContext {
   return {
@@ -48,10 +49,10 @@ describe('CronGet command', () => {
     const res = handleCronGet(
       { cmd: 'CronGet', name: 'daily-cleanup' } as Extract<Command, { cmd: 'CronGet' }>,
       ctx
-    );
+    ) as Response;
 
     expect(res.ok).toBe(true);
-    const cron = (res as Record<string, unknown>).cron as Record<string, unknown>;
+    const cron = (res as unknown as Record<string, unknown>).cron as Record<string, unknown>;
     expect(cron.name).toBe('daily-cleanup');
     expect(cron.queue).toBe('maintenance');
     expect(cron.schedule).toBe('0 0 * * *');
@@ -62,10 +63,10 @@ describe('CronGet command', () => {
     const res = handleCronGet(
       { cmd: 'CronGet', name: 'does-not-exist' } as Extract<Command, { cmd: 'CronGet' }>,
       ctx
-    );
+    ) as Response;
 
     expect(res.ok).toBe(false);
-    expect((res as Record<string, unknown>).error).toBe('Cron job not found');
+    expect((res as unknown as Record<string, unknown>).error).toBe('Cron job not found');
   });
 
   test('should include executions and timezone fields', () => {
@@ -80,10 +81,10 @@ describe('CronGet command', () => {
     const res = handleCronGet(
       { cmd: 'CronGet', name: 'tz-cron' } as Extract<Command, { cmd: 'CronGet' }>,
       ctx
-    );
+    ) as Response;
 
     expect(res.ok).toBe(true);
-    const cron = (res as Record<string, unknown>).cron as Record<string, unknown>;
+    const cron = (res as unknown as Record<string, unknown>).cron as Record<string, unknown>;
     expect(cron.executions).toBe(0);
     expect(cron.timezone).toBe('Europe/Rome');
   });
@@ -99,7 +100,7 @@ describe('CronGet command', () => {
     const res = await handleCommand({ cmd: 'CronGet', name: 'routed-cron' } as Command, ctx);
 
     expect(res.ok).toBe(true);
-    const cron = (res as Record<string, unknown>).cron as Record<string, unknown>;
+    const cron = (res as unknown as Record<string, unknown>).cron as Record<string, unknown>;
     expect(cron.name).toBe('routed-cron');
   });
 });
@@ -133,7 +134,7 @@ describe('GetChildrenValues command', () => {
     );
 
     expect(res.ok).toBe(true);
-    const data = (res as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (res as unknown as Record<string, unknown>).data as Record<string, unknown>;
     expect(data.values).toEqual({});
   });
 
@@ -144,7 +145,7 @@ describe('GetChildrenValues command', () => {
     );
 
     expect(res.ok).toBe(true);
-    const data = (res as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (res as unknown as Record<string, unknown>).data as Record<string, unknown>;
     expect(data.values).toEqual({});
   });
 
@@ -184,7 +185,7 @@ describe('StorageStatus command', () => {
     );
 
     expect(res.ok).toBe(true);
-    const data = (res as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (res as unknown as Record<string, unknown>).data as Record<string, unknown>;
     expect(typeof data.diskFull).toBe('boolean');
     expect(data.diskFull).toBe(false); // Normal conditions
     expect(data.error).toBeNull();
@@ -194,7 +195,7 @@ describe('StorageStatus command', () => {
     const res = await handleCommand({ cmd: 'StorageStatus' } as Command, ctx);
 
     expect(res.ok).toBe(true);
-    const data = (res as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (res as unknown as Record<string, unknown>).data as Record<string, unknown>;
     expect(typeof data.diskFull).toBe('boolean');
   });
 });

@@ -74,7 +74,7 @@ describe('embedded and TCP public feature parity', () => {
     });
     await events.waitUntilReady();
 
-    harness.worker(queue.name, async (job) => ({ doubled: job.data.value * 2 }));
+    harness.worker<{ value: number }>(queue.name, async (job) => ({ doubled: job.data.value * 2 }));
     const job = await queue.add('remote-events', { value: 21 }, { durable: true });
 
     expect(await Promise.race([waiting, timeout<string>('waiting event')])).toBe(job.id);
@@ -211,7 +211,7 @@ describe('embedded and TCP public feature parity', () => {
     harness = await CoreE2eHarness.start('tcp', 'flow-parent-result-parity');
     const queue = harness.queue<{ value: number }>('results');
     const producer = harness.flow();
-    harness.worker(queue.name, async (job) => ({ doubled: job.data.value * 2 }));
+    harness.worker<{ value: number }>(queue.name, async (job) => ({ doubled: job.data.value * 2 }));
     const job = await queue.add('result', { value: 21 }, { durable: true });
     await waitForCompleted(queue, job.id);
 
@@ -222,7 +222,7 @@ describe('embedded and TCP public feature parity', () => {
     harness = await CoreE2eHarness.start('tcp', 'flow-parent-results-parity');
     const queue = harness.queue<{ value: number }>('results');
     const producer: FlowProducer = harness.flow();
-    harness.worker(queue.name, async (job) => job.data.value * 10);
+    harness.worker<{ value: number }>(queue.name, async (job) => job.data.value * 10);
     const first = await queue.add('first', { value: 1 }, { durable: true });
     const second = await queue.add('second', { value: 2 }, { durable: true });
     await Promise.all([waitForCompleted(queue, first.id), waitForCompleted(queue, second.id)]);
@@ -237,7 +237,7 @@ describe('embedded and TCP public feature parity', () => {
   test('Queue.waitJobUntilFinished returns the completed TCP result', async () => {
     harness = await CoreE2eHarness.start('tcp', 'queue-wait-result-parity');
     const queue = harness.queue<{ value: number }>('results');
-    harness.worker(queue.name, async (job) => ({ doubled: job.data.value * 2 }));
+    harness.worker<{ value: number }>(queue.name, async (job) => ({ doubled: job.data.value * 2 }));
     const job = await queue.add('result', { value: 21 }, { durable: true });
     await waitForCompleted(queue, job.id);
 

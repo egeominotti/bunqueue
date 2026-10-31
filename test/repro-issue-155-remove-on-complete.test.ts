@@ -21,6 +21,7 @@ import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, setDefaultTimeout, test } from 'bun:test';
 import type { QueueManager } from '../src/application/queueManager';
 import { jobId } from '../src/domain/types/job';
+import type { ExtendedJobOptions } from '../src/client/queue/types/add';
 import { CoreE2eHarness } from './core-e2e/support/harness';
 
 setDefaultTimeout(30_000);
@@ -182,11 +183,10 @@ for (const mode of ['embedded', 'tcp'] as const) {
       expect(await queue.getJobState(dependency.id)).toBe('unknown');
 
       // The completion proof outlives the removal, as it does for removeOnComplete.
-      const dependent = await queue.add(
-        'dependent',
-        { n: 2 },
-        { dependsOn: [dependency.id], durable: true }
-      );
+      const dependent = await queue.add('dependent', { n: 2 }, {
+        dependsOn: [dependency.id],
+        durable: true,
+      } as ExtendedJobOptions);
       expect(await queue.getJobState(dependent.id)).toBe('waiting');
     });
 

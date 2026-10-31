@@ -219,7 +219,7 @@ describe('pack and unpack', () => {
         params: { name: 'John', code: 12345 },
       };
       const packed = pack(jobData);
-      const result = unpack<typeof jobData>(packed, {}, 'data');
+      const result = unpack<typeof jobData>(packed, {} as typeof jobData, 'data');
       expect(result).toEqual(jobData);
     });
 
@@ -500,7 +500,7 @@ describe('rowToJob', () => {
       last_heartbeat: now,
       stall_count: 0,
       ...overrides,
-    };
+    } as DbJob;
   }
 
   test('should convert a minimal DbJob row to a Job', () => {

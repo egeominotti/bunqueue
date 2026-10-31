@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { Database } from 'bun:sqlite';
+import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -90,7 +90,10 @@ describe('persisted mutation contracts', () => {
     const legacy = new Database(dataPath, { create: true });
     legacy.run(SCHEMA.replace(',\n    dlq_config BLOB', ''));
     legacy.run(MIGRATION_TABLE);
-    legacy.run('INSERT INTO migrations (version, applied_at) VALUES (21, ?)', Date.now());
+    legacy.run(
+      'INSERT INTO migrations (version, applied_at) VALUES (21, ?)',
+      Date.now() as unknown as SQLQueryBindings[]
+    );
     legacy.close();
 
     let manager = openManager(dataPath);

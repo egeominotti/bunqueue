@@ -67,7 +67,7 @@ describe('SetStallConfig command', () => {
     );
 
     expect(res.ok).toBe(true);
-    const config = (res as Record<string, unknown>).config as Record<string, unknown>;
+    const config = (res as unknown as Record<string, unknown>).config as Record<string, unknown>;
     expect(config.stallInterval).toBe(15000);
     expect(config.maxStalls).toBe(2);
     expect(config.gracePeriod).toBe(3000);
@@ -95,7 +95,7 @@ describe('GetStallConfig command', () => {
     const res = await handleCommand({ cmd: 'GetStallConfig', queue: 'test-queue' } as Command, ctx);
 
     expect(res.ok).toBe(true);
-    const config = (res as Record<string, unknown>).config as Record<string, unknown>;
+    const config = (res as unknown as Record<string, unknown>).config as Record<string, unknown>;
     expect(config.enabled).toBe(true);
     expect(config.stallInterval).toBe(30000);
     expect(config.maxStalls).toBe(3);
@@ -146,7 +146,7 @@ describe('SetDlqConfig command', () => {
     const res = await handleCommand({ cmd: 'GetDlqConfig', queue: 'dlq-persist' } as Command, ctx);
 
     expect(res.ok).toBe(true);
-    const config = (res as Record<string, unknown>).config as Record<string, unknown>;
+    const config = (res as unknown as Record<string, unknown>).config as Record<string, unknown>;
     expect(config.autoRetry).toBe(true);
     expect(config.maxAutoRetries).toBe(10);
     expect(config.maxAge).toBe(86400000);
@@ -174,7 +174,7 @@ describe('GetDlqConfig command', () => {
     const res = await handleCommand({ cmd: 'GetDlqConfig', queue: 'test-queue' } as Command, ctx);
 
     expect(res.ok).toBe(true);
-    const config = (res as Record<string, unknown>).config as Record<string, unknown>;
+    const config = (res as unknown as Record<string, unknown>).config as Record<string, unknown>;
     expect(config.autoRetry).toBe(false);
     expect(config.maxEntries).toBe(10000);
     expect(config.maxAutoRetries).toBe(3);

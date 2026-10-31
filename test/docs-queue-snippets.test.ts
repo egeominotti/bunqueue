@@ -44,8 +44,16 @@ function snippets(group: string): Snippet[] {
   });
 }
 
+/** `parseDiagnostics` is an internal TypeScript SourceFile field, not in the public typings. */
+type ParsedSourceFile = ts.SourceFile & { parseDiagnostics: readonly ts.DiagnosticWithLocation[] };
+
 function duplicateTopLevelConstants(code: string): string[] {
-  const source = ts.createSourceFile('snippet.ts', code, ts.ScriptTarget.Latest, true);
+  const source = ts.createSourceFile(
+    'snippet.ts',
+    code,
+    ts.ScriptTarget.Latest,
+    true
+  ) as ParsedSourceFile;
   if (source.parseDiagnostics.length > 0) {
     throw new Error(
       source.parseDiagnostics.map((diagnostic) => String(diagnostic.messageText)).join('; ')

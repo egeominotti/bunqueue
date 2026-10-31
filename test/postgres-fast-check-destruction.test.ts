@@ -100,9 +100,9 @@ async function assertConsumerStillResolvable(
   consumerId: JobId
 ): Promise<void> {
   const consumer = await store.getJob(consumerId);
-  expect(['waiting', 'prioritized', 'delayed', 'waiting-children', 'active']).toContain(
-    consumer?.state
-  );
+  expect(['waiting', 'prioritized', 'delayed', 'waiting-children', 'active']).toContain<
+    (string | undefined)[]
+  >(consumer?.state);
   const producer = await store.getJob(producerId);
   const completion = await store.getResult(producerId);
   expect(producer !== null || completion.found).toBe(true);

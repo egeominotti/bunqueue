@@ -198,7 +198,7 @@ class UniqueKeyContractCommand extends QueueCommand {
       });
       expect(duplicate.id).toBe(first.id);
       const delivered = await pull(real, queue, 'unique-worker');
-      expect((delivered.job as { id: string }).id).toBe(first.id);
+      expect<unknown>((delivered.job as { id: string }).id).toBe(first.id);
       await ack(real, delivered);
       expect((await pull(real, queue, 'unique-worker')).job).toBeNull();
     } finally {

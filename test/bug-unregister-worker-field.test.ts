@@ -9,6 +9,7 @@ import { QueueManager } from '../src/application/queueManager';
 import type { HandlerContext } from '../src/infrastructure/server/types';
 import { handleCommand } from '../src/infrastructure/server/handler';
 import type { Command } from '../src/domain/types/command';
+import type { DataResponse } from '../src/domain/types/response';
 
 function createContext(qm: QueueManager): HandlerContext {
   return {
@@ -39,7 +40,7 @@ describe('UnregisterWorker field handling', () => {
       ctx
     );
     expect(regRes.ok).toBe(true);
-    const workerId = (regRes as Record<string, unknown>).data as Record<string, unknown>;
+    const workerId = (regRes as DataResponse<Record<string, unknown>>).data;
 
     // Unregister with correct field name
     const unregRes = await handleCommand(
@@ -56,7 +57,7 @@ describe('UnregisterWorker field handling', () => {
       ctx
     );
     expect(regRes.ok).toBe(true);
-    const data = (regRes as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (regRes as DataResponse<Record<string, unknown>>).data;
     const wid = data.workerId as string;
 
     // Simulate what MCP adapter sends: { cmd: 'UnregisterWorker', id: workerId }

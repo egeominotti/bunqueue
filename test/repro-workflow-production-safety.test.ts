@@ -281,7 +281,9 @@ describe('workflow production safety invariants', () => {
       },
     };
 
-    await expect(runWithTimeout(thenable, 5)).rejects.toThrow('timed out');
+    await expect(runWithTimeout(thenable as unknown as PromiseLike<string>, 5)).rejects.toThrow(
+      'timed out'
+    );
   });
 
   test('a timed-out step aborts cooperative handler work', async () => {

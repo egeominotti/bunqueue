@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
+import type { Job } from '../src/domain/types/job';
 
 let manager: QueueManager | null = null;
 
@@ -11,7 +12,7 @@ afterEach(() => {
 async function complete(queue: string, result: unknown): Promise<void> {
   const pulled = await manager!.pull(queue);
   if (!pulled) throw new Error(`No job available in ${queue}`);
-  await manager!.ack(pulled.id, result, pulled.token);
+  await manager!.ack(pulled.id, result, (pulled as Job & { token?: string }).token);
 }
 
 test('dependency results survive LRU pressure until the consumer reads them', async () => {

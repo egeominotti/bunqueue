@@ -68,7 +68,6 @@ describe('Issue #65: SQLite restart with skipMissedOnRestart', () => {
     db.close();
 
     // ── Phase 4: Restart server (new QueueManager loads from DB) ──
-    const pushedJobs: string[] = [];
     const manager2 = new QueueManager({ dataPath: TEST_DB });
 
     // Verify: cron was loaded with adjusted nextRun (skipMissedOnRestart)

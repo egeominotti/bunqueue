@@ -58,7 +58,7 @@ export class Harness {
   }
 }
 
-export function elapsedMs(startedAt: bigint): number {
+export function elapsedMs(startedAt: number): number {
   return Number(Bun.nanoseconds() - startedAt) / 1e6;
 }
 

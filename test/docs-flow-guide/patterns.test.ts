@@ -30,6 +30,8 @@ interface FlowJobData {
   __childrenIds?: string[];
   source?: string;
   level?: number;
+  name?: string;
+  __custom?: string;
 }
 
 for (const mode of MODES) {
@@ -480,7 +482,8 @@ for (const mode of MODES) {
             data: {},
             children: [{ name: 'fetch', queueName: queue.name, data: {} }],
           },
-          { queuesOptions: { [queue.name]: { jobId: 'shared-id' } } }
+          // Deliberately invalid input: jobId is rejected at runtime inside queuesOptions.
+          { queuesOptions: { [queue.name]: { jobId: 'shared-id' } as never } }
         )
       ).rejects.toThrow();
     }, 20_000);

@@ -19,7 +19,7 @@ test('JobHeartbeatB returns the renewed count inside the protocol data envelope'
       timeout: 0,
     });
 
-    expect((pulled.job as { id?: string } | null)?.id).toBe(pushed.id);
+    expect<unknown>((pulled.job as { id?: string } | null)?.id).toBe(pushed.id);
     expect(typeof pulled.token).toBe('string');
 
     const response = await real.send({

@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
+import type { TCPSocketListener } from 'bun';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -48,8 +49,8 @@ test('model broker rejects a pair whose HTTP readiness port belongs to another s
 function reserveAdjacentPorts(): number {
   for (let attempt = 0; attempt < 100; attempt++) {
     const port = 20_000 + Math.floor(Math.random() * 20_000);
-    let tcp: ReturnType<typeof Bun.listen> | null = null;
-    let http: ReturnType<typeof Bun.listen> | null = null;
+    let tcp: TCPSocketListener<undefined> | null = null;
+    let http: TCPSocketListener<undefined> | null = null;
     try {
       tcp = probe(port);
       http = probe(port + 1);
@@ -64,7 +65,7 @@ function reserveAdjacentPorts(): number {
   throw new Error('unable to reserve adjacent ports for the model isolation regression');
 }
 
-function probe(port: number): ReturnType<typeof Bun.listen> {
+function probe(port: number): TCPSocketListener<undefined> {
   return Bun.listen({
     hostname: '127.0.0.1',
     port,

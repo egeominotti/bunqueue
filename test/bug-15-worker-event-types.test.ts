@@ -11,6 +11,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
+import type { EventEmitter } from 'events';
 import { Worker } from '../src/client/worker';
 
 describe('Bug #15 - Worker event type safety', () => {
@@ -43,7 +44,7 @@ describe('Bug #15 - Worker event type safety', () => {
     ];
 
     for (const event of knownEvents) {
-      const result = worker.on(event, () => {});
+      const result = (worker as EventEmitter).on(event, () => {});
       // on() should return `this` for chaining (EventEmitter contract)
       expect(result).toBe(worker);
     }
@@ -75,7 +76,7 @@ describe('Bug #15 - Worker event type safety', () => {
     ];
 
     for (const event of knownEvents) {
-      const result = worker.once(event, () => {});
+      const result = (worker as EventEmitter).once(event, () => {});
       expect(result).toBe(worker);
     }
 
@@ -104,22 +105,22 @@ describe('Bug #15 - Worker event type safety', () => {
     });
 
     // 'completed' should receive (job: Job<T>, result: R)
-    worker.on('completed', (job: any, result: any) => {
+    worker.on('completed', (_job: any, result: any) => {
       completedResult = result;
     });
 
     // 'failed' should receive (job: Job<T>, error: Error)
-    worker.on('failed', (job: any, error: any) => {
+    worker.on('failed', (_job: any, error: any) => {
       failedError = error;
     });
 
     // 'progress' should receive (job: Job<T> | null, progress: number)
-    worker.on('progress', (job: any, progress: any) => {
+    worker.on('progress', (_job: any, progress: any) => {
       progressValue = progress;
     });
 
     // 'stalled' should receive (jobId: string, reason: string)
-    worker.on('stalled', (jobId: any, reason: any) => {
+    worker.on('stalled', (jobId: any, _reason: any) => {
       stalledId = jobId;
     });
 

@@ -7,7 +7,8 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import type { HandlerContext } from '../src/infrastructure/server/types';
-import { jobId } from '../src/domain/types/job';
+import { jobId, type JobState } from '../src/domain/types/job';
+import type { Response as CommandResponse } from '../src/domain/types/response';
 
 // Core handlers
 import {
@@ -805,13 +806,13 @@ describe('Query Handlers', () => {
       await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
 
       const waitingRes = await handleGetJobs(
-        { cmd: 'GetJobs', queue: 'emails', state: 'waiting' },
+        { cmd: 'GetJobs', queue: 'emails', state: 'waiting' as JobState },
         ctx
       );
       expect((waitingRes as any).jobs.length).toBe(2);
 
       const activeRes = await handleGetJobs(
-        { cmd: 'GetJobs', queue: 'emails', state: 'active' },
+        { cmd: 'GetJobs', queue: 'emails', state: 'active' as JobState },
         ctx
       );
       expect((activeRes as any).jobs.length).toBe(1);
@@ -1009,7 +1010,7 @@ describe('Management Handlers', () => {
     test('should pause queue and prevent pulls', async () => {
       await handlePush({ cmd: 'PUSH', queue: 'emails', data: { msg: 'test' } }, ctx);
 
-      const pauseRes = handlePause({ cmd: 'Pause', queue: 'emails' }, ctx);
+      const pauseRes = handlePause({ cmd: 'Pause', queue: 'emails' }, ctx) as CommandResponse;
       expect(pauseRes.ok).toBe(true);
 
       // Pull should return null for paused queue
@@ -1032,14 +1033,14 @@ describe('Management Handlers', () => {
         { cmd: 'Pause', queue: 'emails', reqId: 'req-pause' },
         ctx,
         'req-pause'
-      );
+      ) as CommandResponse;
       expect(pauseRes.reqId).toBe('req-pause');
 
       const resumeRes = handleResume(
         { cmd: 'Resume', queue: 'emails', reqId: 'req-resume' },
         ctx,
         'req-resume'
-      );
+      ) as CommandResponse;
       expect(resumeRes.reqId).toBe('req-resume');
     });
   });
@@ -1052,7 +1053,7 @@ describe('Management Handlers', () => {
         await handlePush({ cmd: 'PUSH', queue: 'emails', data: { id: i } }, ctx);
       }
 
-      const res = handleDrain({ cmd: 'Drain', queue: 'emails' }, ctx);
+      const res = handleDrain({ cmd: 'Drain', queue: 'emails' }, ctx) as CommandResponse;
       expect(res.ok).toBe(true);
       expect((res as any).count).toBe(5);
 
@@ -1062,7 +1063,7 @@ describe('Management Handlers', () => {
     });
 
     test('should return 0 for empty queue', () => {
-      const res = handleDrain({ cmd: 'Drain', queue: 'emails' }, ctx);
+      const res = handleDrain({ cmd: 'Drain', queue: 'emails' }, ctx) as CommandResponse;
       expect(res.ok).toBe(true);
       expect((res as any).count).toBe(0);
     });
@@ -1072,7 +1073,7 @@ describe('Management Handlers', () => {
         { cmd: 'Drain', queue: 'emails', reqId: 'req-drain' },
         ctx,
         'req-drain'
-      );
+      ) as CommandResponse;
       expect(res.reqId).toBe('req-drain');
     });
   });
@@ -1602,10 +1603,7 @@ describe('End-to-End Flows', () => {
       { cmd: 'PUSH', queue: 'emails', data: { msg: 'first' }, priority: 1 },
       ctx
     );
-    const push2 = await handlePush(
-      { cmd: 'PUSH', queue: 'emails', data: { msg: 'second' }, priority: 1 },
-      ctx
-    );
+    await handlePush({ cmd: 'PUSH', queue: 'emails', data: { msg: 'second' }, priority: 1 }, ctx);
     const id1 = (push1 as any).id;
 
     // Change first job to higher priority

@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
 import { getSharedManager } from '../src/client/manager';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 // ============================================================
 // ADD OPERATIONS (src/client/queue/operations/add.ts)
@@ -690,11 +691,11 @@ describe('Management Operations', () => {
           if (info && (info as { finishedOn?: number }).finishedOn) break;
           await new Promise((r) => setTimeout(r, 20));
         }
-        const before = q.getJobCounts();
+        const before = q.getJobCounts() as JobCounts;
         expect(before.completed).toBeGreaterThanOrEqual(1);
         const removed = await q.cleanAsync(0, 1000, 'completed');
         expect(removed.length).toBeGreaterThanOrEqual(1);
-        const after = q.getJobCounts();
+        const after = q.getJobCounts() as JobCounts;
         expect(after.completed).toBe(0);
       } finally {
         await w.close();
@@ -716,15 +717,15 @@ describe('Management Operations', () => {
         await q.add('t', {}, { attempts: 1 });
         // Wait for failure → DLQ
         for (let i = 0; i < 50; i++) {
-          const counts = q.getJobCounts();
+          const counts = q.getJobCounts() as JobCounts;
           if (counts.failed >= 1) break;
           await new Promise((r) => setTimeout(r, 20));
         }
-        const before = q.getJobCounts();
+        const before = q.getJobCounts() as JobCounts;
         expect(before.failed).toBeGreaterThanOrEqual(1);
         const removed = await q.cleanAsync(0, 1000, 'failed');
         expect(removed.length).toBeGreaterThanOrEqual(1);
-        const after = q.getJobCounts();
+        const after = q.getJobCounts() as JobCounts;
         expect(after.failed).toBe(0);
       } finally {
         await w.close();
@@ -771,7 +772,7 @@ describe('Management Operations', () => {
             if (info && (info as { finishedOn?: number }).finishedOn) break;
             await new Promise((r) => setTimeout(r, 20));
           }
-          expect(q.getJobCounts().completed).toBeGreaterThanOrEqual(1);
+          expect((q.getJobCounts() as JobCounts).completed).toBeGreaterThanOrEqual(1);
         } finally {
           await w.close();
           await q.close();
@@ -785,7 +786,7 @@ describe('Management Operations', () => {
         try {
           const removed = await q2.cleanAsync(0, 1000, 'completed');
           expect(removed.length).toBeGreaterThanOrEqual(1);
-          expect(q2.getJobCounts().completed).toBe(0);
+          expect((q2.getJobCounts() as JobCounts).completed).toBe(0);
         } finally {
           await q2.close();
           sd();
@@ -814,7 +815,7 @@ describe('Management Operations', () => {
         // grace = 1 hour → nothing should be cleaned
         const removed = await q.cleanAsync(3_600_000, 1000, 'completed');
         expect(removed.length).toBe(0);
-        expect(q.getJobCounts().completed).toBeGreaterThanOrEqual(1);
+        expect((q.getJobCounts() as JobCounts).completed).toBeGreaterThanOrEqual(1);
       } finally {
         await w.close();
         await q.close();
@@ -829,7 +830,7 @@ describe('Management Operations', () => {
         await q.add('b', {});
         const removed = await q.cleanAsync(0, 1000, 'wait');
         expect(removed.length).toBe(2);
-        expect(q.getJobCounts().waiting).toBe(0);
+        expect((q.getJobCounts() as JobCounts).waiting).toBe(0);
       } finally {
         await q.close();
       }
@@ -896,7 +897,7 @@ describe('Management Operations', () => {
       try {
         await q.add('t', {}, { attempts: 1 });
         for (let i = 0; i < 100; i++) {
-          const counts = q.getJobCounts();
+          const counts = q.getJobCounts() as JobCounts;
           if (counts.failed >= 1) break;
           await new Promise((r) => setTimeout(r, 20));
         }
@@ -946,7 +947,7 @@ describe('Counts Operations', () => {
 
   describe('getJobCounts()', () => {
     it('should return zero counts for empty queue', () => {
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
 
       expect(counts.waiting).toBe(0);
       expect(counts.active).toBe(0);
@@ -959,7 +960,7 @@ describe('Counts Operations', () => {
       await queue.add('task2', { value: 2 });
       await queue.add('task3', { value: 3 });
 
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
 
       expect(counts.waiting).toBe(3);
     });
@@ -968,7 +969,7 @@ describe('Counts Operations', () => {
       await queue.add('waiting', { value: 1 });
       await queue.add('delayed', { value: 2 }, { delay: 60000 });
 
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
 
       expect(counts.waiting).toBe(1);
     });
@@ -1228,7 +1229,7 @@ describe('Control Operations', () => {
 
       queue.obliterate();
 
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
       expect(counts.waiting).toBe(0);
     });
 
@@ -1246,7 +1247,7 @@ describe('Control Operations', () => {
 
       await queue.obliterateAsync();
 
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
       expect(counts.waiting).toBe(0);
       expect(counts.delayed).toBe(0);
     });
@@ -1375,7 +1376,7 @@ describe('Control Operations', () => {
       const drained = await queue.drainAsync();
 
       expect(drained).toBe(2);
-      const counts = queue.getJobCounts();
+      const counts = queue.getJobCounts() as JobCounts;
       expect(counts.waiting + counts.delayed).toBe(0);
     });
   });
@@ -1409,7 +1410,7 @@ describe('Integration Tests', () => {
     await queue.add('task3', { value: 3 });
 
     expect(queue.count()).toBe(3);
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(3);
 
     queue.drain();
@@ -1492,7 +1493,7 @@ describe('Integration Tests', () => {
     const q = new Queue<{ x: number }>('worker-integration');
     const results: number[] = [];
 
-    const worker = new Worker('worker-integration', async (job) => {
+    const worker = new Worker<{ x: number }>('worker-integration', async (job) => {
       results.push(job.data.x);
       return { doubled: job.data.x * 2 };
     });

@@ -219,7 +219,7 @@ describe('SQLite startup recovery pagination', () => {
         insert.run(id, 'pending-order', data, 0, now, now, 0, 3, 1_000, 'waiting');
       }
 
-      expect(storage.loadPendingJobs(10, 0).map((job) => job.id)).toEqual([
+      expect(storage.loadPendingJobs(10, 0).map((job) => job.id as string)).toEqual([
         'pending-a',
         'pending-b',
         'pending-c',

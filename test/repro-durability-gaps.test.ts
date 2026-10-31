@@ -210,7 +210,7 @@ class RawConn {
         rawConns.push(conn);
         resolve(conn);
       });
-      sock.on('data', (chunk) => conn.onData(chunk));
+      sock.on('data', (chunk) => conn.onData(chunk as Buffer));
       sock.on('error', (err) => {
         if (!settled) {
           settled = true;

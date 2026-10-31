@@ -9,6 +9,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
+import type { JobId } from '../src/domain/types/job';
 import { shardIndex } from '../src/shared/hash';
 import { unlink } from 'fs/promises';
 
@@ -39,7 +40,7 @@ describe('Race Condition Tests', () => {
       const JOBS_PER_CLIENT = 20;
 
       // Push jobs for each "client"
-      const clientJobs: Map<string, bigint[]> = new Map();
+      const clientJobs: Map<string, JobId[]> = new Map();
 
       for (let c = 0; c < CLIENTS; c++) {
         const clientId = `client-${c}`;
@@ -188,7 +189,7 @@ describe('Race Condition Tests', () => {
       const JOBS = 50;
 
       // Push and pull jobs using pullWithLock
-      const jobs: Array<{ id: bigint; token: string }> = [];
+      const jobs: Array<{ id: JobId; token: string }> = [];
       for (let i = 0; i < JOBS; i++) {
         await qm.push('lock-queue', { data: { i } });
         const { job, token } = await qm.pullWithLock('lock-queue', `owner-${i}`, 0);
@@ -237,7 +238,7 @@ describe('Race Condition Tests', () => {
       const JOB_COUNT = 30;
 
       // Create jobs with locks
-      const jobs: Array<{ id: bigint; token: string }> = [];
+      const jobs: Array<{ id: JobId; token: string }> = [];
       for (let i = 0; i < JOB_COUNT; i++) {
         await qm.push('verify-queue', { data: { i } });
         const { job, token } = await qm.pullWithLock('verify-queue', `owner-${i}`, 0);
@@ -311,7 +312,7 @@ describe('Race Condition Tests', () => {
       });
 
       // Push and pull jobs with locks
-      const jobs: Array<{ id: bigint; token: string }> = [];
+      const jobs: Array<{ id: JobId; token: string }> = [];
       for (let i = 0; i < JOBS; i++) {
         await qm.push(QUEUE, { data: { i } });
         const { job, token } = await qm.pullWithLock(QUEUE, `owner-${i}`, 0);
@@ -365,7 +366,7 @@ describe('Race Condition Tests', () => {
       }
 
       // Pull all jobs with locks
-      const pulledJobs: Array<{ id: bigint; token: string }> = [];
+      const pulledJobs: Array<{ id: JobId; token: string }> = [];
       for (let i = 0; i < JOBS; i++) {
         const { job, token } = await qm.pullWithLock(QUEUE, `owner-${i}`, 0);
         if (job && token) pulledJobs.push({ id: job.id, token });
@@ -647,7 +648,7 @@ describe('Race Condition Tests', () => {
       const QUEUE = 'contention-ack-queue';
 
       // Push and pull jobs with locks
-      const jobs: Array<{ id: bigint; token?: string }> = [];
+      const jobs: Array<{ id: JobId; token?: string }> = [];
       for (let i = 0; i < JOBS; i++) {
         await qm.push(QUEUE, { data: { i } });
         const { job, token } = await qm.pullWithLock(QUEUE, `owner-${i}`, 0);
@@ -683,7 +684,7 @@ describe('Race Condition Tests', () => {
       // Rapid push/pull/ack cycles
       const cycles = Array.from({ length: CYCLES }, async (_, i) => {
         try {
-          const job = await qm.push(QUEUE, { data: { cycle: i } });
+          await qm.push(QUEUE, { data: { cycle: i } });
           const pulled = await qm.pull(QUEUE, 100);
           if (pulled) {
             processedIds.add(String(pulled.id));

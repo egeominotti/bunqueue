@@ -53,6 +53,19 @@ head:
   `bun check` and `bun fmt` are the only type-check and format tools, in every
   directory and SDK. `tsc` stays only where files are emitted, for typedoc and
   for compiler-API tests, and non-JS SDKs keep their language's own toolchain.
+- The test tree is now type-checked: `bun run typecheck` also runs
+  `bun check -p tsconfig.test.json`. 1,008 of the 1,039 type errors in
+  `test/` (and the `bench/`/`scripts/` helpers the tests import) are fixed with
+  type-only changes: annotations, type arguments, casts on test doubles and
+  branded ids, removed unused imports and bindings (each call kept), and `_`
+  for unused parameters. Of the 288 changed files, 233 transpile to identical
+  JavaScript, 8 differ only in whitespace, and 47 differ only by dropped unused
+  bindings (each call kept), renamed unused parameters, narrowed destructuring
+  of the same awaited value, removed side-effect-free expressions and one
+  import alias; no test does or asserts anything different. The 31 remaining
+  errors are genuine test defects that only a behavior change can fix, so their
+  15 files are excluded by name in `tsconfig.test.json`, and
+  `test/tsconfig-test-exclusions.test.ts` fails if that list ever grows.
 
 ### Documentation
 

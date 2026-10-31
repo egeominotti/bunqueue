@@ -30,6 +30,7 @@ import {
   setTracingDisabled,
   tool,
 } from '@openai/agents';
+import type { MockLanguageModelV3 } from 'ai/test';
 import { z } from 'zod';
 import { Engine, Workflow } from '../src/client/workflow';
 
@@ -416,7 +417,7 @@ describe('docs: Mastra', () => {
       name: 'refunder',
       instructions: 'Refund the customer.',
       model: new MockLanguageModelV3({
-        doGenerate: async () => {
+        doGenerate: (async () => {
           turn++;
           if (turn === 1) {
             return {
@@ -439,7 +440,7 @@ describe('docs: Mastra', () => {
             usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
             warnings: [],
           };
-        },
+        }) as unknown as MockLanguageModelV3['doGenerate'],
       }),
       tools: { refundTool },
     });

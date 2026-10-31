@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { SQL } from 'bun';
 import { PostgresQueueManager } from '../src/application/postgresQueueManager';
+import type { JobId } from '../src/domain/types/job';
 import { cleanupPostgresNamespace, eventually } from './support/postgres-event-race';
 
 const postgresUrl = Bun.env.BUNQUEUE_TEST_POSTGRES_URL;
@@ -111,7 +112,7 @@ describe('PostgreSQL destructive dependency lock domain', () => {
         const drainResult = await drain;
         const parentState = await first.getJobState(parent.id);
         const child =
-          admissionResult.status === 'fulfilled' ? (admissionResult.value as { id: string }) : null;
+          admissionResult.status === 'fulfilled' ? (admissionResult.value as { id: JobId }) : null;
         const childState = child ? await second.getJobState(child.id) : 'unknown';
 
         expect({ parentState, childState }).not.toEqual({

@@ -56,7 +56,7 @@ async function pushDependent(
     );
     expect(response).toMatchObject({ ok: true });
     if (!response.ok || !('ids' in response)) throw new Error('PUSHB did not return job ids');
-    return response.ids[0] as JobId;
+    return response.ids![0] as JobId;
   }
 
   const command: Extract<Command, { cmd: 'PUSH' }> = {

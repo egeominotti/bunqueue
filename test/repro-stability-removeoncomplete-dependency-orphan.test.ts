@@ -38,7 +38,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { processPendingDependencies } from '../src/application/dependencyProcessor';
-import type { JobId } from '../src/domain/types/job';
 
 /**
  * Deterministically flush the (event-driven, microtask-scheduled) dependency

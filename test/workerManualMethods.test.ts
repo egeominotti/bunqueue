@@ -53,7 +53,7 @@ describe('Worker Manual Job Control - BullMQ v5', () => {
     await queue.add('test', { value: 42 });
 
     let processed = false;
-    const worker = new Worker(
+    const worker = new Worker<{ value: number }>(
       'manual-test',
       async (job) => {
         processed = true;

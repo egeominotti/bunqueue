@@ -48,7 +48,7 @@ describe('Stability Tests', () => {
     });
 
     test('fail and retry works correctly', async () => {
-      const job = await manager.push('test-queue', {
+      await manager.push('test-queue', {
         data: { message: 'will fail' },
         maxAttempts: 3,
         backoff: 10,
@@ -185,7 +185,7 @@ describe('Stability Tests', () => {
       let manager = new QueueManager({ dataPath: TEST_DB });
 
       // Push job that will fail
-      const job = await manager.push('dlq-persist-queue', {
+      await manager.push('dlq-persist-queue', {
         data: { msg: 'will fail' },
         maxAttempts: 1,
       });

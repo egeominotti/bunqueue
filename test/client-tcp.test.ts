@@ -696,7 +696,7 @@ describe('TcpClient', () => {
       const job = await queue.add('my-task', { value: 123 });
       expect(job.id).toBeDefined();
       expect(job.name).toBe('my-task');
-      expect(job.data.value).toBe(123);
+      expect((job.data as { value: number }).value).toBe(123);
     });
 
     it('should handle multiple sequential commands', async () => {

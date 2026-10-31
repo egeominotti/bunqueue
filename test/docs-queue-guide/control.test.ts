@@ -129,7 +129,7 @@ for (const mode of MODES) {
       await job.remove();
 
       const active = await queue.add('running', { n: 2 }, { durable: true });
-      expect((await manager.pull(queue.name))?.id).toBe(active.id);
+      expect<string | undefined>((await manager.pull(queue.name))?.id).toBe(active.id);
       await expect(queue.removeAsync(active.id)).rejects.toThrow(/current state: active/);
       expect(await queue.getJobState(active.id)).toBe('active');
     });

@@ -26,7 +26,7 @@ async function waitForState(
 }
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
-  let resolve = () => undefined;
+  let resolve: () => void = () => undefined;
   const promise = new Promise<void>((done) => {
     resolve = done;
   });

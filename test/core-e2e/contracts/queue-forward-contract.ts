@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { QueueManager } from '../../../src/application/queueManager';
-import { Queue } from '../../../src/client';
+import { Queue, type Job } from '../../../src/client';
 import { createTcpServer } from '../../../src/infrastructure/server/tcp';
 import { CoreE2eHarness, type CoreE2eMode } from '../support/harness';
 import { CoverageTracker, ensure, eventually } from '../support/tracker';
@@ -41,7 +41,7 @@ export async function runQueueForwardContract(mode: CoreE2eMode): Promise<Covera
       (count) => count === 1,
       'forwarded job did not reach remote broker'
     );
-    const remoteJobs = await remote.getJobsAsync({ end: -1 });
+    const remoteJobs = (await remote.getJobsAsync({ end: -1 })) as Job<{ value: number }>[];
     ensure(remoteJobs[0]?.data.value === 42, 'forwarded payload mismatch');
     ensure(forwardedId === `fwd:${source.name}:${local.id}`, 'forwarded event ID mismatch');
     await tracker.invoke('Forwarder', 'close', () => forwarder.close());

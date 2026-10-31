@@ -20,7 +20,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Queue, Worker, FlowProducer, shutdownManager } from '../src/client';
-import type { FlowJob, JobNode } from '../src/client';
+import type { FlowJob } from '../src/client';
 import { extractUserDataFromInternal, createFlowJobObject } from '../src/client/flowJobFactory';
 
 // =============================================================================
@@ -729,12 +729,12 @@ describe('FlowProducer - Extended', () => {
     });
 
     test('getParentResults should return empty map for non-existent jobs', () => {
-      const results = flowProducer.getParentResults(['no-1', 'no-2']);
+      const results = flowProducer.getParentResults(['no-1', 'no-2']) as Map<string, unknown>;
       expect(results.size).toBe(0);
     });
 
     test('getParentResults should return empty map for empty array', () => {
-      const results = flowProducer.getParentResults([]);
+      const results = flowProducer.getParentResults([]) as Map<string, unknown>;
       expect(results.size).toBe(0);
     });
   });
@@ -922,7 +922,7 @@ describe('FlowProducer - Legacy API Extended', () => {
         data: { index: i },
       }));
 
-      const result = await flowProducer.addBulkThen(parallel, {
+      const result = await flowProducer.addBulkThen<{ index?: number; type?: string }>(parallel, {
         name: 'merge',
         queueName: 'bulk-ext',
         data: { type: 'merge' },
@@ -977,7 +977,7 @@ describe('FlowProducer - Legacy API Extended', () => {
         data: { index: i },
       }));
 
-      const result = await flowProducer.addTree({
+      const result = await flowProducer.addTree<{ index?: number; id?: string }>({
         name: 'wide-root',
         queueName: 'tree-ext',
         data: { id: 'root' },

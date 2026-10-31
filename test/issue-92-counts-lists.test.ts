@@ -25,6 +25,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { Queue } from '../src/client/queue/queue';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 import { getSharedManager } from '../src/client/manager';
 import { unlink } from 'node:fs/promises';
 
@@ -83,12 +84,12 @@ describe('#92 Bug 2: pause must not double-count and the paused list must be pop
     const q = new Queue('pause-counts', { embedded: true });
     await q.add('job', { x: 1 });
 
-    const before = q.getJobCounts();
+    const before = q.getJobCounts() as JobCounts;
     expect(before.waiting).toBe(1);
     expect(before.paused).toBe(0);
 
     q.pause();
-    const after = q.getJobCounts();
+    const after = q.getJobCounts() as JobCounts;
     // BullMQ semantics: waiting jobs move into `paused`, not counted twice.
     expect(after.paused).toBe(1);
     expect(after.waiting).toBe(0);
@@ -102,13 +103,13 @@ describe('#92 Bug 2: pause must not double-count and the paused list must be pop
     await q.add('w', { x: 1 }); // priority 0 -> waiting
     await q.add('p', { x: 2 }, { priority: 10 }); // priority > 0 -> prioritized
 
-    const before = q.getJobCounts();
+    const before = q.getJobCounts() as JobCounts;
     expect(before.waiting).toBe(1);
     expect(before.prioritized).toBe(1);
     expect(before.paused).toBe(0);
 
     q.pause();
-    const after = q.getJobCounts();
+    const after = q.getJobCounts() as JobCounts;
     // Both ready buckets collapse into `paused`; neither is double-counted.
     expect(after.waiting).toBe(0);
     expect(after.prioritized).toBe(0);

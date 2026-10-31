@@ -29,6 +29,7 @@ import { existsSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Queue, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 // Unique file-backed db under /tmp so SQLite persistence is real (not :memory:).
 const DB_DIR = mkdtempSync(join(tmpdir(), 'bunq-drain-'));
@@ -107,7 +108,7 @@ describe('AUDIT: drain() must delete rows from SQLite (embedded)', () => {
     await Bun.sleep(50);
 
     // Sanity: before drain they are all visible as waiting.
-    const beforeCounts = queue.getJobCounts();
+    const beforeCounts = queue.getJobCounts() as JobCounts;
     expect(beforeCounts.waiting).toBe(4);
     for (const id of ids) {
       expect(await queue.getJobState(id)).toBe('waiting');
@@ -117,7 +118,7 @@ describe('AUDIT: drain() must delete rows from SQLite (embedded)', () => {
     queue.drain(); // sync/void in embedded mode
 
     // Poll a couple of times to be deterministic (let any async settle).
-    let counts = queue.getJobCounts();
+    let counts = queue.getJobCounts() as JobCounts;
     let waiting = await queue.getWaitingAsync(0, 100);
     let states = await Promise.all(ids.map((id) => queue.getJobState(id)));
     let jobs = await Promise.all(ids.map((id) => queue.getJob(id)));
@@ -130,7 +131,7 @@ describe('AUDIT: drain() must delete rows from SQLite (embedded)', () => {
         jobs.some((j) => j !== null);
       if (!stillThere) break;
       await Bun.sleep(60);
-      counts = queue.getJobCounts();
+      counts = queue.getJobCounts() as JobCounts;
       waiting = await queue.getWaitingAsync(0, 100);
       states = await Promise.all(ids.map((id) => queue.getJobState(id)));
       jobs = await Promise.all(ids.map((id) => queue.getJob(id)));

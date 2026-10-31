@@ -418,13 +418,13 @@ describe('Advanced DLQ', () => {
 
   describe('Failure reasons', () => {
     test('should have all failure reasons', () => {
-      expect(FailureReason.ExplicitFail).toBe('explicit_fail');
-      expect(FailureReason.MaxAttemptsExceeded).toBe('max_attempts_exceeded');
-      expect(FailureReason.Timeout).toBe('timeout');
-      expect(FailureReason.Stalled).toBe('stalled');
-      expect(FailureReason.TtlExpired).toBe('ttl_expired');
-      expect(FailureReason.WorkerLost).toBe('worker_lost');
-      expect(FailureReason.Unknown).toBe('unknown');
+      expect(FailureReason.ExplicitFail as string).toBe('explicit_fail');
+      expect(FailureReason.MaxAttemptsExceeded as string).toBe('max_attempts_exceeded');
+      expect(FailureReason.Timeout as string).toBe('timeout');
+      expect(FailureReason.Stalled as string).toBe('stalled');
+      expect(FailureReason.TtlExpired as string).toBe('ttl_expired');
+      expect(FailureReason.WorkerLost as string).toBe('worker_lost');
+      expect(FailureReason.Unknown as string).toBe('unknown');
     });
   });
 });

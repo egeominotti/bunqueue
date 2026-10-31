@@ -24,7 +24,7 @@ describe('QueueEvents - Core Events', () => {
   });
 
   test('should emit waiting event when job is added', async () => {
-    let emittedJobId: string | null = null;
+    let emittedJobId = null as string | null;
 
     queueEvents.on('waiting', ({ jobId }) => {
       emittedJobId = jobId;
@@ -39,7 +39,7 @@ describe('QueueEvents - Core Events', () => {
   });
 
   test('should emit completed event when job completes', async () => {
-    let emittedJobId: string | null = null;
+    let emittedJobId = null as string | null;
     let emittedReturnValue: unknown = null;
 
     queueEvents.on('completed', ({ jobId, returnvalue }) => {
@@ -47,7 +47,7 @@ describe('QueueEvents - Core Events', () => {
       emittedReturnValue = returnvalue;
     });
 
-    const worker = new Worker('events-test', async (job) => job.data.value * 2, {
+    const worker = new Worker<{ value: number }>('events-test', async (job) => job.data.value * 2, {
       embedded: true,
       autorun: true,
     });
@@ -102,7 +102,7 @@ describe('QueueEvents - Core Events', () => {
       progressEvents.push({ jobId, data });
     });
 
-    const worker = new Worker(
+    const worker = new Worker<{ value: number }>(
       'events-test',
       async (job) => {
         await job.updateProgress(50, 'Half done');
@@ -113,7 +113,7 @@ describe('QueueEvents - Core Events', () => {
       { embedded: true, autorun: true }
     );
 
-    const job = await queue.add('test', { value: 42 });
+    await queue.add('test', { value: 42 });
 
     // Wait for processing and event propagation
     await Bun.sleep(800);
@@ -147,7 +147,7 @@ describe('QueueEvents - BullMQ v5 Methods', () => {
   });
 
   test('emitError should emit error event', () => {
-    let emittedError: Error | null = null;
+    let emittedError = null as Error | null;
 
     queueEvents.on('error', (error) => {
       emittedError = error;
@@ -177,8 +177,8 @@ describe('QueueEvents - New BullMQ v5 Events', () => {
   });
 
   test('should emit removed event when job is cancelled', async () => {
-    let emittedJobId: string | null = null;
-    let emittedPrev: string | null = null;
+    let emittedJobId = null as string | null;
+    let emittedPrev = null as string | null;
 
     queueEvents.on('removed', ({ jobId, prev }) => {
       emittedJobId = jobId;
@@ -256,7 +256,7 @@ describe('Worker - Stalled Event', () => {
   test('worker should emit stalled event when subscribed', async () => {
     // This test just verifies the subscription mechanism works
     // Actual stall detection requires longer timeouts
-    const worker = new Worker('stalled-test', async (job) => job.data.value, {
+    const worker = new Worker<{ value: number }>('stalled-test', async (job) => job.data.value, {
       embedded: true,
       autorun: true,
     });

@@ -37,7 +37,7 @@ function makeCronJob(overrides: Partial<CronJob> & { name: string; queue: string
     skipMissedOnRestart: true,
     skipIfNoWorker: false,
     ...overrides,
-  };
+  } as CronJob;
 }
 
 describe('Issue #73: Cron starts immediately', () => {

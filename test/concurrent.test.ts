@@ -117,10 +117,7 @@ describe('Concurrent Operations', () => {
         qm.push('test', { data: { id: i } })
       );
 
-      const [pulls, pushes] = await Promise.all([
-        Promise.all(pullPromises),
-        Promise.all(pushPromises),
-      ]);
+      const [pulls] = await Promise.all([Promise.all(pullPromises), Promise.all(pushPromises)]);
 
       const pulledJobs = pulls.filter((j) => j !== null);
       expect(pulledJobs.length).toBe(5);

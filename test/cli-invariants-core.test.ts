@@ -72,7 +72,7 @@ describe('CLI invariant register: pure parser and protocol layer', () => {
     for (const commandCase of CLI_COMMAND_CASES) {
       const built = await buildCommand(commandCase.command, commandCase.args);
       expect(built).toEqual(commandCase.expected);
-      expect(decodeMessagePack(encodeMessagePack(built))).toEqual(commandCase.expected);
+      expect(decodeMessagePack<unknown>(encodeMessagePack(built))).toEqual(commandCase.expected);
     }
   });
 

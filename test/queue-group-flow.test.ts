@@ -6,7 +6,8 @@
  */
 
 import { describe, test, expect, afterEach } from 'bun:test';
-import { Queue, Worker, QueueGroup, FlowProducer, shutdownManager } from '../src/client';
+import { QueueGroup, FlowProducer, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 describe('QueueGroup + Flow - Embedded', () => {
   afterEach(() => {
@@ -197,8 +198,8 @@ describe('QueueGroup + Flow - Embedded', () => {
     ]);
 
     // Verify jobs exist
-    const counts1Before = q1.getJobCounts();
-    const counts2Before = q2.getJobCounts();
+    const counts1Before = q1.getJobCounts() as JobCounts;
+    const counts2Before = q2.getJobCounts() as JobCounts;
     // First step of each chain should be waiting; second step depends on first
     expect(counts1Before.waiting).toBeGreaterThanOrEqual(1);
     expect(counts2Before.waiting).toBeGreaterThanOrEqual(1);
@@ -207,8 +208,8 @@ describe('QueueGroup + Flow - Embedded', () => {
     group.obliterateAll();
 
     // Verify all queues are cleaned up
-    const counts1After = q1.getJobCounts();
-    const counts2After = q2.getJobCounts();
+    const counts1After = q1.getJobCounts() as JobCounts;
+    const counts2After = q2.getJobCounts() as JobCounts;
     expect(counts1After.waiting).toBe(0);
     expect(counts2After.waiting).toBe(0);
 

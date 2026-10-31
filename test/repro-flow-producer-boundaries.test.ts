@@ -96,7 +96,7 @@ describe('FlowProducer validation boundaries', () => {
         data: {},
         opts: { jobId: 'flow-completion-tombstone-id', removeOnComplete: true },
       });
-      expect((await manager.pull(queueName))?.id).toBe(first.job.id);
+      expect((await manager.pull(queueName))?.id).toBe<string | undefined>(first.job.id);
       await manager.ack(jobId(first.job.id), { generation: 1 });
 
       await expect(

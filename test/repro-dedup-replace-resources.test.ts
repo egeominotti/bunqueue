@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QueueManager } from '../src/application/queueManager';
 import type { SqliteStorage } from '../src/infrastructure/persistence/sqlite';
+import type { JobOptions } from '../src/client';
+import type { JobId } from '../src/domain/types/job';
 import {
   type CoreE2eHarness,
   MODES,
@@ -41,15 +43,11 @@ async function createPinnedDedupOwner(activeHarness: CoreE2eHarness, label: stri
     'remove-on-complete dependency evidence'
   );
   const key = `${label}-key-${crypto.randomUUID()}`;
-  const owner = await queue.add(
-    'owner',
-    { generation: 0 },
-    {
-      dependsOn: [completed.id, blocker.id],
-      deduplication: { id: key, ttl: 300_000, replace: true },
-      durable: true,
-    }
-  );
+  const owner = await queue.add('owner', { generation: 0 }, {
+    dependsOn: [completed.id, blocker.id],
+    deduplication: { id: key, ttl: 300_000, replace: true },
+    durable: true,
+  } as JobOptions);
   await waitForState(queue, owner.id, 'waiting-children');
   return { queue, manager, storage, key, owner };
 }
@@ -95,7 +93,7 @@ for (const mode of MODES) {
       expect(await queue.getJobState(first.id)).toBe('unknown');
       expect(await queue.getJobState(replacement.id)).toBe('waiting');
       expect(manager.getJobByCustomId(oldCustomId)).toBeNull();
-      expect(manager.getJobByCustomId(newCustomId)?.id).toBe(replacement.id);
+      expect(manager.getJobByCustomId(newCustomId)?.id).toBe<string | undefined>(replacement.id);
       expect(manager.getMemoryStats()).toMatchObject({
         jobIndex: 1,
         queuedTotal: 1,
@@ -148,7 +146,7 @@ for (const mode of MODES) {
 
       expect(await queue.getJobState(first.id)).toBe('waiting');
       expect(await queue.getDeduplicationJobId(key)).toBe(first.id);
-      expect(manager.getJobByCustomId(oldCustomId)?.id).toBe(first.id);
+      expect(manager.getJobByCustomId(oldCustomId)?.id).toBe<string | undefined>(first.id);
       expect(manager.getJobByCustomId(rejectedCustomId)).toBeNull();
       expect(manager.getMemoryStats()).toMatchObject({
         jobIndex: 1,
@@ -205,9 +203,9 @@ for (const mode of MODES) {
         storage.replaceJob = replaceJob;
       }
 
-      expect(manager.getJobByCustomId(prefixId)?.id).toBe(prefixId);
+      expect(manager.getJobByCustomId(prefixId)?.id).toBe<string | undefined>(prefixId);
       expect(manager.getJobByCustomId(rejectedId)).toBeNull();
-      expect(storage.getJob(prefixId)?.id).toBe(prefixId);
+      expect(storage.getJob(prefixId as JobId)?.id).toBe<string | undefined>(prefixId);
       expect(await queue.getJobState(owner.id)).toBe('waiting');
       expect(await queue.getDeduplicationJobId(key)).toBe(owner.id);
       expect(await queue.getJobCountsAsync()).toMatchObject({ paused: 2 });
@@ -265,7 +263,7 @@ for (const mode of MODES) {
       expect(await queue.getJobState(first.id)).toBe('active');
       expect(await queue.getJobState(rejectedCustomId)).toBe('unknown');
       expect(await queue.getDeduplicationJobId(key)).toBe(first.id);
-      expect(manager.getJobByCustomId(oldCustomId)?.id).toBe(first.id);
+      expect(manager.getJobByCustomId(oldCustomId)?.id).toBe<string | undefined>(first.id);
       expect(manager.getJobByCustomId(rejectedCustomId)).toBeNull();
       expect(await queue.getJobCountsAsync()).toMatchObject({ active: 1, waiting: 0 });
       release();
@@ -290,11 +288,10 @@ for (const mode of MODES) {
           durable: true,
         }
       );
-      const dependent = await consumers.add(
-        'consumer',
-        {},
-        { dependsOn: [first.id], durable: true }
-      );
+      const dependent = await consumers.add('consumer', {}, {
+        dependsOn: [first.id],
+        durable: true,
+      } as JobOptions);
       await waitForState(consumers, dependent.id, 'waiting-children');
 
       await expect(
@@ -314,9 +311,11 @@ for (const mode of MODES) {
       expect(await queue.getJobState(first.id)).toBe('waiting');
       expect(await consumers.getJobState(dependent.id)).toBe('waiting-children');
       expect(await queue.getDeduplicationJobId(key)).toBe(first.id);
-      expect(manager.getJobByCustomId(oldCustomId)?.id).toBe(first.id);
+      expect(manager.getJobByCustomId(oldCustomId)?.id).toBe<string | undefined>(first.id);
       expect(manager.getJobByCustomId(rejectedCustomId)).toBeNull();
-      expect((await manager.getJob(dependent.id))?.dependsOn).toEqual([first.id]);
+      expect((await manager.getJob(dependent.id as JobId))?.dependsOn).toEqual<
+        string[] | undefined
+      >([first.id]);
       expect(manager.getMemoryStats()).toMatchObject({
         jobIndex: 2,
         queuedTotal: 1,
@@ -356,7 +355,7 @@ for (const mode of MODES) {
 
       expect(await queue.getJobState(owner.id)).toBe('unknown');
       expect(await queue.getJobState(replacementId)).toBe('waiting');
-      expect(storage.getJob(replacementId)?.id).toBe(replacementId);
+      expect(storage.getJob(replacementId as JobId)?.id).toBe<string | undefined>(replacementId);
       expect(await queue.getDeduplicationJobId(key)).toBe(replacementId);
       expect(manager.getStats().totalPushed - pushedBefore).toBe(1n);
     });
@@ -401,8 +400,8 @@ for (const mode of MODES) {
       expect(await queue.getJobState(owner.id)).toBe('unknown');
       expect(await queue.getJobState(prefixId)).toBe('waiting');
       expect(await queue.getJobState(replacementId)).toBe('waiting');
-      expect(storage.getJob(prefixId)?.id).toBe(prefixId);
-      expect(storage.getJob(replacementId)?.id).toBe(replacementId);
+      expect(storage.getJob(prefixId as JobId)?.id).toBe<string | undefined>(prefixId);
+      expect(storage.getJob(replacementId as JobId)?.id).toBe<string | undefined>(replacementId);
       expect(await queue.getDeduplicationJobId(key)).toBe(replacementId);
       expect(manager.getStats().totalPushed - pushedBefore).toBe(2n);
     });

@@ -26,7 +26,7 @@ describe('Workflow Engine - doUntil', () => {
       (w) =>
         w.step(
           'increment',
-          async (ctx) => {
+          async (_ctx) => {
             counter++;
             return { count: counter };
           },

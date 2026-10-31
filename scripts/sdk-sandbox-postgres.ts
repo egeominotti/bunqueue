@@ -19,7 +19,7 @@ function docker(args: string[], cwd: string): ReturnType<typeof Bun.spawnSync> {
 }
 
 function dockerOutput(result: ReturnType<typeof Bun.spawnSync>): string {
-  return result.stderr.toString().trim() || result.stdout.toString().trim();
+  return result.stderr!.toString().trim() || result.stdout!.toString().trim();
 }
 
 function resourceIsAbsent(result: ReturnType<typeof Bun.spawnSync>): boolean {

@@ -10,7 +10,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Queue } from '../src/client';
-import { getSharedManager, shutdownManager } from '../src/client/manager';
+import { getSharedManager } from '../src/client/manager';
 import { QueueManager } from '../src/application/queueManager';
 
 describe('Bug #22: upsertJobScheduler timezone support', () => {

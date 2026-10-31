@@ -240,8 +240,7 @@ describe('Job Lifecycle & Events - Embedded', () => {
     const queue = new Queue('lifecycle-data-update', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('update-task', { original: true, count: 0 });
-    const jobId = job.id;
+    await queue.add('update-task', { original: true, count: 0 });
 
     let dataBeforeUpdate: unknown = null;
     let dataAfterUpdate: unknown = null;

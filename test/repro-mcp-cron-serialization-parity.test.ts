@@ -88,8 +88,8 @@ describe.each([
     const fetched = await backend.getCron(name);
     expectIntervalCron(listed, name);
     expectIntervalCron(fetched, name);
-    expect(added.nextRun).toBe(listed?.nextRun);
-    expect(added.nextRun).toBe(fetched?.nextRun);
+    expect(added.nextRun).toBe<string | null | undefined>(listed?.nextRun);
+    expect(added.nextRun).toBe<string | null | undefined>(fetched?.nextRun);
   });
 
   test('add, list and get omit repeatEvery for pattern crons', async () => {
@@ -107,7 +107,7 @@ describe.each([
     const fetched = await backend.getCron(name);
     expectPatternCron(listed, name);
     expectPatternCron(fetched, name);
-    expect(added.nextRun).toBe(listed?.nextRun);
-    expect(added.nextRun).toBe(fetched?.nextRun);
+    expect(added.nextRun).toBe<string | null | undefined>(listed?.nextRun);
+    expect(added.nextRun).toBe<string | null | undefined>(fetched?.nextRun);
   });
 });

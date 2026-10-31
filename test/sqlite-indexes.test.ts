@@ -191,7 +191,7 @@ describe('SQLite Performance Indexes', () => {
 
     // Run EXPLAIN QUERY PLAN
     const plan = db
-      .query<{ detail: string }, []>(
+      .query<{ detail: string }, [number]>(
         "EXPLAIN QUERY PLAN SELECT * FROM jobs WHERE state = 'active' AND started_at < ?"
       )
       .all(now - 30000);

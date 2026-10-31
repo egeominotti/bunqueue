@@ -31,7 +31,7 @@ import {
   JOB_DEFAULTS,
   DEFAULT_LOCK_TTL,
 } from '../src/domain/types/job';
-import type { JobId, Job, JobInput } from '../src/domain/types/job';
+import type { Job, JobInput } from '../src/domain/types/job';
 
 // ============ response.ts imports ============
 import {
@@ -49,6 +49,7 @@ import {
   stats,
   metrics,
 } from '../src/domain/types/response';
+import type { JobCounts, StatsData } from '../src/domain/types/response';
 
 // ============ queue.ts imports ============
 import { createQueueState, RateLimiter, ConcurrencyLimiter } from '../src/domain/types/queue';
@@ -81,7 +82,7 @@ describe('job.ts', () => {
   describe('jobId', () => {
     test('should wrap a string as a branded JobId', () => {
       const id = jobId('abc-123');
-      expect(id).toBe('abc-123');
+      expect<string>(id).toBe('abc-123');
       // It's still a string at runtime
       expect(typeof id).toBe('string');
     });
@@ -126,7 +127,7 @@ describe('job.ts', () => {
       const now = 1700000000000;
       const j = createJob(id, 'emails', minimalInput(), now);
 
-      expect(j.id).toBe('j1');
+      expect<string>(j.id).toBe('j1');
       expect(j.queue).toBe('emails');
       expect(j.data).toEqual({ test: true });
       expect(j.priority).toBe(JOB_DEFAULTS.priority);
@@ -224,7 +225,7 @@ describe('job.ts', () => {
       expect(j.timeout).toBe(30000);
       expect(j.uniqueKey).toBe('unique-1');
       expect(j.customId).toBe('custom-1');
-      expect(j.parentId).toBe('parent-1');
+      expect<string | null>(j.parentId).toBe('parent-1');
       expect(j.groupId).toBe('group-a');
       expect(j.stallTimeout).toBe(15000);
     });
@@ -238,7 +239,7 @@ describe('job.ts', () => {
         0
       );
       expect(j.tags).toEqual(['urgent', 'email']);
-      expect(j.dependsOn).toEqual(['dep-1', 'dep-2']);
+      expect<readonly string[] | undefined>(j.dependsOn).toEqual(['dep-1', 'dep-2']);
     });
 
     // ---- Backoff parsing ----
@@ -638,7 +639,7 @@ describe('job.ts', () => {
   describe('lockToken', () => {
     test('should wrap a string as a branded LockToken', () => {
       const t = lockToken('token-abc');
-      expect(t).toBe('token-abc');
+      expect<string>(t).toBe('token-abc');
       expect(typeof t).toBe('string');
     });
   });
@@ -671,7 +672,7 @@ describe('job.ts', () => {
       const now = 5000;
       const lock = createJobLock(id, 'worker-1', 10000, now);
 
-      expect(lock.jobId).toBe('lock-job-1');
+      expect<string>(lock.jobId).toBe('lock-job-1');
       expect(lock.owner).toBe('worker-1');
       expect(lock.createdAt).toBe(5000);
       expect(lock.expiresAt).toBe(15000); // now + ttl
@@ -973,14 +974,14 @@ describe('response.ts', () => {
         active: 3,
         completed: 100,
         failed: 2,
-      };
+      } as JobCounts;
       const r = counts(c);
       expect(r.ok).toBe(true);
       expect(r.counts).toEqual(c);
     });
 
     test('should include reqId', () => {
-      const c = { waiting: 0, delayed: 0, active: 0, completed: 0, failed: 0 };
+      const c = { waiting: 0, delayed: 0, active: 0, completed: 0, failed: 0 } as JobCounts;
       const r = counts(c, 'req-10');
       expect(r.reqId).toBe('req-10');
     });
@@ -997,7 +998,7 @@ describe('response.ts', () => {
         uptime: 3600,
         pushPerSec: 100,
         pullPerSec: 95,
-      };
+      } as unknown as StatsData;
       const r = stats(s);
       expect(r.ok).toBe(true);
       expect(r.stats).toEqual(s);
@@ -1013,7 +1014,7 @@ describe('response.ts', () => {
         uptime: 0,
         pushPerSec: 0,
         pullPerSec: 0,
-      };
+      } as unknown as StatsData;
       const r = stats(s, 'req-11');
       expect(r.reqId).toBe('req-11');
     });

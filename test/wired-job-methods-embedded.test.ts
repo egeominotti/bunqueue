@@ -30,12 +30,12 @@ describe('createSimpleJob (embedded): wired methods via Queue.getJob', () => {
 
   test('updateData mutates stored data', async () => {
     const added = await queue.add('t', { kind: 'original' });
-    const fetched = await queue.getJob<{ kind: string }>(added.id!);
+    const fetched = await queue.getJob(added.id!);
     expect(fetched).not.toBeNull();
 
     await fetched!.updateData({ kind: 'mutated' });
 
-    const after = await queue.getJob<{ kind: string }>(added.id!);
+    const after = await queue.getJob(added.id!);
     expect(after?.data).toEqual({ kind: 'mutated' });
   });
 

@@ -7,7 +7,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
-import type { DlqConfig, DlqFilter, DlqEntry, DlqStats } from '../src/client';
 
 /**
  * Helper: add a job and process it through a worker that always fails,

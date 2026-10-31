@@ -1,5 +1,6 @@
 import { describe, test, expect, afterEach } from 'bun:test';
 import { Bunqueue, shutdownManager, type BunqueueOptions } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 const openBunqueues = new Set<Bunqueue<unknown, unknown>>();
 
@@ -197,7 +198,7 @@ describe('Bunqueue', () => {
     await bq.add('task', { v: 1 });
     await bq.add('task', { v: 2 });
 
-    const counts = bq.getJobCounts();
+    const counts = bq.getJobCounts() as JobCounts;
     expect(counts.waiting).toBeGreaterThanOrEqual(2);
   });
 
@@ -476,7 +477,7 @@ describe('Bunqueue - Middleware', () => {
 
     bq.use(async (_job, next) => {
       const result = await next();
-      return { ...result, enhanced: true };
+      return { ...(result as object), enhanced: true };
     });
 
     bq.on('completed', (_job, result) => {
@@ -500,7 +501,7 @@ describe('Bunqueue - Middleware', () => {
   test('middleware can catch errors', async () => {
     const recovered: unknown[] = [];
 
-    const bq = createBunqueue('test-mw-catch', {
+    const bq = createBunqueue<unknown, unknown>('test-mw-catch', {
       processor: async () => {
         throw new Error('oops');
       },

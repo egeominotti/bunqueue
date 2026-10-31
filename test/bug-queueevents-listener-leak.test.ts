@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect, afterEach } from 'bun:test';
-import { QueueEvents, Queue } from '../src/client';
+import { QueueEvents } from '../src/client';
 import { shutdownManager } from '../src/client';
 
 describe('QueueEvents listener cleanup on close', () => {

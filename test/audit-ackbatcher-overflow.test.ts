@@ -74,7 +74,7 @@ describe('AUDIT BUG H4 — AckBatcher overflow must not silently drop ACKs', () 
     const TOTAL = MAX_PENDING_ACKS + 1_500; // 11500 -> guarantees an overflow event
 
     const allIds: string[] = [];
-    const queuePromises: Array<Promise<void>> = [];
+    const queuePromises: Array<Promise<void | boolean>> = [];
     // We must NOT let unhandled rejections crash the test; attach a catch that
     // records which ids were rejected (i.e. dropped without being sent).
     const rejectedIds = new Set<string>();

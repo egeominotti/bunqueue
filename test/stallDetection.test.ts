@@ -71,7 +71,7 @@ describe('Stall Detection', () => {
       const job = makeJob(1);
       job.startedAt = now - 20000;
       job.lastHeartbeat = now - 15000;
-      job.stallTimeout = 10000; // 10 second custom timeout
+      (job as { stallTimeout: number | null }).stallTimeout = 10000; // 10 second custom timeout
 
       const result = checkStall(job, DEFAULT_STALL_CONFIG, now);
 

@@ -16,7 +16,7 @@ import { QueueManager } from '../src/application/queueManager';
 import { createTcpServer } from '../src/infrastructure/server/tcp';
 
 // The shipped bundle drives the portable node:net transport even under Bun.
-const portable = (await import('../sdk/typescript/dist/index.js')) as typeof native;
+const portable = (await import('../sdk/typescript/dist/index.js')) as unknown as typeof native;
 
 async function freePort(): Promise<number> {
   const reservation = createServer();

@@ -5,6 +5,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Queue, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 describe('BullMQ v5 "prioritized" state compatibility', () => {
   let queue: Queue<{ value: number }>;
@@ -41,7 +42,7 @@ describe('BullMQ v5 "prioritized" state compatibility', () => {
     await queue.add('high2', { value: 4 }, { priority: 5 });
     await queue.add('high3', { value: 5 }, { priority: 10 });
 
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.waiting).toBe(2);
     expect(counts.prioritized).toBe(3);
   });

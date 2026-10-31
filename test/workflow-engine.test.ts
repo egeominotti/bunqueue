@@ -17,7 +17,7 @@ describe('Workflow Engine', () => {
     const log: string[] = [];
 
     const flow = new Workflow('test-linear')
-      .step('step-1', async (ctx) => {
+      .step('step-1', async (_ctx) => {
         log.push('step-1');
         return { value: 1 };
       })

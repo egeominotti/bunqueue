@@ -95,7 +95,7 @@ describe('PostgreSQL lease deadlines for any duration', () => {
       expect(await recoverExpiredPostgresLeases(store.context)).toBe(1);
       const recovered = await store.getJob(claim.job.id);
       expect(recovered?.job.stallCount).toBe(1);
-      expect(recovered?.dlqRetryState?.attempts.map((attempt) => attempt.reason)).toEqual([
+      expect(recovered?.dlqRetryState?.attempts.map((attempt): string => attempt.reason)).toEqual([
         'stalled',
       ]);
     }
@@ -140,7 +140,7 @@ describe('PostgreSQL lease deadlines for any duration', () => {
         const after = await store.now();
         expect(renewed).toBeDefined();
         expect((await store.getJob(claim.job.id))?.leaseUntil).toBe(renewed.row.leaseUntil);
-        return { min: renewed.row.leaseUntil - after, max: renewed.row.leaseUntil - before };
+        return { min: renewed.row.leaseUntil! - after, max: renewed.row.leaseUntil! - before };
       };
 
       const fractional = await renew(10_000.5);

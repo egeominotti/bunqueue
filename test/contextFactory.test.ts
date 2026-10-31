@@ -52,7 +52,9 @@ function createTestDependencies(overrides?: Partial<ContextDependencies>): Conte
     jobIndex: new Map<JobId, JobLocation>(),
     completedJobs: new BoundedSet<JobId>(DEFAULT_CONFIG.maxCompletedJobs),
     completedJobsData: new BoundedMap<JobId, Job>(DEFAULT_CONFIG.maxCompletedJobs),
-    jobResults: new BoundedMap<JobId, unknown>(DEFAULT_CONFIG.maxJobResults),
+    jobResults: new BoundedMap<JobId, unknown>(
+      DEFAULT_CONFIG.maxJobResults
+    ) as unknown as ContextDependencies['jobResults'],
     jobResultQueues: new Map<JobId, string>(),
     customIdMap: new LRUMap<string, JobId>(DEFAULT_CONFIG.maxCustomIds),
     jobLogs: new LRUMap<JobId, JobLogEntry[]>(DEFAULT_CONFIG.maxJobLogs),
@@ -75,7 +77,7 @@ function createTestDependencies(overrides?: Partial<ContextDependencies>): Conte
     startTime: Date.now(),
     maxLogsPerJob: 100,
     ...overrides,
-  };
+  } as ContextDependencies;
 }
 
 /**
@@ -91,7 +93,7 @@ function createTestCallbacks(overrides?: Partial<ContextCallbacks>): ContextCall
     hasPendingDeps: () => false,
     onRepeat: () => {},
     ...overrides,
-  };
+  } as ContextCallbacks;
 }
 
 describe('ContextFactory', () => {
@@ -626,7 +628,7 @@ describe('ContextFactory', () => {
       const f = new ContextFactory(deps, customCallbacks);
       const ctx = f.getAckContext();
       ctx.onJobCompleted('job-42' as JobId);
-      expect(completedId).toBe('job-42');
+      expect(completedId).toBe('job-42' as JobId);
     });
 
     test('should return context with onJobsCompleted callback', () => {
@@ -644,7 +646,7 @@ describe('ContextFactory', () => {
       const f = new ContextFactory(deps, customCallbacks);
       const ctx = f.getAckContext();
       ctx.onJobsCompleted!(['job-1' as JobId, 'job-2' as JobId]);
-      expect(completedIds).toEqual(['job-1', 'job-2']);
+      expect(completedIds).toEqual(['job-1', 'job-2'] as JobId[]);
     });
 
     test('should return context with needsBroadcast function', () => {
@@ -1173,7 +1175,7 @@ describe('ContextFactory', () => {
     });
 
     test('ack through QueueManager should work (verifies AckContext)', async () => {
-      const job = await qm.push('ack-queue', { data: { value: 42 } });
+      await qm.push('ack-queue', { data: { value: 42 } });
       const pulled = await qm.pull('ack-queue');
       expect(pulled).not.toBeNull();
 

@@ -122,7 +122,7 @@ export async function runQueueFlowContract(mode: CoreE2eMode): Promise<CoverageT
     );
 
     const finishedQueue = harness.queue<{ value: number }>('wait-finished');
-    const finishedWorker = harness.worker(finishedQueue.name, async (job) => {
+    const finishedWorker = harness.worker<{ value: number }>(finishedQueue.name, async (job) => {
       await Bun.sleep(50);
       return job.data.value * 2;
     });

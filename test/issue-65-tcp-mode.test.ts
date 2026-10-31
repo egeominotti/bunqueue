@@ -33,7 +33,7 @@ function makeCronJob(overrides: Partial<CronJob> & { name: string; queue: string
     dedup: null,
     skipMissedOnRestart: false,
     ...overrides,
-  };
+  } as CronJob;
 }
 
 describe('Issue #65: TCP mode - full server restart simulation', () => {

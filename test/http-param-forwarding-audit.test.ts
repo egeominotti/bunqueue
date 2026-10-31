@@ -46,7 +46,7 @@ function spy(obj: Record<string, unknown>, key: string): unknown[][] {
   return calls;
 }
 
-async function post(ctx: HandlerContext, path: string, body: unknown, method = 'POST') {
+async function post(_ctx: HandlerContext, path: string, body: unknown, method = 'POST') {
   const req = new Request(`http://localhost:6790${path}`, {
     method,
     headers: { 'content-type': 'application/json' },

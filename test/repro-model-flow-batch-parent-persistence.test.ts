@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { Database } from 'bun:sqlite';
+import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -136,7 +136,11 @@ test('recovery repairs a stale parent state even when its timeline already recor
   manager.shutdown();
   manager = null;
   const stale = new Database(dataPath);
-  stale.run("UPDATE jobs SET state = 'waiting-children' WHERE id = ?", String(parent.id));
+  stale.run(
+    "UPDATE jobs SET state = 'waiting-children' WHERE id = ?",
+    // bun-types types each variadic binding as an array; bun:sqlite binds scalars.
+    String(parent.id) as unknown as SQLQueryBindings[]
+  );
   stale.close();
 
   manager = new QueueManager({ dataPath });

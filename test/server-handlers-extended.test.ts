@@ -2,6 +2,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import type { HandlerContext } from '../src/infrastructure/server/types';
+import type { Response } from '../src/domain/types/response';
 import { handlePush, handlePull, handleFail } from '../src/infrastructure/server/handlers/core';
 import {
   handleDlq,
@@ -74,7 +75,7 @@ describe('DLQ Handlers (direct)', () => {
 
   describe('handleRetryDlq', () => {
     test('should return count 0 when no DLQ entries', () => {
-      const res = handleRetryDlq({ cmd: 'RetryDlq', queue: 'empty' }, ctx);
+      const res = handleRetryDlq({ cmd: 'RetryDlq', queue: 'empty' }, ctx) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).count).toBe(0);
     });
@@ -83,7 +84,7 @@ describe('DLQ Handlers (direct)', () => {
         { cmd: 'RetryDlq', queue: 'q', jobId: 'x', reqId: 'r2' },
         ctx,
         'r2'
-      );
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).count).toBe(0);
       expect(res.reqId).toBe('r2');
@@ -92,12 +93,16 @@ describe('DLQ Handlers (direct)', () => {
 
   describe('handlePurgeDlq', () => {
     test('should return count 0 when no DLQ entries', () => {
-      const res = handlePurgeDlq({ cmd: 'PurgeDlq', queue: 'empty' }, ctx);
+      const res = handlePurgeDlq({ cmd: 'PurgeDlq', queue: 'empty' }, ctx) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).count).toBe(0);
     });
     test('should propagate reqId', () => {
-      const res = handlePurgeDlq({ cmd: 'PurgeDlq', queue: 'q', reqId: 'r3' }, ctx, 'r3');
+      const res = handlePurgeDlq(
+        { cmd: 'PurgeDlq', queue: 'q', reqId: 'r3' },
+        ctx,
+        'r3'
+      ) as Response;
       expect(res.reqId).toBe('r3');
     });
   });
@@ -115,7 +120,7 @@ describe('DLQ Handlers (direct)', () => {
         { cmd: 'RemoveDlqJob', queue: 'remove-dlq', jobId: id, reqId: 'r-remove' },
         ctx,
         'r-remove'
-      );
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).data.removed).toBe(true);
       expect(res.reqId).toBe('r-remove');
@@ -128,7 +133,10 @@ describe('DLQ Handlers (direct)', () => {
 
   describe('handleRetryCompleted', () => {
     test('should return count 0 and accept optional id', () => {
-      const res = handleRetryCompleted({ cmd: 'RetryCompleted', queue: 'e', id: 'x' }, ctx);
+      const res = handleRetryCompleted(
+        { cmd: 'RetryCompleted', queue: 'e', id: 'x' },
+        ctx
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).count).toBe(0);
     });
@@ -137,7 +145,7 @@ describe('DLQ Handlers (direct)', () => {
         { cmd: 'RetryCompleted', queue: 'q', reqId: 'r4' },
         ctx,
         'r4'
-      );
+      ) as Response;
       expect(res.reqId).toBe('r4');
     });
   });
@@ -159,7 +167,7 @@ describe('Cron Handlers (direct)', () => {
       const res = handleCron(
         { cmd: 'Cron', name: 'r-cron', queue: 'q1', data: {}, repeatEvery: 60000 },
         ctx
-      );
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).cron.name).toBe('r-cron');
       expect((res as any).cron.repeatEvery).toBe(60000);
@@ -169,7 +177,7 @@ describe('Cron Handlers (direct)', () => {
       const res = handleCron(
         { cmd: 'Cron', name: 's-cron', queue: 'q1', data: {}, schedule: '0 0 * * *' },
         ctx
-      );
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).cron.schedule).toBe('0 0 * * *');
     });
@@ -184,12 +192,12 @@ describe('Cron Handlers (direct)', () => {
           timezone: 'America/New_York',
         },
         ctx
-      );
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).cron.timezone).toBe('America/New_York');
     });
     test('should return error for invalid cron (no schedule or repeatEvery)', () => {
-      const res = handleCron({ cmd: 'Cron', name: 'bad', queue: 'q1', data: {} }, ctx);
+      const res = handleCron({ cmd: 'Cron', name: 'bad', queue: 'q1', data: {} }, ctx) as Response;
       expect(res.ok).toBe(false);
       expect((res as any).error).toBeDefined();
     });
@@ -198,7 +206,7 @@ describe('Cron Handlers (direct)', () => {
         { cmd: 'Cron', name: 'rq', queue: 'q1', data: {}, repeatEvery: 5000, reqId: 'c1' },
         ctx,
         'c1'
-      );
+      ) as Response;
       expect(res.reqId).toBe('c1');
     });
   });
@@ -206,23 +214,27 @@ describe('Cron Handlers (direct)', () => {
   describe('handleCronDelete', () => {
     test('should delete an existing cron job', () => {
       handleCron({ cmd: 'Cron', name: 'del', queue: 'q1', data: {}, repeatEvery: 10000 }, ctx);
-      const res = handleCronDelete({ cmd: 'CronDelete', name: 'del' }, ctx);
+      const res = handleCronDelete({ cmd: 'CronDelete', name: 'del' }, ctx) as Response;
       expect(res.ok).toBe(true);
     });
     test('should return error for non-existent cron job', () => {
-      const res = handleCronDelete({ cmd: 'CronDelete', name: 'nope' }, ctx);
+      const res = handleCronDelete({ cmd: 'CronDelete', name: 'nope' }, ctx) as Response;
       expect(res.ok).toBe(false);
       expect((res as any).error).toBe('Cron job not found');
     });
     test('should propagate reqId', () => {
-      const res = handleCronDelete({ cmd: 'CronDelete', name: 'nope', reqId: 'd1' }, ctx, 'd1');
+      const res = handleCronDelete(
+        { cmd: 'CronDelete', name: 'nope', reqId: 'd1' },
+        ctx,
+        'd1'
+      ) as Response;
       expect(res.reqId).toBe('d1');
     });
   });
 
   describe('handleCronList', () => {
     test('should return empty list when no cron jobs exist', () => {
-      const res = handleCronList({ cmd: 'CronList' }, ctx);
+      const res = handleCronList({ cmd: 'CronList' }, ctx) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).crons).toEqual([]);
     });
@@ -236,7 +248,7 @@ describe('Cron Handlers (direct)', () => {
       expect(typeof crons[0].nextRun).toBe('number');
     });
     test('should propagate reqId', () => {
-      const res = handleCronList({ cmd: 'CronList', reqId: 'l1' }, ctx, 'l1');
+      const res = handleCronList({ cmd: 'CronList', reqId: 'l1' }, ctx, 'l1') as Response;
       expect(res.reqId).toBe('l1');
     });
   });
@@ -267,12 +279,15 @@ describe('Monitoring Handlers (direct)', () => {
   describe('handleHeartbeat', () => {
     test('should heartbeat a registered worker', () => {
       const reg = handleRegisterWorker({ cmd: 'RegisterWorker', name: 'hb', queues: ['q1'] }, ctx);
-      const res = handleHeartbeat({ cmd: 'Heartbeat', id: (reg as any).data.workerId }, ctx);
+      const res = handleHeartbeat(
+        { cmd: 'Heartbeat', id: (reg as any).data.workerId },
+        ctx
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).data.ok).toBe(true);
     });
     test('should return error for non-existent worker', () => {
-      const res = handleHeartbeat({ cmd: 'Heartbeat', id: 'fake' }, ctx);
+      const res = handleHeartbeat({ cmd: 'Heartbeat', id: 'fake' }, ctx) as Response;
       expect(res.ok).toBe(false);
       expect((res as any).error).toBe('Worker not found');
     });
@@ -282,12 +297,19 @@ describe('Monitoring Handlers (direct)', () => {
     test('should heartbeat an active job', async () => {
       await handlePush({ cmd: 'PUSH', queue: 'jh', data: {} }, ctx);
       const pull = await handlePull({ cmd: 'PULL', queue: 'jh' }, ctx);
-      const res = handleJobHeartbeat({ cmd: 'JobHeartbeat', id: (pull as any).job.id }, ctx);
+      const res = handleJobHeartbeat(
+        { cmd: 'JobHeartbeat', id: (pull as any).job.id },
+        ctx
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).data.ok).toBe(true);
     });
     test('should return error for non-existent job and propagate reqId', () => {
-      const res = handleJobHeartbeat({ cmd: 'JobHeartbeat', id: 'fake', reqId: 'j1' }, ctx, 'j1');
+      const res = handleJobHeartbeat(
+        { cmd: 'JobHeartbeat', id: 'fake', reqId: 'j1' },
+        ctx,
+        'j1'
+      ) as Response;
       expect(res.ok).toBe(false);
       expect((res as any).error).toContain('Job not found');
       expect(res.reqId).toBe('j1');
@@ -299,7 +321,7 @@ describe('Monitoring Handlers (direct)', () => {
       const res = handleRegisterWorker(
         { cmd: 'RegisterWorker', name: 'w1', queues: ['emails', 'sms'] },
         ctx
-      );
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).data.workerId).toBeDefined();
       expect((res as any).data.name).toBe('w1');
@@ -310,12 +332,15 @@ describe('Monitoring Handlers (direct)', () => {
       const res = handleUnregisterWorker(
         { cmd: 'UnregisterWorker', workerId: (reg as any).data.workerId },
         ctx
-      );
+      ) as Response;
       expect(res.ok).toBe(true);
       expect((res as any).data.removed).toBe(true);
     });
     test('should return error when unregistering non-existent worker', () => {
-      const res = handleUnregisterWorker({ cmd: 'UnregisterWorker', workerId: 'nope' }, ctx);
+      const res = handleUnregisterWorker(
+        { cmd: 'UnregisterWorker', workerId: 'nope' },
+        ctx
+      ) as Response;
       expect(res.ok).toBe(false);
       expect((res as any).error).toBe('Worker not found');
     });
@@ -323,7 +348,7 @@ describe('Monitoring Handlers (direct)', () => {
 
   describe('handleListWorkers', () => {
     test('should return empty list or list workers with detail fields', () => {
-      const empty = handleListWorkers({ cmd: 'ListWorkers' }, ctx);
+      const empty = handleListWorkers({ cmd: 'ListWorkers' }, ctx) as Response;
       expect(empty.ok).toBe(true);
       expect((empty as any).data.workers).toEqual([]);
       expect((empty as any).data.stats).toBeDefined();

@@ -6,7 +6,7 @@ import { decodeMessagePack, encodeMessagePack } from '../src/shared/msgpack';
 
 test('TcpClient.close fully closes a connection even when the peer allows half-open sockets', async () => {
   const parsers = new WeakMap<Socket<undefined>, FrameParser>();
-  let resolveClosed = () => undefined;
+  let resolveClosed: () => void = () => undefined;
   const closed = new Promise<void>((resolve) => {
     resolveClosed = resolve;
   });

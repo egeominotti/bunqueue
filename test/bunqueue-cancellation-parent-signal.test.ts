@@ -89,14 +89,17 @@ describe('simple mode stops in-process retries after a Worker abort', () => {
 
   test('a job timeout during retry backoff runs the processor only once', async () => {
     let calls = 0;
-    const instance: Bunqueue<unknown, unknown> = new Bunqueue(`cancel-retry-${process.pid}`, {
-      embedded: true,
-      retry: { maxAttempts: 5, delay: 400, strategy: 'fixed' },
-      processor: async () => {
-        calls++;
-        throw new Error('transient');
-      },
-    });
+    const instance: Bunqueue<unknown, unknown> = new Bunqueue<unknown, unknown>(
+      `cancel-retry-${process.pid}`,
+      {
+        embedded: true,
+        retry: { maxAttempts: 5, delay: 400, strategy: 'fixed' },
+        processor: async () => {
+          calls++;
+          throw new Error('transient');
+        },
+      }
+    );
     app = instance;
     const job = await instance.add('flaky', {}, { timeout: 200, attempts: 1 });
     const deadline = Date.now() + 3_000;

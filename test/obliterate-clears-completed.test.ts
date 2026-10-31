@@ -10,6 +10,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
+import type { JobCounts } from '../src/client/queue/operations/counts';
 
 const QUEUE = 'obliterate-cleanup';
 
@@ -35,7 +36,7 @@ describe('Queue.obliterate() fully purges completed jobs', () => {
     await Bun.sleep(300);
     await worker.close();
 
-    const countsBeforeOb = queue.getJobCounts();
+    const countsBeforeOb = queue.getJobCounts() as JobCounts;
     expect(countsBeforeOb.completed).toBe(1);
 
     queue.obliterate();
@@ -43,7 +44,7 @@ describe('Queue.obliterate() fully purges completed jobs', () => {
     const all = queue.getJobs({ start: 0, end: 100 });
     expect(all).toHaveLength(0);
 
-    const counts = queue.getJobCounts();
+    const counts = queue.getJobCounts() as JobCounts;
     expect(counts.completed).toBe(0);
   });
 
@@ -74,7 +75,7 @@ describe('Queue.obliterate() fully purges completed jobs', () => {
 
     // The ghost must be gone from every index
     expect(queue.getJobs({ start: 0, end: 100 })).toHaveLength(0);
-    expect(queue.getJobCounts().active).toBe(0);
+    expect((queue.getJobCounts() as JobCounts).active).toBe(0);
 
     // Let the worker finish so close() can drain
     release();

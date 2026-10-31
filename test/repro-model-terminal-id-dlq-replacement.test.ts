@@ -47,12 +47,13 @@ test('re-pushing a terminal custom ID replaces its DLQ generation exactly once',
   const db = new Database(dataPath, { readonly: true });
   expect(
     db
-      .query<{ count: number }, []>('SELECT COUNT(*) AS count FROM dlq WHERE job_id = ?')
+      .query<{ count: number }, [string]>('SELECT COUNT(*) AS count FROM dlq WHERE job_id = ?')
       .get(first.id)?.count
   ).toBe(0);
   expect(
-    db.query<{ count: number }, []>('SELECT COUNT(*) AS count FROM jobs WHERE id = ?').get(first.id)
-      ?.count
+    db
+      .query<{ count: number }, [string]>('SELECT COUNT(*) AS count FROM jobs WHERE id = ?')
+      .get(first.id)?.count
   ).toBe(1);
   db.close();
 

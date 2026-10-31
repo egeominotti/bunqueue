@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { SQL } from 'bun';
 import type { PostgresContext } from '../src/infrastructure/persistence/postgres/context';
+import type { ResolvedPostgresStorageConfig } from '../src/infrastructure/persistence/postgres/types';
 import { POSTGRES_SCHEMA_VERSION } from '../src/infrastructure/persistence/postgres/schema';
 import { initializePostgresSchema } from '../src/infrastructure/persistence/postgres/schemaInitialization';
 
@@ -20,7 +21,7 @@ function context(sql: SQL, url: string): PostgresContext {
       maxMetricDataPoints: 100,
       maxCompletedJobs: 100,
       maxJobResults: 100,
-    },
+    } as ResolvedPostgresStorageConfig,
   };
 }
 
@@ -354,7 +355,7 @@ describe('PostgreSQL schema guard', () => {
             last: Number(last_event_id),
           }))
         ).toEqual([{ retained: 2, last: Math.max(...inserted.map(({ id }) => Number(id))) }]);
-        expect(await sql`SELECT * FROM bunqueue_event_retention_deltas`).toEqual([]);
+        expect<unknown>(await sql`SELECT * FROM bunqueue_event_retention_deltas`).toEqual([]);
 
         await sql`
           INSERT INTO bunqueue_events

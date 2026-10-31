@@ -1,6 +1,10 @@
 import { Bunqueue } from '../../../src/client';
+import type { WorkerOptions } from '../../../src/client';
 import { CoreE2eHarness, type CoreE2eMode } from '../support/harness';
 import { CoverageTracker, ensure, eventually } from '../support/tracker';
+
+// Bunqueue's own `batch` option has a different shape than WorkerOptions.batch.
+type AppWorkerOptions = Omit<WorkerOptions, 'batch'>;
 
 export async function runBunqueueContract(mode: CoreE2eMode): Promise<CoverageTracker> {
   const harness = await CoreE2eHarness.start(mode, 'bunqueue');
@@ -10,7 +14,7 @@ export async function runBunqueueContract(mode: CoreE2eMode): Promise<CoverageTr
     let middlewareCalls = 0;
     let processed = 0;
     const app = new Bunqueue<{ value: number }, { doubled: number }>(harness.unique('simple'), {
-      ...harness.workerOptions({ autorun: false, concurrency: 2 }),
+      ...(harness.workerOptions({ autorun: false, concurrency: 2 }) as AppWorkerOptions),
       processor: async (job) => {
         processed++;
         return { doubled: job.data.value * 2 };
@@ -163,7 +167,7 @@ export async function runBunqueueContract(mode: CoreE2eMode): Promise<CoverageTr
     });
     let activeId = '';
     const cancellable = new Bunqueue<{ value: number }, void>(harness.unique('cancel'), {
-      ...harness.workerOptions({ concurrency: 1 }),
+      ...(harness.workerOptions({ concurrency: 1 }) as AppWorkerOptions),
       processor: async (job) => {
         activeId = job.id;
         await gate;
@@ -186,7 +190,7 @@ export async function runBunqueueContract(mode: CoreE2eMode): Promise<CoverageTr
     release();
 
     const dlq = new Bunqueue<{ value: number }, never>(harness.unique('dlq'), {
-      ...harness.workerOptions({ autorun: false }),
+      ...(harness.workerOptions({ autorun: false }) as AppWorkerOptions),
       processor: async () => {
         throw new Error('unused processor');
       },

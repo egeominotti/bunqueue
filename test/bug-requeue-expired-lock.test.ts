@@ -7,7 +7,6 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
-import type { JobId } from '../src/domain/types/job';
 
 describe('requeueExpiredJob should update shard counters and notify', () => {
   let qm: QueueManager;

@@ -24,7 +24,7 @@ function refreshes(
 ): PostgresQueueRefreshes {
   const value = new PostgresQueueRefreshes(
     ready,
-    refresh,
+    refresh as (queue: string) => Promise<void>,
     (_queue, error) => reports.push(error),
     retryDelayMs
   );
@@ -125,7 +125,7 @@ describe('PostgreSQL queue refresh retries', () => {
         () =>
           new PostgresQueueRefreshes(
             ready,
-            async () => true,
+            (async () => true) as unknown as () => Promise<void>,
             () => undefined,
             retryDelayMs
           )

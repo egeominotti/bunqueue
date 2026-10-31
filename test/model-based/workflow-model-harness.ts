@@ -22,7 +22,7 @@ import { shutdownManager } from '../../src/client';
 import { Engine, type Execution } from '../../src/client/workflow';
 import { checkInvariants, type InvariantState } from './workflow-invariants';
 import { buildChildWorkflows, buildWorkflow } from './workflow-build';
-import { emptyLedger, type Ledger, type WorkflowSpec } from './workflow-spec';
+import { emptyLedger, type Ledger, type NodeSpec, type WorkflowSpec } from './workflow-spec';
 import { listAllExecutions } from './workflow-model-listing';
 
 export interface WorkflowModel {
@@ -247,7 +247,7 @@ export class RealWorkflow {
     const events = new Set(
       this.spec.nodes
         .filter((node) => node.kind === 'waitFor' && node.timeout === undefined)
-        .map((node) => node.event)
+        .map((node) => (node as Extract<NodeSpec, { kind: 'waitFor' }>).event)
     );
     for (const event of events) {
       if (!this.invariants.delivered.has(event)) {

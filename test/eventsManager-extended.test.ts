@@ -7,6 +7,7 @@ import { describe, test, expect, beforeEach } from 'bun:test';
 import { EventsManager } from '../src/application/eventsManager';
 import { WebhookManager } from '../src/application/webhookManager';
 import { EventType } from '../src/domain/types/queue';
+import type { JobId } from '../src/domain/types/jobs/model';
 
 /** Helper to create an EventsManager with a real or mock WebhookManager */
 function createEventsManager(webhookManager?: WebhookManager) {
@@ -23,7 +24,7 @@ function makeEvent(
   return {
     eventType,
     queue: overrides?.queue ?? 'test-queue',
-    jobId: overrides?.jobId ?? 'job-1',
+    jobId: (overrides?.jobId ?? 'job-1') as JobId,
     timestamp: Date.now(),
     data: overrides?.data,
     error: overrides?.error,
@@ -63,7 +64,7 @@ describe('EventsManager - extended', () => {
 
     test('should resolve pending completion waiters', async () => {
       // Start a waiter with a long timeout
-      const waiterPromise = em.waitForJobCompletion('job-100', 30000);
+      const waiterPromise = em.waitForJobCompletion('job-100' as JobId, 30000);
 
       // Clear should resolve all pending waiters
       em.clear();
@@ -74,9 +75,9 @@ describe('EventsManager - extended', () => {
     });
 
     test('should resolve multiple pending completion waiters for different jobs', async () => {
-      const waiter1 = em.waitForJobCompletion('job-a', 30000);
-      const waiter2 = em.waitForJobCompletion('job-b', 30000);
-      const waiter3 = em.waitForJobCompletion('job-c', 30000);
+      const waiter1 = em.waitForJobCompletion('job-a' as JobId, 30000);
+      const waiter2 = em.waitForJobCompletion('job-b' as JobId, 30000);
+      const waiter3 = em.waitForJobCompletion('job-c' as JobId, 30000);
 
       em.clear();
 
@@ -85,8 +86,8 @@ describe('EventsManager - extended', () => {
     });
 
     test('should resolve multiple waiters for the same job', async () => {
-      const waiter1 = em.waitForJobCompletion('job-x', 30000);
-      const waiter2 = em.waitForJobCompletion('job-x', 30000);
+      const waiter1 = em.waitForJobCompletion('job-x' as JobId, 30000);
+      const waiter2 = em.waitForJobCompletion('job-x' as JobId, 30000);
 
       em.clear();
 
@@ -96,7 +97,7 @@ describe('EventsManager - extended', () => {
 
     test('after clear, needsBroadcast should return false (no subscribers or waiters)', () => {
       em.subscribe(() => {});
-      em.waitForJobCompletion('job-1', 30000);
+      em.waitForJobCompletion('job-1' as JobId, 30000);
 
       expect(em.needsBroadcast()).toBe(true);
 
@@ -138,7 +139,7 @@ describe('EventsManager - extended', () => {
     });
 
     test('should return true when there are completion waiters', () => {
-      em.waitForJobCompletion('job-1', 30000);
+      em.waitForJobCompletion('job-1' as JobId, 30000);
       expect(em.needsBroadcast()).toBe(true);
 
       // Cleanup: clear the waiter to avoid dangling timer
@@ -184,7 +185,7 @@ describe('EventsManager - extended', () => {
 
     test('should still return true if only waiters remain after removing subscribers', () => {
       const unsub = em.subscribe(() => {});
-      em.waitForJobCompletion('job-1', 30000);
+      em.waitForJobCompletion('job-1' as JobId, 30000);
 
       unsub();
 
@@ -209,7 +210,7 @@ describe('EventsManager - extended', () => {
 
       // Override trigger to capture calls without making real HTTP requests
       const originalTrigger = wm.trigger.bind(wm);
-      wm.trigger = async (event, jobId, queue, extra) => {
+      wm.trigger = async (event, _jobId, _queue, _extra) => {
         triggered = true;
         expect(event).toBe('job.completed');
       };
@@ -223,7 +224,7 @@ describe('EventsManager - extended', () => {
     });
 
     test('Failed event should trigger job.failed webhook', async () => {
-      let triggeredEvent: string | null = null;
+      let triggeredEvent = null as string | null;
       wm.add('https://example.com/hook', ['job.failed']);
 
       wm.trigger = async (event) => {
@@ -236,7 +237,7 @@ describe('EventsManager - extended', () => {
     });
 
     test('Pushed event should trigger job.pushed webhook', async () => {
-      let triggeredEvent: string | null = null;
+      let triggeredEvent = null as string | null;
       wm.add('https://example.com/hook', ['job.pushed']);
 
       wm.trigger = async (event) => {
@@ -249,7 +250,7 @@ describe('EventsManager - extended', () => {
     });
 
     test('Pulled event should trigger job.started webhook', async () => {
-      let triggeredEvent: string | null = null;
+      let triggeredEvent = null as string | null;
       wm.add('https://example.com/hook', ['job.started']);
 
       wm.trigger = async (event) => {
@@ -382,8 +383,8 @@ describe('EventsManager - extended', () => {
     });
 
     test('should pass correct jobId and queue to webhook trigger', async () => {
-      let capturedJobId: string | null = null;
-      let capturedQueue: string | null = null;
+      let capturedJobId = null as string | null;
+      let capturedQueue = null as string | null;
 
       wm.add('https://example.com/hook', ['job.completed']);
       wm.trigger = async (_event, jobId, queue) => {
@@ -438,8 +439,8 @@ describe('EventsManager - extended', () => {
     });
 
     test('broadcast should notify completion waiters for the matching job only', async () => {
-      const waiterA = em.waitForJobCompletion('job-a', 5000);
-      const waiterB = em.waitForJobCompletion('job-b', 200);
+      const waiterA = em.waitForJobCompletion('job-a' as JobId, 5000);
+      const waiterB = em.waitForJobCompletion('job-b' as JobId, 200);
 
       // Complete only job-a
       em.broadcast(makeEvent(EventType.Completed, { jobId: 'job-a' }));
@@ -453,7 +454,7 @@ describe('EventsManager - extended', () => {
     });
 
     test('broadcast of non-Completed event should not resolve completion waiters', async () => {
-      const waiter = em.waitForJobCompletion('job-1', 200);
+      const waiter = em.waitForJobCompletion('job-1' as JobId, 200);
 
       // Broadcast a non-completion event for the same job
       em.broadcast(makeEvent(EventType.Pushed, { jobId: 'job-1' }));

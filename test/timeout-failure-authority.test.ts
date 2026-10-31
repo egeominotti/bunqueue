@@ -64,7 +64,7 @@ describe('timeout failure authority', () => {
     await expect(
       manager.fail(queued.id, 'late processor failure', retired.token ?? undefined)
     ).resolves.toEqual({ applied: false, reason: 'already-finalized' });
-    expect(manager.getLockInfo(queued.id)?.token).toBe(current.token);
+    expect<string | null | undefined>(manager.getLockInfo(queued.id)?.token).toBe(current.token);
     await expect(manager.fail(queued.id, 'wrong', 'wrong-token')).rejects.toThrow(
       'Invalid or expired lock token'
     );
