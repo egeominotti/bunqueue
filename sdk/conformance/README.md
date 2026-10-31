@@ -87,30 +87,30 @@ A driver is any executable that reads one JSON object per line on stdin and
 writes one JSON object per line on stdout. Requests carry `id`; answers echo
 it: `{"id": 1, "ok": true, ...result}` or `{"id": 1, "ok": false, "error": "..."}`.
 
-| op | request fields | expected answer fields |
-|---|---|---|
-| `connect` | `host`, `port`, `token?` | — |
-| `add` | `queue`, `name`, `data?`, `opts?` | `jobId` |
-| `addBulk` | `queue`, `entries: [{name, data?, opts?}]` | `ids` |
-| `addFlow` | `queue`, `parentId`, `childId` | `parentId`, `childId` |
-| `getJob` | `jobId` | `job` (`{id, name, data, stacktrace?}`) or `null` for missing — **not an error** |
-| `getJobByCustomId` | `queue`, `customId` | `job` or `null` |
-| `getState` | `jobId` | `state` |
-| `getResult` | `jobId` | `result` |
-| `count` | `queue` | `count` |
-| `isPaused` | `queue` | `paused` |
-| `pause` / `resume` | `queue` | — |
-| `drain` | `queue` | `count` |
-| `promote` | `jobId` | — |
-| `upsertScheduler` | `queue`, `schedulerId`, `repeat` (`{pattern?/every?, limit?, tz?}`), `template?` (`{name?, data?, opts?}`) | — |
-| `getScheduler` | `schedulerId` | `scheduler` or `null` |
-| `removeScheduler` | `schedulerId` | — |
-| `waitForJob` | `jobId`, `timeoutMs` | `result` |
-| `getDlqCount` | `queue` | `count` |
-| `retryDlq` | `queue` | `count` |
-| `hello` | — | `protocolVersion`, `capabilities` |
-| `process` | `queue`, `behavior` (`ok`\|`failOnce`\|`unrecoverable`\|`deepThrow`), `result?`, `batchSize?`, `until` (`{completed?, failed?, dlq?}`), `timeoutMs` | — when the `until` condition was reached |
-| `close` | — | — (then exit 0) |
+| op                 | request fields                                                                                                                                      | expected answer fields                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `connect`          | `host`, `port`, `token?`                                                                                                                            | —                                                                                |
+| `add`              | `queue`, `name`, `data?`, `opts?`                                                                                                                   | `jobId`                                                                          |
+| `addBulk`          | `queue`, `entries: [{name, data?, opts?}]`                                                                                                          | `ids`                                                                            |
+| `addFlow`          | `queue`, `parentId`, `childId`                                                                                                                      | `parentId`, `childId`                                                            |
+| `getJob`           | `jobId`                                                                                                                                             | `job` (`{id, name, data, stacktrace?}`) or `null` for missing — **not an error** |
+| `getJobByCustomId` | `queue`, `customId`                                                                                                                                 | `job` or `null`                                                                  |
+| `getState`         | `jobId`                                                                                                                                             | `state`                                                                          |
+| `getResult`        | `jobId`                                                                                                                                             | `result`                                                                         |
+| `count`            | `queue`                                                                                                                                             | `count`                                                                          |
+| `isPaused`         | `queue`                                                                                                                                             | `paused`                                                                         |
+| `pause` / `resume` | `queue`                                                                                                                                             | —                                                                                |
+| `drain`            | `queue`                                                                                                                                             | `count`                                                                          |
+| `promote`          | `jobId`                                                                                                                                             | —                                                                                |
+| `upsertScheduler`  | `queue`, `schedulerId`, `repeat` (`{pattern?/every?, limit?, tz?}`), `template?` (`{name?, data?, opts?}`)                                          | —                                                                                |
+| `getScheduler`     | `schedulerId`                                                                                                                                       | `scheduler` or `null`                                                            |
+| `removeScheduler`  | `schedulerId`                                                                                                                                       | —                                                                                |
+| `waitForJob`       | `jobId`, `timeoutMs`                                                                                                                                | `result`                                                                         |
+| `getDlqCount`      | `queue`                                                                                                                                             | `count`                                                                          |
+| `retryDlq`         | `queue`                                                                                                                                             | `count`                                                                          |
+| `hello`            | —                                                                                                                                                   | `protocolVersion`, `capabilities`                                                |
+| `process`          | `queue`, `behavior` (`ok`\|`failOnce`\|`unrecoverable`\|`deepThrow`), `result?`, `batchSize?`, `until` (`{completed?, failed?, dlq?}`), `timeoutMs` | — when the `until` condition was reached                                         |
+| `close`            | —                                                                                                                                                   | — (then exit 0)                                                                  |
 
 `process` semantics: run your client's worker on `queue` until the `until`
 condition holds (as observed through your own client), then stop it.
@@ -124,26 +124,26 @@ erroring forever).
 
 ## Checks
 
-| # | What it proves | Spec section |
-|---|---|---|
-| C01 | `Hello` protocol v3 and `separate-job-name` match the server | §2 |
-| C02 | PUSH/PUSHB keep top-level job names separate from untouched user data | §5 |
-| C03 | int64 guard: big ints become float64, server stays healthy | §4 |
-| C04 | `jobId` idempotency on PUSH | §6.1 |
-| C05 | PUSHB preserves custom ids (`jobId → customId`) | §6.1 |
-| C06 | Not-found lookups map to null, not errors | §6.2 |
-| C07 | Delayed state + promote | §6.4 |
-| C08 | Process + ACK: result persisted, exactly-once completion | §6.3 |
-| C09 | Retry semantics: transient failure then success | §6.3 |
-| C10 | Unrecoverable failure skips retries into the DLQ | §6.3 |
-| C11 | FAIL stack keeps the raise site within the persisted lines | §6.3 |
-| C12 | Scheduler `jobName`, `data`, and `limit` reach distinct wire fields | §6.6 |
-| C13 | `WaitJob` timeout clamped to the server bound | §6.2/§9 |
-| C14 | Worker batch size clamped to the server max (1000) | §6.3 |
-| C15 | Pause / isPaused / resume / drain | §6.4 |
-| C16 | Unicode payload integrity through msgpack | §4 |
-| C17 | Atomic FlowProducer tree, dependency order, and child-result visibility | §6.5 |
-| C18 | Auth handshake on a token-protected server | §2 |
+| #   | What it proves                                                          | Spec section |
+| --- | ----------------------------------------------------------------------- | ------------ |
+| C01 | `Hello` protocol v3 and `separate-job-name` match the server            | §2           |
+| C02 | PUSH/PUSHB keep top-level job names separate from untouched user data   | §5           |
+| C03 | int64 guard: big ints become float64, server stays healthy              | §4           |
+| C04 | `jobId` idempotency on PUSH                                             | §6.1         |
+| C05 | PUSHB preserves custom ids (`jobId → customId`)                         | §6.1         |
+| C06 | Not-found lookups map to null, not errors                               | §6.2         |
+| C07 | Delayed state + promote                                                 | §6.4         |
+| C08 | Process + ACK: result persisted, exactly-once completion                | §6.3         |
+| C09 | Retry semantics: transient failure then success                         | §6.3         |
+| C10 | Unrecoverable failure skips retries into the DLQ                        | §6.3         |
+| C11 | FAIL stack keeps the raise site within the persisted lines              | §6.3         |
+| C12 | Scheduler `jobName`, `data`, and `limit` reach distinct wire fields     | §6.6         |
+| C13 | `WaitJob` timeout clamped to the server bound                           | §6.2/§9      |
+| C14 | Worker batch size clamped to the server max (1000)                      | §6.3         |
+| C15 | Pause / isPaused / resume / drain                                       | §6.4         |
+| C16 | Unicode payload integrity through msgpack                               | §4           |
+| C17 | Atomic FlowProducer tree, dependency order, and child-result visibility | §6.5         |
+| C18 | Auth handshake on a token-protected server                              | §2           |
 
 ## Adding a new language
 

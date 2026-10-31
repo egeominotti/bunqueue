@@ -70,7 +70,9 @@ async function main() {
     if (completedJobId && attemptCounts.get(completedJobId) === 3) {
       ok(`Job failed twice then succeeded on 3rd attempt`);
     } else {
-      fail(`Expected completed with 3 attempts, got ${completedJobId ? attemptCounts.get(completedJobId) : 'no completion'}`);
+      fail(
+        `Expected completed with 3 attempts, got ${completedJobId ? attemptCounts.get(completedJobId) : 'no completion'}`
+      );
     }
   } catch (e) {
     fail(`Fail then succeed test error: ${e}`);
@@ -113,7 +115,9 @@ async function main() {
       const sorted = failedJobAttempts.sort((a, b) => a - b);
       ok(`Job exhausted all 3 attempts, failed events fired with attemptsMade [${sorted}]`);
     } else {
-      fail(`Expected 3 attempts and 3 failed events, got processCount=${processCount} failedEvents=${failedJobAttempts.length}`);
+      fail(
+        `Expected 3 attempts and 3 failed events, got processCount=${processCount} failedEvents=${failedJobAttempts.length}`
+      );
     }
   } catch (e) {
     fail(`Exhaust all retries test error: ${e}`);
@@ -221,9 +225,13 @@ async function main() {
     const job3Completed = completedIds.includes(job3.id);
 
     if (job1NotCompleted && job2Completed && job3Completed) {
-      ok(`Job1 (attempts:1) not completed, Job2 (attempts:3) completed, Job3 (attempts:5) completed`);
+      ok(
+        `Job1 (attempts:1) not completed, Job2 (attempts:3) completed, Job3 (attempts:5) completed`
+      );
     } else {
-      fail(`Unexpected: job1NotCompleted=${job1NotCompleted} job2Completed=${job2Completed} job3Completed=${job3Completed}`);
+      fail(
+        `Unexpected: job1NotCompleted=${job1NotCompleted} job2Completed=${job2Completed} job3Completed=${job3Completed}`
+      );
     }
   } catch (e) {
     fail(`Multiple jobs with different retry configs test error: ${e}`);
@@ -314,7 +322,9 @@ async function main() {
     if (failedEventCount === 1 && processCount === 1) {
       ok(`Job failed immediately with no retry (processed exactly once)`);
     } else {
-      fail(`Expected 1 process and 1 failed event, got processCount=${processCount} failedEvents=${failedEventCount}`);
+      fail(
+        `Expected 1 process and 1 failed event, got processCount=${processCount} failedEvents=${failedEventCount}`
+      );
     }
   } catch (e) {
     fail(`No retry when attempts:1 test error: ${e}`);

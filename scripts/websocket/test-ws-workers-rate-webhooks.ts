@@ -12,20 +12,35 @@ let passed = 0;
 let failed = 0;
 
 function ok(condition: boolean, msg: string): void {
-  if (condition) { console.log(`   ✅ ${msg}`); passed++; }
-  else { console.log(`   ❌ ${msg}`); failed++; }
+  if (condition) {
+    console.log(`   ✅ ${msg}`);
+    passed++;
+  } else {
+    console.log(`   ❌ ${msg}`);
+    failed++;
+  }
 }
 
 async function connectWs(): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(WS_URL);
     const t = setTimeout(() => reject(new Error('WS connect timeout')), 5000);
-    ws.addEventListener('open', () => { clearTimeout(t); resolve(ws); });
-    ws.addEventListener('error', (e) => { clearTimeout(t); reject(e); });
+    ws.addEventListener('open', () => {
+      clearTimeout(t);
+      resolve(ws);
+    });
+    ws.addEventListener('error', (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
   });
 }
 
-async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Promise<Record<string, unknown>> {
+async function waitEvent(
+  ws: WebSocket,
+  eventName: string,
+  timeoutMs = 5000
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       ws.removeEventListener('message', handler);
@@ -39,7 +54,9 @@ async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Pr
           ws.removeEventListener('message', handler);
           resolve(parsed);
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     }
     ws.addEventListener('message', handler);
   });
@@ -82,8 +99,13 @@ async function main() {
     const ep = waitEvent(ws, 'worker:connected');
     await api('POST', '/workers', { name: 'ws-test-worker', queues: [Q] });
     const ev = await ep;
-    ok(typeof (ev.data as Record<string, unknown>).workerId === 'string', `workerId=${(ev.data as Record<string, unknown>).workerId}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      typeof (ev.data as Record<string, unknown>).workerId === 'string',
+      `workerId=${(ev.data as Record<string, unknown>).workerId}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 2. worker:disconnected
   console.log('\n2. worker:disconnected');
@@ -95,11 +117,16 @@ async function main() {
       const ep = waitEvent(ws, 'worker:disconnected');
       await api('DELETE', `/workers/${wId}`);
       const ev = await ep;
-      ok(typeof (ev.data as Record<string, unknown>).workerId === 'string', `workerId=${(ev.data as Record<string, unknown>).workerId}`);
+      ok(
+        typeof (ev.data as Record<string, unknown>).workerId === 'string',
+        `workerId=${(ev.data as Record<string, unknown>).workerId}`
+      );
     } else {
       ok(false, 'No worker found to disconnect');
     }
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // ── Rate Limit & Concurrency ──
   console.log('\n── Rate Limit & Concurrency ──');
@@ -110,8 +137,13 @@ async function main() {
     const ep = waitEvent(ws, 'ratelimit:set');
     await api('PUT', `/queues/${Q}/rate-limit`, { limit: 100 });
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 4. ratelimit:cleared
   console.log('\n4. ratelimit:cleared');
@@ -119,8 +151,13 @@ async function main() {
     const ep = waitEvent(ws, 'ratelimit:cleared');
     await api('DELETE', `/queues/${Q}/rate-limit`);
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 5. concurrency:set
   console.log('\n5. concurrency:set');
@@ -128,8 +165,13 @@ async function main() {
     const ep = waitEvent(ws, 'concurrency:set');
     await api('PUT', `/queues/${Q}/concurrency`, { concurrency: 5 });
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 6. concurrency:cleared
   console.log('\n6. concurrency:cleared');
@@ -137,8 +179,13 @@ async function main() {
     const ep = waitEvent(ws, 'concurrency:cleared');
     await api('DELETE', `/queues/${Q}/concurrency`);
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // ── Webhook Events ──
   console.log('\n── Webhook Events ──');
@@ -148,12 +195,20 @@ async function main() {
   let webhookId = '';
   try {
     const ep = waitEvent(ws, 'webhook:added');
-    const res = await api('POST', '/webhooks', { url: 'https://example.com/hook', events: ['job.completed'] });
+    const res = await api('POST', '/webhooks', {
+      url: 'https://example.com/hook',
+      events: ['job.completed'],
+    });
     const data = res.data as { webhookId: string } | undefined;
     webhookId = data?.webhookId ?? '';
     const ev = await ep;
-    ok(typeof (ev.data as Record<string, unknown>).id === 'string', `id=${(ev.data as Record<string, unknown>).id}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      typeof (ev.data as Record<string, unknown>).id === 'string',
+      `id=${(ev.data as Record<string, unknown>).id}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 8. webhook:removed
   console.log('\n8. webhook:removed');
@@ -162,11 +217,16 @@ async function main() {
       const ep = waitEvent(ws, 'webhook:removed');
       await api('DELETE', `/webhooks/${webhookId}`);
       const ev = await ep;
-      ok(typeof (ev.data as Record<string, unknown>).id === 'string', `id=${(ev.data as Record<string, unknown>).id}`);
+      ok(
+        typeof (ev.data as Record<string, unknown>).id === 'string',
+        `id=${(ev.data as Record<string, unknown>).id}`
+      );
     } else {
       ok(false, 'No webhook to remove');
     }
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // ── Config Events ──
   console.log('\n── Config Events ──');
@@ -175,10 +235,17 @@ async function main() {
   console.log('\n9. config:stall-changed');
   try {
     const ep = waitEvent(ws, 'config:stall-changed');
-    await api('PUT', `/queues/${Q}/stall-config`, { config: { enabled: true, stallInterval: 20000 } });
+    await api('PUT', `/queues/${Q}/stall-config`, {
+      config: { enabled: true, stallInterval: 20000 },
+    });
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 10. config:dlq-changed
   console.log('\n10. config:dlq-changed');
@@ -186,8 +253,13 @@ async function main() {
     const ep = waitEvent(ws, 'config:dlq-changed');
     await api('PUT', `/queues/${Q}/dlq-config`, { config: { autoRetry: true } });
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   ws.close();
   await cleanup();
@@ -200,4 +272,7 @@ function printSummary() {
   if (failed > 0) process.exit(1);
 }
 
-main().catch((err) => { console.error('Fatal:', err); process.exit(1); });
+main().catch((err) => {
+  console.error('Fatal:', err);
+  process.exit(1);
+});

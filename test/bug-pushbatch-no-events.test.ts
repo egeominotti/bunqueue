@@ -121,11 +121,7 @@ describe('Bug: pushJobBatch missing "pushed" events', () => {
       }
     });
 
-    await qm.pushBatch('batch-q', [
-      { data: { id: 1 } },
-      { data: { id: 2 } },
-      { data: { id: 3 } },
-    ]);
+    await qm.pushBatch('batch-q', [{ data: { id: 1 } }, { data: { id: 2 } }, { data: { id: 3 } }]);
 
     // Both should emit the same number of "pushed" events
     expect(singleEvents.length).toBe(3);

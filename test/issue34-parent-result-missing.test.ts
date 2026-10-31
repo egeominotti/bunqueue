@@ -263,7 +263,9 @@ describe('Issue #34 - Parent result data missing', () => {
     expect(childrenCount).toBe(2);
 
     // Verify actual values
-    const values = Object.values(parentChildrenValues).map((v: any) => v.childValue).sort();
+    const values = Object.values(parentChildrenValues)
+      .map((v: any) => v.childValue)
+      .sort();
     expect(values).toEqual([10, 20]);
 
     await worker.close();

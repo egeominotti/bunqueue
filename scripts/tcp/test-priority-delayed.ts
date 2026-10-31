@@ -59,7 +59,7 @@ async function main() {
         processedOrder.push(data.priority);
         return { ok: true };
       },
-      { connection: connOpts, useLocks: false, concurrency: 1 },
+      { connection: connOpts, useLocks: false, concurrency: 1 }
     );
 
     for (let i = 0; i < 100; i++) {
@@ -114,7 +114,7 @@ async function main() {
         await Bun.sleep(100);
         return { ok: true };
       },
-      { connection: connOpts, useLocks: false, concurrency: 1 },
+      { connection: connOpts, useLocks: false, concurrency: 1 }
     );
 
     // Wait for worker to start processing the first job
@@ -138,7 +138,9 @@ async function main() {
       const highIndex = processedOrder.indexOf('HIGH');
       // HIGH should appear within the first few positions (not last)
       if (highIndex >= 0 && highIndex < 5) {
-        ok(`High priority preempted: HIGH at position ${highIndex}, order: [${processedOrder.join(',')}]`);
+        ok(
+          `High priority preempted: HIGH at position ${highIndex}, order: [${processedOrder.join(',')}]`
+        );
       } else {
         fail(`HIGH at position ${highIndex}, expected < 5. Order: [${processedOrder.join(',')}]`);
       }
@@ -172,7 +174,7 @@ async function main() {
         processedAt = Date.now();
         return { ok: true };
       },
-      { connection: connOpts, useLocks: false, concurrency: 1 },
+      { connection: connOpts, useLocks: false, concurrency: 1 }
     );
 
     // Check that it is NOT processed immediately (within 200ms)
@@ -235,7 +237,7 @@ async function main() {
         processed = true;
         return { ok: true };
       },
-      { connection: connOpts, useLocks: false, concurrency: 1 },
+      { connection: connOpts, useLocks: false, concurrency: 1 }
     );
 
     // Should be processed quickly (well before the original 5s delay)
@@ -291,7 +293,7 @@ async function main() {
         processedOrder.push(data.label);
         return { ok: true };
       },
-      { connection: connOpts, useLocks: false, concurrency: 1 },
+      { connection: connOpts, useLocks: false, concurrency: 1 }
     );
 
     // Wait for all 3 to complete
@@ -303,7 +305,9 @@ async function main() {
     await w.close();
 
     if (processedOrder.length === 3 && processedOrder[0] === 'A') {
-      ok(`Priority changed: A (now priority 100) processed first. Order: [${processedOrder.join(',')}]`);
+      ok(
+        `Priority changed: A (now priority 100) processed first. Order: [${processedOrder.join(',')}]`
+      );
     } else if (processedOrder.length === 3) {
       fail(`Expected A first, got order: [${processedOrder.join(',')}]`);
     } else {
@@ -325,7 +329,11 @@ async function main() {
     await Bun.sleep(200);
 
     // Push 20 jobs: 5 high (100), 5 medium (50), 10 low (1)
-    const jobs: Array<{ name: string; data: { priority: number; index: number }; opts: { priority: number } }> = [];
+    const jobs: Array<{
+      name: string;
+      data: { priority: number; index: number };
+      opts: { priority: number };
+    }> = [];
 
     for (let i = 0; i < 5; i++) {
       jobs.push({
@@ -361,7 +369,7 @@ async function main() {
         await Bun.sleep(30); // Small delay to simulate work
         return { ok: true };
       },
-      { connection: connOpts, useLocks: false, concurrency: 3 },
+      { connection: connOpts, useLocks: false, concurrency: 3 }
     );
 
     // Wait for all 20 to complete
@@ -393,9 +401,13 @@ async function main() {
       const highInFirstFive = firstFive.filter((item) => item.priority === 100).length;
 
       if (avgHighPos < avgLowPos && highInFirstFive >= 3) {
-        ok(`Priority with concurrency: avgHigh=${avgHighPos.toFixed(1)} < avgLow=${avgLowPos.toFixed(1)}, ${highInFirstFive}/5 high in first batch`);
+        ok(
+          `Priority with concurrency: avgHigh=${avgHighPos.toFixed(1)} < avgLow=${avgLowPos.toFixed(1)}, ${highInFirstFive}/5 high in first batch`
+        );
       } else {
-        fail(`Priority ordering weak: avgHigh=${avgHighPos.toFixed(1)}, avgLow=${avgLowPos.toFixed(1)}, highInFirst5=${highInFirstFive}`);
+        fail(
+          `Priority ordering weak: avgHigh=${avgHighPos.toFixed(1)}, avgLow=${avgLowPos.toFixed(1)}, highInFirst5=${highInFirstFive}`
+        );
       }
     } else {
       fail(`Expected 20 jobs, got ${completionOrder.length}`);

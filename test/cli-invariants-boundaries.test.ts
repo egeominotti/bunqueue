@@ -5,16 +5,7 @@ import { parseBigIntArg, parseNumberArg } from '../src/cli/commands/types';
 import { formatError, formatOutput } from '../src/cli/output';
 import { decodeMessagePack, encodeMessagePack } from '../src/shared/msgpack';
 
-const UNICODE_TEXT = [
-  ' ',
-  'queue-😀',
-  '日本語',
-  'e\u0301',
-  '\u0000',
-  'line\nbreak',
-  'مهمة',
-  '👩🏽‍💻',
-];
+const UNICODE_TEXT = [' ', 'queue-😀', '日本語', 'e\u0301', '\u0000', 'line\nbreak', 'مهمة', '👩🏽‍💻'];
 
 describe('CLI pure boundaries and generated inputs', () => {
   test('safe signed integers round-trip exactly', () => {

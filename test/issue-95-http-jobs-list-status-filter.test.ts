@@ -76,7 +76,8 @@ async function seed(manager: QueueManager): Promise<void> {
   // 4 waiting
   for (let i = 0; i < 4; i++) await manager.push(QUEUE, { data: { kind: 'wait', i } });
   // 5 delayed (10 min out)
-  for (let i = 0; i < 5; i++) await manager.push(QUEUE, { data: { kind: 'delay', i }, delay: 600_000 });
+  for (let i = 0; i < 5; i++)
+    await manager.push(QUEUE, { data: { kind: 'delay', i }, delay: 600_000 });
 }
 
 const EXPECTED: Record<string, number> = { failed: 3, completed: 2, waiting: 4, delayed: 5 };

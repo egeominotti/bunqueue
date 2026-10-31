@@ -42,13 +42,15 @@ describe('Issue #61: cron missed jobs on restart', () => {
     scheduler.setPersistCallback(() => {});
 
     // Simulate loading a cron that was due 1 hour ago with skipMissedOnRestart
-    scheduler.load([makeCronJob({
-      name: 'missed-cron',
-      queue: 'test-queue',
-      nextRun: Date.now() - 3600_000,
-      schedule: '0 * * * *',
-      skipMissedOnRestart: true,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'missed-cron',
+        queue: 'test-queue',
+        nextRun: Date.now() - 3600_000,
+        schedule: '0 * * * *',
+        skipMissedOnRestart: true,
+      }),
+    ]);
 
     await tickScheduler(scheduler);
 
@@ -72,13 +74,15 @@ describe('Issue #61: cron missed jobs on restart', () => {
     scheduler.setPersistCallback(() => {});
 
     // Default behavior: execute missed crons (catch-up)
-    scheduler.load([makeCronJob({
-      name: 'catchup-cron',
-      queue: 'test-queue',
-      nextRun: Date.now() - 3600_000,
-      schedule: '0 * * * *',
-      skipMissedOnRestart: false,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'catchup-cron',
+        queue: 'test-queue',
+        nextRun: Date.now() - 3600_000,
+        schedule: '0 * * * *',
+        skipMissedOnRestart: false,
+      }),
+    ]);
 
     await tickScheduler(scheduler);
 
@@ -97,14 +101,16 @@ describe('Issue #61: cron missed jobs on restart', () => {
     });
     scheduler.setPersistCallback(() => {});
 
-    scheduler.load([makeCronJob({
-      name: 'missed-interval',
-      queue: 'test-queue',
-      schedule: null,
-      repeatEvery: 60000,
-      nextRun: Date.now() - 120_000,
-      skipMissedOnRestart: true,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'missed-interval',
+        queue: 'test-queue',
+        schedule: null,
+        repeatEvery: 60000,
+        nextRun: Date.now() - 120_000,
+        skipMissedOnRestart: true,
+      }),
+    ]);
 
     await tickScheduler(scheduler);
 

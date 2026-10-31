@@ -37,9 +37,7 @@ describe('FlowProducer atomicity (BullMQ v5 compat)', () => {
         name: 'parent',
         queueName: 'flow-opts-test',
         data: { x: 1 },
-        children: [
-          { name: 'child', queueName: 'flow-opts-test', data: { y: 2 } },
-        ],
+        children: [{ name: 'child', queueName: 'flow-opts-test', data: { y: 2 } }],
       },
       {} // FlowOpts - empty but should be accepted
     );
@@ -60,9 +58,7 @@ describe('FlowProducer atomicity (BullMQ v5 compat)', () => {
         name: 'parent',
         queueName: 'flow-opts-defaults',
         data: { x: 1 },
-        children: [
-          { name: 'child', queueName: 'flow-opts-defaults', data: { y: 2 } },
-        ],
+        children: [{ name: 'child', queueName: 'flow-opts-defaults', data: { y: 2 } }],
       },
       {
         queuesOptions: {
@@ -88,9 +84,7 @@ describe('FlowProducer atomicity (BullMQ v5 compat)', () => {
         name: 'flow1-parent',
         queueName: 'bulk-atomic-test',
         data: { id: 1 },
-        children: [
-          { name: 'flow1-child', queueName: 'bulk-atomic-test', data: { id: 11 } },
-        ],
+        children: [{ name: 'flow1-child', queueName: 'bulk-atomic-test', data: { id: 11 } }],
       },
       {
         name: 'flow2-parent',
@@ -121,9 +115,7 @@ describe('FlowProducer atomicity (BullMQ v5 compat)', () => {
           name: 'child-a',
           queueName: 'tracking-test',
           data: { level: 1 },
-          children: [
-            { name: 'grandchild-a1', queueName: 'tracking-test', data: { level: 2 } },
-          ],
+          children: [{ name: 'grandchild-a1', queueName: 'tracking-test', data: { level: 2 } }],
         },
         {
           name: 'child-b',

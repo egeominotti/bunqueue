@@ -27,7 +27,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   manager.shutdown();
-  try { await unlink(processorPath); } catch {}
+  try {
+    await unlink(processorPath);
+  } catch {}
 });
 
 describe('Issue #41: Sandboxed Worker idle RAM', () => {
@@ -62,7 +64,7 @@ describe('Issue #41: Sandboxed Worker idle RAM', () => {
     // there are no more jobs. With default idleTimeout=0, they NEVER auto-terminate.
     const statsAfter = worker.getStats();
     expect(statsAfter.total).toBe(3); // Still 3 processes alive!
-    expect(statsAfter.idle).toBe(3);  // All idle, none terminated
+    expect(statsAfter.idle).toBe(3); // All idle, none terminated
     expect(statsAfter.busy).toBe(0);
     expect(worker.isRunning()).toBe(true); // Pool still running
 

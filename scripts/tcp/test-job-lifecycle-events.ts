@@ -35,7 +35,7 @@ function makeQueue(name: string): Queue {
 function makeWorker(
   name: string,
   processor: (job: any) => Promise<any>,
-  opts: Record<string, any> = {},
+  opts: Record<string, any> = {}
 ): Worker {
   const w = new Worker(name, processor, {
     connection: connOpts,
@@ -100,7 +100,7 @@ async function main() {
       ok(`State transitions: waiting -> active -> completed`);
     } else {
       fail(
-        `State transitions incorrect: push=${stateAfterPush}, sawActive=${sawActive}, sawCompleted=${sawCompleted}, final=${stateAfterComplete}`,
+        `State transitions incorrect: push=${stateAfterPush}, sawActive=${sawActive}, sawCompleted=${sawCompleted}, final=${stateAfterComplete}`
       );
     }
   } catch (e) {
@@ -148,16 +148,11 @@ async function main() {
     // After failure with attempts=1, job should be in failed state
     const stateAfterFail = await q.getJobState(jobId);
 
-    if (
-      stateAfterPush === 'waiting' &&
-      sawActive &&
-      sawFailed &&
-      stateAfterFail === 'failed'
-    ) {
+    if (stateAfterPush === 'waiting' && sawActive && sawFailed && stateAfterFail === 'failed') {
       ok(`State transitions: waiting -> active -> failed`);
     } else {
       fail(
-        `State transitions incorrect: push=${stateAfterPush}, sawActive=${sawActive}, sawFailed=${sawFailed}, final=${stateAfterFail}`,
+        `State transitions incorrect: push=${stateAfterPush}, sawActive=${sawActive}, sawFailed=${sawFailed}, final=${stateAfterFail}`
       );
     }
   } catch (e) {
@@ -201,12 +196,7 @@ async function main() {
     const activeIdx = eventOrder.indexOf('active');
     const completedIdx = eventOrder.indexOf('completed');
 
-    if (
-      eventOrder.length >= 2 &&
-      activeIdx >= 0 &&
-      completedIdx >= 0 &&
-      activeIdx < completedIdx
-    ) {
+    if (eventOrder.length >= 2 && activeIdx >= 0 && completedIdx >= 0 && activeIdx < completedIdx) {
       ok(`Event ordering correct: [${eventOrder.join(', ')}]`);
     } else {
       fail(`Event ordering incorrect: [${eventOrder.join(', ')}]`);
@@ -262,7 +252,7 @@ async function main() {
       ok(`Progress values received: [${progressValues.join(', ')}]`);
     } else {
       fail(
-        `Progress tracking incorrect: completed=${completed}, values=[${progressValues.join(', ')}]`,
+        `Progress tracking incorrect: completed=${completed}, values=[${progressValues.join(', ')}]`
       );
     }
   } catch (e) {
@@ -312,7 +302,7 @@ async function main() {
       ok(`All 3 completed listeners fired`);
     } else {
       fail(
-        `Not all listeners fired: l1=${listener1Fired}, l2=${listener2Fired}, l3=${listener3Fired}`,
+        `Not all listeners fired: l1=${listener1Fired}, l2=${listener2Fired}, l3=${listener3Fired}`
       );
     }
   } catch (e) {
@@ -352,16 +342,11 @@ async function main() {
 
     await w.close();
 
-    if (
-      completed &&
-      capturedJobId &&
-      capturedResult &&
-      capturedResult.answer === 42
-    ) {
+    if (completed && capturedJobId && capturedResult && capturedResult.answer === 42) {
       ok(`Result received: { answer: ${capturedResult.answer} } for job ${capturedJobId}`);
     } else {
       fail(
-        `Result incorrect: completed=${completed}, jobId=${capturedJobId}, result=${JSON.stringify(capturedResult)}`,
+        `Result incorrect: completed=${completed}, jobId=${capturedJobId}, result=${JSON.stringify(capturedResult)}`
       );
     }
   } catch (e) {

@@ -64,7 +64,11 @@ async function main() {
       await sleep(50);
     }
 
-    test('Jobs processed with same queue name', processed === 5, processed === 5 ? undefined : `Only ${processed}/5 processed`);
+    test(
+      'Jobs processed with same queue name',
+      processed === 5,
+      processed === 5 ? undefined : `Only ${processed}/5 processed`
+    );
 
     await worker.close();
   }
@@ -98,7 +102,11 @@ async function main() {
     // Wait a bit - worker should NOT process these
     await sleep(500);
 
-    test('Worker does not process jobs from different queue', workerProcessed === 0, workerProcessed === 0 ? undefined : `Unexpectedly processed ${workerProcessed} jobs`);
+    test(
+      'Worker does not process jobs from different queue',
+      workerProcessed === 0,
+      workerProcessed === 0 ? undefined : `Unexpectedly processed ${workerProcessed} jobs`
+    );
 
     await worker.close();
   }
@@ -136,7 +144,11 @@ async function main() {
       await sleep(50);
     }
 
-    test('All 100 jobs processed with stored queue name', processed === 100, processed === 100 ? undefined : `Only ${processed}/100 processed`);
+    test(
+      'All 100 jobs processed with stored queue name',
+      processed === 100,
+      processed === 100 ? undefined : `Only ${processed}/100 processed`
+    );
 
     await worker.close();
   }
@@ -176,7 +188,11 @@ async function main() {
       await sleep(50);
     }
 
-    test('All jobs processed by multiple workers', processed === 50, processed === 50 ? undefined : `Only ${processed}/50 processed`);
+    test(
+      'All jobs processed by multiple workers',
+      processed === 50,
+      processed === 50 ? undefined : `Only ${processed}/50 processed`
+    );
 
     for (const worker of workers) {
       await worker.close();

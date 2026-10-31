@@ -35,7 +35,7 @@ function makeQueue(name: string): Queue {
 function makeWorker(
   name: string,
   processor: (job: any) => Promise<any>,
-  opts: Record<string, any> = {},
+  opts: Record<string, any> = {}
 ): Worker {
   const w = new Worker(name, processor, {
     connection: connOpts,
@@ -71,11 +71,15 @@ async function main() {
 
     const processed: number[] = [];
 
-    const w = makeWorker('tcp-pauseres-stops', async (job) => {
-      const data = job.data as { index: number };
-      processed.push(data.index);
-      return { ok: true };
-    }, { concurrency: 1 });
+    const w = makeWorker(
+      'tcp-pauseres-stops',
+      async (job) => {
+        const data = job.data as { index: number };
+        processed.push(data.index);
+        return { ok: true };
+      },
+      { concurrency: 1 }
+    );
 
     // Push 5 jobs and let the worker process them
     for (let i = 0; i < 5; i++) {
@@ -132,11 +136,15 @@ async function main() {
     q.pause();
     await waitForPauseState(q, true);
 
-    const w = makeWorker('tcp-pauseres-resume', async (job) => {
-      const data = job.data as { index: number };
-      processed.push(data.index);
-      return { ok: true };
-    }, { concurrency: 5 });
+    const w = makeWorker(
+      'tcp-pauseres-resume',
+      async (job) => {
+        const data = job.data as { index: number };
+        processed.push(data.index);
+        return { ok: true };
+      },
+      { concurrency: 5 }
+    );
 
     // Push 5 jobs while paused
     for (let i = 0; i < 5; i++) {
@@ -194,9 +202,13 @@ async function main() {
     const afterResume = await q.isPausedAsync();
 
     if (initial === false && afterPause === true && afterResume === false) {
-      ok(`isPaused state correct: initial=${initial}, afterPause=${afterPause}, afterResume=${afterResume}`);
+      ok(
+        `isPaused state correct: initial=${initial}, afterPause=${afterPause}, afterResume=${afterResume}`
+      );
     } else {
-      fail(`isPaused state wrong: initial=${initial}, afterPause=${afterPause}, afterResume=${afterResume}`);
+      fail(
+        `isPaused state wrong: initial=${initial}, afterPause=${afterPause}, afterResume=${afterResume}`
+      );
     }
   } catch (e) {
     fail(`isPaused reflects state test failed: ${e}`);
@@ -213,11 +225,15 @@ async function main() {
 
     const processed: number[] = [];
 
-    const w = makeWorker('tcp-pauseres-multi', async (job) => {
-      const data = job.data as { index: number };
-      processed.push(data.index);
-      return { ok: true };
-    }, { concurrency: 5 });
+    const w = makeWorker(
+      'tcp-pauseres-multi',
+      async (job) => {
+        const data = job.data as { index: number };
+        processed.push(data.index);
+        return { ok: true };
+      },
+      { concurrency: 5 }
+    );
 
     // Cycle 1: pause, push 3 jobs, resume, wait for processing
     q.pause();
@@ -259,9 +275,13 @@ async function main() {
 
     if (afterCycle1 >= 3 && duringPause === afterCycle1 && processed.length >= 6) {
       const unique = new Set(processed);
-      ok(`Multiple cycles: cycle1=${afterCycle1}, paused=${duringPause}, final=${processed.length}, unique=${unique.size}`);
+      ok(
+        `Multiple cycles: cycle1=${afterCycle1}, paused=${duringPause}, final=${processed.length}, unique=${unique.size}`
+      );
     } else {
-      fail(`Multiple cycles failed: cycle1=${afterCycle1}, paused=${duringPause}, final=${processed.length}`);
+      fail(
+        `Multiple cycles failed: cycle1=${afterCycle1}, paused=${duringPause}, final=${processed.length}`
+      );
     }
 
     await w.close();
@@ -328,7 +348,9 @@ async function main() {
         }
 
         if (processed.length >= countAtPause + 5) {
-          ok(`Concurrent workers respected pause: paused=${countAtPause}, final=${processed.length}`);
+          ok(
+            `Concurrent workers respected pause: paused=${countAtPause}, final=${processed.length}`
+          );
         } else {
           fail(`Workers did not resume: expected ${countAtPause + 5}, got ${processed.length}`);
         }
@@ -356,11 +378,15 @@ async function main() {
     q.pause();
     await waitForPauseState(q, true);
 
-    const w = makeWorker('tcp-pauseres-queued', async (job) => {
-      const data = job.data as { index: number };
-      processed.push(data.index);
-      return { ok: true };
-    }, { concurrency: 5 });
+    const w = makeWorker(
+      'tcp-pauseres-queued',
+      async (job) => {
+        const data = job.data as { index: number };
+        processed.push(data.index);
+        return { ok: true };
+      },
+      { concurrency: 5 }
+    );
 
     // Add 10 jobs
     for (let i = 0; i < 10; i++) {
@@ -375,7 +401,9 @@ async function main() {
     const counts = await q.getJobCountsAsync();
 
     if (counts.paused < 10 || counts.waiting !== 0) {
-      fail(`Jobs not queued properly: waiting=${counts.waiting}, paused=${counts.paused}, expected paused=10/waiting=0`);
+      fail(
+        `Jobs not queued properly: waiting=${counts.waiting}, paused=${counts.paused}, expected paused=10/waiting=0`
+      );
     } else {
       // Verify none are processed
       if (processed.length > 0) {
@@ -392,7 +420,9 @@ async function main() {
 
         if (processed.length >= 10) {
           const unique = new Set(processed);
-          ok(`Jobs queued while paused: paused=${counts.paused}, processed=${processed.length}, unique=${unique.size}`);
+          ok(
+            `Jobs queued while paused: paused=${counts.paused}, processed=${processed.length}, unique=${unique.size}`
+          );
         } else {
           fail(`Not all queued jobs processed: ${processed.length}/10`);
         }

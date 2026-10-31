@@ -136,9 +136,21 @@ describe('BUG: backup misses WAL-pending data', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
-      try { await unlink(f + '-wal'); } catch { /* ok */ }
-      try { await unlink(f + '-shm'); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
+      try {
+        await unlink(f + '-wal');
+      } catch {
+        /* ok */
+      }
+      try {
+        await unlink(f + '-shm');
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -162,7 +174,11 @@ describe('BUG: backup misses WAL-pending data', () => {
 
     // Restore to new path
     const restorePath = tmpPath('restore-wal');
-    const restoreResult = await restoreBackup(result.key!, cfg({ databasePath: restorePath }), client);
+    const restoreResult = await restoreBackup(
+      result.key!,
+      cfg({ databasePath: restorePath }),
+      client
+    );
     expect(restoreResult.success).toBe(true);
 
     // BUG: restored DB should have all 50 rows, but WAL data is lost
@@ -191,7 +207,11 @@ describe('BUG: compression should be non-blocking', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });

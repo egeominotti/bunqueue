@@ -55,7 +55,11 @@ describe('Advanced DLQ', () => {
       const job = makeJob(1);
       const now = Date.now();
 
-      const config: DlqConfig = { ...DEFAULT_DLQ_CONFIG, autoRetry: true, autoRetryInterval: 60000 };
+      const config: DlqConfig = {
+        ...DEFAULT_DLQ_CONFIG,
+        autoRetry: true,
+        autoRetryInterval: 60000,
+      };
       const entry = createDlqEntry(job, FailureReason.Stalled, null, config);
 
       expect(entry.nextRetryAt).toBeGreaterThan(now);
@@ -263,7 +267,11 @@ describe('Advanced DLQ', () => {
         expiresAt: null,
       };
 
-      const config: DlqConfig = { ...DEFAULT_DLQ_CONFIG, autoRetryInterval: 60000, maxAutoRetries: 3 };
+      const config: DlqConfig = {
+        ...DEFAULT_DLQ_CONFIG,
+        autoRetryInterval: 60000,
+        maxAutoRetries: 3,
+      };
 
       scheduleNextRetry(entry, config);
 
@@ -288,7 +296,11 @@ describe('Advanced DLQ', () => {
         expiresAt: null,
       };
 
-      const config: DlqConfig = { ...DEFAULT_DLQ_CONFIG, autoRetryInterval: 60000, maxAutoRetries: 3 };
+      const config: DlqConfig = {
+        ...DEFAULT_DLQ_CONFIG,
+        autoRetryInterval: 60000,
+        maxAutoRetries: 3,
+      };
 
       scheduleNextRetry(entry, config);
 
@@ -313,7 +325,11 @@ describe('Advanced DLQ', () => {
         expiresAt: null,
       };
 
-      const config: DlqConfig = { ...DEFAULT_DLQ_CONFIG, autoRetryInterval: 60000, maxAutoRetries: 3 };
+      const config: DlqConfig = {
+        ...DEFAULT_DLQ_CONFIG,
+        autoRetryInterval: 60000,
+        maxAutoRetries: 3,
+      };
 
       scheduleNextRetry(entry, config);
 

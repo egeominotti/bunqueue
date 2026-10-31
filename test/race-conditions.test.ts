@@ -128,9 +128,7 @@ describe('Race Condition Tests', () => {
 
         // Occasionally release client jobs
         if (i % 10 === 9) {
-          operations.push(
-            qm.releaseClientJobs(clientId).then((count) => `released-${count}`)
-          );
+          operations.push(qm.releaseClientJobs(clientId).then((count) => `released-${count}`));
         }
       }
 
@@ -158,9 +156,7 @@ describe('Race Condition Tests', () => {
       }
 
       // Try to release multiple times concurrently
-      const releaseAttempts = Array.from({ length: 10 }, () =>
-        qm.releaseClientJobs(CLIENT)
-      );
+      const releaseAttempts = Array.from({ length: 10 }, () => qm.releaseClientJobs(CLIENT));
 
       const results = await Promise.all(releaseAttempts);
 
@@ -451,15 +447,18 @@ describe('Race Condition Tests', () => {
           case 1:
             // Pull and register
             operations.push(
-              qm.pull(queue, 10).then((job) => {
-                if (job) {
-                  qm.registerClientJob(clientId, job.id);
-                }
-                return job;
-              }).catch((e) => {
-                errors.push(e);
-                return null;
-              })
+              qm
+                .pull(queue, 10)
+                .then((job) => {
+                  if (job) {
+                    qm.registerClientJob(clientId, job.id);
+                  }
+                  return job;
+                })
+                .catch((e) => {
+                  errors.push(e);
+                  return null;
+                })
             );
             break;
 
@@ -577,11 +576,7 @@ describe('Race Condition Tests', () => {
 
       // Invariant: total jobs should be accounted for
       const midStats = qm.getStats();
-      const accountedFor =
-        midStats.waiting +
-        midStats.active +
-        midStats.completed +
-        midStats.dlq;
+      const accountedFor = midStats.waiting + midStats.active + midStats.completed + midStats.dlq;
 
       // All jobs should be somewhere in the system (allowing for some in-flight)
       expect(accountedFor).toBeLessThanOrEqual(TOTAL_JOBS);
@@ -607,7 +602,9 @@ describe('Race Condition Tests', () => {
       expect(endStats.waiting).toBe(0);
       // All jobs should be accounted for somewhere (completed, DLQ, or still active)
       // This test verifies no jobs are lost, but allows for some to still be in-flight
-      expect(endStats.completed + endStats.dlq + endStats.active).toBeGreaterThanOrEqual(TOTAL_JOBS * 0.5);
+      expect(endStats.completed + endStats.dlq + endStats.active).toBeGreaterThanOrEqual(
+        TOTAL_JOBS * 0.5
+      );
     });
   });
 
@@ -634,9 +631,7 @@ describe('Race Condition Tests', () => {
       }
 
       // 100 concurrent pulls
-      const pulls = Array.from({ length: JOBS }, () =>
-        qm.pull(QUEUE, 100)
-      );
+      const pulls = Array.from({ length: JOBS }, () => qm.pull(QUEUE, 100));
 
       const results = await Promise.all(pulls);
       const pulledJobs = results.filter((r) => r !== null);
@@ -787,9 +782,7 @@ describe('Race Condition Tests', () => {
       }
 
       // Start pulling (but don't ack)
-      const pullPromises = Array.from({ length: 10 }, () =>
-        qm.pull(QUEUE, 0)
-      );
+      const pullPromises = Array.from({ length: 10 }, () => qm.pull(QUEUE, 0));
       await Promise.all(pullPromises);
 
       let stats = qm.getStats();
@@ -823,9 +816,7 @@ describe('Race Condition Benchmarks', () => {
     const COUNT = 1000;
 
     const start = performance.now();
-    const pushes = Array.from({ length: COUNT }, (_, i) =>
-      qm.push('bench-push', { data: { i } })
-    );
+    const pushes = Array.from({ length: COUNT }, (_, i) => qm.push('bench-push', { data: { i } }));
     await Promise.all(pushes);
     const duration = performance.now() - start;
 
@@ -845,9 +836,7 @@ describe('Race Condition Benchmarks', () => {
     }
 
     const start = performance.now();
-    const pulls = Array.from({ length: COUNT }, () =>
-      qm.pull('bench-pull', 100)
-    );
+    const pulls = Array.from({ length: COUNT }, () => qm.pull('bench-pull', 100));
     const results = await Promise.all(pulls);
     const duration = performance.now() - start;
 
@@ -921,9 +910,7 @@ describe('Race Condition Benchmarks', () => {
     }
 
     const start = performance.now();
-    const releases = Array.from({ length: CLIENTS }, (_, c) =>
-      qm.releaseClientJobs(`client-${c}`)
-    );
+    const releases = Array.from({ length: CLIENTS }, (_, c) => qm.releaseClientJobs(`client-${c}`));
     const results = await Promise.all(releases);
     const duration = performance.now() - start;
 

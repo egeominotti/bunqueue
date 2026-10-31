@@ -21,19 +21,18 @@ afterEach(async () => {
 });
 
 describe('workflow production safety invariants', () => {
-  test.each([
-    '__charge',
-    'sub:charge',
-    '__proto__',
-  ])('registration refuses the reserved step name %s', (name) => {
-    engine = new Engine({ embedded: true });
-    const workflow = new Workflow(`reserved-${name}`).step(name, () => ({ ok: true }), {
-      retry: 1,
-      compensate: () => undefined,
-    });
+  test.each(['__charge', 'sub:charge', '__proto__'])(
+    'registration refuses the reserved step name %s',
+    (name) => {
+      engine = new Engine({ embedded: true });
+      const workflow = new Workflow(`reserved-${name}`).step(name, () => ({ ok: true }), {
+        retry: 1,
+        compensate: () => undefined,
+      });
 
-    expect(() => engine?.register(workflow)).toThrow(/reserved/i);
-  });
+      expect(() => engine?.register(workflow)).toThrow(/reserved/i);
+    }
+  );
 
   test('registration validates reserved names in every user-named node', () => {
     const workflows = [

@@ -53,11 +53,7 @@ describe('Job Removal & Cleanup - Embedded', () => {
     const queue = new Queue('removal-on-fail', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add(
-      'fail-task',
-      { value: 1 },
-      { removeOnFail: true, attempts: 1 }
-    );
+    const job = await queue.add('fail-task', { value: 1 }, { removeOnFail: true, attempts: 1 });
     const jobId = job.id;
 
     let failed = false;

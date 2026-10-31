@@ -95,9 +95,7 @@ describe('Bug #16 - Updating repeated job data', () => {
 
     const delayedJobs = qm.getJobs('repeat-q2', { state: 'delayed' });
     expect(delayedJobs.length).toBeGreaterThanOrEqual(1);
-    expect(delayedJobs[0].data).toEqual(
-      expect.objectContaining({ customerId: 'updated' })
-    );
+    expect(delayedJobs[0].data).toEqual(expect.objectContaining({ customerId: 'updated' }));
   });
 
   // === Scenario 3: updateData during processing DOES work ===

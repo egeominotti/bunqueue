@@ -28,11 +28,10 @@ describe('Queue.obliterate() fully purges completed jobs', () => {
 
   test('after completing a job + obliterate, getJobs() returns empty', async () => {
     await queue.add('j', { v: 1 });
-    const worker = new Worker<{ v: number }>(
-      QUEUE,
-      async () => ({ done: true }),
-      { concurrency: 1, embedded: true }
-    );
+    const worker = new Worker<{ v: number }>(QUEUE, async () => ({ done: true }), {
+      concurrency: 1,
+      embedded: true,
+    });
     await Bun.sleep(300);
     await worker.close();
 

@@ -42,12 +42,14 @@ describe('skipIfNoWorker', () => {
     scheduler.setPersistCallback(() => {});
     scheduler.setWorkerCheckCallback((_queue) => false); // no workers
 
-    scheduler.load([makeCronJob({
-      name: 'no-worker-cron',
-      queue: 'sync-queue',
-      nextRun: Date.now() - 1000, // due
-      skipIfNoWorker: true,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'no-worker-cron',
+        queue: 'sync-queue',
+        nextRun: Date.now() - 1000, // due
+        skipIfNoWorker: true,
+      }),
+    ]);
 
     await tickScheduler(scheduler);
 
@@ -67,12 +69,14 @@ describe('skipIfNoWorker', () => {
     scheduler.setPersistCallback(() => {});
     scheduler.setWorkerCheckCallback((_queue) => true); // workers exist
 
-    scheduler.load([makeCronJob({
-      name: 'has-worker-cron',
-      queue: 'sync-queue',
-      nextRun: Date.now() + 60000,
-      skipIfNoWorker: true,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'has-worker-cron',
+        queue: 'sync-queue',
+        nextRun: Date.now() + 60000,
+        skipIfNoWorker: true,
+      }),
+    ]);
 
     // Manually set nextRun to past to simulate cron becoming due at runtime (not a restart)
     const cron = scheduler.get('has-worker-cron');
@@ -96,12 +100,14 @@ describe('skipIfNoWorker', () => {
     scheduler.setPersistCallback(() => {});
     scheduler.setWorkerCheckCallback((_queue) => false); // no workers
 
-    scheduler.load([makeCronJob({
-      name: 'default-cron',
-      queue: 'sync-queue',
-      nextRun: Date.now() - 1000,
-      skipIfNoWorker: false, // default: push regardless
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'default-cron',
+        queue: 'sync-queue',
+        nextRun: Date.now() - 1000,
+        skipIfNoWorker: false, // default: push regardless
+      }),
+    ]);
 
     await tickScheduler(scheduler);
 
@@ -158,14 +164,16 @@ describe('skipIfNoWorker', () => {
     scheduler.setPersistCallback(() => {});
     scheduler.setWorkerCheckCallback(() => false);
 
-    scheduler.load([makeCronJob({
-      name: 'advance-cron',
-      queue: 'q',
-      nextRun: Date.now() + 60000,
-      schedule: '* * * * *',
-      skipIfNoWorker: true,
-      executions: 5,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'advance-cron',
+        queue: 'q',
+        nextRun: Date.now() + 60000,
+        schedule: '* * * * *',
+        skipIfNoWorker: true,
+        executions: 5,
+      }),
+    ]);
 
     // Manually set nextRun to past to simulate cron becoming due at runtime
     const cron = scheduler.get('advance-cron');

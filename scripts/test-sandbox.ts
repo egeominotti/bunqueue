@@ -186,8 +186,7 @@ async function runSuite(suite: (typeof suites)[number]): Promise<SuiteTelemetry>
   // model-based suites and six workflow suites had never executed. Status was decided
   // on the exit code alone, so the counts beside it were decoration. Treat an empty
   // result as a failure, loudly.
-  const counted =
-    telemetry.tests.passed + telemetry.tests.failed + telemetry.tests.skipped;
+  const counted = telemetry.tests.passed + telemetry.tests.failed + telemetry.tests.skipped;
   // One predicate, shared with the markdown verdict, `summary.json`'s `passed` field, the
   // baseline gate and the SDK gate. They were four separate expressions, and the one on
   // `summary.json` disagreed: it reported `passed: true` for a 0/0/0 run, which is the

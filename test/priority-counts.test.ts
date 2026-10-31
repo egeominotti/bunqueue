@@ -32,8 +32,8 @@ describe('getCountsPerPriority', () => {
 
     const counts = queue.getCountsPerPriority();
 
-    expect(counts[1]).toBe(2);  // 2 low priority jobs
-    expect(counts[5]).toBe(3);  // 3 medium priority jobs
+    expect(counts[1]).toBe(2); // 2 low priority jobs
+    expect(counts[5]).toBe(3); // 3 medium priority jobs
     expect(counts[10]).toBe(1); // 1 high priority job
   });
 

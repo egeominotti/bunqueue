@@ -15,9 +15,19 @@ type D = { value: number };
 
 function mockJob(id: string, name: string, data: D): Job<D> {
   return {
-    id, name, data, queueName: 'test', attemptsMade: 0, timestamp: Date.now(),
-    progress: 0, delay: 0, stacktrace: null, stalledCounter: 0, priority: 0,
-    opts: {}, attemptsStarted: 0,
+    id,
+    name,
+    data,
+    queueName: 'test',
+    attemptsMade: 0,
+    timestamp: Date.now(),
+    progress: 0,
+    delay: 0,
+    stacktrace: null,
+    stalledCounter: 0,
+    priority: 0,
+    opts: {},
+    attemptsStarted: 0,
   } as Job<D>;
 }
 
@@ -45,7 +55,7 @@ function controlledFlush() {
 
 function resolveHandle(
   handle: { jobs: Array<{ name: string; data: D }>; resolve: (j: Job<D>[]) => void },
-  prefix = '',
+  prefix = ''
 ) {
   handle.resolve(handle.jobs.map((j, i) => mockJob(`${prefix}${i + 1}`, j.name, j.data)));
 }
@@ -56,7 +66,9 @@ async function yieldMicrotasks(n = 5) {
 
 // ─── Embedded Mode: No Auto-Batching ────────────────────────────
 describe('Auto-Batching: Embedded Mode', () => {
-  afterEach(() => { shutdownManager(); });
+  afterEach(() => {
+    shutdownManager();
+  });
   test('adds jobs directly without batcher', async () => {
     const q = new Queue<D>('ab-emb-1');
     const job = await q.add('task', { value: 1 });
@@ -95,8 +107,12 @@ describe('Auto-Batching: Embedded Mode', () => {
 // ─── pushBatch Persistence ──────────────────────────────────────
 describe('Auto-Batching: pushBatch Persistence', () => {
   let qm: QueueManager;
-  beforeEach(() => { qm = new QueueManager(); });
-  afterEach(() => { qm.shutdown(); });
+  beforeEach(() => {
+    qm = new QueueManager();
+  });
+  afterEach(() => {
+    qm.shutdown();
+  });
 
   test('persists with correct priorities and delay', async () => {
     await qm.pushBatch('pb-1', [
@@ -118,10 +134,7 @@ describe('Auto-Batching: pushBatch Persistence', () => {
   });
 
   test('durable flag persists immediately', async () => {
-    const ids = await qm.pushBatch('pb-3', [
-      { data: { n: 1 }, durable: true },
-      { data: { n: 2 } },
-    ]);
+    const ids = await qm.pushBatch('pb-3', [{ data: { n: 1 }, durable: true }, { data: { n: 2 } }]);
     expect(ids).toHaveLength(2);
     expect(qm.getStats().waiting).toBeGreaterThanOrEqual(2);
   });
@@ -131,7 +144,11 @@ describe('Auto-Batching: pushBatch Persistence', () => {
 describe('Auto-Batching: Batcher Integration', () => {
   let batcher: AddBatcher<D> | null = null;
   afterEach(() => {
-    try { batcher?.stop(); } catch { /* ignore */ }
+    try {
+      batcher?.stop();
+    } catch {
+      /* ignore */
+    }
     batcher = null;
   });
 

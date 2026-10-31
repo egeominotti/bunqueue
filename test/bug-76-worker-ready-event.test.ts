@@ -31,12 +31,9 @@ describe("Bug #76 - Worker 'ready' event with chained listener", () => {
   test("emits 'ready' when listener is chained after construction (default autorun)", async () => {
     let readyEmitted = false;
 
-    worker = new Worker('bug-76-chained', () => {}, { embedded: true }).on(
-      'ready',
-      () => {
-        readyEmitted = true;
-      }
-    );
+    worker = new Worker('bug-76-chained', () => {}, { embedded: true }).on('ready', () => {
+      readyEmitted = true;
+    });
 
     // Listener was attached synchronously after construction. Give the
     // event loop a tick so any deferred emit has a chance to fire.
@@ -93,11 +90,7 @@ describe("Bug #76 - Worker 'ready' event with chained listener", () => {
     const queue = new Queue('bug-76-lifecycle', { embedded: true });
     await queue.add('task', { value: 1 });
 
-    worker = new Worker(
-      'bug-76-lifecycle',
-      async () => ({ ok: true }),
-      { embedded: true }
-    )
+    worker = new Worker('bug-76-lifecycle', async () => ({ ok: true }), { embedded: true })
       .on('ready', () => {
         seen.ready = true;
       })

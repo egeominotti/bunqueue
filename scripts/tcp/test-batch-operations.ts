@@ -46,10 +46,14 @@ async function main() {
   console.log('\n2. Testing BULK PROCESSING...');
   try {
     const processed: number[] = [];
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async (job) => {
-      processed.push((job.data as { index: number }).index);
-      return {};
-    }, { concurrency: 5, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        processed.push((job.data as { index: number }).index);
+        return {};
+      },
+      { concurrency: 5, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -97,10 +101,14 @@ async function main() {
   console.log('\n4. Testing LARGE BATCH PROCESSING...');
   try {
     let processedCount = 0;
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async () => {
-      processedCount++;
-      return {};
-    }, { concurrency: 20, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async () => {
+        processedCount++;
+        return {};
+      },
+      { concurrency: 20, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(3000);
     await worker.close();
@@ -130,10 +138,14 @@ async function main() {
     ]);
 
     const order: number[] = [];
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async (job) => {
-      order.push((job.data as { index: number }).index);
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        order.push((job.data as { index: number }).index);
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();

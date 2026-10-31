@@ -40,10 +40,14 @@ const tests = [
 
     const job = await queue.add('test', { value: 42 });
 
-    const worker = new Worker('test-move-completed', async (j) => {
-      await j.moveToCompleted({ result: 'done' });
-      return null;
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-move-completed',
+      async (j) => {
+        await j.moveToCompleted({ result: 'done' });
+        return null;
+      },
+      { embedded: true, autorun: true }
+    );
 
     await Bun.sleep(300);
 
@@ -60,10 +64,14 @@ const tests = [
 
     const job = await queue.add('test', { value: 42 }, { attempts: 1 });
 
-    const worker = new Worker('test-move-failed', async (j) => {
-      await j.moveToFailed(new Error('Intentional failure'));
-      throw new Error('Should not reach here');
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-move-failed',
+      async (j) => {
+        await j.moveToFailed(new Error('Intentional failure'));
+        throw new Error('Should not reach here');
+      },
+      { embedded: true, autorun: true }
+    );
 
     await Bun.sleep(500);
 
@@ -184,10 +192,14 @@ const tests = [
     const queueEvents = new QueueEvents('test-wait-finished');
     queue.obliterate();
 
-    const worker = new Worker('test-wait-finished', async (job) => {
-      await Bun.sleep(100);
-      return { result: job.data.value * 2 };
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-wait-finished',
+      async (job) => {
+        await Bun.sleep(100);
+        return { result: job.data.value * 2 };
+      },
+      { embedded: true, autorun: true }
+    );
 
     const job = await queue.add('test', { value: 21 });
 

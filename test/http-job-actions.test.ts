@@ -9,19 +9,33 @@ import { handleCommand } from '../src/infrastructure/server/handler';
 import type { HandlerContext } from '../src/infrastructure/server/types';
 
 function createCtx(qm: QueueManager): HandlerContext {
-  return { queueManager: qm, authTokens: new Set<string>(), authenticated: false, clientId: 'test-http' };
+  return {
+    queueManager: qm,
+    authTokens: new Set<string>(),
+    authenticated: false,
+    clientId: 'test-http',
+  };
 }
 
 describe('HTTP Job Endpoints', () => {
   let qm: QueueManager;
   let ctx: HandlerContext;
 
-  beforeEach(() => { qm = new QueueManager(); ctx = createCtx(qm); });
-  afterEach(async () => { qm.shutdown(); await Bun.sleep(50); });
+  beforeEach(() => {
+    qm = new QueueManager();
+    ctx = createCtx(qm);
+  });
+  afterEach(async () => {
+    qm.shutdown();
+    await Bun.sleep(50);
+  });
 
   describe('Promote', () => {
     test('promotes delayed job to waiting', async () => {
-      const push = await handleCommand({ cmd: 'PUSH', queue: 'q', data: { x: 1 }, delay: 60000 }, ctx);
+      const push = await handleCommand(
+        { cmd: 'PUSH', queue: 'q', data: { x: 1 }, delay: 60000 },
+        ctx
+      );
       const id = (push as { id: string }).id;
 
       const state = await handleCommand({ cmd: 'GetState', id }, ctx);
@@ -59,7 +73,10 @@ describe('HTTP Job Endpoints', () => {
     });
 
     test('updates delayed job data', async () => {
-      const push = await handleCommand({ cmd: 'PUSH', queue: 'q', data: { old: 1 }, delay: 60000 }, ctx);
+      const push = await handleCommand(
+        { cmd: 'PUSH', queue: 'q', data: { old: 1 }, delay: 60000 },
+        ctx
+      );
       const id = (push as { id: string }).id;
 
       await handleCommand({ cmd: 'Update', id, data: { updated: true } }, ctx);

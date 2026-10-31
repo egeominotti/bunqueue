@@ -107,9 +107,7 @@ describe('Ack Operations', () => {
 
     test('should throw when acking non-existent job', async () => {
       const fakeId = jobId('00000000-0000-7000-8000-000000000099');
-      await expect(qm.ack(fakeId)).rejects.toThrow(
-        /Job not found or not in processing state/
-      );
+      await expect(qm.ack(fakeId)).rejects.toThrow(/Job not found or not in processing state/);
     });
 
     test('should throw when acking already completed job', async () => {
@@ -119,9 +117,7 @@ describe('Ack Operations', () => {
       await qm.ack(pulled!.id);
 
       // Acking again should throw because job is no longer in processing
-      await expect(qm.ack(pulled!.id)).rejects.toThrow(
-        /Job not found or not in processing state/
-      );
+      await expect(qm.ack(pulled!.id)).rejects.toThrow(/Job not found or not in processing state/);
     });
   });
 
@@ -525,9 +521,9 @@ describe('Ack Operations', () => {
       const { job } = await qm.pullWithLock('test-q', 'worker-1');
       expect(job).not.toBeNull();
 
-      await expect(
-        qm.ack(job!.id, { done: true }, 'invalid-token-abc')
-      ).rejects.toThrow(/Invalid or expired lock token/);
+      await expect(qm.ack(job!.id, { done: true }, 'invalid-token-abc')).rejects.toThrow(
+        /Invalid or expired lock token/
+      );
     });
 
     test('should fail with valid lock token', async () => {
@@ -544,9 +540,9 @@ describe('Ack Operations', () => {
       await qm.push('test-q', { data: { msg: 'hello' }, maxAttempts: 1 });
       const { job } = await qm.pullWithLock('test-q', 'worker-1');
 
-      await expect(
-        qm.fail(job!.id, 'Error', 'invalid-token-xyz')
-      ).rejects.toThrow(/Invalid or expired lock token/);
+      await expect(qm.fail(job!.id, 'Error', 'invalid-token-xyz')).rejects.toThrow(
+        /Invalid or expired lock token/
+      );
     });
 
     test('should ack without token when no lock was acquired', async () => {
@@ -652,9 +648,7 @@ describe('Ack Operations', () => {
         tokens.push('invalid-token');
       }
 
-      await expect(qm.ackBatch(ids, tokens)).rejects.toThrow(
-        /Invalid or expired lock token/
-      );
+      await expect(qm.ackBatch(ids, tokens)).rejects.toThrow(/Invalid or expired lock token/);
     });
   });
 
@@ -890,17 +884,10 @@ describe('Ack Operations', () => {
 
   describe('ackHelpers', () => {
     test('groupByProcShard groups job IDs by processing shard', async () => {
-      const { groupByProcShard } = await import(
-        '../src/application/operations/ackHelpers'
-      );
+      const { groupByProcShard } = await import('../src/application/operations/ackHelpers');
       const { processingShardIndex } = await import('../src/shared/hash');
 
-      const ids = [
-        jobId('id-aaa'),
-        jobId('id-bbb'),
-        jobId('id-ccc'),
-        jobId('id-ddd'),
-      ];
+      const ids = [jobId('id-aaa'), jobId('id-bbb'), jobId('id-ccc'), jobId('id-ddd')];
 
       const grouped = groupByProcShard(ids);
 
@@ -916,9 +903,7 @@ describe('Ack Operations', () => {
     });
 
     test('groupItemsByProcShard groups items with results', async () => {
-      const { groupItemsByProcShard } = await import(
-        '../src/application/operations/ackHelpers'
-      );
+      const { groupItemsByProcShard } = await import('../src/application/operations/ackHelpers');
 
       const items = [
         { id: jobId('id-1'), result: 'r1' },
@@ -936,9 +921,7 @@ describe('Ack Operations', () => {
     });
 
     test('groupByQueueShard groups extracted jobs by queue shard', async () => {
-      const { groupByQueueShard } = await import(
-        '../src/application/operations/ackHelpers'
-      );
+      const { groupByQueueShard } = await import('../src/application/operations/ackHelpers');
       const { shardIndex: getShardIndex } = await import('../src/shared/hash');
 
       const fakeJob = (queue: string) =>
@@ -1052,11 +1035,7 @@ describe('Ack Operations', () => {
       }
 
       // Ack even-indexed, fail odd-indexed
-      await Promise.all(
-        ids.map((id, i) =>
-          i % 2 === 0 ? qm.ack(id) : qm.fail(id, 'Error')
-        )
-      );
+      await Promise.all(ids.map((id, i) => (i % 2 === 0 ? qm.ack(id) : qm.fail(id, 'Error'))));
 
       const stats = qm.getStats();
       expect(stats.completed).toBe(5);

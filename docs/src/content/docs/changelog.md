@@ -41,6 +41,18 @@ head:
 - The 46 leftover `eslint-disable` / `eslint-enable` directives in `src/` and
   `test/` are removed too: no ESLint runs in this repository. The two that
   explained the code keep their explanation as a plain comment.
+- `bun fmt` now also covers `test/`, `scripts/`, `bench/`, `examples/` and
+  `sdk/conformance` (227 files reformatted, layout only), and
+  `bun run typecheck` now checks `src/mcp` (excluded since its dependencies
+  were missing), and the SDK workflow type-checks `sdk/conformance` after
+  building the SDK it imports; both were already free of type errors.
+  Generated benchmark reports under `bench/vs-bullmq/results/` are excluded
+  from formatting.
+- `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, the contributing guide, the
+  TypeScript SDK rules and the agent profiles now state the mandatory rule:
+  `bun check` and `bun fmt` are the only type-check and format tools, in every
+  directory and SDK. `tsc` stays only where files are emitted, for typedoc and
+  for compiler-API tests, and non-JS SDKs keep their language's own toolchain.
 
 ### Documentation
 

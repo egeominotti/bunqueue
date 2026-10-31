@@ -149,7 +149,7 @@ async function main() {
 
     // Initially should be active
     const activeWorkers = workerManager.listActive();
-    const isActive = activeWorkers.some(w => w.id === worker.id);
+    const isActive = activeWorkers.some((w) => w.id === worker.id);
 
     if (isActive) {
       console.log(`   [PASS] Worker is active after registration`);

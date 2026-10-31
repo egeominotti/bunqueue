@@ -74,15 +74,9 @@ describe('WriteBuffer critical-loss handling at SqliteStorage', () => {
 
     const onError: WriteBufferErrorCallback = () => {};
 
-    const buffer = new WriteBuffer(
-      alwaysFailingBatch,
-      100,
-      10000,
-      onError,
-      (jobs) => {
-        capturedJobs = jobs;
-      }
-    );
+    const buffer = new WriteBuffer(alwaysFailingBatch, 100, 10000, onError, (jobs) => {
+      capturedJobs = jobs;
+    });
 
     buffer.add(mockJob(1));
     buffer.add(mockJob(2));

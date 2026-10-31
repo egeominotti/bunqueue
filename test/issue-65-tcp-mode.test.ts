@@ -59,15 +59,17 @@ describe('Issue #65: TCP mode - full server restart simulation', () => {
 
     // Step 2: load() from DB (like QueueManager constructor line 180)
     // Simulates: server was down for 2 hours, cron was due 2h ago
-    const dbCrons: CronJob[] = [makeCronJob({
-      name: 'my-scheduler',
-      queue: 'my-queue',
-      nextRun: Date.now() - 7200_000, // 2 hours overdue
-      schedule: '* * * * *',
-      skipMissedOnRestart: true,
-      executions: 50,
-      timezone: 'America/New_York',
-    })];
+    const dbCrons: CronJob[] = [
+      makeCronJob({
+        name: 'my-scheduler',
+        queue: 'my-queue',
+        nextRun: Date.now() - 7200_000, // 2 hours overdue
+        schedule: '* * * * *',
+        skipMissedOnRestart: true,
+        executions: 50,
+        timezone: 'America/New_York',
+      }),
+    ];
 
     scheduler.load(dbCrons);
 
@@ -124,18 +126,24 @@ describe('Issue #65: TCP mode - full server restart simulation', () => {
     const persisted: Array<{ name: string; nextRun: number }> = [];
 
     const scheduler = new CronScheduler();
-    scheduler.setPushCallback(async (queue) => { pushedJobs.push({ queue }); });
-    scheduler.setPersistCallback((name, _exec, nextRun) => { persisted.push({ name, nextRun }); });
+    scheduler.setPushCallback(async (queue) => {
+      pushedJobs.push({ queue });
+    });
+    scheduler.setPersistCallback((name, _exec, nextRun) => {
+      persisted.push({ name, nextRun });
+    });
 
     // Server restarts, loads cron from DB - overdue by 30 min
-    scheduler.load([makeCronJob({
-      name: 'standalone-cron',
-      queue: 'jobs',
-      nextRun: Date.now() - 1800_000,
-      schedule: '0 * * * *',
-      skipMissedOnRestart: true,
-      executions: 100,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'standalone-cron',
+        queue: 'jobs',
+        nextRun: Date.now() - 1800_000,
+        schedule: '0 * * * *',
+        skipMissedOnRestart: true,
+        executions: 100,
+      }),
+    ]);
 
     scheduler.start();
 
@@ -159,19 +167,23 @@ describe('Issue #65: TCP mode - full server restart simulation', () => {
     const pushedJobs: Array<{ queue: string }> = [];
 
     const scheduler = new CronScheduler();
-    scheduler.setPushCallback(async (queue) => { pushedJobs.push({ queue }); });
+    scheduler.setPushCallback(async (queue) => {
+      pushedJobs.push({ queue });
+    });
     scheduler.setPersistCallback(() => {});
 
     // Load interval-based cron from DB (overdue)
-    scheduler.load([makeCronJob({
-      name: 'interval-cron',
-      queue: 'tasks',
-      schedule: null,
-      repeatEvery: 60000,
-      nextRun: Date.now() - 300_000, // 5 min overdue
-      skipMissedOnRestart: true,
-      executions: 75,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'interval-cron',
+        queue: 'tasks',
+        schedule: null,
+        repeatEvery: 60000,
+        nextRun: Date.now() - 300_000, // 5 min overdue
+        skipMissedOnRestart: true,
+        executions: 75,
+      }),
+    ]);
 
     scheduler.start();
 
@@ -200,20 +212,24 @@ describe('Issue #65: TCP mode - full server restart simulation', () => {
       const pushedJobs: Array<{ queue: string }> = [];
 
       const scheduler = new CronScheduler();
-      scheduler.setPushCallback(async (queue) => { pushedJobs.push({ queue }); });
+      scheduler.setPushCallback(async (queue) => {
+        pushedJobs.push({ queue });
+      });
       scheduler.setPersistCallback((name, executions, nextRun) => {
         persisted.push({ name, executions, nextRun });
       });
 
       // Each restart loads the same stale DB state
-      scheduler.load([makeCronJob({
-        name: 'multi-restart',
-        queue: 'q',
-        nextRun: Date.now() - 3600_000, // always 1h overdue
-        schedule: '0 * * * *',
-        skipMissedOnRestart: true,
-        executions: 200 + restart, // increments each restart to track
-      })]);
+      scheduler.load([
+        makeCronJob({
+          name: 'multi-restart',
+          queue: 'q',
+          nextRun: Date.now() - 3600_000, // always 1h overdue
+          schedule: '0 * * * *',
+          skipMissedOnRestart: true,
+          executions: 200 + restart, // increments each restart to track
+        }),
+      ]);
 
       scheduler.start();
       await tickScheduler(scheduler);
@@ -234,18 +250,22 @@ describe('Issue #65: TCP mode - full server restart simulation', () => {
     const pushedJobs: Array<{ queue: string }> = [];
 
     const scheduler = new CronScheduler();
-    scheduler.setPushCallback(async (queue) => { pushedJobs.push({ queue }); });
+    scheduler.setPushCallback(async (queue) => {
+      pushedJobs.push({ queue });
+    });
     scheduler.setPersistCallback(() => {});
 
     // Load cron WITHOUT skipMissedOnRestart (default catch-up behavior)
-    scheduler.load([makeCronJob({
-      name: 'catchup-cron',
-      queue: 'jobs',
-      nextRun: Date.now() - 3600_000,
-      schedule: '0 * * * *',
-      skipMissedOnRestart: false,
-      executions: 10,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'catchup-cron',
+        queue: 'jobs',
+        nextRun: Date.now() - 3600_000,
+        schedule: '0 * * * *',
+        skipMissedOnRestart: false,
+        executions: 10,
+      }),
+    ]);
 
     scheduler.start();
     await tickScheduler(scheduler);

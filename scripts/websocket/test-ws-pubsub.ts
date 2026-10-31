@@ -12,20 +12,35 @@ let passed = 0;
 let failed = 0;
 
 function ok(condition: boolean, msg: string): void {
-  if (condition) { console.log(`   ✅ ${msg}`); passed++; }
-  else { console.log(`   ❌ ${msg}`); failed++; }
+  if (condition) {
+    console.log(`   ✅ ${msg}`);
+    passed++;
+  } else {
+    console.log(`   ❌ ${msg}`);
+    failed++;
+  }
 }
 
 async function connectWs(url = WS_URL): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     const t = setTimeout(() => reject(new Error('WS connect timeout')), 5000);
-    ws.addEventListener('open', () => { clearTimeout(t); resolve(ws); });
-    ws.addEventListener('error', (e) => { clearTimeout(t); reject(e); });
+    ws.addEventListener('open', () => {
+      clearTimeout(t);
+      resolve(ws);
+    });
+    ws.addEventListener('error', (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
   });
 }
 
-async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Promise<Record<string, unknown>> {
+async function waitEvent(
+  ws: WebSocket,
+  eventName: string,
+  timeoutMs = 5000
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       ws.removeEventListener('message', handler);
@@ -39,7 +54,9 @@ async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Pr
           ws.removeEventListener('message', handler);
           resolve(parsed);
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     }
     ws.addEventListener('message', handler);
   });
@@ -78,7 +95,9 @@ async function main() {
     const resp = await waitForResponse(ws, 3000);
     ok(resp.ok === true, 'Subscribe acknowledged');
     ok(Array.isArray(resp.subscribed), `Subscribed: ${JSON.stringify(resp.subscribed)}`);
-  } catch (e) { ok(false, `Subscribe failed: ${e}`); }
+  } catch (e) {
+    ok(false, `Subscribe failed: ${e}`);
+  }
 
   // 2. Receive subscribed event
   console.log('\n2. Receive job:pushed event');
@@ -88,8 +107,13 @@ async function main() {
     await api('POST', `/queues/${Q}/jobs`, { data: { x: 1 } });
     const ev = await ep;
     ok(ev.event === 'job:pushed', `event=${ev.event}`);
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `Receive event failed: ${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `Receive event failed: ${e}`);
+  }
 
   // 3. Don't receive unsubscribed events
   console.log('\n3. No events after unsubscribe');
@@ -101,14 +125,18 @@ async function main() {
       try {
         const p = JSON.parse(String(ev.data));
         if (p.event) received = true;
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     };
     ws.addEventListener('message', h);
     await api('POST', `/queues/${Q}/jobs`, { data: { x: 2 } });
     await Bun.sleep(500);
     ws.removeEventListener('message', h);
     ok(!received, 'No events after unsubscribe');
-  } catch (e) { ok(false, `Unsubscribe test failed: ${e}`); }
+  } catch (e) {
+    ok(false, `Unsubscribe test failed: ${e}`);
+  }
 
   // 4. Wildcard job:*
   console.log('\n4. Wildcard job:* subscription');
@@ -120,7 +148,9 @@ async function main() {
     await api('POST', `/queues/${Q}/jobs`, { data: { x: 3 } });
     await ep;
     ok(true, 'Wildcard job:* received job:pushed');
-  } catch (e) { ok(false, `Wildcard failed: ${e}`); }
+  } catch (e) {
+    ok(false, `Wildcard failed: ${e}`);
+  }
 
   // 5. Catch-all * wildcard
   console.log('\n5. Catch-all * wildcard');
@@ -132,7 +162,9 @@ async function main() {
     await api('POST', `/queues/${Q}/jobs`, { data: { x: 4 } });
     await ep;
     ok(true, 'Catch-all * received job:pushed');
-  } catch (e) { ok(false, `Catch-all failed: ${e}`); }
+  } catch (e) {
+    ok(false, `Catch-all failed: ${e}`);
+  }
 
   // 6. Multiple event subscription
   console.log('\n6. Multiple event subscription');
@@ -153,7 +185,9 @@ async function main() {
     await api('POST', `/queues/${Q}/resume`);
 
     ok(true, 'Received both job:pushed and queue:paused');
-  } catch (e) { ok(false, `Multi-sub failed: ${e}`); }
+  } catch (e) {
+    ok(false, `Multi-sub failed: ${e}`);
+  }
 
   // 7. Queue-filtered WebSocket
   console.log('\n7. Queue-filtered WebSocket');
@@ -173,10 +207,15 @@ async function main() {
     const h = (ev: MessageEvent) => {
       try {
         const p = JSON.parse(String(ev.data));
-        if (p.event === 'job:pushed' && (p.data as Record<string, unknown>)?.queue === 'other-queue') {
+        if (
+          p.event === 'job:pushed' &&
+          (p.data as Record<string, unknown>)?.queue === 'other-queue'
+        ) {
           gotOther = true;
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     };
     wsFiltered.addEventListener('message', h);
     await api('POST', '/queues/other-queue/jobs', { data: { x: 7 } });
@@ -186,7 +225,9 @@ async function main() {
 
     wsFiltered.close();
     await api('POST', '/queues/other-queue/obliterate');
-  } catch (e) { ok(false, `Queue filter failed: ${e}`); }
+  } catch (e) {
+    ok(false, `Queue filter failed: ${e}`);
+  }
 
   // 8. reqId echo
   console.log('\n8. reqId is echoed back');
@@ -194,7 +235,9 @@ async function main() {
     ws.send(JSON.stringify({ cmd: 'Subscribe', events: ['job:*'], reqId: 'test-123' }));
     const resp = await waitForResponse(ws, 3000);
     ok(resp.reqId === 'test-123', `reqId=${resp.reqId}`);
-  } catch (e) { ok(false, `reqId failed: ${e}`); }
+  } catch (e) {
+    ok(false, `reqId failed: ${e}`);
+  }
 
   ws.close();
   await cleanup();
@@ -215,7 +258,9 @@ async function waitForResponse(ws: WebSocket, timeoutMs: number): Promise<Record
           ws.removeEventListener('message', handler);
           resolve(parsed);
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     }
     ws.addEventListener('message', handler);
   });
@@ -227,4 +272,7 @@ function printSummary() {
   if (failed > 0) process.exit(1);
 }
 
-main().catch((err) => { console.error('Fatal:', err); process.exit(1); });
+main().catch((err) => {
+  console.error('Fatal:', err);
+  process.exit(1);
+});

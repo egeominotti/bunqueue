@@ -918,10 +918,7 @@ describe('MCP Prompts - incident_response data gathering', () => {
   });
 
   test('gathers worker and stats data', async () => {
-    const [workers, stats] = await Promise.all([
-      backend.listWorkers(),
-      backend.getStats(),
-    ]);
+    const [workers, stats] = await Promise.all([backend.listWorkers(), backend.getStats()]);
 
     expect(Array.isArray(workers)).toBe(true);
     expect(typeof stats).toBe('object');
@@ -1209,9 +1206,7 @@ describe('EmbeddedBackend - getChildrenValues with real flow', () => {
     const flow = await backend.addFlow({
       name: 'parent',
       queueName: 'cv-q',
-      children: [
-        { name: 'child-1', queueName: 'cv-q', data: { step: 1 } },
-      ],
+      children: [{ name: 'child-1', queueName: 'cv-q', data: { step: 1 } }],
     });
 
     // Pull and ack the child with a result

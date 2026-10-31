@@ -95,10 +95,14 @@ async function main() {
   // ─────────────────────────────────────────────────
   console.log('\n5. Testing BOTH failure options...');
   try {
-    const job = await q.add('test', { value: 5 }, {
-      continueParentOnFailure: true,
-      ignoreDependencyOnFailure: true,
-    });
+    const job = await q.add(
+      'test',
+      { value: 5 },
+      {
+        continueParentOnFailure: true,
+        ignoreDependencyOnFailure: true,
+      }
+    );
     if (job && job.id) {
       ok('Accepted both failure options together');
     } else {
@@ -129,13 +133,17 @@ async function main() {
   // ─────────────────────────────────────────────────
   console.log('\n7. Testing ALL advanced options...');
   try {
-    const job = await q.add('test', { value: 7 }, {
-      continueParentOnFailure: true,
-      ignoreDependencyOnFailure: true,
-      failParentOnFailure: false,
-      removeDependencyOnFailure: false,
-      timestamp: Date.now(),
-    });
+    const job = await q.add(
+      'test',
+      { value: 7 },
+      {
+        continueParentOnFailure: true,
+        ignoreDependencyOnFailure: true,
+        failParentOnFailure: false,
+        removeDependencyOnFailure: false,
+        timestamp: Date.now(),
+      }
+    );
     if (job && job.id) {
       ok('Accepted all advanced options together');
     } else {
@@ -150,9 +158,13 @@ async function main() {
   // ─────────────────────────────────────────────────
   console.log('\n8. Testing DEDUPLICATION extend...');
   try {
-    const job = await q.add('test', { value: 8 }, {
-      deduplication: { id: 'tcp-test-extend', ttl: 1000, extend: true },
-    });
+    const job = await q.add(
+      'test',
+      { value: 8 },
+      {
+        deduplication: { id: 'tcp-test-extend', ttl: 1000, extend: true },
+      }
+    );
     if (job && job.id) {
       ok('Accepted deduplication with extend');
     } else {
@@ -167,9 +179,13 @@ async function main() {
   // ─────────────────────────────────────────────────
   console.log('\n9. Testing DEDUPLICATION replace...');
   try {
-    const job = await q.add('test', { value: 9 }, {
-      deduplication: { id: 'tcp-test-replace', ttl: 1000, replace: true },
-    });
+    const job = await q.add(
+      'test',
+      { value: 9 },
+      {
+        deduplication: { id: 'tcp-test-replace', ttl: 1000, replace: true },
+      }
+    );
     if (job && job.id) {
       ok('Accepted deduplication with replace');
     } else {
@@ -184,9 +200,13 @@ async function main() {
   // ─────────────────────────────────────────────────
   console.log('\n10. Testing DEDUPLICATION extend+replace...');
   try {
-    const job = await q.add('test', { value: 10 }, {
-      deduplication: { id: 'tcp-test-both', ttl: 1000, extend: true, replace: true },
-    });
+    const job = await q.add(
+      'test',
+      { value: 10 },
+      {
+        deduplication: { id: 'tcp-test-both', ttl: 1000, extend: true, replace: true },
+      }
+    );
     if (job && job.id) {
       ok('Accepted deduplication with extend+replace');
     } else {

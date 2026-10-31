@@ -154,6 +154,8 @@ describe('Protocol reqId', () => {
       expect(result.id.length).toBeGreaterThan(0);
     }
 
-    console.log(`  Rapid fire: 200 commands in ${elapsed}ms (${Math.round(200000 / elapsed)} ops/sec)`);
+    console.log(
+      `  Rapid fire: 200 commands in ${elapsed}ms (${Math.round(200000 / elapsed)} ops/sec)`
+    );
   });
 });

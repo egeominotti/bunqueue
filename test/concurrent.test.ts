@@ -19,9 +19,7 @@ describe('Concurrent Operations', () => {
 
   describe('Concurrent Push', () => {
     test('should handle concurrent pushes', async () => {
-      const pushes = Array.from({ length: 100 }, (_, i) =>
-        qm.push('test', { data: { id: i } })
-      );
+      const pushes = Array.from({ length: 100 }, (_, i) => qm.push('test', { data: { id: i } }));
 
       const jobs = await Promise.all(pushes);
 

@@ -47,7 +47,9 @@ async function main() {
     });
 
     if (result.ok && result.cron && result.cron.name === 'tcp-cron-expr-test') {
-      console.log(`   ✅ Cron job added with schedule, nextRun: ${new Date(result.cron.nextRun).toISOString()}`);
+      console.log(
+        `   ✅ Cron job added with schedule, nextRun: ${new Date(result.cron.nextRun).toISOString()}`
+      );
       passed++;
     } else {
       console.log(`   ❌ Cron job not created correctly: ${JSON.stringify(result)}`);
@@ -109,7 +111,9 @@ async function main() {
     if (result.ok && Array.isArray(result.crons)) {
       const names = result.crons.map((c: { name: string }) => c.name);
       if (names.includes('tcp-cron-list-1') && names.includes('tcp-cron-list-2')) {
-        console.log(`   ✅ CronList returned ${result.crons.length} cron jobs: ${names.join(', ')}`);
+        console.log(
+          `   ✅ CronList returned ${result.crons.length} cron jobs: ${names.join(', ')}`
+        );
         passed++;
       } else {
         console.log(`   ❌ CronList missing expected crons: ${names.join(', ')}`);
@@ -142,7 +146,9 @@ async function main() {
 
     // Verify it exists
     const listBefore = await tcp.send({ cmd: 'CronList' });
-    const existsBefore = listBefore.crons?.some((c: { name: string }) => c.name === 'tcp-cron-to-delete');
+    const existsBefore = listBefore.crons?.some(
+      (c: { name: string }) => c.name === 'tcp-cron-to-delete'
+    );
 
     if (!existsBefore) {
       throw new Error('Cron job was not created');
@@ -153,13 +159,17 @@ async function main() {
 
     // Verify it's gone
     const listAfter = await tcp.send({ cmd: 'CronList' });
-    const existsAfter = listAfter.crons?.some((c: { name: string }) => c.name === 'tcp-cron-to-delete');
+    const existsAfter = listAfter.crons?.some(
+      (c: { name: string }) => c.name === 'tcp-cron-to-delete'
+    );
 
     if (deleteResult.ok && !existsAfter) {
       console.log('   ✅ Cron job deleted successfully');
       passed++;
     } else {
-      console.log(`   ❌ Cron job not deleted: result=${JSON.stringify(deleteResult)}, exists=${existsAfter}`);
+      console.log(
+        `   ❌ Cron job not deleted: result=${JSON.stringify(deleteResult)}, exists=${existsAfter}`
+      );
       failed++;
     }
   } catch (e) {

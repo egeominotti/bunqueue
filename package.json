@@ -142,9 +142,9 @@
     "bench:workflow:scale": "bun run bench/workflow-engine/scale.ts",
     "bench:joblist": "bun run bench/job-list-perf.ts",
     "bench:compare": "bun run bench/comparison/run.ts",
-    "fmt": "bun fmt --no-script src",
-    "format": "bun fmt --no-script src",
-    "format:check": "bun fmt --check --no-script src",
+    "fmt": "bun fmt --no-script src test scripts bench examples sdk/conformance",
+    "format": "bun fmt --no-script src test scripts bench examples sdk/conformance",
+    "format:check": "bun fmt --check --no-script src test scripts bench examples sdk/conformance",
     "typecheck": "bun check --no-script",
     "check": "bun run typecheck && bun run format:check && bun run check:docs-data",
     "prepublishOnly": "bun run build:lib"

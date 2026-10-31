@@ -22,11 +22,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { DlqShard, type DlqStatsCallback } from '../src/domain/queue/dlqShard';
-import {
-  createDlqEntry,
-  FailureReason,
-  type DlqEntry,
-} from '../src/domain/types/dlq';
+import { createDlqEntry, FailureReason, type DlqEntry } from '../src/domain/types/dlq';
 import { createJob, jobId, type Job } from '../src/domain/types/job';
 
 const QUEUE = 'recovery-queue';
@@ -55,7 +51,12 @@ function makeJob(n: number): Job {
 /** Build a DlqEntry as if it were loaded from persistence on restart. */
 function makeRestoredEntry(shard: DlqShard, n: number): DlqEntry {
   // Mirror how a persisted entry is reconstructed: a full DlqEntry blob.
-  return createDlqEntry(makeJob(n), FailureReason.MaxAttemptsExceeded, `err-${n}`, shard.getConfig(QUEUE));
+  return createDlqEntry(
+    makeJob(n),
+    FailureReason.MaxAttemptsExceeded,
+    `err-${n}`,
+    shard.getConfig(QUEUE)
+  );
 }
 
 describe('BUG M5: DLQ recovery (restoreEntry) must enforce maxEntries bound', () => {

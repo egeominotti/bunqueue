@@ -76,7 +76,9 @@ async function main() {
     }
 
     if (completedJobs.length === 1 && (completedJobs[0].result as { value: number }).value === 42) {
-      console.log(`   ✅ Job processed correctly: value=${(completedJobs[0].result as { value: number }).value}`);
+      console.log(
+        `   ✅ Job processed correctly: value=${(completedJobs[0].result as { value: number }).value}`
+      );
       passed++;
     } else {
       console.log(`   ❌ Job not processed correctly: ${JSON.stringify(completedJobs)}`);
@@ -202,7 +204,11 @@ async function main() {
     }
 
     await worker.stop();
-    try { await unlink(errorProcessorPath); } catch { /* ignore */ }
+    try {
+      await unlink(errorProcessorPath);
+    } catch {
+      /* ignore */
+    }
   } catch (e) {
     console.log(`   ❌ Error: ${e}`);
     failed++;
@@ -211,7 +217,11 @@ async function main() {
   // Cleanup
   queue.obliterate();
   queue.close();
-  try { await unlink(processorPath); } catch { /* ignore */ }
+  try {
+    await unlink(processorPath);
+  } catch {
+    /* ignore */
+  }
 
   // Summary
   console.log(`\n=== Summary ===`);

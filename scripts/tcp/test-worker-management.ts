@@ -105,9 +105,7 @@ async function main() {
       if (testWorkers.length >= 1) {
         console.log(`   [PASS] Listed ${res.data.workers.length} total worker(s)`);
         console.log(`   Test worker found: ${testWorkers[0].name} (${testWorkers[0].id})`);
-        console.log(
-          `   Stats: total=${res.data.stats?.total}, active=${res.data.stats?.active}`
-        );
+        console.log(`   Stats: total=${res.data.stats?.total}, active=${res.data.stats?.active}`);
         passed++;
       } else {
         console.log(`   [FAIL] Test worker not found in list`);
@@ -233,8 +231,7 @@ async function main() {
     if (worker3.data?.workerId) registeredWorkerIds.push(worker3.data.workerId);
 
     const listRes = (await tcp.send({ cmd: 'ListWorkers' })) as WorkerResponse;
-    const testWorkers =
-      listRes.data?.workers?.filter((w) => w.name.startsWith('tcp-multi-')) ?? [];
+    const testWorkers = listRes.data?.workers?.filter((w) => w.name.startsWith('tcp-multi-')) ?? [];
 
     if (testWorkers.length === 3 && listRes.data?.stats?.total) {
       console.log(`   [PASS] ${testWorkers.length} workers registered`);

@@ -141,7 +141,11 @@ describe('BUG: restore accepts invalid SQLite data', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -179,7 +183,11 @@ describe('BUG: cleanup with retention=0 deletes all backups', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });

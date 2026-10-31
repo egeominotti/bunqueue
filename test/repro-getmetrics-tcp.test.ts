@@ -78,11 +78,18 @@ describe('REPRO: getMetrics over TCP returns 0', () => {
     for (let i = 0; i < N; i++) await q.add('t', { i });
 
     let done = 0;
-    const w = new Worker('gm', async () => { done++; return { ok: true }; }, {
-      connection: { host: '127.0.0.1', port: PORT },
-      embedded: false,
-      concurrency: 5,
-    });
+    const w = new Worker(
+      'gm',
+      async () => {
+        done++;
+        return { ok: true };
+      },
+      {
+        connection: { host: '127.0.0.1', port: PORT },
+        embedded: false,
+        concurrency: 5,
+      }
+    );
     const t0 = Date.now();
     while (done < N && Date.now() - t0 < 15000) await Bun.sleep(50);
     await Bun.sleep(500); // let server-side totalCompleted settle

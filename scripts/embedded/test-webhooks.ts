@@ -26,14 +26,18 @@ async function main() {
   // Test 1: Add webhook with URL and events
   console.log('1. Testing ADD WEBHOOK...');
   try {
-    const webhook = webhookManager.add(
-      'https://example.com/webhook',
-      ['job.completed', 'job.failed']
-    );
+    const webhook = webhookManager.add('https://example.com/webhook', [
+      'job.completed',
+      'job.failed',
+    ]);
 
-    if (webhook.id && webhook.url === 'https://example.com/webhook' &&
-        webhook.events.includes('job.completed') && webhook.events.includes('job.failed') &&
-        webhook.enabled === true) {
+    if (
+      webhook.id &&
+      webhook.url === 'https://example.com/webhook' &&
+      webhook.events.includes('job.completed') &&
+      webhook.events.includes('job.failed') &&
+      webhook.enabled === true
+    ) {
       console.log(`   PASS Webhook added: ${webhook.id}`);
       passed++;
     } else {
@@ -87,7 +91,7 @@ async function main() {
     const webhook = webhookManager.add(
       'https://example.com/emails-hook',
       ['job.completed'],
-      'emails'  // Only for 'emails' queue
+      'emails' // Only for 'emails' queue
     );
 
     if (webhook.queue === 'emails') {
@@ -110,7 +114,7 @@ async function main() {
     const webhook = webhookManager.add(
       'https://example.com/secure-hook',
       ['job.completed'],
-      undefined,  // All queues
+      undefined, // All queues
       'my-secret-key-12345'
     );
 
@@ -131,24 +135,14 @@ async function main() {
   // Test 6: Multiple webhooks for same event
   console.log('\n6. Testing MULTIPLE WEBHOOKS FOR SAME EVENT...');
   try {
-    const webhook1 = webhookManager.add(
-      'https://example.com/hook1',
-      ['job.completed']
-    );
-    const webhook2 = webhookManager.add(
-      'https://example.com/hook2',
-      ['job.completed']
-    );
-    const webhook3 = webhookManager.add(
-      'https://example.com/hook3',
-      ['job.completed']
-    );
+    const webhook1 = webhookManager.add('https://example.com/hook1', ['job.completed']);
+    const webhook2 = webhookManager.add('https://example.com/hook2', ['job.completed']);
+    const webhook3 = webhookManager.add('https://example.com/hook3', ['job.completed']);
 
     const webhooks = webhookManager.list();
-    const completedHooks = webhooks.filter(w => w.events.includes('job.completed'));
+    const completedHooks = webhooks.filter((w) => w.events.includes('job.completed'));
 
-    if (completedHooks.length >= 3 &&
-        webhook1.id !== webhook2.id && webhook2.id !== webhook3.id) {
+    if (completedHooks.length >= 3 && webhook1.id !== webhook2.id && webhook2.id !== webhook3.id) {
       console.log(`   PASS Multiple webhooks created: ${completedHooks.length} for job.completed`);
       passed++;
     } else {

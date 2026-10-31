@@ -60,7 +60,7 @@ describe('Data Integrity - Embedded', () => {
 
     const unicodeData = {
       emoji: '\uD83C\uDF89', // party popper
-      cjk: '\u4F60\u597D',   // nihao
+      cjk: '\u4F60\u597D', // nihao
       arabic: '\u0645\u0631\u062D\u0628\u0627', // marhaba
       nullByte: 'before\x00after',
       mixed: '\uD83C\uDF89 \u4F60\u597D \u0645\u0631\u062D\u0628\u0627',

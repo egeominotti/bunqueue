@@ -189,8 +189,7 @@ describe('with a decision model and no elicitation', () => {
     const tools = (await m.client.listTools()).tools;
     const props = (name: string) => {
       const schema = tools.find((t) => t.name === name)?.inputSchema as
-        | { properties?: object }
-        | undefined;
+        { properties?: object } | undefined;
       return Object.keys(schema?.properties ?? {});
     };
     expect(props('bunqueue_drain_queue')).toEqual(

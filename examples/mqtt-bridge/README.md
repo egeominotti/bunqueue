@@ -32,11 +32,11 @@ mosquitto_pub -t sensors/temp/room1 -m '{"temp":21.5}'
 
 ## Configuration
 
-| Env var | Default | Purpose |
-| --- | --- | --- |
-| `MQTT_URL` | `mqtt://localhost:1883` | Broker URL |
-| `MQTT_TOPIC` | `sensors/#` | Topic filter to subscribe |
-| `BUNQUEUE_DATA_PATH` | `./edge-queue.db` | SQLite path for the local queue |
+| Env var              | Default                 | Purpose                         |
+| -------------------- | ----------------------- | ------------------------------- |
+| `MQTT_URL`           | `mqtt://localhost:1883` | Broker URL                      |
+| `MQTT_TOPIC`         | `sensors/#`             | Topic filter to subscribe       |
+| `BUNQUEUE_DATA_PATH` | `./edge-queue.db`       | SQLite path for the local queue |
 
 ## Forwarding to a central bunqueue (with TLS)
 

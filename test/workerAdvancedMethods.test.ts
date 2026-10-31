@@ -22,11 +22,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
 
   describe('rateLimit', () => {
     test('worker.rateLimit should apply rate limiting', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       // Apply rate limit
       worker.rateLimit(1000);
@@ -38,11 +37,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
     });
 
     test('worker.rateLimit with 0 should not apply rate limit', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       // Apply rate limit with 0
       worker.rateLimit(0);
@@ -54,11 +52,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
     });
 
     test('worker.isRateLimited should return false when not rate limited', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       // Should not be rate limited initially
       expect(worker.isRateLimited()).toBe(false);
@@ -67,11 +64,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
     });
 
     test('worker.isRateLimited should return false after rate limit expires', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       // Apply short rate limit
       worker.rateLimit(50);
@@ -88,11 +84,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
 
   describe('startStalledCheckTimer', () => {
     test('worker.startStalledCheckTimer should be a function', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       expect(typeof worker.startStalledCheckTimer).toBe('function');
 
@@ -100,11 +95,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
     });
 
     test('worker.startStalledCheckTimer should not throw', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       // Should not throw
       await expect(worker.startStalledCheckTimer()).resolves.toBeUndefined();
@@ -115,11 +109,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
 
   describe('delay', () => {
     test('worker.delay should be a function', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       expect(typeof worker.delay).toBe('function');
 
@@ -127,11 +120,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
     });
 
     test('worker.delay with 0 should resolve immediately', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       const start = Date.now();
       await worker.delay(0);
@@ -144,11 +136,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
     });
 
     test('worker.delay should delay for specified time', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       const start = Date.now();
       await worker.delay(100);
@@ -161,11 +152,10 @@ describe('Worker Advanced Methods - BullMQ v5', () => {
     });
 
     test('worker.delay should be abortable', async () => {
-      const worker = new Worker(
-        'worker-advanced-test',
-        async () => ({ done: true }),
-        { embedded: true, autorun: false }
-      );
+      const worker = new Worker('worker-advanced-test', async () => ({ done: true }), {
+        embedded: true,
+        autorun: false,
+      });
 
       const abortController = new AbortController();
 

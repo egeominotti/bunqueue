@@ -24,16 +24,15 @@ describe('Workflow Engine - Step Retry', () => {
   test('retries a failing step before giving up', async () => {
     let attempts = 0;
 
-    const flow = new Workflow('retry-test')
-      .step(
-        'flaky',
-        async () => {
-          attempts++;
-          if (attempts < 3) throw new Error(`fail #${attempts}`);
-          return { ok: true };
-        },
-        { retry: 3 }
-      );
+    const flow = new Workflow('retry-test').step(
+      'flaky',
+      async () => {
+        attempts++;
+        if (attempts < 3) throw new Error(`fail #${attempts}`);
+        return { ok: true };
+      },
+      { retry: 3 }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -49,15 +48,14 @@ describe('Workflow Engine - Step Retry', () => {
   test('fails after exhausting all retries', async () => {
     let attempts = 0;
 
-    const flow = new Workflow('retry-exhaust')
-      .step(
-        'always-fail',
-        async () => {
-          attempts++;
-          throw new Error('nope');
-        },
-        { retry: 2 }
-      );
+    const flow = new Workflow('retry-exhaust').step(
+      'always-fail',
+      async () => {
+        attempts++;
+        throw new Error('nope');
+      },
+      { retry: 2 }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -73,15 +71,14 @@ describe('Workflow Engine - Step Retry', () => {
   test('retry: 1 means no retry (fail immediately)', async () => {
     let attempts = 0;
 
-    const flow = new Workflow('no-retry')
-      .step(
-        'once',
-        async () => {
-          attempts++;
-          throw new Error('boom');
-        },
-        { retry: 1 }
-      );
+    const flow = new Workflow('no-retry').step(
+      'once',
+      async () => {
+        attempts++;
+        throw new Error('boom');
+      },
+      { retry: 1 }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -200,15 +197,11 @@ describe('Workflow Engine - Parallel Steps', () => {
     const compensations: string[] = [];
 
     const flow = new Workflow('parallel-fail')
-      .step(
-        'setup',
-        async () => ({ ready: true }),
-        {
-          compensate: async () => {
-            compensations.push('undo-setup');
-          },
-        }
-      )
+      .step('setup', async () => ({ ready: true }), {
+        compensate: async () => {
+          compensations.push('undo-setup');
+        },
+      })
       .parallel((w) =>
         w
           .step('ok-step', async () => {
@@ -252,15 +245,11 @@ describe('Workflow Engine - Signal Timeout', () => {
     const compensations: string[] = [];
 
     const flow = new Workflow('timeout-signal')
-      .step(
-        'submit',
-        async () => ({ submitted: true }),
-        {
-          compensate: async () => {
-            compensations.push('undo-submit');
-          },
-        }
-      )
+      .step('submit', async () => ({ submitted: true }), {
+        compensate: async () => {
+          compensations.push('undo-submit');
+        },
+      })
       .waitFor('approval', { timeout: 1000 });
 
     engine = new Engine({ embedded: true });
@@ -335,8 +324,7 @@ describe('Workflow Engine - Cleanup & Archival', () => {
   });
 
   test('cleanup only removes specified states', async () => {
-    const flow = new Workflow('cleanup-states')
-      .step('do', async () => ({ done: true }));
+    const flow = new Workflow('cleanup-states').step('do', async () => ({ done: true }));
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -409,16 +397,15 @@ describe('Workflow Engine - Observability', () => {
     let attempts = 0;
     const retryEvents: StepEvent[] = [];
 
-    const flow = new Workflow('retry-events')
-      .step(
-        'flaky',
-        async () => {
-          attempts++;
-          if (attempts < 3) throw new Error('fail');
-          return { ok: true };
-        },
-        { retry: 3 }
-      );
+    const flow = new Workflow('retry-events').step(
+      'flaky',
+      async () => {
+        attempts++;
+        if (attempts < 3) throw new Error('fail');
+        return { ok: true };
+      },
+      { retry: 3 }
+    );
 
     engine = new Engine({ embedded: true });
     engine.on('step:retry', (e) => retryEvents.push(e as StepEvent));
@@ -437,11 +424,7 @@ describe('Workflow Engine - Observability', () => {
     const lifecycleTypes: string[] = [];
 
     const flow = new Workflow('fail-events')
-      .step(
-        'setup',
-        async () => ({ done: true }),
-        { compensate: async () => {} }
-      )
+      .step('setup', async () => ({ done: true }), { compensate: async () => {} })
       .step(
         'boom',
         async () => {
@@ -549,21 +532,18 @@ describe('Workflow Engine - Nested Workflows', () => {
   test('sub-workflow failure fails the parent', async () => {
     const compensations: string[] = [];
 
-    const child = new Workflow('bad-child')
-      .step(
-        'fail',
-        async () => {
-          throw new Error('child failed');
-        },
-        { retry: 1 }
-      );
+    const child = new Workflow('bad-child').step(
+      'fail',
+      async () => {
+        throw new Error('child failed');
+      },
+      { retry: 1 }
+    );
 
     const parent = new Workflow('parent-with-bad-child')
-      .step(
-        'setup',
-        async () => ({ ready: true }),
-        { compensate: async () => compensations.push('undo-setup') }
-      )
+      .step('setup', async () => ({ ready: true }), {
+        compensate: async () => compensations.push('undo-setup'),
+      })
       .subWorkflow('bad-child', () => ({}));
 
     engine = new Engine({ embedded: true });

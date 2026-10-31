@@ -35,10 +35,14 @@ async function main() {
 
       // Process the job
       let processedId: string | null = null;
-      const worker = new Worker<{ value: number }>(QUEUE_NAME, async (j) => {
-        processedId = j.id;
-        return { processed: true };
-      }, { concurrency: 1, embedded: true });
+      const worker = new Worker<{ value: number }>(
+        QUEUE_NAME,
+        async (j) => {
+          processedId = j.id;
+          return { processed: true };
+        },
+        { concurrency: 1, embedded: true }
+      );
 
       await Bun.sleep(500);
       await worker.close();
@@ -69,9 +73,13 @@ async function main() {
     const expectedResult = { sum: 42, processed: true };
     const job = await queue.add('result-test', { value: 42 });
 
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (j) => {
-      return { sum: (j.data as { value: number }).value, processed: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (j) => {
+        return { sum: (j.data as { value: number }).value, processed: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -112,7 +120,9 @@ async function main() {
       console.log('   [PASS] GetJobs state filter works');
       passed++;
     } else {
-      console.log(`   [FAIL] Expected >=2 waiting and >=1 delayed, got ${waitingJobs.length} waiting and ${delayedJobs.length} delayed`);
+      console.log(
+        `   [FAIL] Expected >=2 waiting and >=1 delayed, got ${waitingJobs.length} waiting and ${delayedJobs.length} delayed`
+      );
       failed++;
     }
   } catch (e) {
@@ -143,8 +153,8 @@ async function main() {
 
     if (firstPage.length === 3 && secondPage.length === 3 && allJobs.length === 10) {
       // Check that pages don't overlap
-      const firstIds = new Set(firstPage.map(j => j.id));
-      const hasOverlap = secondPage.some(j => firstIds.has(j.id));
+      const firstIds = new Set(firstPage.map((j) => j.id));
+      const hasOverlap = secondPage.some((j) => firstIds.has(j.id));
 
       if (!hasOverlap) {
         console.log('   [PASS] GetJobs pagination works correctly');
@@ -188,7 +198,9 @@ async function main() {
       console.log('   [PASS] GetCountsPerPriority works correctly');
       passed++;
     } else {
-      console.log(`   [FAIL] Expected p1=2, p5=3, p10=1, got p1=${p1Count}, p5=${p5Count}, p10=${p10Count}`);
+      console.log(
+        `   [FAIL] Expected p1=2, p5=3, p10=1, got p1=${p1Count}, p5=${p5Count}, p10=${p10Count}`
+      );
       failed++;
     }
   } catch (e) {
@@ -209,7 +221,9 @@ async function main() {
 
     if (retrievedById) {
       console.log(`   Job created with ID: ${job.id}`);
-      console.log(`   Retrieved job data value: ${(retrievedById.data as { value: number }).value}`);
+      console.log(
+        `   Retrieved job data value: ${(retrievedById.data as { value: number }).value}`
+      );
 
       if ((retrievedById.data as { value: number }).value === 42) {
         console.log('   [PASS] GetJobByCustomId works correctly');

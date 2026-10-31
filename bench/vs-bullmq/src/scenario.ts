@@ -71,8 +71,10 @@ function checkDelivery(results: any[], expected: number, times = 1) {
   const seen = new Map<string, number>();
   for (const r of results)
     r.ids.forEach((id: string, i: number) => seen.set(id, (seen.get(id) ?? 0) + r.attempts[i]));
-  if (seen.size !== expected) throw new Error(`processed ${seen.size} distinct jobs, expected ${expected}`);
-  for (const [id, n] of seen) if (n !== times) throw new Error(`job ${id} ran ${n} times, expected ${times}`);
+  if (seen.size !== expected)
+    throw new Error(`processed ${seen.size} distinct jobs, expected ${expected}`);
+  for (const [id, n] of seen)
+    if (n !== times) throw new Error(`job ${id} ran ${n} times, expected ${times}`);
 }
 
 /** Waits until the queue holds nothing waiting, active or delayed and every job ran. */
@@ -92,7 +94,9 @@ async function drained(producer: Producer, children: Child[], expected: number, 
 async function fill(producer: Producer, total: number, batch = 1000, options = {}) {
   for (let i = 0; i < total; i += batch) {
     const n = Math.min(batch, total - i);
-    await producer.addBulk(Array.from({ length: n }, (_, k) => ({ data: payload(i + k), options })));
+    await producer.addBulk(
+      Array.from({ length: n }, (_, k) => ({ data: payload(i + k), options }))
+    );
   }
 }
 
@@ -141,7 +145,9 @@ const scenarios: Record<string, (p: Producer) => Promise<Record<string, unknown>
     const lat: number[] = [];
     const t0 = now();
     for (let i = 0; i < n; i += batch) {
-      const items = Array.from({ length: Math.min(batch, n - i) }, (_, k) => ({ data: payload(i + k) }));
+      const items = Array.from({ length: Math.min(batch, n - i) }, (_, k) => ({
+        data: payload(i + k),
+      }));
       const s = now();
       await producer.addBulk(items);
       lat.push(now() - s);
@@ -156,7 +162,10 @@ const scenarios: Record<string, (p: Producer) => Promise<Record<string, unknown>
     const processes = params.processes ?? 1;
     const concurrency = params.concurrency ?? 50;
     await fill(producer, n);
-    const children = startWorkers(processes, { BENCH_KIND: 'drain', BENCH_CONCURRENCY: String(concurrency) });
+    const children = startWorkers(processes, {
+      BENCH_KIND: 'drain',
+      BENCH_CONCURRENCY: String(concurrency),
+    });
     await Promise.all(children.map((c) => c.ready));
     const t0 = now();
     for (const c of children) c.proc.stdin!.write('go\n');
@@ -176,7 +185,10 @@ const scenarios: Record<string, (p: Producer) => Promise<Record<string, unknown>
     const processes = params.processes ?? 2;
     const concurrency = params.concurrency ?? 50;
     const total = rate * seconds;
-    const children = startWorkers(processes, { BENCH_KIND: 'latency', BENCH_CONCURRENCY: String(concurrency) });
+    const children = startWorkers(processes, {
+      BENCH_KIND: 'latency',
+      BENCH_CONCURRENCY: String(concurrency),
+    });
     await Promise.all(children.map((c) => c.ready));
     for (const c of children) c.proc.stdin!.write('go\n');
     await sleep(500);
@@ -189,7 +201,9 @@ const scenarios: Record<string, (p: Producer) => Promise<Record<string, unknown>
       while (sent < due && outstanding < 512) {
         const i = sent++;
         outstanding++;
-        pending.push(producer.add({ ...payload(i), t: t0 + (i * 1000) / rate }).finally(() => outstanding--));
+        pending.push(
+          producer.add({ ...payload(i), t: t0 + (i * 1000) / rate }).finally(() => outstanding--)
+        );
       }
       await sleep(1);
     }
@@ -234,7 +248,11 @@ const scenarios: Record<string, (p: Producer) => Promise<Record<string, unknown>
   async retry(producer) {
     const n = params.jobs ?? 20_000;
     await fill(producer, n, 1000, { attempts: 3, backoff: 0 });
-    const children = startWorkers(1, { BENCH_KIND: 'retry', BENCH_CONCURRENCY: '50', BENCH_SUCCEED_ON_ATTEMPT: '3' });
+    const children = startWorkers(1, {
+      BENCH_KIND: 'retry',
+      BENCH_CONCURRENCY: '50',
+      BENCH_SUCCEED_ON_ATTEMPT: '3',
+    });
     await Promise.all(children.map((c) => c.ready));
     const t0 = now();
     for (const c of children) c.proc.stdin!.write('go\n');
@@ -242,7 +260,13 @@ const scenarios: Record<string, (p: Producer) => Promise<Record<string, unknown>
     const results = await stopWorkers(children);
     checkDelivery(results, n, 3);
     const ms = end - t0;
-    return { jobs: n, attemptsPerJob: 3, ms, jobsPerSec: (n / ms) * 1000, attemptsPerSec: ((3 * n) / ms) * 1000 };
+    return {
+      jobs: n,
+      attemptsPerJob: 3,
+      ms,
+      jobsPerSec: (n / ms) * 1000,
+      attemptsPerSec: ((3 * n) / ms) * 1000,
+    };
   },
 
   /** Fill a backlog and leave it in place; the orchestrator reads the broker's memory. */
@@ -266,5 +290,7 @@ try {
   if (scenario !== 'fill') await producer.obliterate().catch(() => undefined);
   await producer.close().catch(() => undefined);
 }
-process.stdout.write(`RESULT ${JSON.stringify({ system: systemName, scenario, params, queue: queueName, runtime: process.versions.bun ? `bun ${process.versions.bun}` : `node ${process.versions.node}`, ...result })}\n`);
+process.stdout.write(
+  `RESULT ${JSON.stringify({ system: systemName, scenario, params, queue: queueName, runtime: process.versions.bun ? `bun ${process.versions.bun}` : `node ${process.versions.node}`, ...result })}\n`
+);
 process.exit(0);

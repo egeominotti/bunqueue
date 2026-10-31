@@ -10,6 +10,15 @@ allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 
 You are working on **bunqueue**, a high-performance job queue for Bun with SQLite persistence.
 
+## Tooling (mandatory)
+
+Type check only with `bun check` (`bun run typecheck`) and format only with
+`bun fmt` (`bun run format`, `bun run format:check`), in every directory and in
+`sdk/typescript` (`bun run check`). Never use `tsc --noEmit`, ESLint, Prettier,
+Biome, oxlint, oxfmt or lint-suppression comments; `tsc` stays only where files
+are emitted (`build:lib`, the SDK build), for typedoc and for compiler-API
+tests. Non-JS SDKs keep their own language toolchain.
+
 ## Architecture
 
 bunqueue uses a sharded priority queue architecture:

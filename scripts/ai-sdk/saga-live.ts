@@ -56,9 +56,11 @@ const destroy = (id: string) => {
   world.run("UPDATE resources SET state = 'destroyed' WHERE id = ?", [id]);
 };
 const liveResources = () =>
-  (world.query("SELECT id FROM resources WHERE state = 'live' ORDER BY id").all() as {
-    id: string;
-  }[]).map((r) => r.id);
+  (
+    world.query("SELECT id FROM resources WHERE state = 'live' ORDER BY id").all() as {
+      id: string;
+    }[]
+  ).map((r) => r.id);
 const ops = () =>
   (world.query('SELECT op FROM calls ORDER BY seq').all() as { op: string }[]).map((r) => r.op);
 
@@ -129,10 +131,14 @@ const flow = new Workflow<{ tenant: string; region: string }>('live-agent-saga')
       },
     }
   )
-  .step('verify', () => {
-    // The one scripted part: something downstream rejects the provisioning.
-    throw new Error('compliance verification rejected the tenant');
-  }, { retry: 1 });
+  .step(
+    'verify',
+    () => {
+      // The one scripted part: something downstream rejects the provisioning.
+      throw new Error('compliance verification rejected the tenant');
+    },
+    { retry: 1 }
+  );
 
 const engine = new Engine({
   embedded: true,

@@ -12,13 +12,7 @@ function namespace(label: string): string {
   return value;
 }
 
-function orderedJob(
-  queue: string,
-  label: string,
-  id: string,
-  timestamp: number,
-  delay: number
-) {
+function orderedJob(queue: string, label: string, id: string, timestamp: number, delay: number) {
   return createJob(jobId(id), queue, {
     data: { label },
     delay,

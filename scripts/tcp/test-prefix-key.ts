@@ -218,7 +218,9 @@ async function main() {
     );
 
     if (!devSched || !prodSched) {
-      console.log(`   ❌ One of the upserts returned null (dev=${!!devSched}, prod=${!!prodSched})`);
+      console.log(
+        `   ❌ One of the upserts returned null (dev=${!!devSched}, prod=${!!prodSched})`
+      );
       failed++;
     } else {
       const devSchedulers = await dev.getJobSchedulers();

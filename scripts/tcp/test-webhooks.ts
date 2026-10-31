@@ -42,7 +42,7 @@ async function main() {
   let failed = 0;
 
   // Clean up any existing webhooks
-  const initialList = await tcp.send({ cmd: 'ListWebhooks' }) as { data: ListWebhooksResponse };
+  const initialList = (await tcp.send({ cmd: 'ListWebhooks' })) as { data: ListWebhooksResponse };
   for (const webhook of initialList.data?.webhooks ?? []) {
     await tcp.send({ cmd: 'RemoveWebhook', webhookId: webhook.id });
   }
@@ -50,14 +50,18 @@ async function main() {
   // Test 1: Add webhook with URL and events
   console.log('1. Testing ADD WEBHOOK...');
   try {
-    const result = await tcp.send({
+    const result = (await tcp.send({
       cmd: 'AddWebhook',
       url: 'https://example.com/webhook',
-      events: ['job.completed', 'job.failed']
-    }) as { data: WebhookResponse };
+      events: ['job.completed', 'job.failed'],
+    })) as { data: WebhookResponse };
 
-    if (result.data?.webhookId && result.data?.url === 'https://example.com/webhook' &&
-        result.data?.events?.includes('job.completed') && result.data?.events?.includes('job.failed')) {
+    if (
+      result.data?.webhookId &&
+      result.data?.url === 'https://example.com/webhook' &&
+      result.data?.events?.includes('job.completed') &&
+      result.data?.events?.includes('job.failed')
+    ) {
       console.log(`   PASS Webhook added: ${result.data.webhookId}`);
       passed++;
     } else {
@@ -73,7 +77,7 @@ async function main() {
   // Test 2: List webhooks
   console.log('\n2. Testing LIST WEBHOOKS...');
   try {
-    const result = await tcp.send({ cmd: 'ListWebhooks' }) as { data: ListWebhooksResponse };
+    const result = (await tcp.send({ cmd: 'ListWebhooks' })) as { data: ListWebhooksResponse };
     const webhooks = result.data?.webhooks ?? [];
 
     if (webhooks.length >= 1 && webhooks[0].url === 'https://example.com/webhook') {
@@ -91,19 +95,23 @@ async function main() {
   // Test 3: Remove webhook
   console.log('\n3. Testing REMOVE WEBHOOK...');
   try {
-    const listResult = await tcp.send({ cmd: 'ListWebhooks' }) as { data: ListWebhooksResponse };
+    const listResult = (await tcp.send({ cmd: 'ListWebhooks' })) as { data: ListWebhooksResponse };
     const webhookId = listResult.data?.webhooks?.[0]?.id;
 
     if (!webhookId) {
       console.log('   FAIL No webhook found to remove');
       failed++;
     } else {
-      const removeResult = await tcp.send({ cmd: 'RemoveWebhook', webhookId }) as { data: { removed: boolean } };
+      const removeResult = (await tcp.send({ cmd: 'RemoveWebhook', webhookId })) as {
+        data: { removed: boolean };
+      };
 
       if (removeResult.data?.removed) {
         // Verify it's gone
-        const verifyResult = await tcp.send({ cmd: 'ListWebhooks' }) as { data: ListWebhooksResponse };
-        const stillExists = verifyResult.data?.webhooks?.some(w => w.id === webhookId);
+        const verifyResult = (await tcp.send({ cmd: 'ListWebhooks' })) as {
+          data: ListWebhooksResponse;
+        };
+        const stillExists = verifyResult.data?.webhooks?.some((w) => w.id === webhookId);
 
         if (!stillExists) {
           console.log('   PASS Webhook removed successfully');
@@ -125,12 +133,12 @@ async function main() {
   // Test 4: Webhook with specific queue filter
   console.log('\n4. Testing WEBHOOK WITH QUEUE FILTER...');
   try {
-    const result = await tcp.send({
+    const result = (await tcp.send({
       cmd: 'AddWebhook',
       url: 'https://example.com/emails-hook',
       events: ['job.completed'],
-      queue: 'emails'
-    }) as { data: WebhookResponse };
+      queue: 'emails',
+    })) as { data: WebhookResponse };
 
     if (result.data?.queue === 'emails') {
       console.log(`   PASS Webhook with queue filter: ${result.data.queue}`);
@@ -149,12 +157,12 @@ async function main() {
   // Test 5: Webhook with secret for signing
   console.log('\n5. Testing WEBHOOK WITH SECRET...');
   try {
-    const result = await tcp.send({
+    const result = (await tcp.send({
       cmd: 'AddWebhook',
       url: 'https://example.com/secure-hook',
       events: ['job.completed'],
-      secret: 'my-secret-key-12345'
-    }) as { data: WebhookResponse };
+      secret: 'my-secret-key-12345',
+    })) as { data: WebhookResponse };
 
     // Note: The secret is not returned in the response for security
     // We just verify the webhook was created successfully
@@ -175,31 +183,33 @@ async function main() {
   // Test 6: Multiple webhooks for same event
   console.log('\n6. Testing MULTIPLE WEBHOOKS FOR SAME EVENT...');
   try {
-    const result1 = await tcp.send({
+    const result1 = (await tcp.send({
       cmd: 'AddWebhook',
       url: 'https://example.com/hook1',
-      events: ['job.completed']
-    }) as { data: WebhookResponse };
+      events: ['job.completed'],
+    })) as { data: WebhookResponse };
 
-    const result2 = await tcp.send({
+    const result2 = (await tcp.send({
       cmd: 'AddWebhook',
       url: 'https://example.com/hook2',
-      events: ['job.completed']
-    }) as { data: WebhookResponse };
+      events: ['job.completed'],
+    })) as { data: WebhookResponse };
 
-    const result3 = await tcp.send({
+    const result3 = (await tcp.send({
       cmd: 'AddWebhook',
       url: 'https://example.com/hook3',
-      events: ['job.completed']
-    }) as { data: WebhookResponse };
+      events: ['job.completed'],
+    })) as { data: WebhookResponse };
 
-    const listResult = await tcp.send({ cmd: 'ListWebhooks' }) as { data: ListWebhooksResponse };
+    const listResult = (await tcp.send({ cmd: 'ListWebhooks' })) as { data: ListWebhooksResponse };
     const webhooks = listResult.data?.webhooks ?? [];
-    const completedHooks = webhooks.filter(w => w.events.includes('job.completed'));
+    const completedHooks = webhooks.filter((w) => w.events.includes('job.completed'));
 
-    if (completedHooks.length >= 3 &&
-        result1.data?.webhookId !== result2.data?.webhookId &&
-        result2.data?.webhookId !== result3.data?.webhookId) {
+    if (
+      completedHooks.length >= 3 &&
+      result1.data?.webhookId !== result2.data?.webhookId &&
+      result2.data?.webhookId !== result3.data?.webhookId
+    ) {
       console.log(`   PASS Multiple webhooks created: ${completedHooks.length} for job.completed`);
       passed++;
     } else {
@@ -217,7 +227,7 @@ async function main() {
   }
 
   // Final cleanup
-  const finalList = await tcp.send({ cmd: 'ListWebhooks' }) as { data: ListWebhooksResponse };
+  const finalList = (await tcp.send({ cmd: 'ListWebhooks' })) as { data: ListWebhooksResponse };
   for (const webhook of finalList.data?.webhooks ?? []) {
     await tcp.send({ cmd: 'RemoveWebhook', webhookId: webhook.id });
   }

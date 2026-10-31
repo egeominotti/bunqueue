@@ -45,10 +45,13 @@ function report(name: string, results: Result[], maxAcceptable: number): boolean
   const icon = pass ? '✓' : '✗';
 
   console.log(`  ${icon} ${name}`);
-  console.log(`    ${s.got}/${s.total} got jobs | avg ${s.avg}ms | p50 ${s.p50}ms | p95 ${s.p95}ms | p99 ${s.p99}ms | max ${s.max}ms`);
+  console.log(
+    `    ${s.got}/${s.total} got jobs | avg ${s.avg}ms | p50 ${s.p50}ms | p95 ${s.p95}ms | p99 ${s.p99}ms | max ${s.max}ms`
+  );
   if (!pass) {
     if (s.got < s.total) console.log(`    MISS: ${s.total - s.got} workers got no job`);
-    if (s.p99 >= maxAcceptable) console.log(`    SLOW: p99 ${s.p99}ms >= ${maxAcceptable}ms threshold`);
+    if (s.p99 >= maxAcceptable)
+      console.log(`    SLOW: p99 ${s.p99}ms >= ${maxAcceptable}ms threshold`);
   }
   console.log();
   return pass;
@@ -71,7 +74,10 @@ async function test1() {
 
   // Push in chunks of 1000
   for (let i = 0; i < JOBS; i += 1000) {
-    await qm.pushBatch(q, Array.from({ length: 1000 }, (_, j) => ({ data: { n: i + j } })));
+    await qm.pushBatch(
+      q,
+      Array.from({ length: 1000 }, (_, j) => ({ data: { n: i + j } }))
+    );
   }
 
   return report('500 workers, 50k jobs (50×1000 batches)', await Promise.all(promises), 500);
@@ -92,9 +98,16 @@ async function test2() {
   await Bun.sleep(30);
 
   // Single batch — all 200 workers should wake at once
-  await qm.pushBatch(q, Array.from({ length: WORKERS }, (_, i) => ({ data: { i } })));
+  await qm.pushBatch(
+    q,
+    Array.from({ length: WORKERS }, (_, i) => ({ data: { i } }))
+  );
 
-  return report('Thundering herd: 200 workers, 200 jobs, 1 batch', await Promise.all(promises), 300);
+  return report(
+    'Thundering herd: 200 workers, 200 jobs, 1 batch',
+    await Promise.all(promises),
+    300
+  );
 }
 
 // ─── Test 3: 50 producers firing randomly ───
@@ -123,7 +136,11 @@ async function test3() {
   });
 
   await Promise.all(producerPromises);
-  return report('100 workers vs 50 staggered producers (500 jobs)', await Promise.all(workerPromises), 300);
+  return report(
+    '100 workers vs 50 staggered producers (500 jobs)',
+    await Promise.all(workerPromises),
+    300
+  );
 }
 
 // ─── Test 4: Drain-refill torture ───
@@ -144,7 +161,10 @@ async function test4() {
     });
     await Bun.sleep(5);
 
-    await qm.pushBatch(q, Array.from({ length: JOBS_PER_CYCLE }, (_, i) => ({ data: { c, i } })));
+    await qm.pushBatch(
+      q,
+      Array.from({ length: JOBS_PER_CYCLE }, (_, i) => ({ data: { c, i } }))
+    );
 
     const results = await Promise.all(promises);
     allResults.push(...results);
@@ -167,7 +187,10 @@ async function test5() {
 
   // Push all jobs first
   for (let i = 0; i < TOTAL_JOBS; i += 500) {
-    await qm.pushBatch(q, Array.from({ length: 500 }, (_, j) => ({ data: { n: i + j } })));
+    await qm.pushBatch(
+      q,
+      Array.from({ length: 500 }, (_, j) => ({ data: { n: i + j } }))
+    );
   }
 
   // Workers pull in a loop until all consumed
@@ -190,7 +213,9 @@ async function test5() {
   console.log(`  ✓ Asymmetric: 5 workers drained ${totalPulled}/${TOTAL_JOBS} jobs`);
   console.log(`    Per worker: ${counts.join(', ')}`);
   const s = stats(results);
-  console.log(`    Pull latency: avg ${s.avg}ms | p50 ${s.p50}ms | p95 ${s.p95}ms | p99 ${s.p99}ms | max ${s.max}ms`);
+  console.log(
+    `    Pull latency: avg ${s.avg}ms | p50 ${s.p50}ms | p95 ${s.p95}ms | p99 ${s.p99}ms | max ${s.max}ms`
+  );
   console.log();
   return totalPulled === TOTAL_JOBS;
 }
@@ -204,7 +229,10 @@ async function test6() {
 
   // Push 5k jobs — no workers, all become pendingNotifications
   for (let i = 0; i < COUNT; i += 500) {
-    await qm.pushBatch(q, Array.from({ length: 500 }, (_, j) => ({ data: { n: i + j } })));
+    await qm.pushBatch(
+      q,
+      Array.from({ length: 500 }, (_, j) => ({ data: { n: i + j } }))
+    );
   }
 
   // Now start 5k workers — each should consume a pendingNotification and find a job
@@ -214,7 +242,11 @@ async function test6() {
     return { id: i, wakeup: Date.now() - start, got: job !== null };
   });
 
-  return report(`Notification storm: ${COUNT} pushes → ${COUNT} workers`, await Promise.all(promises), 500);
+  return report(
+    `Notification storm: ${COUNT} pushes → ${COUNT} workers`,
+    await Promise.all(promises),
+    500
+  );
 }
 
 // ─── Test 7: Interleaved chaos ───
@@ -256,7 +288,11 @@ async function test8() {
     await qm.push(q, { data: { i } });
   }
 
-  return report(`Worst case: ${COUNT} workers, ${COUNT} single pushes`, await Promise.all(promises), 500);
+  return report(
+    `Worst case: ${COUNT} workers, ${COUNT} single pushes`,
+    await Promise.all(promises),
+    500
+  );
 }
 
 // ─── Run all ───
@@ -280,7 +316,9 @@ const elapsed = Date.now() - start;
 
 console.log('━'.repeat(60));
 console.log(`\n${ok}/${passed.length} passed in ${(elapsed / 1000).toFixed(1)}s`);
-console.log(ok === passed.length ? '\n✓ ALL EXTREME TESTS PASSED' : `\n✗ ${passed.length - ok} FAILED`);
+console.log(
+  ok === passed.length ? '\n✓ ALL EXTREME TESTS PASSED' : `\n✗ ${passed.length - ok} FAILED`
+);
 
 qm.shutdown();
 process.exit(ok === passed.length ? 0 : 1);

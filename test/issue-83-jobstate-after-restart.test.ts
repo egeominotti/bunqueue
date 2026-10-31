@@ -38,11 +38,10 @@ describe('Issue #83: job state after server restart', () => {
 
     // Phase 1: add + complete a job
     let queue = new Queue(QUEUE, { embedded: true });
-    const worker = new Worker(
-      QUEUE,
-      async () => ({ done: true }),
-      { embedded: true, removeOnComplete: false }
-    );
+    const worker = new Worker(QUEUE, async () => ({ done: true }), {
+      embedded: true,
+      removeOnComplete: false,
+    });
 
     const job = await queue.add('task', { hello: 'world' }, { durable: true });
     const jobId = String(job.id);
@@ -88,11 +87,10 @@ describe('Issue #83: job state after server restart', () => {
 
     // Phase 1
     let queue = new Queue(QUEUE, { embedded: true });
-    const worker = new Worker(
-      QUEUE,
-      async () => 'done',
-      { embedded: true, removeOnComplete: false }
-    );
+    const worker = new Worker(QUEUE, async () => 'done', {
+      embedded: true,
+      removeOnComplete: false,
+    });
 
     const added = await queue.add('task', { v: 1 }, { durable: true });
     const jobId = String(added.id);
@@ -136,11 +134,7 @@ describe('Issue #83: job state after server restart', () => {
       { embedded: true, removeOnFail: false }
     );
 
-    const added = await queue.add(
-      'task',
-      { v: 1 },
-      { attempts: 1, backoff: 0, durable: true }
-    );
+    const added = await queue.add('task', { v: 1 }, { attempts: 1, backoff: 0, durable: true });
     const jobId = String(added.id);
 
     for (let i = 0; i < 50; i++) {
@@ -185,11 +179,7 @@ describe('Issue #83: job state after server restart', () => {
       { embedded: true, removeOnFail: false }
     );
 
-    const added = await queue.add(
-      'task',
-      { v: 42 },
-      { attempts: 1, backoff: 0, durable: true }
-    );
+    const added = await queue.add('task', { v: 42 }, { attempts: 1, backoff: 0, durable: true });
     const jobId = String(added.id);
 
     for (let i = 0; i < 50; i++) {

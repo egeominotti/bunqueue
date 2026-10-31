@@ -203,13 +203,12 @@ describe('workflow production API hardening', () => {
       )
     ).toThrow(/maxIterations/);
     expect(() =>
-      new Workflow('fractional-loop')
-        .forEach(
-          () => [],
-          'work',
-          () => null,
-          { maxIterations: 1.5 }
-        )
+      new Workflow('fractional-loop').forEach(
+        () => [],
+        'work',
+        () => null,
+        { maxIterations: 1.5 }
+      )
     ).toThrow(/maxIterations/);
   });
 

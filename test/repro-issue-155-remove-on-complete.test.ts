@@ -54,8 +54,8 @@ async function until(check: () => boolean | Promise<boolean>, what: string): Pro
 }
 
 function completionWaiters(manager: QueueManager): number {
-  return (manager as unknown as { eventsManager: { completionWaiterCount: number } })
-    .eventsManager.completionWaiterCount;
+  return (manager as unknown as { eventsManager: { completionWaiterCount: number } }).eventsManager
+    .completionWaiterCount;
 }
 
 /**

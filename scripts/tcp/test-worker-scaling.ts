@@ -79,7 +79,9 @@ async function main() {
     // Allow ack batchers to flush before closing
     await Bun.sleep(500);
     for (const w of workers) {
-      try { await w.close(); } catch {}
+      try {
+        await w.close();
+      } catch {}
     }
 
     if (totalCompleted === 20) {
@@ -89,7 +91,9 @@ async function main() {
       }
       const sum = Object.values(workerCounts).reduce((a, b) => a + b, 0);
       if (sum === 20 && workersWithJobs >= 2) {
-        ok(`All 20 jobs completed, ${workersWithJobs}/4 workers got jobs (w0=${workerCounts[0]}, w1=${workerCounts[1]}, w2=${workerCounts[2]}, w3=${workerCounts[3]})`);
+        ok(
+          `All 20 jobs completed, ${workersWithJobs}/4 workers got jobs (w0=${workerCounts[0]}, w1=${workerCounts[1]}, w2=${workerCounts[2]}, w3=${workerCounts[3]})`
+        );
       } else {
         fail(`Sum=${sum}, workersWithJobs=${workersWithJobs}`);
       }
@@ -170,16 +174,26 @@ async function main() {
 
     // Allow ack batchers to flush before closing
     await Bun.sleep(500);
-    try { await worker1.close(); } catch {}
-    try { await worker2.close(); } catch {}
-    try { await worker3.close(); } catch {}
+    try {
+      await worker1.close();
+    } catch {}
+    try {
+      await worker2.close();
+    } catch {}
+    try {
+      await worker3.close();
+    } catch {}
 
     if (totalCompleted === JOB_COUNT) {
       const singleWorkerEstimate = remainingJobs * JOB_DURATION;
       if (elapsedForRemaining < singleWorkerEstimate) {
-        ok(`All ${JOB_COUNT} jobs completed. Remaining ${remainingJobs} done in ${Math.round(elapsedForRemaining)}ms vs single-worker estimate ${singleWorkerEstimate}ms`);
+        ok(
+          `All ${JOB_COUNT} jobs completed. Remaining ${remainingJobs} done in ${Math.round(elapsedForRemaining)}ms vs single-worker estimate ${singleWorkerEstimate}ms`
+        );
       } else {
-        fail(`Scaling did not speed up: ${Math.round(elapsedForRemaining)}ms >= ${singleWorkerEstimate}ms`);
+        fail(
+          `Scaling did not speed up: ${Math.round(elapsedForRemaining)}ms >= ${singleWorkerEstimate}ms`
+        );
       }
     } else {
       fail(`Only ${totalCompleted}/${JOB_COUNT} jobs completed`);
@@ -252,7 +266,9 @@ async function main() {
 
     // Gracefully close worker1 — wait for in-flight to finish
     await Bun.sleep(200);
-    try { await worker1.close(); } catch {}
+    try {
+      await worker1.close();
+    } catch {}
 
     const countAfterRemoval = totalCompleted;
 
@@ -263,11 +279,17 @@ async function main() {
     }
 
     await Bun.sleep(500);
-    try { await worker2.close(); } catch {}
-    try { await worker3.close(); } catch {}
+    try {
+      await worker2.close();
+    } catch {}
+    try {
+      await worker3.close();
+    } catch {}
 
     if (totalCompleted >= JOB_COUNT) {
-      ok(`All ${JOB_COUNT} jobs completed. Worker1 processed ${worker1Count} before removal. Remaining processed by workers 2 & 3.`);
+      ok(
+        `All ${JOB_COUNT} jobs completed. Worker1 processed ${worker1Count} before removal. Remaining processed by workers 2 & 3.`
+      );
     } else {
       fail(`Only ${totalCompleted}/${JOB_COUNT} jobs completed (worker1 did ${worker1Count})`);
     }
@@ -323,15 +345,23 @@ async function main() {
 
     // Allow ack batchers to flush before closing
     await Bun.sleep(500);
-    try { await worker1.close(); } catch {}
-    try { await worker2.close(); } catch {}
+    try {
+      await worker1.close();
+    } catch {}
+    try {
+      await worker2.close();
+    } catch {}
 
     if (totalCompleted === JOB_COUNT) {
       if (worker2Count > worker1Count && worker1Count >= 1 && worker2Count >= 1) {
-        ok(`All ${JOB_COUNT} jobs completed. W1(conc:1)=${worker1Count}, W2(conc:5)=${worker2Count}. W2 processed more.`);
+        ok(
+          `All ${JOB_COUNT} jobs completed. W1(conc:1)=${worker1Count}, W2(conc:5)=${worker2Count}. W2 processed more.`
+        );
       } else if (worker1Count + worker2Count === JOB_COUNT) {
         // In TCP mode distribution may vary; as long as both participated it's valid
-        ok(`All ${JOB_COUNT} jobs completed. W1=${worker1Count}, W2=${worker2Count} (distribution varies in TCP mode)`);
+        ok(
+          `All ${JOB_COUNT} jobs completed. W1=${worker1Count}, W2=${worker2Count} (distribution varies in TCP mode)`
+        );
       } else {
         fail(`Sum mismatch: W1=${worker1Count} + W2=${worker2Count} != ${JOB_COUNT}`);
       }
@@ -375,7 +405,9 @@ async function main() {
     }
 
     await Bun.sleep(500);
-    try { await worker.close(); } catch {}
+    try {
+      await worker.close();
+    } catch {}
 
     if (completedIndices.length === JOB_COUNT) {
       const unique = new Set(completedIndices);
@@ -429,7 +461,9 @@ async function main() {
 
     // Close worker1
     await Bun.sleep(500);
-    try { await worker1.close(); } catch {}
+    try {
+      await worker1.close();
+    } catch {}
 
     if (worker1Completed.length !== 5) {
       fail(`Worker1 only completed ${worker1Completed.length}/5 jobs`);
@@ -459,7 +493,9 @@ async function main() {
       }
 
       await Bun.sleep(500);
-      try { await worker2.close(); } catch {}
+      try {
+        await worker2.close();
+      } catch {}
 
       if (worker2Completed.length === 5) {
         const worker1Sorted = [...worker1Completed].sort((a, b) => a - b);
@@ -468,7 +504,9 @@ async function main() {
         const unique = new Set(allIndices);
 
         if (unique.size === 10) {
-          ok(`Worker replacement successful. W1=${worker1Sorted.join(',')}, W2=${worker2Sorted.join(',')}, no overlap`);
+          ok(
+            `Worker replacement successful. W1=${worker1Sorted.join(',')}, W2=${worker2Sorted.join(',')}, no overlap`
+          );
         } else {
           fail(`Expected 10 unique indices, got ${unique.size}`);
         }

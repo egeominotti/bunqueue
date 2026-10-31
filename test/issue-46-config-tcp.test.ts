@@ -92,10 +92,7 @@ describe('GetStallConfig command', () => {
   });
 
   test('should return default stall config via handleCommand', async () => {
-    const res = await handleCommand(
-      { cmd: 'GetStallConfig', queue: 'test-queue' } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'GetStallConfig', queue: 'test-queue' } as Command, ctx);
 
     expect(res.ok).toBe(true);
     const config = (res as Record<string, unknown>).config as Record<string, unknown>;
@@ -146,10 +143,7 @@ describe('SetDlqConfig command', () => {
       ctx
     );
 
-    const res = await handleCommand(
-      { cmd: 'GetDlqConfig', queue: 'dlq-persist' } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'GetDlqConfig', queue: 'dlq-persist' } as Command, ctx);
 
     expect(res.ok).toBe(true);
     const config = (res as Record<string, unknown>).config as Record<string, unknown>;
@@ -177,10 +171,7 @@ describe('GetDlqConfig command', () => {
   });
 
   test('should return default DLQ config via handleCommand', async () => {
-    const res = await handleCommand(
-      { cmd: 'GetDlqConfig', queue: 'test-queue' } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'GetDlqConfig', queue: 'test-queue' } as Command, ctx);
 
     expect(res.ok).toBe(true);
     const config = (res as Record<string, unknown>).config as Record<string, unknown>;

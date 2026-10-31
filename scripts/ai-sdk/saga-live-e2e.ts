@@ -55,7 +55,9 @@ class World {
     this.db = new Database(path, { create: true });
     this.db.run('PRAGMA journal_mode = WAL');
     this.db.run(`CREATE TABLE IF NOT EXISTS resources (id TEXT PRIMARY KEY, state TEXT, key TEXT)`);
-    this.db.run(`CREATE TABLE IF NOT EXISTS calls (seq INTEGER PRIMARY KEY AUTOINCREMENT, op TEXT)`);
+    this.db.run(
+      `CREATE TABLE IF NOT EXISTS calls (seq INTEGER PRIMARY KEY AUTOINCREMENT, op TEXT)`
+    );
   }
   log(op: string) {
     this.db.run('INSERT INTO calls (op) VALUES (?)', [op]);
@@ -229,9 +231,13 @@ function saga(
   if (opts.approval !== undefined) wf = wf.waitFor('human-approval', { timeout: 300_000 });
 
   if (opts.failAt === 'verify') {
-    wf = wf.step('verify', () => {
-      throw new Error('compliance rejected the tenant');
-    }, { retry: 1 });
+    wf = wf.step(
+      'verify',
+      () => {
+        throw new Error('compliance rejected the tenant');
+      },
+      { retry: 1 }
+    );
   }
   if (opts.withPivot) {
     wf = wf.pivot().step('welcome-email', () => {
@@ -240,9 +246,13 @@ function saga(
     });
   }
   if (opts.failAt === 'post-pivot') {
-    wf = wf.step('activate', () => {
-      throw new Error('activation failed after the point of no return');
-    }, { retry: 1 });
+    wf = wf.step(
+      'activate',
+      () => {
+        throw new Error('activation failed after the point of no return');
+      },
+      { retry: 1 }
+    );
   }
   return wf;
 }
@@ -317,7 +327,10 @@ await run('S4', 'refused rollback parks, operator resumes', async (world) => {
   await engine.close(true);
 
   check(exec?.state === 'failed', `after resume expected failed, got ${exec?.state}`);
-  check(exec?.rollbackStatus === 'completed', `after resume rollbackStatus=${exec?.rollbackStatus}`);
+  check(
+    exec?.rollbackStatus === 'completed',
+    `after resume rollbackStatus=${exec?.rollbackStatus}`
+  );
   check(world.live().length === 0, `resources left behind after resume: ${world.live()}`);
   return 'parked, then fully unwound on resume';
 });
@@ -350,14 +363,20 @@ await run('S5', 'the idempotency key survives a retry after a real API call', as
   check(keys[0] === keys[1], `key changed across retries: ${keys[0]} vs ${keys[1]}`);
   // The honest cost: the model really was called twice. That is what step-level
   // durability buys back, and why the retry must not also duplicate the side effect.
-  check(world.count('llm:plan') === 2, `expected 2 real model calls, got ${world.count('llm:plan')}`);
+  check(
+    world.count('llm:plan') === 2,
+    `expected 2 real model calls, got ${world.count('llm:plan')}`
+  );
   return `key stable across ${attempts} attempts, ${world.count('llm:plan')} model calls paid`;
 });
 
-await run('S6', 'SIGKILL after tokens were paid; resume does not re-call the model', async (world) => {
-  const wfDb = join(DIR, 'wf-s6.db');
-  const runIdFile = join(DIR, 's6-run-id');
-  const child = (mode: string) => `
+await run(
+  'S6',
+  'SIGKILL after tokens were paid; resume does not re-call the model',
+  async (world) => {
+    const wfDb = join(DIR, 'wf-s6.db');
+    const runIdFile = join(DIR, 's6-run-id');
+    const child = (mode: string) => `
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText, stepCountIs, tool } from 'ai';
 import { Database } from 'bun:sqlite';
@@ -414,34 +433,41 @@ await engine.close(true);
 process.exit(0);
 `;
 
-  const spawn = async (mode: string) => {
-    const p = join(DIR, `s6-${mode}.ts`);
-    writeFileSync(p, child(mode));
-    const proc = Bun.spawn(['bun', p], { stdout: 'pipe', stderr: 'pipe', env: process.env });
-    const [out, err] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ]);
-    await proc.exited;
-    return { out, err, signal: proc.signalCode };
-  };
+    const spawn = async (mode: string) => {
+      const p = join(DIR, `s6-${mode}.ts`);
+      writeFileSync(p, child(mode));
+      const proc = Bun.spawn(['bun', p], { stdout: 'pipe', stderr: 'pipe', env: process.env });
+      const [out, err] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
+      await proc.exited;
+      return { out, err, signal: proc.signalCode };
+    };
 
-  const killed = await spawn('kill');
-  check(killed.signal === 'SIGKILL', `expected SIGKILL, got ${killed.signal} / ${killed.err.slice(0, 200)}`);
-  const callsBefore = world.count('llm:plan');
-  check(callsBefore === 1, `expected 1 model call before the crash, got ${callsBefore}`);
-  check(world.count('provision:') === 0, 'nothing should have been provisioned yet');
+    const killed = await spawn('kill');
+    check(
+      killed.signal === 'SIGKILL',
+      `expected SIGKILL, got ${killed.signal} / ${killed.err.slice(0, 200)}`
+    );
+    const callsBefore = world.count('llm:plan');
+    check(callsBefore === 1, `expected 1 model call before the crash, got ${callsBefore}`);
+    check(world.count('provision:') === 0, 'nothing should have been provisioned yet');
 
-  const resumed = await spawn('resume');
-  check(resumed.out.includes('state=completed'), `resume did not complete: ${resumed.out} ${resumed.err.slice(0, 200)}`);
-  // THE point: the plan step was journaled, so its tokens are not paid for twice.
-  check(
-    world.count('llm:plan') === 1,
-    `the model was called again after the crash (${world.count('llm:plan')} total)`
-  );
-  check(world.count('provision:') > 0, 'the interrupted step never finished');
-  return `1 model call total across a crash, ${world.count('provision:')} resources applied on resume`;
-});
+    const resumed = await spawn('resume');
+    check(
+      resumed.out.includes('state=completed'),
+      `resume did not complete: ${resumed.out} ${resumed.err.slice(0, 200)}`
+    );
+    // THE point: the plan step was journaled, so its tokens are not paid for twice.
+    check(
+      world.count('llm:plan') === 1,
+      `the model was called again after the crash (${world.count('llm:plan')} total)`
+    );
+    check(world.count('provision:') > 0, 'the interrupted step never finished');
+    return `1 model call total across a crash, ${world.count('provision:')} resources applied on resume`;
+  }
+);
 
 await run('S7', 'human approval gate: reject unwinds the agent work', async (world) => {
   const engine = newEngine(world);

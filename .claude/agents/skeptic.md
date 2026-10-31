@@ -49,6 +49,6 @@ When invoked before commit or push, execute this checklist:
    - Look for `any` types, missing input validation, unchecked return values
    - Verify idempotency where required (webhooks, retries, cron jobs)
 3. Verify tests exist for new behavior (or explicitly demand e2e run)
-4. Run `bun run typecheck` (or project-specific type check) and report errors (pre-existing vs new)
+4. Run `bun run typecheck` and `bun run format:check` (Bun-native `bun check` / `bun fmt`; in `sdk/typescript` run `bun run check`) and report errors (pre-existing vs new). FAIL any change that adds `tsc --noEmit`, ESLint, Prettier, Biome, oxlint, oxfmt or another type-check/lint/format library, or lint-suppression comments
 5. Emit final Verdict — PASS / CONDITIONAL / FAIL
 6. Block commit/push if Verdict = FAIL unless user explicitly overrides

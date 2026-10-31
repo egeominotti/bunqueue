@@ -18,7 +18,9 @@ function createMockServer(statusCode = 200) {
     async fetch(req) {
       const body = (await req.json()) as WebhookPayload;
       const headers: Record<string, string> = {};
-      req.headers.forEach((v, k) => { headers[k] = v; });
+      req.headers.forEach((v, k) => {
+        headers[k] = v;
+      });
       received.push({ body, headers });
       return new Response('OK', { status: statusCode });
     },
@@ -44,7 +46,9 @@ describe('Webhook Delivery', () => {
     mock = createMockServer();
   });
 
-  afterEach(() => { mock.stop(); });
+  afterEach(() => {
+    mock.stop();
+  });
 
   describe('registration', () => {
     test('should register with all properties', () => {

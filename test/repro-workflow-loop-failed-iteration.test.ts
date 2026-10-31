@@ -127,10 +127,11 @@ describe('a failed loop iteration is still rolled back', () => {
       if (!name.includes(':')) continue;
       expect(record.compensation?.status, `${name} finished with no outcome at all`).toBeDefined();
     }
-    expect(Object.keys(steps).filter((k) => k.startsWith('reserve:')).sort()).toEqual([
-      'reserve:0',
-      'reserve:1',
-    ]);
+    expect(
+      Object.keys(steps)
+        .filter((k) => k.startsWith('reserve:'))
+        .sort()
+    ).toEqual(['reserve:0', 'reserve:1']);
   }, 60_000);
 
   test('the last iteration is still not compensated twice', async () => {
@@ -154,9 +155,13 @@ describe('a failed loop iteration is still rolled back', () => {
             }),
           { maxIterations: 10 }
         )
-        .step('boom', async () => {
-          throw new Error('downstream rejected');
-        }, { retry: 1 })
+        .step(
+          'boom',
+          async () => {
+            throw new Error('downstream rejected');
+          },
+          { retry: 1 }
+        )
     );
 
     const run = await engine.start('loop-clean', {});
@@ -169,7 +174,7 @@ describe('a failed loop iteration is still rolled back', () => {
 });
 
 describe('the mirror write never replaces the step failure', () => {
-  test("a store that refuses the mirror write does not hide why the step failed", async () => {
+  test('a store that refuses the mirror write does not hide why the step failed', async () => {
     // The regression the `finally` introduced, found by re-review.
     //
     // `updateFn(exec)` runs inside the `finally` while the step's exception is still
@@ -188,9 +193,13 @@ describe('the mirror write never replaces the step failure', () => {
     const wf = new Workflow('mirror-write').doUntil(
       () => false,
       (w) =>
-        w.step('charge', async () => {
-          throw new Error('PROVIDER TIMEOUT AFTER THE CHARGE SETTLED');
-        }, { retry: 1 }),
+        w.step(
+          'charge',
+          async () => {
+            throw new Error('PROVIDER TIMEOUT AFTER THE CHARGE SETTLED');
+          },
+          { retry: 1 }
+        ),
       { maxIterations: 5 }
     );
     const node = wf.nodes.find((n) => n.type === 'doUntil') as {
@@ -222,9 +231,10 @@ describe('the mirror write never replaces the step failure', () => {
       threw = error;
     }
 
-    expect(String((threw as Error)?.message), 'the write error replaced the step failure').toContain(
-      'PROVIDER TIMEOUT'
-    );
+    expect(
+      String((threw as Error)?.message),
+      'the write error replaced the step failure'
+    ).toContain('PROVIDER TIMEOUT');
   }, 30_000);
 
   test('a write failure on a SUCCESSFUL iteration still surfaces', async () => {

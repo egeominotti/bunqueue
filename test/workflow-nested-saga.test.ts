@@ -39,20 +39,32 @@ describe('nested saga: the parent rolls the child back', () => {
     const world: string[] = [];
 
     const child = new Workflow('seed-tenant')
-      .step('create-schema', () => {
-        world.push('create-schema');
-        return { schema: 's1' };
-      }, { retry: 1, compensate: () => void world.push('drop-schema') })
-      .step('load-fixtures', () => {
-        world.push('load-fixtures');
-        return { rows: 10 };
-      }, { retry: 1, compensate: () => void world.push('purge-fixtures') });
+      .step(
+        'create-schema',
+        () => {
+          world.push('create-schema');
+          return { schema: 's1' };
+        },
+        { retry: 1, compensate: () => void world.push('drop-schema') }
+      )
+      .step(
+        'load-fixtures',
+        () => {
+          world.push('load-fixtures');
+          return { rows: 10 };
+        },
+        { retry: 1, compensate: () => void world.push('purge-fixtures') }
+      );
 
     const parent = new Workflow('provision')
-      .step('reserve', () => {
-        world.push('reserve');
-        return { slug: 'acme' };
-      }, { retry: 1, compensate: () => void world.push('release') })
+      .step(
+        'reserve',
+        () => {
+          world.push('reserve');
+          return { slug: 'acme' };
+        },
+        { retry: 1, compensate: () => void world.push('release') }
+      )
       .subWorkflow('seed-tenant', () => ({}))
       .step('verify', boom('verification rejected the tenant'), { retry: 1 });
 
@@ -89,26 +101,38 @@ describe('nested saga: the parent rolls the child back', () => {
     const world: string[] = [];
 
     const child = new Workflow('seed-stuck')
-      .step('create-schema', () => {
-        world.push('create-schema');
-        return { ok: 1 };
-      }, { retry: 1, compensate: () => void world.push('drop-schema') })
-      .step('load-fixtures', () => {
-        world.push('load-fixtures');
-        return { ok: 1 };
-      }, {
-        retry: 1,
-        compensate: () => {
-          world.push('purge-ATTEMPT');
-          throw new Error('fixture store unreachable');
+      .step(
+        'create-schema',
+        () => {
+          world.push('create-schema');
+          return { ok: 1 };
         },
-      });
+        { retry: 1, compensate: () => void world.push('drop-schema') }
+      )
+      .step(
+        'load-fixtures',
+        () => {
+          world.push('load-fixtures');
+          return { ok: 1 };
+        },
+        {
+          retry: 1,
+          compensate: () => {
+            world.push('purge-ATTEMPT');
+            throw new Error('fixture store unreachable');
+          },
+        }
+      );
 
     const parent = new Workflow('provision-stuck')
-      .step('reserve', () => {
-        world.push('reserve');
-        return { ok: 1 };
-      }, { retry: 1, compensate: () => void world.push('release-MUST-NOT-RUN') })
+      .step(
+        'reserve',
+        () => {
+          world.push('reserve');
+          return { ok: 1 };
+        },
+        { retry: 1, compensate: () => void world.push('release-MUST-NOT-RUN') }
+      )
       .subWorkflow('seed-stuck', () => ({}))
       .step('verify', boom('rejected'), { retry: 1 });
 
@@ -134,17 +158,25 @@ describe('nested saga: the parent rolls the child back', () => {
     const world: string[] = [];
 
     const child = new Workflow('seed-fails')
-      .step('create-schema', () => {
-        world.push('create-schema');
-        return { ok: 1 };
-      }, { retry: 1, compensate: () => void world.push('drop-schema') })
+      .step(
+        'create-schema',
+        () => {
+          world.push('create-schema');
+          return { ok: 1 };
+        },
+        { retry: 1, compensate: () => void world.push('drop-schema') }
+      )
       .step('bad', boom('child step failed'), { retry: 1 });
 
     const parent = new Workflow('provision-childfail')
-      .step('reserve', () => {
-        world.push('reserve');
-        return { ok: 1 };
-      }, { retry: 1, compensate: () => void world.push('release') })
+      .step(
+        'reserve',
+        () => {
+          world.push('reserve');
+          return { ok: 1 };
+        },
+        { retry: 1, compensate: () => void world.push('release') }
+      )
       .subWorkflow('seed-fails', () => ({}));
 
     engine = new Engine({ embedded: true });

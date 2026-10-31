@@ -28,10 +28,14 @@ describe('Queue', () => {
     });
 
     it('should respect job options', async () => {
-      const job = await queue.add('task', { value: 1 }, {
-        priority: 10,
-        delay: 1000,
-      });
+      const job = await queue.add(
+        'task',
+        { value: 1 },
+        {
+          priority: 10,
+          delay: 1000,
+        }
+      );
 
       expect(job.id).toBeDefined();
     });
@@ -143,12 +147,16 @@ describe('Worker', () => {
       let concurrent = 0;
       let maxConcurrent = 0;
 
-      const worker = new Worker('concurrency-test', async () => {
-        concurrent++;
-        maxConcurrent = Math.max(maxConcurrent, concurrent);
-        await Bun.sleep(50);
-        concurrent--;
-      }, { concurrency: 3 });
+      const worker = new Worker(
+        'concurrency-test',
+        async () => {
+          concurrent++;
+          maxConcurrent = Math.max(maxConcurrent, concurrent);
+          await Bun.sleep(50);
+          concurrent--;
+        },
+        { concurrency: 3 }
+      );
 
       for (let i = 0; i < 9; i++) {
         await queue.add('task', { id: i });
@@ -394,13 +402,17 @@ describe('Integration', () => {
     const processed: string[] = [];
     const progressUpdates: number[] = [];
 
-    const worker = new Worker('integration', async (job) => {
-      await job.log('Starting');
-      await job.updateProgress(50);
-      processed.push(job.data.email);
-      await job.updateProgress(100);
-      return { sent: true };
-    }, { concurrency: 2 });
+    const worker = new Worker(
+      'integration',
+      async (job) => {
+        await job.log('Starting');
+        await job.updateProgress(50);
+        processed.push(job.data.email);
+        await job.updateProgress(100);
+        return { sent: true };
+      },
+      { concurrency: 2 }
+    );
 
     worker.on('progress', (_job, progress) => {
       progressUpdates.push(progress);
@@ -434,9 +446,13 @@ describe('Integration', () => {
     const JOBS = 1000;
     let completed = 0;
 
-    const worker = new Worker('throughput', async () => {
-      return { ok: true };
-    }, { concurrency: 50 });
+    const worker = new Worker(
+      'throughput',
+      async () => {
+        return { ok: true };
+      },
+      { concurrency: 50 }
+    );
 
     worker.on('completed', () => completed++);
 

@@ -581,9 +581,7 @@ describe('HTTP Endpoints', () => {
       expect(res.headers.get('Access-Control-Allow-Methods')).toBe(
         'GET, POST, PUT, DELETE, OPTIONS'
       );
-      expect(res.headers.get('Access-Control-Allow-Headers')).toBe(
-        'Content-Type, Authorization'
-      );
+      expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type, Authorization');
       expect(res.headers.get('Access-Control-Max-Age')).toBe('86400');
     });
 
@@ -800,19 +798,13 @@ describe('Handler Routes', () => {
     });
 
     test('should route PULL command', async () => {
-      const result = await routeCoreCommand(
-        { cmd: 'PULL', queue: 'test' },
-        ctx
-      );
+      const result = await routeCoreCommand({ cmd: 'PULL', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route PULLB command', async () => {
-      const result = await routeCoreCommand(
-        { cmd: 'PULLB', queue: 'test', count: 5 },
-        ctx
-      );
+      const result = await routeCoreCommand({ cmd: 'PULLB', queue: 'test', count: 5 }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -823,10 +815,7 @@ describe('Handler Routes', () => {
       const pullRes = await handleCommand({ cmd: 'PULL', queue: 'test' }, ctx);
       const jobId = (pullRes as any).job.id;
 
-      const result = await routeCoreCommand(
-        { cmd: 'ACK', id: jobId },
-        ctx
-      );
+      const result = await routeCoreCommand({ cmd: 'ACK', id: jobId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -836,10 +825,7 @@ describe('Handler Routes', () => {
       const pullRes = await handleCommand({ cmd: 'PULL', queue: 'test' }, ctx);
       const jobId = (pullRes as any).job.id;
 
-      const result = await routeCoreCommand(
-        { cmd: 'ACKB', ids: [jobId] },
-        ctx
-      );
+      const result = await routeCoreCommand({ cmd: 'ACKB', ids: [jobId] }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -849,19 +835,13 @@ describe('Handler Routes', () => {
       const pullRes = await handleCommand({ cmd: 'PULL', queue: 'test' }, ctx);
       const jobId = (pullRes as any).job.id;
 
-      const result = await routeCoreCommand(
-        { cmd: 'FAIL', id: jobId, error: 'test error' },
-        ctx
-      );
+      const result = await routeCoreCommand({ cmd: 'FAIL', id: jobId, error: 'test error' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should return null for unknown command', async () => {
-      const result = await routeCoreCommand(
-        { cmd: 'Stats' } as any,
-        ctx
-      );
+      const result = await routeCoreCommand({ cmd: 'Stats' } as any, ctx);
       expect(result).toBeNull();
     });
 
@@ -879,66 +859,42 @@ describe('Handler Routes', () => {
 
   describe('routeQueryCommand', () => {
     test('should route GetJob command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
-      const result = await routeQueryCommand(
-        { cmd: 'GetJob', id: jobId },
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'GetJob', id: jobId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route GetState command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
-      const result = await routeQueryCommand(
-        { cmd: 'GetState', id: jobId },
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'GetState', id: jobId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
       expect((result as any).state).toBe('waiting');
     });
 
     test('should route GetResult command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
-      const result = await routeQueryCommand(
-        { cmd: 'GetResult', id: jobId },
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'GetResult', id: jobId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route GetJobCounts command', async () => {
-      const result = await routeQueryCommand(
-        { cmd: 'GetJobCounts', queue: 'test' },
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'GetJobCounts', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
       expect((result as any).counts).toBeDefined();
     });
 
     test('should route GetCountsPerPriority command', async () => {
-      const result = await routeQueryCommand(
-        { cmd: 'GetCountsPerPriority', queue: 'test' },
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'GetCountsPerPriority', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -954,38 +910,26 @@ describe('Handler Routes', () => {
     });
 
     test('should route GetJobs command', async () => {
-      const result = await routeQueryCommand(
-        { cmd: 'GetJobs', queue: 'test' },
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'GetJobs', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route Count command', async () => {
-      const result = await routeQueryCommand(
-        { cmd: 'Count', queue: 'test' },
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'Count', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
       expect((result as any).count).toBe(0);
     });
 
     test('should route GetProgress command', async () => {
-      const result = await routeQueryCommand(
-        { cmd: 'GetProgress', id: 'non-existent' },
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'GetProgress', id: 'non-existent' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(false);
     });
 
     test('should return null for unknown command', async () => {
-      const result = await routeQueryCommand(
-        { cmd: 'PUSH' } as any,
-        ctx
-      );
+      const result = await routeQueryCommand({ cmd: 'PUSH' } as any, ctx);
       expect(result).toBeNull();
     });
   });
@@ -994,16 +938,10 @@ describe('Handler Routes', () => {
 
   describe('routeManagementCommand', () => {
     test('should route Cancel command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
-      const result = await routeManagementCommand(
-        { cmd: 'Cancel', id: jobId },
-        ctx
-      );
+      const result = await routeManagementCommand({ cmd: 'Cancel', id: jobId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -1022,10 +960,7 @@ describe('Handler Routes', () => {
     });
 
     test('should route Update command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
       const result = await routeManagementCommand(
@@ -1037,10 +972,7 @@ describe('Handler Routes', () => {
     });
 
     test('should route ChangePriority command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
       const result = await routeManagementCommand(
@@ -1058,19 +990,13 @@ describe('Handler Routes', () => {
       );
       const jobId = (pushRes as any).id;
 
-      const result = await routeManagementCommand(
-        { cmd: 'Promote', id: jobId },
-        ctx
-      );
+      const result = await routeManagementCommand({ cmd: 'Promote', id: jobId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route MoveToDelayed command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
       const result = await routeManagementCommand(
@@ -1081,16 +1007,10 @@ describe('Handler Routes', () => {
     });
 
     test('should route Discard command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
-      const result = await routeManagementCommand(
-        { cmd: 'Discard', id: jobId },
-        ctx
-      );
+      const result = await routeManagementCommand({ cmd: 'Discard', id: jobId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -1104,10 +1024,7 @@ describe('Handler Routes', () => {
     });
 
     test('should return null for unknown command', async () => {
-      const result = await routeManagementCommand(
-        { cmd: 'PUSH' } as any,
-        ctx
-      );
+      const result = await routeManagementCommand({ cmd: 'PUSH' } as any, ctx);
       expect(result).toBeNull();
     });
   });
@@ -1116,73 +1033,49 @@ describe('Handler Routes', () => {
 
   describe('routeQueueControlCommand', () => {
     test('should route Pause command', () => {
-      const result = routeQueueControlCommand(
-        { cmd: 'Pause', queue: 'test' },
-        ctx
-      );
+      const result = routeQueueControlCommand({ cmd: 'Pause', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route Resume command', () => {
-      const result = routeQueueControlCommand(
-        { cmd: 'Resume', queue: 'test' },
-        ctx
-      );
+      const result = routeQueueControlCommand({ cmd: 'Resume', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route IsPaused command', () => {
-      const result = routeQueueControlCommand(
-        { cmd: 'IsPaused', queue: 'test' },
-        ctx
-      );
+      const result = routeQueueControlCommand({ cmd: 'IsPaused', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route Drain command', () => {
-      const result = routeQueueControlCommand(
-        { cmd: 'Drain', queue: 'test' },
-        ctx
-      );
+      const result = routeQueueControlCommand({ cmd: 'Drain', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route Obliterate command', () => {
-      const result = routeQueueControlCommand(
-        { cmd: 'Obliterate', queue: 'test' },
-        ctx
-      );
+      const result = routeQueueControlCommand({ cmd: 'Obliterate', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route ListQueues command', () => {
-      const result = routeQueueControlCommand(
-        { cmd: 'ListQueues' },
-        ctx
-      );
+      const result = routeQueueControlCommand({ cmd: 'ListQueues' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route Clean command', () => {
-      const result = routeQueueControlCommand(
-        { cmd: 'Clean', queue: 'test', grace: 60000 },
-        ctx
-      );
+      const result = routeQueueControlCommand({ cmd: 'Clean', queue: 'test', grace: 60000 }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should return null for unknown command', () => {
-      const result = routeQueueControlCommand(
-        { cmd: 'PUSH' } as any,
-        ctx
-      );
+      const result = routeQueueControlCommand({ cmd: 'PUSH' } as any, ctx);
       expect(result).toBeNull();
     });
 
@@ -1200,55 +1093,37 @@ describe('Handler Routes', () => {
 
   describe('routeDlqCommand', () => {
     test('should route Dlq command', () => {
-      const result = routeDlqCommand(
-        { cmd: 'Dlq', queue: 'test' },
-        ctx
-      );
+      const result = routeDlqCommand({ cmd: 'Dlq', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route RetryDlq command', () => {
-      const result = routeDlqCommand(
-        { cmd: 'RetryDlq', queue: 'test' },
-        ctx
-      );
+      const result = routeDlqCommand({ cmd: 'RetryDlq', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route PurgeDlq command', () => {
-      const result = routeDlqCommand(
-        { cmd: 'PurgeDlq', queue: 'test' },
-        ctx
-      );
+      const result = routeDlqCommand({ cmd: 'PurgeDlq', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route RemoveDlqJob command', () => {
-      const result = routeDlqCommand(
-        { cmd: 'RemoveDlqJob', queue: 'test', jobId: 'missing' },
-        ctx
-      );
+      const result = routeDlqCommand({ cmd: 'RemoveDlqJob', queue: 'test', jobId: 'missing' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
       expect((result as any).data.removed).toBe(false);
     });
 
     test('should route RetryCompleted command', () => {
-      const result = routeDlqCommand(
-        { cmd: 'RetryCompleted', queue: 'test' },
-        ctx
-      );
+      const result = routeDlqCommand({ cmd: 'RetryCompleted', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
     });
 
     test('should return null for unknown command', () => {
-      const result = routeDlqCommand(
-        { cmd: 'PUSH' } as any,
-        ctx
-      );
+      const result = routeDlqCommand({ cmd: 'PUSH' } as any, ctx);
       expect(result).toBeNull();
     });
   });
@@ -1257,19 +1132,13 @@ describe('Handler Routes', () => {
 
   describe('routeRateLimitCommand', () => {
     test('should route RateLimit command', () => {
-      const result = routeRateLimitCommand(
-        { cmd: 'RateLimit', queue: 'test', limit: 100 },
-        ctx
-      );
+      const result = routeRateLimitCommand({ cmd: 'RateLimit', queue: 'test', limit: 100 }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route RateLimitClear command', () => {
-      const result = routeRateLimitCommand(
-        { cmd: 'RateLimitClear', queue: 'test' },
-        ctx
-      );
+      const result = routeRateLimitCommand({ cmd: 'RateLimitClear', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -1284,19 +1153,13 @@ describe('Handler Routes', () => {
     });
 
     test('should route ClearConcurrency command', () => {
-      const result = routeRateLimitCommand(
-        { cmd: 'ClearConcurrency', queue: 'test' },
-        ctx
-      );
+      const result = routeRateLimitCommand({ cmd: 'ClearConcurrency', queue: 'test' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should return null for unknown command', () => {
-      const result = routeRateLimitCommand(
-        { cmd: 'PUSH' } as any,
-        ctx
-      );
+      const result = routeRateLimitCommand({ cmd: 'PUSH' } as any, ctx);
       expect(result).toBeNull();
     });
   });
@@ -1319,28 +1182,19 @@ describe('Handler Routes', () => {
         { cmd: 'Cron', name: 'delete-me', queue: 'test', data: {}, repeatEvery: 60000 },
         ctx
       );
-      const result = routeCronCommand(
-        { cmd: 'CronDelete', name: 'delete-me' },
-        ctx
-      );
+      const result = routeCronCommand({ cmd: 'CronDelete', name: 'delete-me' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route CronList command', () => {
-      const result = routeCronCommand(
-        { cmd: 'CronList' },
-        ctx
-      );
+      const result = routeCronCommand({ cmd: 'CronList' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should return null for unknown command', () => {
-      const result = routeCronCommand(
-        { cmd: 'PUSH' } as any,
-        ctx
-      );
+      const result = routeCronCommand({ cmd: 'PUSH' } as any, ctx);
       expect(result).toBeNull();
     });
   });
@@ -1349,48 +1203,33 @@ describe('Handler Routes', () => {
 
   describe('routeMonitoringCommand', () => {
     test('should route Stats command', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'Stats' },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'Stats' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
       expect((result as any).stats).toBeDefined();
     });
 
     test('should route Metrics command', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'Metrics' },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'Metrics' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
       expect((result as any).metrics).toBeDefined();
     });
 
     test('should route Prometheus command', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'Prometheus' },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'Prometheus' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route Ping command', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'Ping' },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'Ping' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route Hello command', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'Hello', protocolVersion: 1 },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'Hello', protocolVersion: 1 }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -1412,19 +1251,13 @@ describe('Handler Routes', () => {
       );
       const workerId = (regResult as any).data.workerId;
 
-      const result = routeMonitoringCommand(
-        { cmd: 'UnregisterWorker', workerId },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'UnregisterWorker', workerId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route ListWorkers command', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'ListWorkers' },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'ListWorkers' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
@@ -1437,67 +1270,42 @@ describe('Handler Routes', () => {
       );
       const workerId = (regResult as any).data.workerId;
 
-      const result = routeMonitoringCommand(
-        { cmd: 'Heartbeat', id: workerId },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'Heartbeat', id: workerId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route AddLog command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
-      const result = routeMonitoringCommand(
-        { cmd: 'AddLog', id: jobId, message: 'test log' },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'AddLog', id: jobId, message: 'test log' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route GetLogs command', async () => {
-      const pushRes = await handleCommand(
-        { cmd: 'PUSH', queue: 'test', data: {} },
-        ctx
-      );
+      const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'test', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
-      const result = routeMonitoringCommand(
-        { cmd: 'GetLogs', id: jobId },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'GetLogs', id: jobId }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should route ListWebhooks command', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'ListWebhooks' },
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'ListWebhooks' }, ctx);
       expect(result).not.toBeNull();
       expect(result!.ok).toBe(true);
     });
 
     test('should return null for unknown command', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'PUSH' } as any,
-        ctx
-      );
+      const result = routeMonitoringCommand({ cmd: 'PUSH' } as any, ctx);
       expect(result).toBeNull();
     });
 
     test('should propagate reqId', () => {
-      const result = routeMonitoringCommand(
-        { cmd: 'Ping', reqId: 'req-ping' },
-        ctx,
-        'req-ping'
-      );
+      const result = routeMonitoringCommand({ cmd: 'Ping', reqId: 'req-ping' }, ctx, 'req-ping');
       expect(result!.reqId).toBe('req-ping');
     });
   });
@@ -1506,20 +1314,14 @@ describe('Handler Routes', () => {
 
   describe('handleCommand - unknown command handling', () => {
     test('should return error for completely unknown command', async () => {
-      const result = await handleCommand(
-        { cmd: 'CompletelyUnknownCmd' } as any,
-        ctx
-      );
+      const result = await handleCommand({ cmd: 'CompletelyUnknownCmd' } as any, ctx);
       expect(result.ok).toBe(false);
       expect((result as any).error).toContain('Unknown command');
       expect((result as any).error).toContain('CompletelyUnknownCmd');
     });
 
     test('should include command name in error message', async () => {
-      const result = await handleCommand(
-        { cmd: 'DoSomethingWeird' } as any,
-        ctx
-      );
+      const result = await handleCommand({ cmd: 'DoSomethingWeird' } as any, ctx);
       expect(result.ok).toBe(false);
       expect((result as any).error).toContain('DoSomethingWeird');
     });
@@ -1542,10 +1344,7 @@ describe('Handler Routes', () => {
     test('all queue control commands should be routable', () => {
       const queueCommands = ['Pause', 'Resume', 'IsPaused', 'Drain', 'Obliterate', 'ListQueues'];
       for (const cmd of queueCommands) {
-        const result = routeQueueControlCommand(
-          { cmd, queue: 'test', grace: 60000 } as any,
-          ctx
-        );
+        const result = routeQueueControlCommand({ cmd, queue: 'test', grace: 60000 } as any, ctx);
         expect(result).not.toBeNull();
       }
     });
@@ -1553,10 +1352,7 @@ describe('Handler Routes', () => {
     test('all DLQ commands should be routable', () => {
       const dlqCommands = ['Dlq', 'RetryDlq', 'PurgeDlq', 'RemoveDlqJob', 'RetryCompleted'];
       for (const cmd of dlqCommands) {
-        const result = routeDlqCommand(
-          { cmd, queue: 'test', jobId: 'missing' } as any,
-          ctx
-        );
+        const result = routeDlqCommand({ cmd, queue: 'test', jobId: 'missing' } as any, ctx);
         expect(result).not.toBeNull();
       }
     });
@@ -1564,10 +1360,7 @@ describe('Handler Routes', () => {
     test('all rate limit commands should be routable', () => {
       const rlCommands = ['RateLimit', 'RateLimitClear', 'SetConcurrency', 'ClearConcurrency'];
       for (const cmd of rlCommands) {
-        const result = routeRateLimitCommand(
-          { cmd, queue: 'test', limit: 100 } as any,
-          ctx
-        );
+        const result = routeRateLimitCommand({ cmd, queue: 'test', limit: 100 } as any, ctx);
         expect(result).not.toBeNull();
       }
     });
@@ -1584,12 +1377,16 @@ describe('Handler Routes', () => {
     });
 
     test('all monitoring commands should be routable', () => {
-      const monitorCommands = ['Stats', 'Metrics', 'Prometheus', 'Ping', 'ListWorkers', 'ListWebhooks'];
+      const monitorCommands = [
+        'Stats',
+        'Metrics',
+        'Prometheus',
+        'Ping',
+        'ListWorkers',
+        'ListWebhooks',
+      ];
       for (const cmd of monitorCommands) {
-        const result = routeMonitoringCommand(
-          { cmd, protocolVersion: 1 } as any,
-          ctx
-        );
+        const result = routeMonitoringCommand({ cmd, protocolVersion: 1 } as any, ctx);
         expect(result).not.toBeNull();
       }
     });

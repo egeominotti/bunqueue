@@ -104,7 +104,7 @@ async function main() {
 
     const unicodeData = {
       emoji: '\uD83C\uDF89', // party popper
-      cjk: '\u4F60\u597D',   // nihao
+      cjk: '\u4F60\u597D', // nihao
       arabic: '\u0645\u0631\u062D\u0628\u0627', // marhaba
       mixed: '\uD83C\uDF89 \u4F60\u597D \u0645\u0631\u062D\u0628\u0627',
       accents: '\u00E9\u00E0\u00FC\u00F1\u00F6',
@@ -274,7 +274,10 @@ async function main() {
         fail(`Strings array length: ${receivedData.strings.length}, expected 1000`);
         valid = false;
       }
-      if (valid && (receivedData.strings[0] !== 'item-0' || receivedData.strings[999] !== 'item-999')) {
+      if (
+        valid &&
+        (receivedData.strings[0] !== 'item-0' || receivedData.strings[999] !== 'item-999')
+      ) {
         fail('Strings array boundary values incorrect');
         valid = false;
       }
@@ -286,9 +289,14 @@ async function main() {
         const obj0 = receivedData.objects[0];
         const obj500 = receivedData.objects[500];
         const obj999 = receivedData.objects[999];
-        if (obj0.id === 0 && obj0.active === true &&
-            obj500.id === 500 && obj500.active === true &&
-            obj999.id === 999 && obj999.active === false) {
+        if (
+          obj0.id === 0 &&
+          obj0.active === true &&
+          obj500.id === 500 &&
+          obj500.active === true &&
+          obj999.id === 999 &&
+          obj999.active === false
+        ) {
           ok('All 3 arrays (numbers, strings, objects) x 1000 elements survived roundtrip');
         } else {
           fail('Object array values incorrect');
@@ -401,9 +409,14 @@ async function main() {
       let allCorrect = true;
       for (const pair of receivedPairs) {
         const expectedIndex = parseInt(pair.name.replace('job-', ''), 10);
-        if (pair.data.index !== expectedIndex || pair.data.payload !== `data-for-job-${expectedIndex}`) {
+        if (
+          pair.data.index !== expectedIndex ||
+          pair.data.payload !== `data-for-job-${expectedIndex}`
+        ) {
           allCorrect = false;
-          fail(`Job "${pair.name}" data mismatch: index=${pair.data.index}, payload=${pair.data.payload}`);
+          fail(
+            `Job "${pair.name}" data mismatch: index=${pair.data.index}, payload=${pair.data.payload}`
+          );
           break;
         }
       }
@@ -473,7 +486,9 @@ async function main() {
         }
       }
       if (allFound) {
-        ok('All 7 special job names (spaces, dots, slashes, colons, dashes, underscores, mixed) roundtripped');
+        ok(
+          'All 7 special job names (spaces, dots, slashes, colons, dashes, underscores, mixed) roundtripped'
+        );
       }
     }
   }

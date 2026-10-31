@@ -12,20 +12,35 @@ let passed = 0;
 let failed = 0;
 
 function ok(condition: boolean, msg: string): void {
-  if (condition) { console.log(`   ✅ ${msg}`); passed++; }
-  else { console.log(`   ❌ ${msg}`); failed++; }
+  if (condition) {
+    console.log(`   ✅ ${msg}`);
+    passed++;
+  } else {
+    console.log(`   ❌ ${msg}`);
+    failed++;
+  }
 }
 
 async function connectWs(url = WS_URL): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     const t = setTimeout(() => reject(new Error('WS connect timeout')), 5000);
-    ws.addEventListener('open', () => { clearTimeout(t); resolve(ws); });
-    ws.addEventListener('error', (e) => { clearTimeout(t); reject(e); });
+    ws.addEventListener('open', () => {
+      clearTimeout(t);
+      resolve(ws);
+    });
+    ws.addEventListener('error', (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
   });
 }
 
-async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Promise<Record<string, unknown>> {
+async function waitEvent(
+  ws: WebSocket,
+  eventName: string,
+  timeoutMs = 5000
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       ws.removeEventListener('message', handler);
@@ -39,7 +54,9 @@ async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Pr
           ws.removeEventListener('message', handler);
           resolve(parsed);
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     }
     ws.addEventListener('message', handler);
   });
@@ -48,7 +65,7 @@ async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Pr
 async function waitForMessage(
   ws: WebSocket,
   predicate: (data: Record<string, unknown>) => boolean,
-  timeoutMs: number,
+  timeoutMs: number
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -63,7 +80,9 @@ async function waitForMessage(
           ws.removeEventListener('message', handler);
           resolve(parsed);
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     }
     ws.addEventListener('message', handler);
   });
@@ -96,7 +115,9 @@ async function main() {
     const resp = await waitForMessage(ws, (p) => p.ok === false, 3000);
     ok(resp.ok === false, `Rejected: ${resp.error}`);
     ws.close();
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   console.log('\n2. Empty events array');
   try {
@@ -105,7 +126,9 @@ async function main() {
     const resp = await waitForMessage(ws, (p) => p.ok !== undefined, 3000);
     ok(resp.ok === true || resp.ok === false, `Response received: ok=${resp.ok}`);
     ws.close();
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   console.log('\n3. Mixed valid and invalid patterns');
   try {
@@ -115,7 +138,9 @@ async function main() {
     // Should reject the whole subscribe or only invalid ones
     ok(resp.ok !== undefined, `Response: ok=${resp.ok}`);
     ws.close();
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // ── 2. Legacy Mode ──
   console.log('\n── Legacy Mode (no Subscribe) ──');
@@ -130,7 +155,11 @@ async function main() {
     // Collect messages
     const messages: Record<string, unknown>[] = [];
     const h = (ev: MessageEvent) => {
-      try { messages.push(JSON.parse(String(ev.data))); } catch { /* */ }
+      try {
+        messages.push(JSON.parse(String(ev.data)));
+      } catch {
+        /* */
+      }
     };
     ws.addEventListener('message', h);
 
@@ -139,11 +168,13 @@ async function main() {
     ws.removeEventListener('message', h);
 
     // Legacy mode should receive raw JobEvent with eventType field
-    const legacyEvent = messages.find(m => m.eventType !== undefined);
+    const legacyEvent = messages.find((m) => m.eventType !== undefined);
     if (legacyEvent) {
       ok(true, 'Received legacy format with eventType field');
-      ok(typeof legacyEvent.eventType === 'string' || typeof legacyEvent.eventType === 'number',
-        `eventType=${legacyEvent.eventType}`);
+      ok(
+        typeof legacyEvent.eventType === 'string' || typeof legacyEvent.eventType === 'number',
+        `eventType=${legacyEvent.eventType}`
+      );
       ok(typeof legacyEvent.queue === 'string', `queue=${legacyEvent.queue}`);
       ok(typeof legacyEvent.timestamp === 'number', `timestamp=${legacyEvent.timestamp}`);
     } else {
@@ -152,7 +183,9 @@ async function main() {
     }
 
     ws.close();
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // ── 3. Multi-Client Broadcast ──
   console.log('\n── Multi-Client Broadcast ──');
@@ -177,12 +210,14 @@ async function main() {
     ok(ev2.event === 'job:pushed', 'Client 2 received job:pushed');
     ok(
       (ev1.data as Record<string, unknown>).jobId === (ev2.data as Record<string, unknown>).jobId,
-      'Both clients got same jobId',
+      'Both clients got same jobId'
     );
 
     ws1.close();
     ws2.close();
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   console.log('\n6. Five clients with different subscriptions');
   try {
@@ -203,19 +238,27 @@ async function main() {
     await Bun.sleep(200);
 
     // Push a job — clients 0,1,4 should get job:pushed; 2,3 should get queue:counts; 4 gets both
-    const jobPromises = [0, 1, 4].map(i => waitEvent(clients[i], 'job:pushed'));
-    const queuePromises = [2, 3, 4].map(i => waitEvent(clients[i], 'queue:counts'));
+    const jobPromises = [0, 1, 4].map((i) => waitEvent(clients[i], 'job:pushed'));
+    const queuePromises = [2, 3, 4].map((i) => waitEvent(clients[i], 'queue:counts'));
 
     await api('POST', `/queues/${Q}/jobs`, { data: { multi: true } });
 
     const jobResults = await Promise.all(jobPromises);
-    ok(jobResults.every(r => r.event === 'job:pushed'), 'Clients 0,1,4 got job:pushed');
+    ok(
+      jobResults.every((r) => r.event === 'job:pushed'),
+      'Clients 0,1,4 got job:pushed'
+    );
 
     const queueResults = await Promise.all(queuePromises);
-    ok(queueResults.every(r => r.event === 'queue:counts'), 'Clients 2,3,4 got queue:counts');
+    ok(
+      queueResults.every((r) => r.event === 'queue:counts'),
+      'Clients 2,3,4 got queue:counts'
+    );
 
-    clients.forEach(c => c.close());
-  } catch (e) { ok(false, `${e}`); }
+    clients.forEach((c) => c.close());
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   console.log('\n7. Queue-filtered client ignores other queues');
   try {
@@ -230,7 +273,9 @@ async function main() {
       try {
         const p = JSON.parse(String(ev.data));
         if (p.event) received.push(`${p.event}:${(p.data as Record<string, unknown>)?.queue}`);
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     };
     wsFiltered.addEventListener('message', h);
 
@@ -240,15 +285,17 @@ async function main() {
     await Bun.sleep(500);
     wsFiltered.removeEventListener('message', h);
 
-    const fromTarget = received.filter(r => r.includes(Q));
-    const fromNoise = received.filter(r => r.includes('noise-queue'));
+    const fromTarget = received.filter((r) => r.includes(Q));
+    const fromNoise = received.filter((r) => r.includes('noise-queue'));
 
     ok(fromTarget.length > 0, `Received ${fromTarget.length} events from target queue`);
     ok(fromNoise.length === 0, `Received ${fromNoise.length} events from noise queue`);
 
     wsFiltered.close();
     await api('POST', '/queues/noise-queue/obliterate');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   await cleanup();
   printSummary();
@@ -260,4 +307,7 @@ function printSummary() {
   if (failed > 0) process.exit(1);
 }
 
-main().catch((err) => { console.error('Fatal:', err); process.exit(1); });
+main().catch((err) => {
+  console.error('Fatal:', err);
+  process.exit(1);
+});

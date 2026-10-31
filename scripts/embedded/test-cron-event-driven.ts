@@ -33,9 +33,13 @@ async function main() {
       { concurrency: 1, embedded: true }
     );
 
-    await queue.add('precise-cron', { test: 'precision' }, {
-      repeat: { every: 300, limit: 3 },
-    });
+    await queue.add(
+      'precise-cron',
+      { test: 'precision' },
+      {
+        repeat: { every: 300, limit: 3 },
+      }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -79,9 +83,13 @@ async function main() {
 
     // Wait 200ms then add a cron with 150ms interval
     await Bun.sleep(200);
-    await queue.add('dynamic-cron', { test: 'dynamic' }, {
-      repeat: { every: 150, limit: 3 },
-    });
+    await queue.add(
+      'dynamic-cron',
+      { test: 'dynamic' },
+      {
+        repeat: { every: 150, limit: 3 },
+      }
+    );
 
     await Bun.sleep(800);
     await worker.close();
@@ -122,9 +130,13 @@ async function main() {
       { concurrency: 1, embedded: true }
     );
 
-    await queue.add('rapid-cron', { test: 'rapid' }, {
-      repeat: { every: 100, limit: 5 },
-    });
+    await queue.add(
+      'rapid-cron',
+      { test: 'rapid' },
+      {
+        repeat: { every: 100, limit: 5 },
+      }
+    );
 
     await Bun.sleep(1000);
     await worker.close();

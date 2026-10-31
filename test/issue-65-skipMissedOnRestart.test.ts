@@ -51,14 +51,16 @@ describe('Issue #65: skipMissedOnRestart in add() path', () => {
 
     // Simulate: load existing cron from DB with past nextRun
     // This simulates what happens after a server restart
-    scheduler.load([makeCronJob({
-      name: 'my-scheduler',
-      queue: 'test-queue',
-      nextRun: Date.now() - 3600_000, // 1 hour overdue
-      schedule: '0 * * * *',
-      skipMissedOnRestart: true,
-      executions: 42, // Had 42 executions before restart
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'my-scheduler',
+        queue: 'test-queue',
+        nextRun: Date.now() - 3600_000, // 1 hour overdue
+        schedule: '0 * * * *',
+        skipMissedOnRestart: true,
+        executions: 42, // Had 42 executions before restart
+      }),
+    ]);
 
     // Verify load() correctly adjusted nextRun
     const afterLoad = scheduler.list();
@@ -96,14 +98,16 @@ describe('Issue #65: skipMissedOnRestart in add() path', () => {
 
     const pastNextRun = Date.now() - 3600_000;
 
-    scheduler.load([makeCronJob({
-      name: 'persist-test',
-      queue: 'test-queue',
-      nextRun: pastNextRun,
-      schedule: '0 * * * *',
-      skipMissedOnRestart: true,
-      executions: 10,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'persist-test',
+        queue: 'test-queue',
+        nextRun: pastNextRun,
+        schedule: '0 * * * *',
+        skipMissedOnRestart: true,
+        executions: 10,
+      }),
+    ]);
 
     // BUG: load() adjusts nextRun in memory but never calls persistCron()
     // The DB still has the old (past) nextRun value
@@ -125,12 +129,14 @@ describe('Issue #65: skipMissedOnRestart in add() path', () => {
     scheduler.setPersistCallback(() => {});
 
     // First: load cron with 100 executions from DB
-    scheduler.load([makeCronJob({
-      name: 'counter-test',
-      queue: 'test-queue',
-      schedule: '*/5 * * * *',
-      executions: 100,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'counter-test',
+        queue: 'test-queue',
+        schedule: '*/5 * * * *',
+        executions: 100,
+      }),
+    ]);
 
     const beforeUpsert = scheduler.get('counter-test');
     expect(beforeUpsert?.executions).toBe(100);
@@ -234,14 +240,16 @@ describe('Issue #65: skipMissedOnRestart in add() path', () => {
     scheduler.setPersistCallback(() => {});
 
     // Simulate restart: load from DB with historical state
-    scheduler.load([makeCronJob({
-      name: 'upsert-cron',
-      queue: 'test-queue',
-      schedule: '*/10 * * * *',
-      executions: 55,
-      skipMissedOnRestart: true,
-      nextRun: Date.now() + 300_000, // 5 min from now (correctly in future)
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'upsert-cron',
+        queue: 'test-queue',
+        schedule: '*/10 * * * *',
+        executions: 55,
+        skipMissedOnRestart: true,
+        nextRun: Date.now() + 300_000, // 5 min from now (correctly in future)
+      }),
+    ]);
 
     const loaded = scheduler.get('upsert-cron');
     expect(loaded?.executions).toBe(55);
@@ -281,14 +289,16 @@ describe('Issue #65: skipMissedOnRestart in add() path', () => {
     });
 
     // Step 1: Server starts, loads cron from DB (was due 2 hours ago)
-    scheduler.load([makeCronJob({
-      name: 'restart-test',
-      queue: 'jobs',
-      nextRun: Date.now() - 7200_000,
-      schedule: '0 * * * *',
-      skipMissedOnRestart: true,
-      executions: 200,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'restart-test',
+        queue: 'jobs',
+        nextRun: Date.now() - 7200_000,
+        schedule: '0 * * * *',
+        skipMissedOnRestart: true,
+        executions: 200,
+      }),
+    ]);
 
     // Step 2: App initializes and calls upsertJobScheduler -> add()
     scheduler.add({

@@ -41,11 +41,10 @@ async function runTests() {
 
   // Test 1: Worker has rateLimit method
   await test('Worker has rateLimit method', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     if (typeof worker.rateLimit !== 'function') {
       throw new Error('rateLimit is not a function');
@@ -56,11 +55,10 @@ async function runTests() {
 
   // Test 2: rateLimit applies rate limiting
   await test('rateLimit applies rate limiting', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     worker.rateLimit(1000);
 
@@ -73,11 +71,10 @@ async function runTests() {
 
   // Test 3: isRateLimited returns false initially
   await test('isRateLimited returns false initially', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     if (worker.isRateLimited()) {
       throw new Error('Worker should not be rate limited initially');
@@ -88,11 +85,10 @@ async function runTests() {
 
   // Test 4: isRateLimited returns false after expiry
   await test('isRateLimited returns false after expiry', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     worker.rateLimit(50);
 
@@ -111,11 +107,10 @@ async function runTests() {
 
   // Test 5: Worker has startStalledCheckTimer method
   await test('Worker has startStalledCheckTimer method', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     if (typeof worker.startStalledCheckTimer !== 'function') {
       throw new Error('startStalledCheckTimer is not a function');
@@ -126,11 +121,10 @@ async function runTests() {
 
   // Test 6: startStalledCheckTimer does not throw
   await test('startStalledCheckTimer does not throw', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     await worker.startStalledCheckTimer();
 
@@ -139,11 +133,10 @@ async function runTests() {
 
   // Test 7: Worker has delay method
   await test('Worker has delay method', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     if (typeof worker.delay !== 'function') {
       throw new Error('delay is not a function');
@@ -154,11 +147,10 @@ async function runTests() {
 
   // Test 8: delay with 0 resolves immediately
   await test('delay with 0 resolves immediately', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     const start = Date.now();
     await worker.delay(0);
@@ -173,11 +165,10 @@ async function runTests() {
 
   // Test 9: delay waits for specified time
   await test('delay waits for specified time', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     const start = Date.now();
     await worker.delay(100);
@@ -192,11 +183,10 @@ async function runTests() {
 
   // Test 10: delay can be aborted
   await test('delay can be aborted', async () => {
-    const worker = new Worker(
-      QUEUE_NAME,
-      async () => ({ done: true }),
-      { embedded: true, autorun: false }
-    );
+    const worker = new Worker(QUEUE_NAME, async () => ({ done: true }), {
+      embedded: true,
+      autorun: false,
+    });
 
     const abortController = new AbortController();
     const delayPromise = worker.delay(1000, abortController);

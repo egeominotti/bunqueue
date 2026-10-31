@@ -244,7 +244,8 @@ describe('DOMAIN: loop iteration naming', () => {
       ),
       { numRuns: RUNS }
     );
-  });});
+  });
+});
 
 describe('ORACLE: the gate guard against an obvious naive implementation', () => {
   test('it throws exactly when a naive duplicate scan says it should', () => {
@@ -457,8 +458,7 @@ describe('DOMAIN: node-job admission, as a pure function', () => {
     ] as const;
     fc.assert(
       fc.property(fc.constantFrom(...states), (state) => {
-        const admitted =
-          decideAdmission(exec({ state }), 3, new Set()).kind === 'run';
+        const admitted = decideAdmission(exec({ state }), 3, new Set()).kind === 'run';
         expect(admitted).toBe(state === 'running' || state === 'waiting');
       }),
       { numRuns: 200 }

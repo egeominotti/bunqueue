@@ -34,7 +34,7 @@ function makeQueue(name: string): Queue {
 function makeWorker(
   name: string,
   processor: (job: any) => Promise<any>,
-  opts: Record<string, any> = {},
+  opts: Record<string, any> = {}
 ): Worker {
   const w = new Worker(name, processor, {
     connection: connOpts,
@@ -68,14 +68,18 @@ async function main() {
     let currentConcurrent = 0;
     let completed = 0;
 
-    const w = makeWorker('bp-tcp-conc-limit', async () => {
-      currentConcurrent++;
-      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-      await Bun.sleep(300);
-      currentConcurrent--;
-      completed++;
-      return {};
-    }, { concurrency: 10 });
+    const w = makeWorker(
+      'bp-tcp-conc-limit',
+      async () => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await Bun.sleep(300);
+        currentConcurrent--;
+        completed++;
+        return {};
+      },
+      { concurrency: 10 }
+    );
 
     for (let i = 0; i < 80; i++) {
       if (completed >= 10) break;
@@ -108,12 +112,16 @@ async function main() {
     let completed = 0;
     const completionTimestamps: number[] = [];
 
-    const w = makeWorker('bp-tcp-conc-remove', async () => {
-      await Bun.sleep(100);
-      completed++;
-      completionTimestamps.push(Date.now());
-      return {};
-    }, { concurrency: 5 });
+    const w = makeWorker(
+      'bp-tcp-conc-remove',
+      async () => {
+        await Bun.sleep(100);
+        completed++;
+        completionTimestamps.push(Date.now());
+        return {};
+      },
+      { concurrency: 5 }
+    );
 
     for (let i = 0; i < 5; i++) {
       await q.add('task', { idx: i });
@@ -125,9 +133,8 @@ async function main() {
       await Bun.sleep(100);
     }
 
-    const timeForFirst2 = completionTimestamps.length >= 2
-      ? completionTimestamps[1] - completionTimestamps[0]
-      : 0;
+    const timeForFirst2 =
+      completionTimestamps.length >= 2 ? completionTimestamps[1] - completionTimestamps[0] : 0;
 
     // Remove the limit
     q.removeGlobalConcurrency();
@@ -167,11 +174,15 @@ async function main() {
     let completed = 0;
     const completionTimestamps: number[] = [];
 
-    const w = makeWorker('bp-tcp-rate-limit', async () => {
-      completed++;
-      completionTimestamps.push(Date.now());
-      return {};
-    }, { concurrency: 10 });
+    const w = makeWorker(
+      'bp-tcp-rate-limit',
+      async () => {
+        completed++;
+        completionTimestamps.push(Date.now());
+        return {};
+      },
+      { concurrency: 10 }
+    );
 
     for (let i = 0; i < 80; i++) {
       if (completed >= 10) break;
@@ -180,7 +191,8 @@ async function main() {
     await w.close();
 
     if (completionTimestamps.length >= 5) {
-      const duration = completionTimestamps[completionTimestamps.length - 1] - completionTimestamps[0];
+      const duration =
+        completionTimestamps[completionTimestamps.length - 1] - completionTimestamps[0];
       if (duration > 0 && completed >= 5) {
         ok(`Rate limited: ${completed} jobs over ${duration}ms`);
       } else {
@@ -207,10 +219,14 @@ async function main() {
 
     let completed = 0;
 
-    const w = makeWorker('bp-tcp-rate-remove', async () => {
-      completed++;
-      return {};
-    }, { concurrency: 5 });
+    const w = makeWorker(
+      'bp-tcp-rate-remove',
+      async () => {
+        completed++;
+        return {};
+      },
+      { concurrency: 5 }
+    );
 
     for (let i = 0; i < 5; i++) {
       await q.add('task', { idx: i });
@@ -260,14 +276,18 @@ async function main() {
     let currentConcurrent = 0;
     let completed = 0;
 
-    const w = makeWorker('bp-tcp-conc-worker', async () => {
-      currentConcurrent++;
-      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-      await Bun.sleep(200);
-      currentConcurrent--;
-      completed++;
-      return {};
-    }, { concurrency: 5 });
+    const w = makeWorker(
+      'bp-tcp-conc-worker',
+      async () => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await Bun.sleep(200);
+        currentConcurrent--;
+        completed++;
+        return {};
+      },
+      { concurrency: 5 }
+    );
 
     for (let i = 0; i < 10; i++) {
       await q.add('task', { idx: i });
@@ -300,10 +320,14 @@ async function main() {
 
     let completed = 0;
 
-    const w = makeWorker('bp-tcp-burst', async () => {
-      completed++;
-      return {};
-    }, { concurrency: 10 });
+    const w = makeWorker(
+      'bp-tcp-burst',
+      async () => {
+        completed++;
+        return {};
+      },
+      { concurrency: 10 }
+    );
 
     // Burst: add 100 jobs at once via addBulk
     const jobs = Array.from({ length: 100 }, (_, i) => ({

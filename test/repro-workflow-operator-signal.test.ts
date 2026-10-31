@@ -42,9 +42,13 @@ describe('a parked unwind keeps the diagnostic it was parked with', () => {
             throw { code: 502, detail: 'refund endpoint unreachable' };
           },
         })
-        .step('boom', async () => {
-          throw new Error('downstream rejected');
-        }, { retry: 1 })
+        .step(
+          'boom',
+          async () => {
+            throw new Error('downstream rejected');
+          },
+          { retry: 1 }
+        )
     );
 
     const run = await engine.start('structured');
@@ -69,9 +73,13 @@ describe('a parked unwind keeps the diagnostic it was parked with', () => {
               throw thrown;
             },
           })
-          .step('boom', async () => {
-            throw new Error('x');
-          }, { retry: 1 })
+          .step(
+            'boom',
+            async () => {
+              throw new Error('x');
+            },
+            { retry: 1 }
+          )
       );
       const run = await engine.start(`thrown-${typeof thrown}`);
       expect(await waitForWorkflowState(engine, run.id, 'compensation-stuck')).toBeTruthy();
@@ -123,12 +131,20 @@ describe('a parallel group reports every failure, not the first', () => {
     engine.register(
       new Workflow('par-fail').parallel((w) =>
         w
-          .step('charge', async () => {
-            throw new Error('card declined');
-          }, { retry: 1 })
-          .step('reserve', async () => {
-            throw new Error('warehouse offline');
-          }, { retry: 1 })
+          .step(
+            'charge',
+            async () => {
+              throw new Error('card declined');
+            },
+            { retry: 1 }
+          )
+          .step(
+            'reserve',
+            async () => {
+              throw new Error('warehouse offline');
+            },
+            { retry: 1 }
+          )
           .step('notify', async () => ({ ok: true }), { retry: 1 })
       )
     );
@@ -146,9 +162,13 @@ describe('a parallel group reports every failure, not the first', () => {
     engine.register(
       new Workflow('par-one').parallel((w) =>
         w
-          .step('a', async () => {
-            throw new Error('only this one');
-          }, { retry: 1 })
+          .step(
+            'a',
+            async () => {
+              throw new Error('only this one');
+            },
+            { retry: 1 }
+          )
           .step('b', async () => ({ ok: true }), { retry: 1 })
       )
     );

@@ -113,7 +113,7 @@ async function main() {
     ) {
       console.log('   PASS Prometheus format valid');
       console.log('   Sample lines:');
-      const lines = prometheusMetrics.split('\n').filter(l => !l.startsWith('#') && l.trim());
+      const lines = prometheusMetrics.split('\n').filter((l) => !l.startsWith('#') && l.trim());
       for (const line of lines.slice(0, 5)) {
         console.log(`     ${line}`);
       }
@@ -140,10 +140,7 @@ async function main() {
 
     const statsAfter = manager.getStats();
 
-    if (
-      statsAfter.waiting >= 3 &&
-      statsAfter.totalPushed >= totalPushedBefore + BigInt(3)
-    ) {
+    if (statsAfter.waiting >= 3 && statsAfter.totalPushed >= totalPushedBefore + BigInt(3)) {
       console.log(`   PASS Stats updated after adding jobs:`);
       console.log(`     - waiting: ${statsAfter.waiting}`);
       console.log(`     - totalPushed: ${totalPushedBefore} -> ${statsAfter.totalPushed}`);
@@ -151,7 +148,9 @@ async function main() {
     } else {
       console.log(`   FAIL Stats not updated correctly after adding jobs`);
       console.log(`     - waiting: ${statsAfter.waiting} (expected >= 3)`);
-      console.log(`     - totalPushed: ${statsAfter.totalPushed} (expected >= ${totalPushedBefore + BigInt(3)})`);
+      console.log(
+        `     - totalPushed: ${statsAfter.totalPushed} (expected >= ${totalPushedBefore + BigInt(3)})`
+      );
       failed++;
     }
   } catch (e) {
@@ -165,9 +164,13 @@ async function main() {
     const statsBefore = manager.getStats();
 
     // Process jobs
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (job) => {
-      return { processed: (job.data as { value: number }).value };
-    }, { concurrency: 5, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        return { processed: (job.data as { value: number }).value };
+      },
+      { concurrency: 5, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -181,7 +184,9 @@ async function main() {
       console.log(`   PASS Stats updated after processing:`);
       console.log(`     - waiting: ${statsBefore.waiting} -> ${statsAfter.waiting}`);
       console.log(`     - completed: ${statsBefore.completed} -> ${statsAfter.completed}`);
-      console.log(`     - totalCompleted: ${statsBefore.totalCompleted} -> ${statsAfter.totalCompleted}`);
+      console.log(
+        `     - totalCompleted: ${statsBefore.totalCompleted} -> ${statsAfter.totalCompleted}`
+      );
       passed++;
     } else {
       console.log('   FAIL Stats not updated correctly after processing');

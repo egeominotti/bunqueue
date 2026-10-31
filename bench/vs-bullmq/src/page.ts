@@ -8,7 +8,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const DATA = new URL('../../../docs/src/data/benchmark-vs-bullmq.json', import.meta.url).pathname;
-const PAGE = new URL('../../../docs/src/content/docs/guide/bullmq-benchmark.md', import.meta.url).pathname;
+const PAGE = new URL('../../../docs/src/content/docs/guide/bullmq-benchmark.md', import.meta.url)
+  .pathname;
 const data = JSON.parse(readFileSync(DATA, 'utf8'));
 const v = data.versions;
 
@@ -16,20 +17,32 @@ type Stat = { median: number; min: number; max: number } | null;
 const ms = (x: number) => (x < 10 ? x.toFixed(2) : x < 100 ? x.toFixed(1) : String(Math.round(x)));
 const num = (x: number) => Math.round(x).toLocaleString('en-US');
 const cell = (unit: string, s: Stat) =>
-  !s ? '–' : unit === 'ms' ? `${ms(s.median)} ms <small>(${ms(s.min)}–${ms(s.max)})</small>` : `${num(s.median)} <small>(${num(s.min)}–${num(s.max)})</small>`;
+  !s
+    ? '–'
+    : unit === 'ms'
+      ? `${ms(s.median)} ms <small>(${ms(s.min)}–${ms(s.max)})</small>`
+      : `${num(s.median)} <small>(${num(s.min)}–${num(s.max)})</small>`;
 /** bunqueue / BullMQ advantage from the medians: "3.95x" when bunqueue is ahead,
  *  "BullMQ 7.40x" when BullMQ is (a ratio below 1 reads poorly as 0.14x). */
 const advantage = (m: any): number | null => {
   if (!m.bunqueue || !m.bullmq) return null;
-  return m.higherIsBetter ? m.bunqueue.median / m.bullmq.median : m.bullmq.median / m.bunqueue.median;
+  return m.higherIsBetter
+    ? m.bunqueue.median / m.bullmq.median
+    : m.bullmq.median / m.bunqueue.median;
 };
-const fmtX = (x: number) => (x >= 100 ? Math.round(x).toLocaleString('en-US') : x >= 10 ? x.toFixed(1) : x.toFixed(2));
+const fmtX = (x: number) =>
+  x >= 100 ? Math.round(x).toLocaleString('en-US') : x >= 10 ? x.toFixed(1) : x.toFixed(2);
 const ratio = (m: any) => {
   const r = advantage(m);
   if (r === null) return '–';
   return r >= 1 ? `${fmtX(r)}x` : `BullMQ ${fmtX(1 / r)}x`;
 };
-const date = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(data.date));
+const date = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+}).format(new Date(data.date));
 
 function table(rows: any[]) {
   const out = [
@@ -38,14 +51,18 @@ function table(rows: any[]) {
   ];
   for (const m of rows) {
     const unit = m.unit === 'ms' ? 'ms, lower is better' : 'jobs/s';
-    out.push(`| ${m.title} (${unit}) | ${cell(m.unit, m.bunqueue)} | ${cell(m.unit, m.bullmqNode)} | ${cell(m.unit, m.bullmqBun)} | **${ratio(m)}** |`);
+    out.push(
+      `| ${m.title} (${unit}) | ${cell(m.unit, m.bunqueue)} | ${cell(m.unit, m.bullmqNode)} | ${cell(m.unit, m.bullmqBun)} | **${ratio(m)}** |`
+    );
   }
   return out.join('\n');
 }
 
 function verdicts(rows: any[]) {
   const ahead = rows.filter((m) => (advantage(m) ?? 0) >= 1.1);
-  const level = rows.filter((m) => advantage(m) !== null && advantage(m)! > 1 / 1.1 && advantage(m)! < 1.1);
+  const level = rows.filter(
+    (m) => advantage(m) !== null && advantage(m)! > 1 / 1.1 && advantage(m)! < 1.1
+  );
   const behind = rows.filter((m) => advantage(m) !== null && advantage(m)! <= 1 / 1.1);
   const list = (xs: any[]) => xs.map((m) => `- ${m.title}: **${ratio(m)}**`).join('\n') || '- none';
   return { ahead: list(ahead), level: list(level), behind: list(behind) };

@@ -203,14 +203,7 @@ describe('CLI v2.7.13 audit issues', () => {
     const jobId = idMatch![1];
 
     // job delay on a waiting (not active) job
-    const delayWaiting = await runCli([
-      '--port',
-      String(TCP_PORT),
-      'job',
-      'delay',
-      jobId,
-      '5000',
-    ]);
+    const delayWaiting = await runCli(['--port', String(TCP_PORT), 'job', 'delay', jobId, '5000']);
     const delayMissing = await runCli([
       '--port',
       String(TCP_PORT),
@@ -243,13 +236,7 @@ describe('CLI v2.7.13 audit issues', () => {
 
   test('issue#6 — queue clean: output uses correct verb (not "Created")', async () => {
     // Push and complete a job so clean has something to remove
-    await runCli([
-      '--port',
-      String(TCP_PORT),
-      'push',
-      'audit-clean-q',
-      JSON.stringify({ v: 1 }),
-    ]);
+    await runCli(['--port', String(TCP_PORT), 'push', 'audit-clean-q', JSON.stringify({ v: 1 })]);
 
     const result = await runCli([
       '--port',
@@ -285,13 +272,7 @@ describe('CLI v2.7.13 audit issues', () => {
   // ─────────── Bug 7: `job result` shows literal "undefined" ───────────
 
   test('issue#9 — dlq retry does NOT print misleading "Cleaned" verb', async () => {
-    const result = await runCli([
-      '--port',
-      String(TCP_PORT),
-      'dlq',
-      'retry',
-      'audit-retry-q',
-    ]);
+    const result = await runCli(['--port', String(TCP_PORT), 'dlq', 'retry', 'audit-retry-q']);
     expect(result.exitCode).toBe(0);
     // Must never wrongly claim jobs were "Cleaned" — they were retried.
     expect(result.stdout).not.toMatch(/Cleaned \d+ jobs/);

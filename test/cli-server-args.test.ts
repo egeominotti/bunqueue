@@ -88,10 +88,7 @@ describe('CLI server argument passing', () => {
     setArgv('start', '--port=6666');
     const { commandArgs } = parseGlobalOptions();
     const serverArgs = commandArgs.slice(1);
-    expect(
-      serverArgs.includes('--port') ||
-        serverArgs.includes('--tcp-port')
-    ).toBe(true);
+    expect(serverArgs.includes('--port') || serverArgs.includes('--tcp-port')).toBe(true);
     expect(serverArgs).toContain('6666');
   });
 

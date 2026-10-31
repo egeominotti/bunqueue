@@ -27,11 +27,7 @@ describe('JobOptions - Backoff Object', () => {
   });
 
   test('should accept backoff as fixed object', async () => {
-    const job = await queue.add(
-      'test',
-      { value: 1 },
-      { backoff: { type: 'fixed', delay: 3000 } }
-    );
+    const job = await queue.add('test', { value: 1 }, { backoff: { type: 'fixed', delay: 3000 } });
     expect(job.id).toBeDefined();
     expect(job.opts.backoff).toEqual({ type: 'fixed', delay: 3000 });
   });
@@ -68,11 +64,7 @@ describe('JobOptions - Backoff Object', () => {
       { embedded: true, autorun: true }
     );
 
-    await queue.add(
-      'test',
-      { value: 1 },
-      { attempts: 3, backoff: { type: 'fixed', delay: 100 } }
-    );
+    await queue.add('test', { value: 1 }, { attempts: 3, backoff: { type: 'fixed', delay: 100 } });
 
     await Bun.sleep(1000);
 
@@ -157,11 +149,7 @@ describe('JobOptions - Extended Repeat', () => {
 
   test('should accept repeat with startDate as Date', async () => {
     const startDate = new Date(Date.now() + 60000);
-    const job = await queue.add(
-      'test',
-      { value: 1 },
-      { repeat: { every: 1000, startDate } }
-    );
+    const job = await queue.add('test', { value: 1 }, { repeat: { every: 1000, startDate } });
     expect(job.id).toBeDefined();
   });
 
@@ -211,20 +199,12 @@ describe('JobOptions - Extended Repeat', () => {
   });
 
   test('should accept repeat with count', async () => {
-    const job = await queue.add(
-      'test',
-      { value: 1 },
-      { repeat: { every: 1000, count: 5 } }
-    );
+    const job = await queue.add('test', { value: 1 }, { repeat: { every: 1000, count: 5 } });
     expect(job.id).toBeDefined();
   });
 
   test('should accept repeat with offset', async () => {
-    const job = await queue.add(
-      'test',
-      { value: 1 },
-      { repeat: { every: 1000, offset: 500 } }
-    );
+    const job = await queue.add('test', { value: 1 }, { repeat: { every: 1000, offset: 500 } });
     expect(job.id).toBeDefined();
   });
 
@@ -273,11 +253,7 @@ describe('JobOptions - Deduplication', () => {
   });
 
   test('should accept deduplication option', async () => {
-    const job = await queue.add(
-      'test',
-      { value: 1 },
-      { deduplication: { id: 'unique-task-1' } }
-    );
+    const job = await queue.add('test', { value: 1 }, { deduplication: { id: 'unique-task-1' } });
     expect(job.id).toBeDefined();
   });
 
@@ -292,18 +268,10 @@ describe('JobOptions - Deduplication', () => {
 
   test('deduplication should prevent duplicate jobs', async () => {
     // Add first job
-    const job1 = await queue.add(
-      'test',
-      { value: 1 },
-      { deduplication: { id: 'same-task' } }
-    );
+    const job1 = await queue.add('test', { value: 1 }, { deduplication: { id: 'same-task' } });
 
     // Try to add duplicate
-    const job2 = await queue.add(
-      'test',
-      { value: 2 },
-      { deduplication: { id: 'same-task' } }
-    );
+    const job2 = await queue.add('test', { value: 2 }, { deduplication: { id: 'same-task' } });
 
     // Both should have the same ID (deduped)
     expect(job1.id).toBe(job2.id);
@@ -356,11 +324,7 @@ describe('JobOptions - Parent/Children', () => {
   });
 
   test('should accept failParentOnFailure option', async () => {
-    const job = await queue.add(
-      'test',
-      { value: 1 },
-      { failParentOnFailure: true }
-    );
+    const job = await queue.add('test', { value: 1 }, { failParentOnFailure: true });
     expect(job.id).toBeDefined();
     expect(job.opts.failParentOnFailure).toBe(true);
   });
@@ -371,11 +335,7 @@ describe('JobOptions - Parent/Children', () => {
   });
 
   test('should accept removeDependencyOnFailure option', async () => {
-    const job = await queue.add(
-      'test',
-      { value: 1 },
-      { removeDependencyOnFailure: true }
-    );
+    const job = await queue.add('test', { value: 1 }, { removeDependencyOnFailure: true });
     expect(job.id).toBeDefined();
     expect(job.opts.removeDependencyOnFailure).toBe(true);
   });

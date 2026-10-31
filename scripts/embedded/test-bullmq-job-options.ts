@@ -40,7 +40,8 @@ const tests = [
 
     const job = await queue.add('test', { value: 1 }, { backoff: 5000 });
     if (!job.id) throw new Error('Job not created');
-    if (job.opts.backoff !== 5000) throw new Error(`Expected backoff 5000, got ${job.opts.backoff}`);
+    if (job.opts.backoff !== 5000)
+      throw new Error(`Expected backoff 5000, got ${job.opts.backoff}`);
 
     queue.close();
   }),
@@ -49,9 +50,13 @@ const tests = [
     const queue = new Queue('test-backoff-fixed', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      backoff: { type: 'fixed', delay: 3000 }
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        backoff: { type: 'fixed', delay: 3000 },
+      }
+    );
     if (!job.id) throw new Error('Job not created');
     const opts = job.opts.backoff as { type: string; delay: number };
     if (opts.type !== 'fixed') throw new Error(`Expected type fixed, got ${opts.type}`);
@@ -64,9 +69,13 @@ const tests = [
     const queue = new Queue('test-backoff-exp', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      backoff: { type: 'exponential', delay: 1000 }
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        backoff: { type: 'exponential', delay: 1000 },
+      }
+    );
     const opts = job.opts.backoff as { type: string; delay: number };
     if (opts.type !== 'exponential') throw new Error(`Expected type exponential, got ${opts.type}`);
 
@@ -93,16 +102,21 @@ const tests = [
     await queue.add('test', { order: 3 }, { lifo: true });
 
     const processedOrder: number[] = [];
-    const worker = new Worker('test-lifo-order', async (job) => {
-      processedOrder.push(job.data.order);
-      return { done: true };
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-lifo-order',
+      async (job) => {
+        processedOrder.push(job.data.order);
+        return { done: true };
+      },
+      { embedded: true, autorun: true }
+    );
 
     queue.resume();
     await Bun.sleep(500);
 
     // LIFO: 3, 2, 1
-    if (processedOrder[0] !== 3) throw new Error(`Expected first job order 3, got ${processedOrder[0]}`);
+    if (processedOrder[0] !== 3)
+      throw new Error(`Expected first job order 3, got ${processedOrder[0]}`);
 
     await worker.close();
     queue.close();
@@ -113,7 +127,8 @@ const tests = [
     queue.obliterate();
 
     const job = await queue.add('test', { value: 1 }, { stackTraceLimit: 5 });
-    if (job.opts.stackTraceLimit !== 5) throw new Error(`Expected stackTraceLimit 5, got ${job.opts.stackTraceLimit}`);
+    if (job.opts.stackTraceLimit !== 5)
+      throw new Error(`Expected stackTraceLimit 5, got ${job.opts.stackTraceLimit}`);
 
     queue.close();
   }),
@@ -123,7 +138,8 @@ const tests = [
     queue.obliterate();
 
     const job = await queue.add('test', { value: 1 }, { keepLogs: 100 });
-    if (job.opts.keepLogs !== 100) throw new Error(`Expected keepLogs 100, got ${job.opts.keepLogs}`);
+    if (job.opts.keepLogs !== 100)
+      throw new Error(`Expected keepLogs 100, got ${job.opts.keepLogs}`);
 
     queue.close();
   }),
@@ -153,7 +169,8 @@ const tests = [
     queue.obliterate();
 
     const job = await queue.add('test', { value: 1 }, { removeDependencyOnFailure: true });
-    if (job.opts.removeDependencyOnFailure !== true) throw new Error('Expected removeDependencyOnFailure true');
+    if (job.opts.removeDependencyOnFailure !== true)
+      throw new Error('Expected removeDependencyOnFailure true');
 
     queue.close();
   }),
@@ -162,12 +179,20 @@ const tests = [
     const queue = new Queue('test-dedup', { embedded: true });
     queue.obliterate();
 
-    const job1 = await queue.add('test', { value: 1 }, {
-      deduplication: { id: 'unique-1', ttl: 60000 }
-    });
-    const job2 = await queue.add('test', { value: 2 }, {
-      deduplication: { id: 'unique-1', ttl: 60000 }
-    });
+    const job1 = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        deduplication: { id: 'unique-1', ttl: 60000 },
+      }
+    );
+    const job2 = await queue.add(
+      'test',
+      { value: 2 },
+      {
+        deduplication: { id: 'unique-1', ttl: 60000 },
+      }
+    );
 
     // Should be deduplicated (same ID)
     if (job1.id !== job2.id) throw new Error('Expected jobs to be deduplicated');
@@ -179,9 +204,13 @@ const tests = [
     const queue = new Queue('test-debounce', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      debounce: { id: 'debounce-1', ttl: 1000 }
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        debounce: { id: 'debounce-1', ttl: 1000 },
+      }
+    );
     if (!job.id) throw new Error('Job not created');
 
     queue.close();
@@ -191,18 +220,22 @@ const tests = [
     const queue = new Queue('test-repeat-ext', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      repeat: {
-        every: 5000,
-        limit: 10,
-        startDate: Date.now(),
-        endDate: Date.now() + 3600000,
-        tz: 'UTC',
-        immediately: true,
-        offset: 100,
-        jobId: 'repeat-job-1',
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        repeat: {
+          every: 5000,
+          limit: 10,
+          startDate: Date.now(),
+          endDate: Date.now() + 3600000,
+          tz: 'UTC',
+          immediately: true,
+          offset: 100,
+          jobId: 'repeat-job-1',
+        },
       }
-    });
+    );
     if (!job.id) throw new Error('Job not created');
 
     queue.close();
@@ -212,9 +245,13 @@ const tests = [
     const queue = new Queue('test-remove-complete', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      removeOnComplete: { age: 3600000, count: 1000 }
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        removeOnComplete: { age: 3600000, count: 1000 },
+      }
+    );
     if (!job.id) throw new Error('Job not created');
 
     queue.close();
@@ -224,9 +261,13 @@ const tests = [
     const queue = new Queue('test-remove-fail', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      removeOnFail: { age: 86400000, count: 500 }
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        removeOnFail: { age: 86400000, count: 500 },
+      }
+    );
     if (!job.id) throw new Error('Job not created');
 
     queue.close();
@@ -237,9 +278,13 @@ const tests = [
     queue.obliterate();
 
     const parentJob = await queue.add('parent', { value: 0 });
-    const childJob = await queue.add('child', { value: 1 }, {
-      parent: { id: parentJob.id, queue: 'test-parent' }
-    });
+    const childJob = await queue.add(
+      'child',
+      { value: 1 },
+      {
+        parent: { id: parentJob.id, queue: 'test-parent' },
+      }
+    );
 
     if (!childJob.opts.parent) throw new Error('Expected parent option');
     if (childJob.opts.parent.id !== parentJob.id) throw new Error('Parent ID mismatch');
@@ -251,20 +296,24 @@ const tests = [
     const queue = new Queue('test-combined', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('comprehensive', { value: 42 }, {
-      priority: 10,
-      delay: 100,
-      attempts: 5,
-      timeout: 30000,
-      backoff: { type: 'exponential', delay: 1000 },
-      lifo: false,
-      stackTraceLimit: 15,
-      keepLogs: 50,
-      sizeLimit: 1024 * 1024,
-      failParentOnFailure: false,
-      removeDependencyOnFailure: false,
-      deduplication: { id: 'combined-dedup', ttl: 60000 },
-    });
+    const job = await queue.add(
+      'comprehensive',
+      { value: 42 },
+      {
+        priority: 10,
+        delay: 100,
+        attempts: 5,
+        timeout: 30000,
+        backoff: { type: 'exponential', delay: 1000 },
+        lifo: false,
+        stackTraceLimit: 15,
+        keepLogs: 50,
+        sizeLimit: 1024 * 1024,
+        failParentOnFailure: false,
+        removeDependencyOnFailure: false,
+        deduplication: { id: 'combined-dedup', ttl: 60000 },
+      }
+    );
 
     if (!job.id) throw new Error('Job not created');
     if (job.opts.priority !== 10) throw new Error('Priority mismatch');

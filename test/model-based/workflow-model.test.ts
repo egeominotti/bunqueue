@@ -57,19 +57,17 @@ describe('Workflow engine state-machine model', () => {
         (rows, workflowName, stateFilter, limit, offset) => {
           const store = new WorkflowStore();
           try {
-            const executions = rows.map(
-              (row, index): Execution => ({
-                id: `wf_property_${index.toString().padStart(3, '0')}`,
-                workflowName: row.workflowName,
-                state: row.state,
-                input: {},
-                steps: {},
-                currentNodeIndex: 0,
-                signals: {},
-                createdAt: row.createdAt,
-                updatedAt: row.createdAt,
-              })
-            );
+            const executions = rows.map((row, index): Execution => ({
+              id: `wf_property_${index.toString().padStart(3, '0')}`,
+              workflowName: row.workflowName,
+              state: row.state,
+              input: {},
+              steps: {},
+              currentNodeIndex: 0,
+              signals: {},
+              createdAt: row.createdAt,
+              updatedAt: row.createdAt,
+            }));
             for (const exec of executions) store.save(exec);
 
             const expected = executions
@@ -132,13 +130,12 @@ describe('Workflow engine state-machine model', () => {
             )
           ).toThrow();
           expect(() =>
-            new Workflow('invalid-each')
-              .forEach(
-                () => [],
-                'work',
-                () => null,
-                { maxIterations }
-              )
+            new Workflow('invalid-each').forEach(
+              () => [],
+              'work',
+              () => null,
+              { maxIterations }
+            )
           ).toThrow();
           expect(() =>
             new Workflow('invalid-child-timeout').subWorkflow('child', () => ({}), {

@@ -53,10 +53,15 @@ describe('Issue #65: SQLite restart with skipMissedOnRestart', () => {
     const { Database } = await import('bun:sqlite');
     const db = new Database(TEST_DB);
     const pastTime = Date.now() - 7200_000; // 2 hours ago
-    db.run('UPDATE cron_jobs SET next_run = ?, executions = 50 WHERE name = ?', [pastTime, 'sync-scheduler']);
+    db.run('UPDATE cron_jobs SET next_run = ?, executions = 50 WHERE name = ?', [
+      pastTime,
+      'sync-scheduler',
+    ]);
 
     // Verify DB has the stale state
-    const row = db.query('SELECT next_run, executions, skip_missed_on_restart FROM cron_jobs WHERE name = ?').get('sync-scheduler') as any;
+    const row = db
+      .query('SELECT next_run, executions, skip_missed_on_restart FROM cron_jobs WHERE name = ?')
+      .get('sync-scheduler') as any;
     expect(row.next_run).toBe(pastTime);
     expect(row.executions).toBe(50);
     expect(row.skip_missed_on_restart).toBe(1);
@@ -88,7 +93,9 @@ describe('Issue #65: SQLite restart with skipMissedOnRestart', () => {
 
     // ── Phase 6: Verify DB is consistent ──
     const db2 = new Database(TEST_DB);
-    const rowAfter = db2.query('SELECT next_run, executions FROM cron_jobs WHERE name = ?').get('sync-scheduler') as any;
+    const rowAfter = db2
+      .query('SELECT next_run, executions FROM cron_jobs WHERE name = ?')
+      .get('sync-scheduler') as any;
     expect(rowAfter.next_run).toBeGreaterThan(Date.now());
     expect(rowAfter.executions).toBe(50);
     db2.close();
@@ -114,7 +121,10 @@ describe('Issue #65: SQLite restart with skipMissedOnRestart', () => {
     // Set nextRun to 2 hours ago
     const { Database } = await import('bun:sqlite');
     const db = new Database(TEST_DB);
-    db.run('UPDATE cron_jobs SET next_run = ? WHERE name = ?', [Date.now() - 7200_000, 'catchup-cron']);
+    db.run('UPDATE cron_jobs SET next_run = ? WHERE name = ?', [
+      Date.now() - 7200_000,
+      'catchup-cron',
+    ]);
     db.close();
 
     // Restart
@@ -146,8 +156,11 @@ describe('Issue #65: SQLite restart with skipMissedOnRestart', () => {
     // Simulate 3 consecutive restarts with stale DB each time
     for (let i = 0; i < 3; i++) {
       const db = new Database(TEST_DB);
-      db.run('UPDATE cron_jobs SET next_run = ?, executions = ? WHERE name = ?',
-        [Date.now() - 3600_000, 100 + i, 'multi-restart-cron']);
+      db.run('UPDATE cron_jobs SET next_run = ?, executions = ? WHERE name = ?', [
+        Date.now() - 3600_000,
+        100 + i,
+        'multi-restart-cron',
+      ]);
       db.close();
 
       const m = new QueueManager({ dataPath: TEST_DB });
@@ -159,7 +172,9 @@ describe('Issue #65: SQLite restart with skipMissedOnRestart', () => {
 
       // Verify DB was updated
       const db2 = new Database(TEST_DB);
-      const row = db2.query('SELECT next_run FROM cron_jobs WHERE name = ?').get('multi-restart-cron') as any;
+      const row = db2
+        .query('SELECT next_run FROM cron_jobs WHERE name = ?')
+        .get('multi-restart-cron') as any;
       expect(row.next_run).toBeGreaterThan(Date.now());
       db2.close();
 

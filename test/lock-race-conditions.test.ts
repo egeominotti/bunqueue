@@ -107,9 +107,7 @@ describe('Lock Race Conditions', () => {
     for (let i = 0; i < 10; i++) await qm.push(queue, { data: { i } });
 
     const results = await Promise.all(
-      Array.from({ length: 10 }, (_, i) =>
-        qm.pullWithLock(queue, `worker-${i}`, 0, 60_000)
-      )
+      Array.from({ length: 10 }, (_, i) => qm.pullWithLock(queue, `worker-${i}`, 0, 60_000))
     );
 
     const jobs = results.filter((r) => r.job !== null);

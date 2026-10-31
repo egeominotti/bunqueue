@@ -50,14 +50,16 @@ describe('Issue #67: skipIfNoWorker on restart', () => {
 
     const now = Date.now();
     // Simulate restart: cron has past-due nextRun (missed 2 minutes ago)
-    scheduler.load([makeCronJob({
-      name: 'long-worker-cron',
-      queue: 'sync-queue',
-      schedule: '* * * * *',
-      nextRun: now - 120_000, // 2 minutes in the past
-      skipIfNoWorker: true,
-      executions: 10,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'long-worker-cron',
+        queue: 'sync-queue',
+        schedule: '* * * * *',
+        nextRun: now - 120_000, // 2 minutes in the past
+        skipIfNoWorker: true,
+        executions: 10,
+      }),
+    ]);
 
     // nextRun should have been recalculated to the future
     const cron = scheduler.get('long-worker-cron');
@@ -86,13 +88,15 @@ describe('Issue #67: skipIfNoWorker on restart', () => {
 
     const now = Date.now();
     // Simulate restart: cron missed while server was down
-    scheduler.load([makeCronJob({
-      name: 'restart-cron',
-      queue: 'sync-queue',
-      schedule: '* * * * *',
-      nextRun: now - 60_000, // 1 minute in the past
-      skipIfNoWorker: true,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'restart-cron',
+        queue: 'sync-queue',
+        schedule: '* * * * *',
+        nextRun: now - 60_000, // 1 minute in the past
+        skipIfNoWorker: true,
+      }),
+    ]);
 
     // Simulate worker reconnecting before tick fires
     workerRegistered = true;
@@ -117,14 +121,16 @@ describe('Issue #67: skipIfNoWorker on restart', () => {
 
     const now = Date.now();
     // Simulate restart with past-due cron
-    scheduler.load([makeCronJob({
-      name: 'schedule-cron',
-      queue: 'sync-queue',
-      repeatEvery: 60_000,
-      schedule: null,
-      nextRun: now - 120_000, // past due
-      skipIfNoWorker: true,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'schedule-cron',
+        queue: 'sync-queue',
+        repeatEvery: 60_000,
+        schedule: null,
+        nextRun: now - 120_000, // past due
+        skipIfNoWorker: true,
+      }),
+    ]);
 
     // nextRun should be in the future
     const cron = scheduler.get('schedule-cron');
@@ -149,13 +155,15 @@ describe('Issue #67: skipIfNoWorker on restart', () => {
     const now = Date.now();
     const pastDue = now - 60_000;
 
-    scheduler.load([makeCronJob({
-      name: 'no-skip-cron',
-      queue: 'sync-queue',
-      nextRun: pastDue,
-      skipIfNoWorker: false,
-      skipMissedOnRestart: false,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'no-skip-cron',
+        queue: 'sync-queue',
+        nextRun: pastDue,
+        skipIfNoWorker: false,
+        skipMissedOnRestart: false,
+      }),
+    ]);
 
     // nextRun should NOT have been recalculated
     const cron = scheduler.get('no-skip-cron');
@@ -175,13 +183,15 @@ describe('Issue #67: skipIfNoWorker on restart', () => {
     scheduler.setWorkerCheckCallback(() => false);
 
     const now = Date.now();
-    scheduler.load([makeCronJob({
-      name: 'both-flags-cron',
-      queue: 'sync-queue',
-      nextRun: now - 120_000,
-      skipIfNoWorker: true,
-      skipMissedOnRestart: true,
-    })]);
+    scheduler.load([
+      makeCronJob({
+        name: 'both-flags-cron',
+        queue: 'sync-queue',
+        nextRun: now - 120_000,
+        skipIfNoWorker: true,
+        skipMissedOnRestart: true,
+      }),
+    ]);
 
     const cron = scheduler.get('both-flags-cron');
     expect(cron!.nextRun).toBeGreaterThan(now);

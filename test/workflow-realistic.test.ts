@@ -27,26 +27,34 @@ describe('Workflow Engine - Realistic Scenarios', () => {
         if (input.amount <= 0) throw new Error('Invalid amount');
         return { valid: true, orderId: input.orderId };
       })
-      .step('reserve-stock', async (ctx) => {
-        events.push('reserve-stock');
-        db['stock-reserved'] = true;
-        return { reserved: true };
-      }, {
-        compensate: async () => {
-          events.push('release-stock');
-          db['stock-reserved'] = false;
+      .step(
+        'reserve-stock',
+        async (ctx) => {
+          events.push('reserve-stock');
+          db['stock-reserved'] = true;
+          return { reserved: true };
         },
-      })
-      .step('charge-payment', async (ctx) => {
-        events.push('charge');
-        db['payment-charged'] = true;
-        return { transactionId: 'tx_123' };
-      }, {
-        compensate: async () => {
-          events.push('refund');
-          db['payment-charged'] = false;
+        {
+          compensate: async () => {
+            events.push('release-stock');
+            db['stock-reserved'] = false;
+          },
+        }
+      )
+      .step(
+        'charge-payment',
+        async (ctx) => {
+          events.push('charge');
+          db['payment-charged'] = true;
+          return { transactionId: 'tx_123' };
         },
-      })
+        {
+          compensate: async () => {
+            events.push('refund');
+            db['payment-charged'] = false;
+          },
+        }
+      )
       .step('send-confirmation', async (ctx) => {
         events.push('confirm');
         const txId = (ctx.steps['charge-payment'] as { transactionId: string }).transactionId;
@@ -66,7 +74,10 @@ describe('Workflow Engine - Realistic Scenarios', () => {
     expect(db['payment-charged']).toBe(true);
 
     // Verify step results chain correctly
-    const confirmResult = exec!.steps['send-confirmation'].result as { emailSent: boolean; txId: string };
+    const confirmResult = exec!.steps['send-confirmation'].result as {
+      emailSent: boolean;
+      txId: string;
+    };
     expect(confirmResult.txId).toBe('tx_123');
   });
 
@@ -75,25 +86,33 @@ describe('Workflow Engine - Realistic Scenarios', () => {
     const db: Record<string, unknown> = {};
 
     const orderFlow = new Workflow('order-fail')
-      .step('reserve-stock', async () => {
-        events.push('reserve');
-        db['stock'] = 'reserved';
-        return { ok: true };
-      }, {
-        compensate: async () => {
-          events.push('release-stock');
-          db['stock'] = 'available';
+      .step(
+        'reserve-stock',
+        async () => {
+          events.push('reserve');
+          db['stock'] = 'reserved';
+          return { ok: true };
         },
-      })
-      .step('charge-payment', async () => {
-        events.push('charge-attempt');
-        throw new Error('Card declined');
-      }, {
-        retry: 1,
-        compensate: async () => {
-          events.push('refund');
+        {
+          compensate: async () => {
+            events.push('release-stock');
+            db['stock'] = 'available';
+          },
+        }
+      )
+      .step(
+        'charge-payment',
+        async () => {
+          events.push('charge-attempt');
+          throw new Error('Card declined');
         },
-      });
+        {
+          retry: 1,
+          compensate: async () => {
+            events.push('refund');
+          },
+        }
+      );
 
     engine = new Engine({ embedded: true });
     engine.register(orderFlow);
@@ -234,13 +253,12 @@ describe('Workflow Engine - Realistic Scenarios', () => {
   test('multiple concurrent executions of same workflow', async () => {
     const results = new Map<string, number>();
 
-    const flow = new Workflow('counter')
-      .step('compute', async (ctx) => {
-        const input = ctx.input as { n: number };
-        // Simulate async work
-        await new Promise((r) => setTimeout(r, 50));
-        return { result: input.n * 2 };
-      });
+    const flow = new Workflow('counter').step('compute', async (ctx) => {
+      const input = ctx.input as { n: number };
+      // Simulate async work
+      await new Promise((r) => setTimeout(r, 50));
+      return { result: input.n * 2 };
+    });
 
     engine = new Engine({ embedded: true, concurrency: 10 });
     engine.register(flow);
@@ -297,8 +315,7 @@ describe('Workflow Engine - Realistic Scenarios', () => {
   // ============ Edge Cases ============
 
   test('workflow with single step', async () => {
-    const flow = new Workflow('single')
-      .step('only', async () => ({ done: true }));
+    const flow = new Workflow('single').step('only', async () => ({ done: true }));
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -311,11 +328,14 @@ describe('Workflow Engine - Realistic Scenarios', () => {
   });
 
   test('step timeout works', async () => {
-    const flow = new Workflow('timeout-test')
-      .step('slow', async () => {
+    const flow = new Workflow('timeout-test').step(
+      'slow',
+      async () => {
         await new Promise((r) => setTimeout(r, 5000));
         return { done: true };
-      }, { timeout: 200, retry: 1 });
+      },
+      { timeout: 200, retry: 1 }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -341,11 +361,10 @@ describe('Workflow Engine - Realistic Scenarios', () => {
   // ============ Persistence ============
 
   test('execution state persists across queries', async () => {
-    const flow = new Workflow('persist-test')
-      .step('work', async () => {
-        await new Promise((r) => setTimeout(r, 50));
-        return { data: 'persisted' };
-      });
+    const flow = new Workflow('persist-test').step('work', async () => {
+      await new Promise((r) => setTimeout(r, 50));
+      return { data: 'persisted' };
+    });
 
     engine = new Engine({ embedded: true });
     engine.register(flow);

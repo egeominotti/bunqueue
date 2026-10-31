@@ -41,11 +41,15 @@ async function main() {
   console.log('\n2. Testing WORKER PROCESSING...');
   try {
     let processed = false;
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async (job) => {
-      console.log(`   Processing job ${job.id}: ${(job.data as { message: string }).message}`);
-      processed = true;
-      return { success: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async (job) => {
+        console.log(`   Processing job ${job.id}: ${(job.data as { message: string }).message}`);
+        processed = true;
+        return { success: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -70,10 +74,14 @@ async function main() {
     await queue.add('fail-job', { message: 'This will fail' }, { attempts: 1 });
 
     let failedJob = false;
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async () => {
-      failedJob = true;
-      throw new Error('Intentional failure');
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async () => {
+        failedJob = true;
+        throw new Error('Intentional failure');
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -99,10 +107,14 @@ async function main() {
     await queue.add('high-priority', { message: 'High' }, { priority: 10 });
 
     const jobs: string[] = [];
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async (job) => {
-      jobs.push((job.data as { message: string }).message);
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async (job) => {
+        jobs.push((job.data as { message: string }).message);
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -128,10 +140,14 @@ async function main() {
     await queue.add('delayed-job', { message: 'Delayed' }, { delay: 300 });
 
     let processedAt = 0;
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async () => {
-      processedAt = Date.now();
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async () => {
+        processedAt = Date.now();
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();

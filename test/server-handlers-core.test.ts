@@ -152,10 +152,7 @@ describe('Core Handlers', () => {
     });
 
     test('should return error for empty queue name', async () => {
-      const res = await handlePush(
-        { cmd: 'PUSH', queue: '', data: { msg: 'hi' } },
-        ctx
-      );
+      const res = await handlePush({ cmd: 'PUSH', queue: '', data: { msg: 'hi' } }, ctx);
       expect(res.ok).toBe(false);
       expect((res as any).error).toBeDefined();
     });
@@ -249,11 +246,7 @@ describe('Core Handlers', () => {
         {
           cmd: 'PUSHB',
           queue: 'emails',
-          jobs: [
-            { data: { id: 1 } },
-            { data: { id: 2 } },
-            { data: { id: 3 } },
-          ],
+          jobs: [{ data: { id: 1 } }, { data: { id: 2 } }, { data: { id: 3 } }],
         },
         ctx
       );
@@ -374,10 +367,7 @@ describe('Core Handlers', () => {
 
     test('should pull with lock when owner is specified', async () => {
       await handlePush({ cmd: 'PUSH', queue: 'emails', data: { msg: 'lock-test' } }, ctx);
-      const res = await handlePull(
-        { cmd: 'PULL', queue: 'emails', owner: 'worker-1' },
-        ctx
-      );
+      const res = await handlePull({ cmd: 'PULL', queue: 'emails', owner: 'worker-1' }, ctx);
       expect(res.ok).toBe(true);
       expect((res as any).job).not.toBeNull();
       expect((res as any).token).toBeDefined();
@@ -400,44 +390,29 @@ describe('Core Handlers', () => {
       for (let i = 0; i < 5; i++) {
         await handlePush({ cmd: 'PUSH', queue: 'emails', data: { id: i } }, ctx);
       }
-      const res = await handlePullBatch(
-        { cmd: 'PULLB', queue: 'emails', count: 3 },
-        ctx
-      );
+      const res = await handlePullBatch({ cmd: 'PULLB', queue: 'emails', count: 3 }, ctx);
       expect(res.ok).toBe(true);
       expect((res as any).jobs).toHaveLength(3);
     });
 
     test('should return empty array when queue is empty', async () => {
-      const res = await handlePullBatch(
-        { cmd: 'PULLB', queue: 'emails', count: 5 },
-        ctx
-      );
+      const res = await handlePullBatch({ cmd: 'PULLB', queue: 'emails', count: 5 }, ctx);
       expect(res.ok).toBe(true);
       expect((res as any).jobs).toHaveLength(0);
     });
 
     test('should return error for invalid queue name', async () => {
-      const res = await handlePullBatch(
-        { cmd: 'PULLB', queue: '', count: 5 },
-        ctx
-      );
+      const res = await handlePullBatch({ cmd: 'PULLB', queue: '', count: 5 }, ctx);
       expect(res.ok).toBe(false);
     });
 
     test('should return error for count < 1', async () => {
-      const res = await handlePullBatch(
-        { cmd: 'PULLB', queue: 'emails', count: 0 },
-        ctx
-      );
+      const res = await handlePullBatch({ cmd: 'PULLB', queue: 'emails', count: 0 }, ctx);
       expect(res.ok).toBe(false);
     });
 
     test('should return error for count > 1000', async () => {
-      const res = await handlePullBatch(
-        { cmd: 'PULLB', queue: 'emails', count: 1001 },
-        ctx
-      );
+      const res = await handlePullBatch({ cmd: 'PULLB', queue: 'emails', count: 1001 }, ctx);
       expect(res.ok).toBe(false);
     });
 
@@ -456,10 +431,7 @@ describe('Core Handlers', () => {
 
     test('should return fewer jobs than requested when queue has less', async () => {
       await handlePush({ cmd: 'PUSH', queue: 'emails', data: { id: 1 } }, ctx);
-      const res = await handlePullBatch(
-        { cmd: 'PULLB', queue: 'emails', count: 10 },
-        ctx
-      );
+      const res = await handlePullBatch({ cmd: 'PULLB', queue: 'emails', count: 10 }, ctx);
       expect(res.ok).toBe(true);
       expect((res as any).jobs).toHaveLength(1);
     });
@@ -482,10 +454,7 @@ describe('Core Handlers', () => {
       const pullRes = await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
       const jobId = (pullRes as any).job.id;
 
-      const res = await handleAck(
-        { cmd: 'ACK', id: jobId, result: { sent: true } },
-        ctx
-      );
+      const res = await handleAck({ cmd: 'ACK', id: jobId, result: { sent: true } }, ctx);
       expect(res.ok).toBe(true);
 
       // Result should be stored
@@ -503,11 +472,7 @@ describe('Core Handlers', () => {
       const pullRes = await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
       const jobId = (pullRes as any).job.id;
 
-      const res = await handleAck(
-        { cmd: 'ACK', id: jobId, reqId: 'req-ack' },
-        ctx,
-        'req-ack'
-      );
+      const res = await handleAck({ cmd: 'ACK', id: jobId, reqId: 'req-ack' }, ctx, 'req-ack');
       expect(res.reqId).toBe('req-ack');
     });
   });
@@ -519,10 +484,7 @@ describe('Core Handlers', () => {
       for (let i = 0; i < 3; i++) {
         await handlePush({ cmd: 'PUSH', queue: 'emails', data: { id: i } }, ctx);
       }
-      const pullRes = await handlePullBatch(
-        { cmd: 'PULLB', queue: 'emails', count: 3 },
-        ctx
-      );
+      const pullRes = await handlePullBatch({ cmd: 'PULLB', queue: 'emails', count: 3 }, ctx);
       const ids = (pullRes as any).jobs.map((j: any) => j.id);
 
       const res = await handleAckBatch({ cmd: 'ACKB', ids }, ctx);
@@ -533,10 +495,7 @@ describe('Core Handlers', () => {
       for (let i = 0; i < 2; i++) {
         await handlePush({ cmd: 'PUSH', queue: 'emails', data: { id: i } }, ctx);
       }
-      const pullRes = await handlePullBatch(
-        { cmd: 'PULLB', queue: 'emails', count: 2 },
-        ctx
-      );
+      const pullRes = await handlePullBatch({ cmd: 'PULLB', queue: 'emails', count: 2 }, ctx);
       const ids = (pullRes as any).jobs.map((j: any) => j.id);
 
       const res = await handleAckBatch(
@@ -574,18 +533,12 @@ describe('Core Handlers', () => {
       const pullRes = await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
       const jobId = (pullRes as any).job.id;
 
-      const res = await handleFail(
-        { cmd: 'FAIL', id: jobId, error: 'Something went wrong' },
-        ctx
-      );
+      const res = await handleFail({ cmd: 'FAIL', id: jobId, error: 'Something went wrong' }, ctx);
       expect(res.ok).toBe(true);
     });
 
     test('should return error for non-existent job', async () => {
-      const res = await handleFail(
-        { cmd: 'FAIL', id: 'non-existent', error: 'Oops' },
-        ctx
-      );
+      const res = await handleFail({ cmd: 'FAIL', id: 'non-existent', error: 'Oops' }, ctx);
       expect(res.ok).toBe(false);
     });
 
@@ -603,11 +556,7 @@ describe('Core Handlers', () => {
       const pullRes = await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
       const jobId = (pullRes as any).job.id;
 
-      const res = await handleFail(
-        { cmd: 'FAIL', id: jobId, reqId: 'req-fail' },
-        ctx,
-        'req-fail'
-      );
+      const res = await handleFail({ cmd: 'FAIL', id: jobId, reqId: 'req-fail' }, ctx, 'req-fail');
       expect(res.reqId).toBe('req-fail');
     });
   });
@@ -714,10 +663,7 @@ describe('Query Handlers', () => {
     });
 
     test('should propagate reqId', async () => {
-      const pushRes = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: {} },
-        ctx
-      );
+      const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
       const jobId = (pushRes as any).id;
 
       const res = await handleGetState(
@@ -760,10 +706,7 @@ describe('Query Handlers', () => {
     });
 
     test('should propagate reqId', async () => {
-      const pushRes = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: {} },
-        ctx
-      );
+      const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
       const res = await handleGetResult(
         { cmd: 'GetResult', id: (pushRes as any).id, reqId: 'req-result' },
         ctx,
@@ -777,10 +720,7 @@ describe('Query Handlers', () => {
 
   describe('handleGetJobCounts', () => {
     test('should return zero counts for empty queue', () => {
-      const res = handleGetJobCounts(
-        { cmd: 'GetJobCounts', queue: 'emails' },
-        ctx
-      );
+      const res = handleGetJobCounts({ cmd: 'GetJobCounts', queue: 'emails' }, ctx);
       expect(res.ok).toBe(true);
       const counts = (res as any).counts;
       expect(counts.waiting).toBe(0);
@@ -852,10 +792,7 @@ describe('Query Handlers', () => {
         await handlePush({ cmd: 'PUSH', queue: 'emails', data: { id: i } }, ctx);
       }
 
-      const res = await handleGetJobs(
-        { cmd: 'GetJobs', queue: 'emails' },
-        ctx
-      );
+      const res = await handleGetJobs({ cmd: 'GetJobs', queue: 'emails' }, ctx);
       expect(res.ok).toBe(true);
       expect((res as any).jobs.length).toBe(5);
     });
@@ -894,10 +831,7 @@ describe('Query Handlers', () => {
     });
 
     test('should return empty array for empty queue', async () => {
-      const res = await handleGetJobs(
-        { cmd: 'GetJobs', queue: 'non-existent' },
-        ctx
-      );
+      const res = await handleGetJobs({ cmd: 'GetJobs', queue: 'non-existent' }, ctx);
       expect(res.ok).toBe(true);
       expect((res as any).jobs).toHaveLength(0);
     });
@@ -952,10 +886,7 @@ describe('Query Handlers', () => {
 
       await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
 
-      await handleProgress(
-        { cmd: 'Progress', id: jobId, progress: 42, message: 'Step 2' },
-        ctx
-      );
+      await handleProgress({ cmd: 'Progress', id: jobId, progress: 42, message: 'Step 2' }, ctx);
 
       const res = await handleGetProgress({ cmd: 'GetProgress', id: jobId }, ctx);
       expect(res.ok).toBe(true);
@@ -964,18 +895,12 @@ describe('Query Handlers', () => {
     });
 
     test('should return error for non-active job', async () => {
-      const res = await handleGetProgress(
-        { cmd: 'GetProgress', id: 'non-existent' },
-        ctx
-      );
+      const res = await handleGetProgress({ cmd: 'GetProgress', id: 'non-existent' }, ctx);
       expect(res.ok).toBe(false);
     });
 
     test('should propagate reqId', async () => {
-      const pushRes = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: {} },
-        ctx
-      );
+      const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
       const jobId = (pushRes as any).id;
       await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
       await handleProgress({ cmd: 'Progress', id: jobId, progress: 10 }, ctx);
@@ -1032,10 +957,7 @@ describe('Management Handlers', () => {
     });
 
     test('should propagate reqId', async () => {
-      const pushRes = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: {} },
-        ctx
-      );
+      const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
       const res = await handleCancel(
         { cmd: 'Cancel', id: (pushRes as any).id, reqId: 'req-cancel' },
         ctx,
@@ -1064,18 +986,12 @@ describe('Management Handlers', () => {
     });
 
     test('should return error for non-active job', async () => {
-      const res = await handleProgress(
-        { cmd: 'Progress', id: 'non-existent', progress: 50 },
-        ctx
-      );
+      const res = await handleProgress({ cmd: 'Progress', id: 'non-existent', progress: 50 }, ctx);
       expect(res.ok).toBe(false);
     });
 
     test('should propagate reqId', async () => {
-      const pushRes = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: {} },
-        ctx
-      );
+      const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
       await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
 
       const res = await handleProgress(
@@ -1239,10 +1155,7 @@ describe('Advanced Handlers', () => {
       );
       const jobId = (pushRes as any).id;
 
-      const res = await handleUpdate(
-        { cmd: 'Update', id: jobId, data: { msg: 'updated' } },
-        ctx
-      );
+      const res = await handleUpdate({ cmd: 'Update', id: jobId, data: { msg: 'updated' } }, ctx);
       expect(res.ok).toBe(true);
 
       // Verify data was updated
@@ -1259,10 +1172,7 @@ describe('Advanced Handlers', () => {
     });
 
     test('should propagate reqId', async () => {
-      const pushRes = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: {} },
-        ctx
-      );
+      const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
       const res = await handleUpdate(
         { cmd: 'Update', id: (pushRes as any).id, data: {}, reqId: 'req-upd' },
         ctx,
@@ -1302,10 +1212,7 @@ describe('Advanced Handlers', () => {
     });
 
     test('should propagate reqId', async () => {
-      const pushRes = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: {} },
-        ctx
-      );
+      const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
       const res = await handleChangePriority(
         { cmd: 'ChangePriority', id: (pushRes as any).id, priority: 5, reqId: 'req-cp' },
         ctx,
@@ -1389,10 +1296,7 @@ describe('Advanced Handlers', () => {
     });
 
     test('should propagate reqId', async () => {
-      const pushRes = await handlePush(
-        { cmd: 'PUSH', queue: 'emails', data: {} },
-        ctx
-      );
+      const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
       const res = await handleDiscard(
         { cmd: 'Discard', id: (pushRes as any).id, reqId: 'req-disc' },
         ctx,
@@ -1421,23 +1325,14 @@ describe('Handler Router', () => {
   });
 
   test('should route PUSH command', async () => {
-    const res = await handleCommand(
-      { cmd: 'PUSH', queue: 'emails', data: { msg: 'routed' } },
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'PUSH', queue: 'emails', data: { msg: 'routed' } }, ctx);
     expect(res.ok).toBe(true);
     expect((res as any).id).toBeDefined();
   });
 
   test('should route PULL command', async () => {
-    await handleCommand(
-      { cmd: 'PUSH', queue: 'emails', data: { msg: 'test' } },
-      ctx
-    );
-    const res = await handleCommand(
-      { cmd: 'PULL', queue: 'emails' },
-      ctx
-    );
+    await handleCommand({ cmd: 'PUSH', queue: 'emails', data: { msg: 'test' } }, ctx);
+    const res = await handleCommand({ cmd: 'PULL', queue: 'emails' }, ctx);
     expect(res.ok).toBe(true);
   });
 
@@ -1460,22 +1355,13 @@ describe('Handler Router', () => {
   });
 
   test('should route Cancel command', async () => {
-    const pushRes = await handleCommand(
-      { cmd: 'PUSH', queue: 'emails', data: {} },
-      ctx
-    );
-    const res = await handleCommand(
-      { cmd: 'Cancel', id: (pushRes as any).id },
-      ctx
-    );
+    const pushRes = await handleCommand({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
+    const res = await handleCommand({ cmd: 'Cancel', id: (pushRes as any).id }, ctx);
     expect(res.ok).toBe(true);
   });
 
   test('should return error for unknown command', async () => {
-    const res = await handleCommand(
-      { cmd: 'UnknownCommand' } as any,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'UnknownCommand' } as any, ctx);
     expect(res.ok).toBe(false);
     expect((res as any).error).toContain('Unknown command');
   });
@@ -1484,10 +1370,7 @@ describe('Handler Router', () => {
     ctx.authTokens = new Set(['secret-token']);
     ctx.authenticated = false;
 
-    const res = await handleCommand(
-      { cmd: 'PUSH', queue: 'emails', data: {} },
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
     expect(res.ok).toBe(false);
     expect((res as any).error).toContain('Not authenticated');
   });
@@ -1496,10 +1379,7 @@ describe('Handler Router', () => {
     ctx.authTokens = new Set(['secret-token']);
     ctx.authenticated = false;
 
-    const res = await handleCommand(
-      { cmd: 'Auth', token: 'secret-token' },
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'Auth', token: 'secret-token' }, ctx);
     expect(res.ok).toBe(true);
     expect(ctx.authenticated).toBe(true);
   });
@@ -1508,10 +1388,7 @@ describe('Handler Router', () => {
     ctx.authTokens = new Set(['secret-token']);
     ctx.authenticated = false;
 
-    const res = await handleCommand(
-      { cmd: 'Auth', token: 'wrong-token' },
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'Auth', token: 'wrong-token' }, ctx);
     expect(res.ok).toBe(false);
     expect((res as any).error).toContain('Invalid token');
   });
@@ -1522,32 +1399,20 @@ describe('Handler Router', () => {
 
     await handleCommand({ cmd: 'Auth', token: 'secret-token' }, ctx);
 
-    const res = await handleCommand(
-      { cmd: 'PUSH', queue: 'emails', data: {} },
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'PUSH', queue: 'emails', data: {} }, ctx);
     expect(res.ok).toBe(true);
   });
 
   test('should route Pause and Resume commands', async () => {
-    const pauseRes = await handleCommand(
-      { cmd: 'Pause', queue: 'emails' },
-      ctx
-    );
+    const pauseRes = await handleCommand({ cmd: 'Pause', queue: 'emails' }, ctx);
     expect(pauseRes.ok).toBe(true);
 
-    const resumeRes = await handleCommand(
-      { cmd: 'Resume', queue: 'emails' },
-      ctx
-    );
+    const resumeRes = await handleCommand({ cmd: 'Resume', queue: 'emails' }, ctx);
     expect(resumeRes.ok).toBe(true);
   });
 
   test('should route Drain command', async () => {
-    const res = await handleCommand(
-      { cmd: 'Drain', queue: 'emails' },
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'Drain', queue: 'emails' }, ctx);
     expect(res.ok).toBe(true);
   });
 
@@ -1633,10 +1498,7 @@ describe('End-to-End Flows', () => {
 
     // Pull and fail
     await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
-    const failRes = await handleFail(
-      { cmd: 'FAIL', id: jobId, error: 'Connection timeout' },
-      ctx
-    );
+    const failRes = await handleFail({ cmd: 'FAIL', id: jobId, error: 'Connection timeout' }, ctx);
     expect(failRes.ok).toBe(true);
 
     // Job should be back in waiting (retry)
@@ -1652,11 +1514,7 @@ describe('End-to-End Flows', () => {
       {
         cmd: 'PUSHB',
         queue: 'emails',
-        jobs: [
-          { data: { id: 1 } },
-          { data: { id: 2 } },
-          { data: { id: 3 } },
-        ],
+        jobs: [{ data: { id: 1 } }, { data: { id: 2 } }, { data: { id: 3 } }],
       },
       ctx
     );
@@ -1667,10 +1525,7 @@ describe('End-to-End Flows', () => {
     expect((countsRes as any).counts.waiting).toBe(3);
 
     // Pull batch
-    const pullRes = await handlePullBatch(
-      { cmd: 'PULLB', queue: 'emails', count: 3 },
-      ctx
-    );
+    const pullRes = await handlePullBatch({ cmd: 'PULLB', queue: 'emails', count: 3 }, ctx);
     expect((pullRes as any).jobs).toHaveLength(3);
 
     // Verify active counts
@@ -1685,10 +1540,7 @@ describe('End-to-End Flows', () => {
   });
 
   test('push -> cancel -> verify removed', async () => {
-    const pushRes = await handlePush(
-      { cmd: 'PUSH', queue: 'emails', data: { msg: 'test' } },
-      ctx
-    );
+    const pushRes = await handlePush({ cmd: 'PUSH', queue: 'emails', data: { msg: 'test' } }, ctx);
     const jobId = (pushRes as any).id;
 
     // Cancel
@@ -1737,10 +1589,7 @@ describe('End-to-End Flows', () => {
     const jobId = (pushRes as any).id;
 
     // Update data
-    await handleUpdate(
-      { cmd: 'Update', id: jobId, data: { msg: 'modified', extra: true } },
-      ctx
-    );
+    await handleUpdate({ cmd: 'Update', id: jobId, data: { msg: 'modified', extra: true } }, ctx);
 
     // Pull and verify data
     const pullRes = await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);
@@ -1760,10 +1609,7 @@ describe('End-to-End Flows', () => {
     const id1 = (push1 as any).id;
 
     // Change first job to higher priority
-    await handleChangePriority(
-      { cmd: 'ChangePriority', id: id1, priority: 100 },
-      ctx
-    );
+    await handleChangePriority({ cmd: 'ChangePriority', id: id1, priority: 100 }, ctx);
 
     // Pull should return the higher priority job first
     const pullRes = await handlePull({ cmd: 'PULL', queue: 'emails' }, ctx);

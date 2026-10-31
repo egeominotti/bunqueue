@@ -34,8 +34,14 @@ function sendCommand(
       socket.data.reject = null;
       reject(new Error('Command timeout'));
     }, timeoutMs);
-    socket.data.resolve = (v) => { clearTimeout(tid); resolve(v); };
-    socket.data.reject = (e) => { clearTimeout(tid); reject(e); };
+    socket.data.resolve = (v) => {
+      clearTimeout(tid);
+      resolve(v);
+    };
+    socket.data.reject = (e) => {
+      clearTimeout(tid);
+      reject(e);
+    };
     socket.write(FrameParser.frame(pack(command)));
   });
 }
@@ -141,10 +147,18 @@ describe('CLI Client - socket handler simulation', () => {
   test('data handler resolves on valid framed msgpack', () => {
     const sd: SocketData = { frameParser: new FrameParser(), resolve: null, reject: null };
     let resolved: Record<string, unknown> | null = null;
-    sd.resolve = (v) => { resolved = v; };
-    const frames = sd.frameParser.addData(new Uint8Array(FrameParser.frame(pack({ ok: true, id: '42' }))));
+    sd.resolve = (v) => {
+      resolved = v;
+    };
+    const frames = sd.frameParser.addData(
+      new Uint8Array(FrameParser.frame(pack({ ok: true, id: '42' })))
+    );
     for (const f of frames) {
-      if (sd.resolve) { sd.resolve(unpack(f) as Record<string, unknown>); sd.resolve = null; sd.reject = null; }
+      if (sd.resolve) {
+        sd.resolve(unpack(f) as Record<string, unknown>);
+        sd.resolve = null;
+        sd.reject = null;
+      }
     }
     expect(resolved).not.toBeNull();
     expect(resolved!.id).toBe('42');
@@ -153,11 +167,16 @@ describe('CLI Client - socket handler simulation', () => {
   test('data handler rejects on FrameSizeError', () => {
     const sd: SocketData = { frameParser: new FrameParser(64), resolve: null, reject: null };
     let err: Error | null = null;
-    sd.reject = (e) => { err = e; };
-    try { sd.frameParser.addData(new Uint8Array([0, 0, 1, 0])); } catch (e) {
+    sd.reject = (e) => {
+      err = e;
+    };
+    try {
+      sd.frameParser.addData(new Uint8Array([0, 0, 1, 0]));
+    } catch (e) {
       if (e instanceof FrameSizeError && sd.reject) {
         sd.reject(new Error(`Frame too large: ${e.requestedSize} exceeds ${e.maxSize}`));
-        sd.resolve = null; sd.reject = null;
+        sd.resolve = null;
+        sd.reject = null;
       }
     }
     expect(err!.message).toContain('Frame too large');
@@ -166,7 +185,9 @@ describe('CLI Client - socket handler simulation', () => {
   test('close handler rejects pending command', () => {
     const sd: SocketData = { frameParser: new FrameParser(), resolve: null, reject: null };
     let err: Error | null = null;
-    sd.reject = (e) => { err = e; };
+    sd.reject = (e) => {
+      err = e;
+    };
     if (sd.reject) sd.reject(new Error('Connection closed'));
     expect(err!.message).toBe('Connection closed');
   });
@@ -184,11 +205,22 @@ describe('CLI Client - connect failures', () => {
     const promise = new Promise((resolve, reject) => {
       const tid = setTimeout(() => reject(new Error('Connection timeout')), 1000);
       void Bun.connect({
-        hostname: 'localhost', port: 1,
+        hostname: 'localhost',
+        port: 1,
         socket: {
-          data() {}, open() { clearTimeout(tid); resolve(true); }, close() {},
-          error(_s, e) { reject(new Error(`Connection error: ${e.message}`)); },
-          connectError(_s, e) { clearTimeout(tid); reject(new Error(`Failed: ${e.message}`)); },
+          data() {},
+          open() {
+            clearTimeout(tid);
+            resolve(true);
+          },
+          close() {},
+          error(_s, e) {
+            reject(new Error(`Connection error: ${e.message}`));
+          },
+          connectError(_s, e) {
+            clearTimeout(tid);
+            reject(new Error(`Failed: ${e.message}`));
+          },
         },
       });
     });
@@ -198,7 +230,9 @@ describe('CLI Client - connect failures', () => {
   test('connection timeout pattern rejects correctly', async () => {
     const promise = new Promise((_resolve, reject) => {
       const connected = false;
-      setTimeout(() => { if (!connected) reject(new Error('Connection timeout')); }, 100);
+      setTimeout(() => {
+        if (!connected) reject(new Error('Connection timeout'));
+      }, 100);
     });
     await expect(promise).rejects.toThrow('Connection timeout');
   });
@@ -210,9 +244,18 @@ describe('CLI Client - buildCommand routing', () => {
     const { buildCoreCommand } = await import('../src/cli/commands/core');
     const { buildMonitorCommand } = await import('../src/cli/commands/monitor');
     switch (command) {
-      case 'push': case 'pull': case 'ack': case 'fail': return buildCoreCommand(command, args);
-      case 'stats': case 'metrics': case 'health': case 'ping': return buildMonitorCommand(command);
-      default: return null;
+      case 'push':
+      case 'pull':
+      case 'ack':
+      case 'fail':
+        return buildCoreCommand(command, args);
+      case 'stats':
+      case 'metrics':
+      case 'health':
+      case 'ping':
+        return buildMonitorCommand(command);
+      default:
+        return null;
     }
   }
 
@@ -240,7 +283,9 @@ describe('CLI Client - buildCommand routing', () => {
 describe('CLI Client - ClientOptions interface', () => {
   test('accepts minimal required fields with token optional', () => {
     const opts: import('../src/cli/client').ClientOptions = {
-      host: 'localhost', port: 6789, json: false,
+      host: 'localhost',
+      port: 6789,
+      json: false,
     };
     expect(opts.host).toBe('localhost');
     expect(opts.port).toBe(6789);
@@ -250,7 +295,10 @@ describe('CLI Client - ClientOptions interface', () => {
 
   test('accepts all fields including token', () => {
     const opts: import('../src/cli/client').ClientOptions = {
-      host: '127.0.0.1', port: 7000, json: true, token: 'my-secret',
+      host: '127.0.0.1',
+      port: 7000,
+      json: true,
+      token: 'my-secret',
     };
     expect(opts.token).toBe('my-secret');
     expect(opts.json).toBe(true);

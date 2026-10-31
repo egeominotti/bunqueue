@@ -71,10 +71,14 @@ async function main() {
 
     // Process the job
     let processed = false;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      processed = true;
-      return { done: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        processed = true;
+        return { done: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -122,10 +126,14 @@ async function main() {
     await queue.add('process-unique', { value: 1 }, { jobId: 'process-key-5' });
 
     let processed = false;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (job) => {
-      processed = true;
-      return { value: (job.data as { value: number }).value * 2 };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        processed = true;
+        return { value: (job.data as { value: number }).value * 2 };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();

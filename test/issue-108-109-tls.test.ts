@@ -34,10 +34,22 @@ let server: TcpServer;
 
 function genCert(cert: string, key: string): void {
   const gen = Bun.spawnSync([
-    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
-    '-keyout', key, '-out', cert, '-days', '2', '-nodes',
-    '-subj', '/CN=localhost',
-    '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1',
+    'openssl',
+    'req',
+    '-x509',
+    '-newkey',
+    'rsa:2048',
+    '-keyout',
+    key,
+    '-out',
+    cert,
+    '-days',
+    '2',
+    '-nodes',
+    '-subj',
+    '/CN=localhost',
+    '-addext',
+    'subjectAltName=DNS:localhost,IP:127.0.0.1',
   ]);
   if (gen.exitCode !== 0) throw new Error(`openssl failed: ${gen.stderr.toString()}`);
 }
@@ -51,7 +63,11 @@ beforeAll(() => {
   genCert(OTHER_CERT, join(certDir, 'other-key.pem'));
 
   qm = new QueueManager();
-  server = createTcpServer(qm, { port: TLS_PORT, hostname: '127.0.0.1', tls: { certFile: CERT, keyFile: KEY } });
+  server = createTcpServer(qm, {
+    port: TLS_PORT,
+    hostname: '127.0.0.1',
+    tls: { certFile: CERT, keyFile: KEY },
+  });
 });
 
 afterAll(() => {
@@ -67,7 +83,10 @@ function makeFakeSocket() {
   const writes: Uint8Array[] = [];
   return {
     data: undefined as unknown, // NOT yet set — as if `open` never ran
-    write(d: Uint8Array) { writes.push(d); return d.length; },
+    write(d: Uint8Array) {
+      writes.push(d);
+      return d.length;
+    },
     end() {},
     terminate() {},
     _writes: writes,
@@ -82,20 +101,34 @@ async function rawTlsPing(rejectUnauthorized = false): Promise<Record<string, un
       if (settled) return;
       settled = true;
       clearTimeout(t);
-      try { s?.end(); } catch { /* closed */ }
+      try {
+        s?.end();
+      } catch {
+        /* closed */
+      }
       resolve(v);
     };
     const t = setTimeout(() => finish(null), 2000);
     void (Bun.connect as (o: unknown) => Promise<unknown>)({
-      hostname: '127.0.0.1', port: TLS_PORT,
+      hostname: '127.0.0.1',
+      port: TLS_PORT,
       tls: { rejectUnauthorized },
       socket: {
-        open(s: { write: (d: Uint8Array) => void }) { s.write(FrameParser.frame(pack({ cmd: 'Ping', reqId: 'r' }))); },
-        data(s: { end: () => void }, d: Buffer) {
-          for (const f of parser.addData(d)) { finish(unpack(f) as Record<string, unknown>, s); return; }
+        open(s: { write: (d: Uint8Array) => void }) {
+          s.write(FrameParser.frame(pack({ cmd: 'Ping', reqId: 'r' })));
         },
-        error() { finish(null); },
-        connectError() { finish(null); },
+        data(s: { end: () => void }, d: Buffer) {
+          for (const f of parser.addData(d)) {
+            finish(unpack(f) as Record<string, unknown>, s);
+            return;
+          }
+        },
+        error() {
+          finish(null);
+        },
+        connectError() {
+          finish(null);
+        },
       },
     }).catch(() => finish(null));
   });
@@ -105,13 +138,15 @@ describe('#108 TLS data-before-open must not crash the server', () => {
   // Bun can fire `data` before `open` under TLS; the old handler destructured a
   // null `socket.data` and the TypeError escalated to a full server shutdown.
   const getHandlers = () =>
-    (server as unknown as {
-      _socketHandlers: {
-        data: (s: unknown, d: Buffer) => Promise<void>;
-        close: (s: unknown) => void;
-        drain: (s: unknown) => void;
-      };
-    })._socketHandlers;
+    (
+      server as unknown as {
+        _socketHandlers: {
+          data: (s: unknown, d: Buffer) => Promise<void>;
+          close: (s: unknown) => void;
+          drain: (s: unknown) => void;
+        };
+      }
+    )._socketHandlers;
 
   test('data() handles an uninitialised socket.data (lazy init, no throw)', async () => {
     const handlers = getHandlers();
@@ -145,11 +180,11 @@ describe('#108 TLS data-before-open must not crash the server', () => {
 
 describe('#109 TLS client must authenticate the server certificate', () => {
   const connect = (tls: unknown) =>
-    createConnection(
-      { host: 'localhost', port: TLS_PORT, tls } as never,
-      3000,
-      { onData: () => {}, onClose: () => {}, onError: () => {} }
-    );
+    createConnection({ host: 'localhost', port: TLS_PORT, tls } as never, 3000, {
+      onData: () => {},
+      onClose: () => {},
+      onError: () => {},
+    });
 
   test('right pinned CA is accepted', async () => {
     const { cleanup } = await connect({ caFile: CERT, rejectUnauthorized: true });
@@ -188,7 +223,13 @@ describe('#109 TLS client must authenticate the server certificate', () => {
     const muteServer = Bun.listen({
       hostname: '127.0.0.1',
       port: 18812,
-      socket: { open(s: { end?: () => void }) { held.push(s); }, data() {}, close() {} },
+      socket: {
+        open(s: { end?: () => void }) {
+          held.push(s);
+        },
+        data() {},
+        close() {},
+      },
     });
     try {
       const start = Date.now();

@@ -48,9 +48,13 @@ describe('resumeCompensation does not replay a settled reversal', () => {
           if (refuseB) throw new Error('provider refused the reversal');
         },
       })
-      .step('boom', async () => {
-        throw new Error('run failed');
-      }, { retry: 1 });
+      .step(
+        'boom',
+        async () => {
+          throw new Error('run failed');
+        },
+        { retry: 1 }
+      );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);

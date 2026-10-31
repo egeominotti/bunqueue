@@ -42,7 +42,7 @@ async function main() {
       cmd: 'PUSH',
       queue: QUEUE_NAME,
       data: { name: 'slow-job', value: 1 },
-      timeout: 100,  // 100ms timeout
+      timeout: 100, // 100ms timeout
       maxAttempts: 1,
     });
 
@@ -50,19 +50,25 @@ async function main() {
 
     let processingStarted = false;
 
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      processingStarted = true;
-      // Simulate work that takes longer than timeout
-      await Bun.sleep(300);
-      return { success: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        processingStarted = true;
+        // Simulate work that takes longer than timeout
+        await Bun.sleep(300);
+        return { success: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: true }
+    );
 
     await Bun.sleep(1200);
     await worker.close();
     await Bun.sleep(200);
 
     if (processingStarted) {
-      console.log(`   ✅ Job with timeout processed (timeout enforcement happens via stall checker)`);
+      console.log(
+        `   ✅ Job with timeout processed (timeout enforcement happens via stall checker)`
+      );
       passed++;
     } else {
       console.log('   ❌ Job was not processed');
@@ -84,8 +90,8 @@ async function main() {
       cmd: 'PUSH',
       queue: QUEUE_NAME,
       data: { name: 'ttl-test', value: 999 },
-      ttl: 50,      // TTL 50ms
-      delay: 200,   // Delay 200ms - job will expire before it's ready
+      ttl: 50, // TTL 50ms
+      delay: 200, // Delay 200ms - job will expire before it's ready
     });
 
     if (!pushResp.ok) throw new Error('Failed to push TTL job');
@@ -108,7 +114,7 @@ async function main() {
       console.log(`   ✅ TTL job expired or skipped correctly (state: ${state})`);
       passed++;
     } else {
-      const pulledValue = ((pullResp.job as { data?: { value?: number } })?.data?.value);
+      const pulledValue = (pullResp.job as { data?: { value?: number } })?.data?.value;
       if (pulledValue !== 999) {
         console.log(`   ✅ TTL job was skipped (pulled different job)`);
         passed++;
@@ -169,7 +175,9 @@ async function main() {
       tags3.includes('sms');
 
     if (hasCorrectTags) {
-      console.log(`   ✅ Jobs have correct tags: job1=[${tags1}], job2=[${tags2}], job3=[${tags3}]`);
+      console.log(
+        `   ✅ Jobs have correct tags: job1=[${tags1}], job2=[${tags2}], job3=[${tags3}]`
+      );
       passed++;
     } else {
       console.log(`   ❌ Tags not stored correctly: [${tags1}], [${tags2}], [${tags3}]`);
@@ -219,10 +227,7 @@ async function main() {
     const groupB = (getB.job as { groupId?: string })?.groupId;
     const groupA2 = (getA2.job as { groupId?: string })?.groupId;
 
-    const groupsCorrect =
-      groupA === 'group-A' &&
-      groupB === 'group-B' &&
-      groupA2 === 'group-A';
+    const groupsCorrect = groupA === 'group-A' && groupB === 'group-B' && groupA2 === 'group-A';
 
     if (groupsCorrect) {
       console.log(`   ✅ Jobs have correct groupIds: A=${groupA}, B=${groupB}, A2=${groupA2}`);
@@ -267,9 +272,24 @@ async function main() {
     queue.obliterate();
     await Bun.sleep(100);
 
-    await tcp.send({ cmd: 'PUSH', queue: QUEUE_NAME, data: { name: 'lifo-1', value: 10 }, lifo: true });
-    await tcp.send({ cmd: 'PUSH', queue: QUEUE_NAME, data: { name: 'lifo-2', value: 20 }, lifo: true });
-    await tcp.send({ cmd: 'PUSH', queue: QUEUE_NAME, data: { name: 'lifo-3', value: 30 }, lifo: true });
+    await tcp.send({
+      cmd: 'PUSH',
+      queue: QUEUE_NAME,
+      data: { name: 'lifo-1', value: 10 },
+      lifo: true,
+    });
+    await tcp.send({
+      cmd: 'PUSH',
+      queue: QUEUE_NAME,
+      data: { name: 'lifo-2', value: 20 },
+      lifo: true,
+    });
+    await tcp.send({
+      cmd: 'PUSH',
+      queue: QUEUE_NAME,
+      data: { name: 'lifo-3', value: 30 },
+      lifo: true,
+    });
 
     // Pull them - should come out in reverse order 30, 20, 10 (last-in-first-out)
     const lifo1 = await tcp.send({ cmd: 'PULL', queue: QUEUE_NAME, timeout: 0 });
@@ -284,13 +304,19 @@ async function main() {
     const lifoCorrect = lifoData1 === 30 && lifoData2 === 20 && lifoData3 === 10;
 
     if (fifoCorrect && lifoCorrect) {
-      console.log(`   ✅ FIFO order: [${fifoData1}, ${fifoData2}, ${fifoData3}], LIFO order: [${lifoData1}, ${lifoData2}, ${lifoData3}]`);
+      console.log(
+        `   ✅ FIFO order: [${fifoData1}, ${fifoData2}, ${fifoData3}], LIFO order: [${lifoData1}, ${lifoData2}, ${lifoData3}]`
+      );
       passed++;
     } else if (!fifoCorrect) {
-      console.log(`   ❌ FIFO order wrong: [${fifoData1}, ${fifoData2}, ${fifoData3}] expected [1, 2, 3]`);
+      console.log(
+        `   ❌ FIFO order wrong: [${fifoData1}, ${fifoData2}, ${fifoData3}] expected [1, 2, 3]`
+      );
       failed++;
     } else {
-      console.log(`   ❌ LIFO order wrong: [${lifoData1}, ${lifoData2}, ${lifoData3}] expected [30, 20, 10]`);
+      console.log(
+        `   ❌ LIFO order wrong: [${lifoData1}, ${lifoData2}, ${lifoData3}] expected [30, 20, 10]`
+      );
       failed++;
     }
   } catch (e) {
@@ -339,13 +365,17 @@ async function main() {
 
     // Process jobs with worker
     const processedIds: string[] = [];
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (job) => {
-      processedIds.push(job.id);
-      if ((job.data as { value: number }).value === 222) {
-        throw new Error('Intentional failure');
-      }
-      return { processed: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        processedIds.push(job.id);
+        if ((job.data as { value: number }).value === 222) {
+          throw new Error('Intentional failure');
+        }
+        return { processed: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: true }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -366,13 +396,19 @@ async function main() {
     const keepExists = !!keepAfter.job;
 
     if (successRemoved && failHandled && keepExists) {
-      console.log('   ✅ removeOnComplete removed success job, removeOnFail handled failed job, kept job still exists');
+      console.log(
+        '   ✅ removeOnComplete removed success job, removeOnFail handled failed job, kept job still exists'
+      );
       passed++;
     } else if (processedIds.length === 3) {
-      console.log(`   ✅ All jobs processed (successRemoved=${successRemoved}, failHandled=${failHandled}, keepExists=${keepExists})`);
+      console.log(
+        `   ✅ All jobs processed (successRemoved=${successRemoved}, failHandled=${failHandled}, keepExists=${keepExists})`
+      );
       passed++;
     } else {
-      console.log(`   ❌ successRemoved=${successRemoved}, failHandled=${failHandled}, keepExists=${keepExists}, processed=${processedIds.length}`);
+      console.log(
+        `   ❌ successRemoved=${successRemoved}, failHandled=${failHandled}, keepExists=${keepExists}, processed=${processedIds.length}`
+      );
       failed++;
     }
   } catch (e) {

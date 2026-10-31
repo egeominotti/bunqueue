@@ -25,8 +25,12 @@ import { jobId } from '../src/domain/types/job';
 describe('pushJob (embedded)', () => {
   let ctx: PushContext;
 
-  beforeEach(() => { ctx = { embedded: true, tcp: null }; });
-  afterEach(() => { shutdownManager(); });
+  beforeEach(() => {
+    ctx = { embedded: true, tcp: null };
+  });
+  afterEach(() => {
+    shutdownManager();
+  });
 
   test('should push a job with no options and return a string ID', async () => {
     const id = await pushJob(ctx, 'push-test', { value: 1 });
@@ -49,9 +53,16 @@ describe('pushJob (embedded)', () => {
   });
 
   test('should push with attempts, backoff, and timeout options', async () => {
-    const id = await pushJob(ctx, 'push-test', {}, {
-      attempts: 5, backoff: 2000, timeout: 15000,
-    });
+    const id = await pushJob(
+      ctx,
+      'push-test',
+      {},
+      {
+        attempts: 5,
+        backoff: 2000,
+        timeout: 15000,
+      }
+    );
     expect(typeof id).toBe('string');
   });
 
@@ -62,7 +73,12 @@ describe('pushJob (embedded)', () => {
 
   test('should push with removeOnComplete and removeOnFail', async () => {
     const id1 = await pushJob(ctx, 'push-test', {}, { removeOnComplete: true, removeOnFail: true });
-    const id2 = await pushJob(ctx, 'push-test', {}, { removeOnComplete: false, removeOnFail: false });
+    const id2 = await pushJob(
+      ctx,
+      'push-test',
+      {},
+      { removeOnComplete: false, removeOnFail: false }
+    );
     expect(typeof id1).toBe('string');
     expect(typeof id2).toBe('string');
   });
@@ -75,10 +91,20 @@ describe('pushJob (embedded)', () => {
   });
 
   test('should push with all options combined', async () => {
-    const id = await pushJob(ctx, 'push-test', { full: true }, {
-      priority: 5, delay: 1000, attempts: 3, backoff: 500,
-      timeout: 10000, removeOnComplete: true, removeOnFail: false,
-    });
+    const id = await pushJob(
+      ctx,
+      'push-test',
+      { full: true },
+      {
+        priority: 5,
+        delay: 1000,
+        attempts: 3,
+        backoff: 500,
+        timeout: 10000,
+        removeOnComplete: true,
+        removeOnFail: false,
+      }
+    );
     expect(typeof id).toBe('string');
   });
 
@@ -104,14 +130,21 @@ describe('pushJob (embedded)', () => {
 describe('pushJobWithParent (embedded)', () => {
   let ctx: PushContext;
 
-  beforeEach(() => { ctx = { embedded: true, tcp: null }; });
-  afterEach(() => { shutdownManager(); });
+  beforeEach(() => {
+    ctx = { embedded: true, tcp: null };
+  });
+  afterEach(() => {
+    shutdownManager();
+  });
 
   test('should push a job with parentRef', async () => {
     const parentId = await pushJob(ctx, 'parent-q', { role: 'parent' });
     const childId = await pushJobWithParent(ctx, {
-      queueName: 'child-q', data: { role: 'child' }, opts: {},
-      parentRef: { id: parentId, queue: 'parent-q' }, childIds: [],
+      queueName: 'child-q',
+      data: { role: 'child' },
+      opts: {},
+      parentRef: { id: parentId, queue: 'parent-q' },
+      childIds: [],
     });
     expect(typeof childId).toBe('string');
     expect(childId).not.toBe(parentId);
@@ -119,8 +152,11 @@ describe('pushJobWithParent (embedded)', () => {
 
   test('should push a job with null parentRef', async () => {
     const id = await pushJobWithParent(ctx, {
-      queueName: 'test-q', data: { standalone: true }, opts: {},
-      parentRef: null, childIds: [],
+      queueName: 'test-q',
+      data: { standalone: true },
+      opts: {},
+      parentRef: null,
+      childIds: [],
     });
     expect(typeof id).toBe('string');
   });
@@ -129,26 +165,37 @@ describe('pushJobWithParent (embedded)', () => {
     const child1 = await pushJob(ctx, 'flow-q', { step: 'c1' });
     const child2 = await pushJob(ctx, 'flow-q', { step: 'c2' });
     const parentId = await pushJobWithParent(ctx, {
-      queueName: 'flow-q', data: { step: 'parent' }, opts: {},
-      parentRef: null, childIds: [child1, child2],
+      queueName: 'flow-q',
+      data: { step: 'parent' },
+      opts: {},
+      parentRef: null,
+      childIds: [child1, child2],
     });
     expect(typeof parentId).toBe('string');
   });
 
   test('should pass job options through', async () => {
     const id = await pushJobWithParent(ctx, {
-      queueName: 'opts-q', data: {},
+      queueName: 'opts-q',
+      data: {},
       opts: { priority: 20, attempts: 4, timeout: 5000 },
-      parentRef: null, childIds: [],
+      parentRef: null,
+      childIds: [],
     });
     expect(typeof id).toBe('string');
   });
 
   test('should throw when TCP not initialized in non-embedded mode', async () => {
     const tcpCtx: PushContext = { embedded: false, tcp: null };
-    await expect(pushJobWithParent(tcpCtx, {
-      queueName: 'q', data: {}, opts: {}, parentRef: null, childIds: [],
-    })).rejects.toThrow('TCP connection not initialized');
+    await expect(
+      pushJobWithParent(tcpCtx, {
+        queueName: 'q',
+        data: {},
+        opts: {},
+        parentRef: null,
+        childIds: [],
+      })
+    ).rejects.toThrow('TCP connection not initialized');
   });
 });
 
@@ -159,8 +206,12 @@ describe('pushJobWithParent (embedded)', () => {
 describe('cleanupJobs', () => {
   let ctx: PushContext;
 
-  beforeEach(() => { ctx = { embedded: true, tcp: null }; });
-  afterEach(() => { shutdownManager(); });
+  beforeEach(() => {
+    ctx = { embedded: true, tcp: null };
+  });
+  afterEach(() => {
+    shutdownManager();
+  });
 
   test('should return immediately for empty jobIds array', async () => {
     await expect(cleanupJobs(ctx, [])).resolves.toBeUndefined();
@@ -200,8 +251,12 @@ describe('cleanupJobs', () => {
 describe('BullMQ Compat - getPrioritized', () => {
   let queue: Queue<Record<string, unknown>>;
 
-  beforeEach(() => { queue = new Queue('compat-prioritized'); });
-  afterEach(() => { shutdownManager(); });
+  beforeEach(() => {
+    queue = new Queue('compat-prioritized');
+  });
+  afterEach(() => {
+    shutdownManager();
+  });
 
   test('should return empty array for empty queue', async () => {
     const jobs = await queue.getPrioritized();
@@ -229,8 +284,12 @@ describe('BullMQ Compat - getPrioritized', () => {
 describe('BullMQ Compat - getPrioritizedCount', () => {
   let queue: Queue<Record<string, unknown>>;
 
-  beforeEach(() => { queue = new Queue('compat-pri-count'); });
-  afterEach(() => { shutdownManager(); });
+  beforeEach(() => {
+    queue = new Queue('compat-pri-count');
+  });
+  afterEach(() => {
+    shutdownManager();
+  });
 
   test('should return 0 for empty queue', async () => {
     const count = await queue.getPrioritizedCount();
@@ -260,8 +319,12 @@ describe('BullMQ Compat - getPrioritizedCount', () => {
 describe('BullMQ Compat - getWaitingChildren', () => {
   let queue: Queue<Record<string, unknown>>;
 
-  beforeEach(() => { queue = new Queue('compat-waiting-children'); });
-  afterEach(() => { shutdownManager(); });
+  beforeEach(() => {
+    queue = new Queue('compat-waiting-children');
+  });
+  afterEach(() => {
+    shutdownManager();
+  });
 
   test('should return empty array when no waiting-children jobs exist', async () => {
     const jobs = await queue.getWaitingChildren();
@@ -279,8 +342,12 @@ describe('BullMQ Compat - getWaitingChildren', () => {
 describe('BullMQ Compat - getWaitingChildrenCount', () => {
   let queue: Queue<Record<string, unknown>>;
 
-  beforeEach(() => { queue = new Queue('compat-wc-count'); });
-  afterEach(() => { shutdownManager(); });
+  beforeEach(() => {
+    queue = new Queue('compat-wc-count');
+  });
+  afterEach(() => {
+    shutdownManager();
+  });
 
   test('should return 0 when no waiting-children jobs exist', async () => {
     const count = await queue.getWaitingChildrenCount();

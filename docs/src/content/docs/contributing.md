@@ -81,7 +81,11 @@ before fixing it. The model run is required in addition to the final isolated
 
 We use Bun's built-in tools only: [`bun check`](https://bun.com/docs/runtime/check)
 for type checking and [`bun fmt`](https://bun.com/docs/format) for formatting,
-configured in the `[fmt]` section of `bunfig.toml`. There is no separate linter.
+configured in the `[fmt]` section of `bunfig.toml`. They are the only type-check
+and format tools for JavaScript and TypeScript, in this repository and in every
+SDK: ESLint, Prettier, Biome, oxlint, oxfmt and `tsc --noEmit` are not used, and
+there is no JavaScript linter. SDKs in other languages keep their own toolchain
+(`gofmt`, `go vet`, `cargo fmt`, `cargo clippy`, `mix format`, `php -l`).
 
 ```bash
 # Type check
@@ -143,7 +147,7 @@ How was this tested?
 
 ## Checklist
 - [ ] Tests pass
-- [ ] Linting passes
+- [ ] `bun run typecheck` and `bun run format:check` pass
 - [ ] Documentation updated
 ```
 

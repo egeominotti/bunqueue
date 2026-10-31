@@ -32,7 +32,7 @@ describe('Backpressure - Embedded', () => {
         completed++;
         return {};
       },
-      { embedded: true, concurrency: 10 },
+      { embedded: true, concurrency: 10 }
     );
 
     for (let i = 0; i < 10; i++) {
@@ -72,7 +72,7 @@ describe('Backpressure - Embedded', () => {
         completionTimestamps.push(Date.now());
         return {};
       },
-      { embedded: true, concurrency: 5 },
+      { embedded: true, concurrency: 5 }
     );
 
     for (let i = 0; i < 5; i++) {
@@ -122,7 +122,7 @@ describe('Backpressure - Embedded', () => {
         completionTimestamps.push(Date.now());
         return {};
       },
-      { embedded: true, concurrency: 10 },
+      { embedded: true, concurrency: 10 }
     );
 
     for (let i = 0; i < 10; i++) {
@@ -138,7 +138,8 @@ describe('Backpressure - Embedded', () => {
     // With rate limit of 3, not all 10 jobs should complete instantly
     // Verify there is some throttling: total duration > 0
     if (completionTimestamps.length >= 5) {
-      const duration = completionTimestamps[completionTimestamps.length - 1] - completionTimestamps[0];
+      const duration =
+        completionTimestamps[completionTimestamps.length - 1] - completionTimestamps[0];
       // Rate limiting should cause some spread in completion times
       expect(duration).toBeGreaterThan(0);
     }
@@ -164,7 +165,7 @@ describe('Backpressure - Embedded', () => {
         completed++;
         return {};
       },
-      { embedded: true, concurrency: 5 },
+      { embedded: true, concurrency: 5 }
     );
 
     for (let i = 0; i < 5; i++) {
@@ -218,7 +219,7 @@ describe('Backpressure - Embedded', () => {
         completed++;
         return {};
       },
-      { embedded: true, concurrency: 5 },
+      { embedded: true, concurrency: 5 }
     );
 
     for (let i = 0; i < 10; i++) {
@@ -254,7 +255,7 @@ describe('Backpressure - Embedded', () => {
         completed++;
         return {};
       },
-      { embedded: true, concurrency: 10 },
+      { embedded: true, concurrency: 10 }
     );
 
     // Burst: add 100 jobs at once
@@ -301,17 +302,15 @@ describe('Backpressure - Embedded', () => {
       return {};
     };
 
-    const worker1 = new Worker<{ idx: number }>(
-      'bp-multi-worker',
-      processor,
-      { embedded: true, concurrency: 5 },
-    );
+    const worker1 = new Worker<{ idx: number }>('bp-multi-worker', processor, {
+      embedded: true,
+      concurrency: 5,
+    });
 
-    const worker2 = new Worker<{ idx: number }>(
-      'bp-multi-worker',
-      processor,
-      { embedded: true, concurrency: 5 },
-    );
+    const worker2 = new Worker<{ idx: number }>('bp-multi-worker', processor, {
+      embedded: true,
+      concurrency: 5,
+    });
 
     for (let i = 0; i < 20; i++) {
       await queue.add('task', { idx: i });

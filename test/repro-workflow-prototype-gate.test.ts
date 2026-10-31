@@ -75,7 +75,9 @@ describe('a gate named after an inherited member still waits', () => {
   test('a payload-less signal on such a gate still counts', async () => {
     engine = new Engine({ embedded: true });
     engine.register(
-      new Workflow('gate-bare').waitFor('constructor', { timeout: 20_000 }).step('beyond', async () => ({}))
+      new Workflow('gate-bare')
+        .waitFor('constructor', { timeout: 20_000 })
+        .step('beyond', async () => ({}))
     );
 
     const run = await engine.start('gate-bare');

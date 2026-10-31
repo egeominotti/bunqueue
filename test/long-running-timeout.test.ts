@@ -309,11 +309,15 @@ describe('Long-running Jobs & Timeouts - Embedded', () => {
       return w;
     }
 
-    await queue.add('retry-timeout-job', { value: 1 }, {
-      timeout: 500,
-      attempts: 3,
-      backoff: 100,
-    });
+    await queue.add(
+      'retry-timeout-job',
+      { value: 1 },
+      {
+        timeout: 500,
+        attempts: 3,
+        backoff: 100,
+      }
+    );
 
     // Run through up to 3 worker cycles (one per attempt).
     // Each cycle: create worker -> wait ~5s for timeout check -> force close.

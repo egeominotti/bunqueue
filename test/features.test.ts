@@ -7,13 +7,7 @@
  */
 
 import { describe, it, expect, afterEach } from 'bun:test';
-import {
-  Queue,
-  Worker,
-  QueueGroup,
-  FlowProducer,
-  shutdownManager,
-} from '../src/client';
+import { Queue, Worker, QueueGroup, FlowProducer, shutdownManager } from '../src/client';
 
 describe('Bulk Operations', () => {
   afterEach(() => {
@@ -151,9 +145,13 @@ describe('Repeatable Jobs', () => {
       return { done: true };
     });
 
-    await queue.add('task', { value: 42 }, {
-      repeat: { every: 50, limit: 3 },
-    });
+    await queue.add(
+      'task',
+      { value: 42 },
+      {
+        repeat: { every: 50, limit: 3 },
+      }
+    );
 
     // Wait for all repetitions
     await Bun.sleep(400);
@@ -172,9 +170,13 @@ describe('Repeatable Jobs', () => {
       return {};
     });
 
-    await queue.add('task', {}, {
-      repeat: { every: 30, limit: 2 },
-    });
+    await queue.add(
+      'task',
+      {},
+      {
+        repeat: { every: 30, limit: 2 },
+      }
+    );
 
     await Bun.sleep(300);
 
@@ -193,9 +195,7 @@ describe('Repeatable Jobs', () => {
       return {};
     });
 
-    await queue.addBulk([
-      { name: 'task', data: {}, opts: { repeat: { every: 50, limit: 2 } } },
-    ]);
+    await queue.addBulk([{ name: 'task', data: {}, opts: { repeat: { every: 50, limit: 2 } } }]);
 
     await Bun.sleep(300);
 
@@ -393,10 +393,14 @@ describe('Integration', () => {
     const queue = group.getQueue<{ i: number }>('test');
     let completed = 0;
 
-    const worker = group.getWorker('test', async () => {
-      completed++;
-      return {};
-    }, { concurrency: 50 });
+    const worker = group.getWorker(
+      'test',
+      async () => {
+        completed++;
+        return {};
+      },
+      { concurrency: 50 }
+    );
 
     const jobs = Array.from({ length: 500 }, (_, i) => ({
       name: 'task',

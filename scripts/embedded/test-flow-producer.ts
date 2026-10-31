@@ -160,9 +160,7 @@ const tests = [
           name: 'branch1',
           queueName: 'test-flow-tree',
           data: { level: 1 },
-          children: [
-            { name: 'leaf1', queueName: 'test-flow-tree', data: { level: 2 } },
-          ],
+          children: [{ name: 'leaf1', queueName: 'test-flow-tree', data: { level: 2 } }],
         },
         { name: 'branch2', queueName: 'test-flow-tree', data: { level: 1 } },
       ],
@@ -206,9 +204,13 @@ const tests = [
     // Create a parent job and complete it
     const parentJob = await queue.add('parent', { value: 100 });
 
-    const worker = new Worker('test-flow-parent-result', async (job) => {
-      return { computed: job.data.value * 2 };
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-flow-parent-result',
+      async (job) => {
+        return { computed: job.data.value * 2 };
+      },
+      { embedded: true, autorun: true }
+    );
 
     await Bun.sleep(300);
 
@@ -233,9 +235,13 @@ const tests = [
     const job1 = await queue.add('parent1', { value: 10 });
     const job2 = await queue.add('parent2', { value: 20 });
 
-    const worker = new Worker('test-flow-parent-results', async (job) => {
-      return { result: job.data.value };
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-flow-parent-results',
+      async (job) => {
+        return { result: job.data.value };
+      },
+      { embedded: true, autorun: true }
+    );
 
     await Bun.sleep(300);
 

@@ -31,13 +31,17 @@ async function main() {
     let maxConcurrent = 0;
     let currentConcurrent = 0;
 
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async () => {
-      currentConcurrent++;
-      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-      await Bun.sleep(100);
-      currentConcurrent--;
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async () => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await Bun.sleep(100);
+        currentConcurrent--;
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(600);
     await worker.close();
@@ -69,13 +73,17 @@ async function main() {
     let maxConcurrent = 0;
     let currentConcurrent = 0;
 
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async () => {
-      currentConcurrent++;
-      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-      await Bun.sleep(200);
-      currentConcurrent--;
-      return {};
-    }, { concurrency: 5, embedded: true });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async () => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await Bun.sleep(200);
+        currentConcurrent--;
+        return {};
+      },
+      { concurrency: 5, embedded: true }
+    );
 
     await Bun.sleep(800);
     await worker.close();
@@ -108,14 +116,18 @@ async function main() {
     let currentConcurrent = 0;
     let processed = 0;
 
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async () => {
-      currentConcurrent++;
-      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-      await Bun.sleep(50);
-      currentConcurrent--;
-      processed++;
-      return {};
-    }, { concurrency: 20, embedded: true });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async () => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await Bun.sleep(50);
+        currentConcurrent--;
+        processed++;
+        return {};
+      },
+      { concurrency: 20, embedded: true }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -146,17 +158,25 @@ async function main() {
 
     const processedBy = new Map<string, number>();
 
-    const worker1 = new Worker<{ index: number }>(QUEUE_NAME, async () => {
-      processedBy.set('worker1', (processedBy.get('worker1') ?? 0) + 1);
-      await Bun.sleep(50);
-      return {};
-    }, { concurrency: 2, embedded: true });
+    const worker1 = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async () => {
+        processedBy.set('worker1', (processedBy.get('worker1') ?? 0) + 1);
+        await Bun.sleep(50);
+        return {};
+      },
+      { concurrency: 2, embedded: true }
+    );
 
-    const worker2 = new Worker<{ index: number }>(QUEUE_NAME, async () => {
-      processedBy.set('worker2', (processedBy.get('worker2') ?? 0) + 1);
-      await Bun.sleep(50);
-      return {};
-    }, { concurrency: 2, embedded: true });
+    const worker2 = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async () => {
+        processedBy.set('worker2', (processedBy.get('worker2') ?? 0) + 1);
+        await Bun.sleep(50);
+        return {};
+      },
+      { concurrency: 2, embedded: true }
+    );
 
     await Bun.sleep(1000);
     await worker1.close();
@@ -165,7 +185,9 @@ async function main() {
     const total = (processedBy.get('worker1') ?? 0) + (processedBy.get('worker2') ?? 0);
 
     if (total === 20) {
-      console.log(`   ✅ Jobs distributed: worker1=${processedBy.get('worker1')}, worker2=${processedBy.get('worker2')}`);
+      console.log(
+        `   ✅ Jobs distributed: worker1=${processedBy.get('worker1')}, worker2=${processedBy.get('worker2')}`
+      );
       passed++;
     } else {
       console.log(`   ❌ Total processed: ${total}, expected 20`);
@@ -190,11 +212,15 @@ async function main() {
 
     let processed = 0;
 
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async () => {
-      processed++;
-      await Bun.sleep(50);
-      return {};
-    }, { concurrency: 1, autorun: false, embedded: true });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async () => {
+        processed++;
+        await Bun.sleep(50);
+        return {};
+      },
+      { concurrency: 1, autorun: false, embedded: true }
+    );
 
     // Process first batch
     worker.run();
@@ -212,10 +238,14 @@ async function main() {
     await worker.close();
 
     if (afterFirst > 0 && afterPause === afterFirst && processed === 5) {
-      console.log(`   ✅ Pause/resume works: first=${afterFirst}, paused=${afterPause}, final=${processed}`);
+      console.log(
+        `   ✅ Pause/resume works: first=${afterFirst}, paused=${afterPause}, final=${processed}`
+      );
       passed++;
     } else {
-      console.log(`   ❌ Pause/resume failed: first=${afterFirst}, paused=${afterPause}, final=${processed}`);
+      console.log(
+        `   ❌ Pause/resume failed: first=${afterFirst}, paused=${afterPause}, final=${processed}`
+      );
       failed++;
     }
   } catch (e) {
@@ -238,10 +268,14 @@ async function main() {
 
     let processed = 0;
 
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async () => {
-      processed++;
-      return {};
-    }, { concurrency: 3, embedded: true });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async () => {
+        processed++;
+        return {};
+      },
+      { concurrency: 3, embedded: true }
+    );
 
     // Wait while paused
     await Bun.sleep(300);

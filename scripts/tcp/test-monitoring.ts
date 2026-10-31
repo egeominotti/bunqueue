@@ -202,7 +202,7 @@ async function main() {
     ) {
       console.log('   PASS Prometheus format valid');
       console.log('   Sample lines:');
-      const lines = prometheusMetrics.split('\n').filter(l => !l.startsWith('#') && l.trim());
+      const lines = prometheusMetrics.split('\n').filter((l) => !l.startsWith('#') && l.trim());
       for (const line of lines.slice(0, 5)) {
         console.log(`     ${line}`);
       }
@@ -240,7 +240,9 @@ async function main() {
       passed++;
     } else {
       console.log(`   FAIL Stats not updated correctly after adding jobs`);
-      console.log(`     - waiting: ${queuedBefore} -> ${queuedAfter} (expected >= ${queuedBefore + 3})`);
+      console.log(
+        `     - waiting: ${queuedBefore} -> ${queuedAfter} (expected >= ${queuedBefore + 3})`
+      );
       failed++;
     }
   } catch (e) {
@@ -257,9 +259,13 @@ async function main() {
     const completedBefore = (statsDataBefore?.completed as number) ?? 0;
 
     // Process jobs
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (job) => {
-      return { processed: (job.data as { value: number }).value };
-    }, { concurrency: 5, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        return { processed: (job.data as { value: number }).value };
+      },
+      { concurrency: 5, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();

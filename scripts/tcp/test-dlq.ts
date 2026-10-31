@@ -27,10 +27,14 @@ async function main() {
     await queue.add('dlq-job', { value: 1 }, { attempts: 2, backoff: 50 });
 
     let attempts = 0;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      attempts++;
-      throw new Error('Always fails');
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        attempts++;
+        throw new Error('Always fails');
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -60,10 +64,14 @@ async function main() {
     ]);
 
     let failCount = 0;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      failCount++;
-      throw new Error('Intentional failure');
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        failCount++;
+        throw new Error('Intentional failure');
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -88,10 +96,14 @@ async function main() {
     await Bun.sleep(200);
 
     let retryCount = 0;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      retryCount++;
-      return { success: true }; // Now succeed
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        retryCount++;
+        return { success: true }; // Now succeed
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -115,14 +127,22 @@ async function main() {
     queue.obliterate();
     await Bun.sleep(100);
 
-    await queue.add('remove-on-fail', { value: 99 }, {
-      attempts: 1,
-      removeOnFail: true,
-    });
+    await queue.add(
+      'remove-on-fail',
+      { value: 99 },
+      {
+        attempts: 1,
+        removeOnFail: true,
+      }
+    );
 
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      throw new Error('Fail and remove');
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        throw new Error('Fail and remove');
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -147,9 +167,13 @@ async function main() {
       { name: 'purge-2', data: { value: 2 }, opts: { attempts: 1 } },
     ]);
 
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      throw new Error('Fail for purge test');
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        throw new Error('Fail for purge test');
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -174,11 +198,15 @@ async function main() {
     await queue.add('retry-success', { value: 42 }, { attempts: 3, backoff: 50 });
 
     let attempts = 0;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      attempts++;
-      if (attempts < 3) throw new Error('Not yet');
-      return { success: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        attempts++;
+        if (attempts < 3) throw new Error('Not yet');
+        return { success: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();

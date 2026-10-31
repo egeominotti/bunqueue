@@ -202,10 +202,9 @@ describe('DLQ Patterns - Embedded', () => {
   }, 30000);
 
   test('5. DLQ preserves job data', async () => {
-    const queue = new Queue<{ user: string; action: string; amount: number }>(
-      'dlq-pat-data',
-      { embedded: true }
-    );
+    const queue = new Queue<{ user: string; action: string; amount: number }>('dlq-pat-data', {
+      embedded: true,
+    });
     queue.obliterate();
     queue.setDlqConfig({ maxEntries: 1000 });
 

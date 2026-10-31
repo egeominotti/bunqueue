@@ -123,7 +123,9 @@ describe('S3 Backup Config', () => {
   });
 
   test('reports all errors at once', () => {
-    const r = validateConfig(cfg({ accessKeyId: '', secretAccessKey: '', bucket: '', databasePath: '' }));
+    const r = validateConfig(
+      cfg({ accessKeyId: '', secretAccessKey: '', bucket: '', databasePath: '' })
+    );
     expect(r.valid).toBe(false);
     expect(r.errors).toHaveLength(4);
   });
@@ -150,7 +152,11 @@ describe('performBackup', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -206,7 +212,11 @@ describe('listBackups', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -247,7 +257,11 @@ describe('restoreBackup', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -306,7 +320,11 @@ describe('cleanupOldBackups', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });

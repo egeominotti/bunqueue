@@ -38,7 +38,7 @@ function makeQueue(name: string): Queue {
 function makeWorker(
   name: string,
   processor: (job: any) => Promise<any>,
-  opts: Record<string, any> = {},
+  opts: Record<string, any> = {}
 ): Worker {
   const w = new Worker(name, processor, {
     connection: connOpts,
@@ -87,7 +87,9 @@ async function main() {
     } else if (stateInCallback === 'completed') {
       ok(`getJobState() returned 'completed' inside completed callback`);
     } else {
-      fail(`getJobState() returned '${stateInCallback}' inside completed callback (expected 'completed')`);
+      fail(
+        `getJobState() returned '${stateInCallback}' inside completed callback (expected 'completed')`
+      );
     }
   } catch (err: any) {
     fail(`Error: ${err.message}`);
@@ -106,9 +108,13 @@ async function main() {
     let completedCount = 0;
     const totalJobs = 5;
 
-    const w = makeWorker('tcp-issue72-multi-race', async (job) => {
-      return { id: job.id };
-    }, { concurrency: 5 });
+    const w = makeWorker(
+      'tcp-issue72-multi-race',
+      async (job) => {
+        return { id: job.id };
+      },
+      { concurrency: 5 }
+    );
 
     w.on('completed', async (job) => {
       const state = await q.getJobState(job.id);
@@ -134,7 +140,9 @@ async function main() {
       if (wrongStates.length === 0) {
         ok(`All ${totalJobs} jobs returned 'completed' state in callback`);
       } else {
-        fail(`${wrongStates.length}/${totalJobs} jobs had wrong state in callback: ${JSON.stringify(wrongStates)}`);
+        fail(
+          `${wrongStates.length}/${totalJobs} jobs had wrong state in callback: ${JSON.stringify(wrongStates)}`
+        );
       }
     }
   } catch (err: any) {
@@ -175,7 +183,9 @@ async function main() {
     } else if (jobStateResult === 'completed') {
       ok(`job.getState() returned 'completed' inside completed callback`);
     } else {
-      fail(`job.getState() returned '${jobStateResult}' inside completed callback (expected 'completed')`);
+      fail(
+        `job.getState() returned '${jobStateResult}' inside completed callback (expected 'completed')`
+      );
     }
   } catch (err: any) {
     fail(`Error: ${err.message}`);
@@ -183,11 +193,17 @@ async function main() {
 
   // Cleanup
   for (const w of workers) {
-    try { await w.close(); } catch {}
+    try {
+      await w.close();
+    } catch {}
   }
   for (const q of queues) {
-    try { q.obliterate(); } catch {}
-    try { await q.close(); } catch {}
+    try {
+      q.obliterate();
+    } catch {}
+    try {
+      await q.close();
+    } catch {}
   }
 
   console.log(`\n--- Results: ${passed} passed, ${failed} failed ---`);

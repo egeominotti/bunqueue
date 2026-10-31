@@ -20,7 +20,12 @@ describe('HTTP Dashboard Pagination', () => {
     const httpServer = createHttpServer(qm, { port: 0 });
     baseUrl = `http://localhost:${httpServer.server.port}`;
     stop = () => httpServer.stop();
-    ctx = { queueManager: qm, authTokens: new Set<string>(), authenticated: false, clientId: 'test' };
+    ctx = {
+      queueManager: qm,
+      authTokens: new Set<string>(),
+      authenticated: false,
+      clientId: 'test',
+    };
   });
 
   afterEach(() => {
@@ -47,7 +52,10 @@ describe('HTTP Dashboard Pagination', () => {
 
     test('limit restricts number of queues returned', async () => {
       for (let i = 0; i < 10; i++) {
-        await handleCommand({ cmd: 'PUSH', queue: `q-${String(i).padStart(2, '0')}`, data: {} }, ctx);
+        await handleCommand(
+          { cmd: 'PUSH', queue: `q-${String(i).padStart(2, '0')}`, data: {} },
+          ctx
+        );
       }
 
       const res = await fetch(`${baseUrl}/dashboard/queues?limit=3`);
@@ -61,7 +69,10 @@ describe('HTTP Dashboard Pagination', () => {
 
     test('offset skips queues', async () => {
       for (let i = 0; i < 10; i++) {
-        await handleCommand({ cmd: 'PUSH', queue: `q-${String(i).padStart(2, '0')}`, data: {} }, ctx);
+        await handleCommand(
+          { cmd: 'PUSH', queue: `q-${String(i).padStart(2, '0')}`, data: {} },
+          ctx
+        );
       }
 
       const res = await fetch(`${baseUrl}/dashboard/queues?limit=3&offset=7`);

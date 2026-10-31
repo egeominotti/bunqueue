@@ -158,9 +158,13 @@ describe("a sub-workflow's own failure survives a store that cannot record it", 
     // the diff.
     engine = new Engine({ embedded: true });
     engine.register(
-      new Workflow('mask-child').step('boom', async () => {
-        throw new Error('CHILD CARD DECLINED');
-      }, { retry: 1 })
+      new Workflow('mask-child').step(
+        'boom',
+        async () => {
+          throw new Error('CHILD CARD DECLINED');
+        },
+        { retry: 1 }
+      )
     );
     engine.register(
       new Workflow('mask-parent')

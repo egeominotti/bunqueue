@@ -112,9 +112,13 @@ describe('TCP orphan recovery', () => {
           jobLocks: Map<unknown, unknown>;
           jobIndex: Map<
             unknown,
-            { type: string; shardIdx: number; queueName: string } | { type: string; queueName: string }
+            | { type: string; shardIdx: number; queueName: string }
+            | { type: string; queueName: string }
           >;
-          processingShards: Map<unknown, { lastHeartbeat: number | null; startedAt: number | null }>[];
+          processingShards: Map<
+            unknown,
+            { lastHeartbeat: number | null; startedAt: number | null }
+          >[];
         };
       };
     };
@@ -176,7 +180,8 @@ describe('TCP orphan recovery', () => {
           clientJobs: Map<string, Set<unknown>>;
           jobIndex: Map<
             unknown,
-            { type: string; shardIdx: number; queueName: string } | { type: string; queueName: string }
+            | { type: string; shardIdx: number; queueName: string }
+            | { type: string; queueName: string }
           >;
           processingShards: Map<unknown, { lastHeartbeat: number | null }>[];
         };

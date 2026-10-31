@@ -10,18 +10,14 @@ afterEach(async () => {
   } catch {}
 });
 
-function waitForState(
-  eng: Engine,
-  id: string,
-  target: string,
-  timeoutMs = 5000
-): Promise<void> {
+function waitForState(eng: Engine, id: string, target: string, timeoutMs = 5000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = () => {
       const exec = eng.getExecution(id);
       if (exec?.state === target) return resolve();
-      if (Date.now() - start > timeoutMs) return reject(new Error(`Timeout waiting for state "${target}"`));
+      if (Date.now() - start > timeoutMs)
+        return reject(new Error(`Timeout waiting for state "${target}"`));
       setTimeout(check, 50);
     };
     check();
@@ -58,11 +54,13 @@ describe('type-safe workflow steps', () => {
   });
 
   test('input type is properly threaded through steps', async () => {
-    const flow = new Workflow<{ name: string; age: number }>('typed-input')
-      .step('greet', async (ctx) => {
+    const flow = new Workflow<{ name: string; age: number }>('typed-input').step(
+      'greet',
+      async (ctx) => {
         // ctx.input should be typed as { name: string; age: number }
         return { greeting: `Hello ${ctx.input.name}, age ${ctx.input.age}` };
-      });
+      }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -124,10 +122,9 @@ describe('type-safe workflow steps', () => {
   });
 
   test('subWorkflow result is typed under sub: prefix', async () => {
-    const childFlow = new Workflow<{ amount: number }>('payment')
-      .step('charge', async (ctx) => {
-        return { txId: `tx_${ctx.input.amount}` };
-      });
+    const childFlow = new Workflow<{ amount: number }>('payment').step('charge', async (ctx) => {
+      return { txId: `tx_${ctx.input.amount}` };
+    });
 
     const parentFlow = new Workflow<{ amount: number }>('order')
       .step('init', async (ctx) => ({ orderId: 'O1', amount: ctx.input.amount }))

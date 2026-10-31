@@ -27,11 +27,15 @@ async function main() {
     await queue.add('retry-job', { failCount: 0 }, { attempts: 3, backoff: 100 });
 
     let attempts = 0;
-    const worker = new Worker<{ failCount: number }>(QUEUE_NAME, async () => {
-      attempts++;
-      if (attempts < 3) throw new Error(`Attempt ${attempts} failed`);
-      return { success: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ failCount: number }>(
+      QUEUE_NAME,
+      async () => {
+        attempts++;
+        if (attempts < 3) throw new Error(`Attempt ${attempts} failed`);
+        return { success: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -57,11 +61,15 @@ async function main() {
     await queue.add('backoff-job', { failCount: 0 }, { attempts: 3, backoff: 200 });
 
     const attemptTimes: number[] = [];
-    const worker = new Worker<{ failCount: number }>(QUEUE_NAME, async () => {
-      attemptTimes.push(Date.now());
-      if (attemptTimes.length < 3) throw new Error('Still failing');
-      return { done: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ failCount: number }>(
+      QUEUE_NAME,
+      async () => {
+        attemptTimes.push(Date.now());
+        if (attemptTimes.length < 3) throw new Error('Still failing');
+        return { done: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(2000);
     await worker.close();
@@ -93,10 +101,14 @@ async function main() {
     await queue.add('max-attempts-job', { failCount: 0 }, { attempts: 2, backoff: 50 });
 
     let totalAttempts = 0;
-    const worker = new Worker<{ failCount: number }>(QUEUE_NAME, async () => {
-      totalAttempts++;
-      throw new Error('Always fails');
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ failCount: number }>(
+      QUEUE_NAME,
+      async () => {
+        totalAttempts++;
+        throw new Error('Always fails');
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -123,11 +135,15 @@ async function main() {
     await queue.add('exp-backoff-job', { failCount: 0 }, { attempts: 4, backoff: 100 });
 
     const attemptTimes: number[] = [];
-    const worker = new Worker<{ failCount: number }>(QUEUE_NAME, async () => {
-      attemptTimes.push(Date.now());
-      if (attemptTimes.length < 3) throw new Error('Failing');
-      return { done: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ failCount: number }>(
+      QUEUE_NAME,
+      async () => {
+        attemptTimes.push(Date.now());
+        if (attemptTimes.length < 3) throw new Error('Failing');
+        return { done: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(2000);
     await worker.close();
@@ -165,12 +181,16 @@ async function main() {
     let attemptCount = 0;
     let finalResult: unknown = null;
 
-    const worker = new Worker<{ failCount: number }>(QUEUE_NAME, async () => {
-      attemptCount++;
-      if (attemptCount < 3) throw new Error('Not ready');
-      finalResult = { value: 42 };
-      return finalResult;
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ failCount: number }>(
+      QUEUE_NAME,
+      async () => {
+        attemptCount++;
+        if (attemptCount < 3) throw new Error('Not ready');
+        finalResult = { value: 42 };
+        return finalResult;
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -200,22 +220,27 @@ async function main() {
     ]);
 
     const jobAttempts = new Map<string, number>();
-    const worker = new Worker<{ failCount: number }>(QUEUE_NAME, async (job) => {
-      const key = job.name;
-      const attempts = (jobAttempts.get(key) ?? 0) + 1;
-      jobAttempts.set(key, attempts);
+    const worker = new Worker<{ failCount: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        const key = job.name;
+        const attempts = (jobAttempts.get(key) ?? 0) + 1;
+        jobAttempts.set(key, attempts);
 
-      if (attempts <= job.data.failCount) {
-        throw new Error('Configured to fail');
-      }
-      return { success: true };
-    }, { concurrency: 2, connection: { port: TCP_PORT }, useLocks: false });
+        if (attempts <= job.data.failCount) {
+          throw new Error('Configured to fail');
+        }
+        return { success: true };
+      },
+      { concurrency: 2, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
 
     const totalAttempts = Array.from(jobAttempts.values()).reduce((a, b) => a + b, 0);
-    if (totalAttempts >= 4) { // 2+2+1 = 5 total
+    if (totalAttempts >= 4) {
+      // 2+2+1 = 5 total
       console.log(`   ✅ Multiple jobs completed with ${totalAttempts} total attempts`);
       passed++;
     } else {

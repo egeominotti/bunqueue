@@ -28,7 +28,11 @@ async function main() {
 
       if (req.method === 'POST') {
         const body = await req.json();
-        const result = { weather: 'sunny', temp: 22, city: (body as Record<string, unknown>).city ?? 'unknown' };
+        const result = {
+          weather: 'sunny',
+          temp: 22,
+          city: (body as Record<string, unknown>).city ?? 'unknown',
+        };
         results.push({ time: new Date().toISOString(), data: result });
         return Response.json(result);
       }
@@ -68,7 +72,9 @@ async function main() {
 
   const crons = manager.listCrons();
   console.log(`    Cron created: ${crons[0].name}, queue: ${crons[0].queue}`);
-  console.log(`    Next run: ${crons[0].nextRun ? new Date(crons[0].nextRun).toISOString() : 'now'}\n`);
+  console.log(
+    `    Next run: ${crons[0].nextRun ? new Date(crons[0].nextRun).toISOString() : 'now'}\n`
+  );
 
   // 4. Wait and observe
   console.log('[4] Waiting 7 seconds for cron ticks + processing...\n');
@@ -90,7 +96,9 @@ async function main() {
 
   // 7. Verify
   const success = results.length >= 3;
-  console.log(`\n[7] Test ${success ? 'PASSED' : 'FAILED'}: ${results.length} HTTP calls (expected >= 3)`);
+  console.log(
+    `\n[7] Test ${success ? 'PASSED' : 'FAILED'}: ${results.length} HTTP calls (expected >= 3)`
+  );
 
   // Cleanup
   manager.removeCron('check-meteo');

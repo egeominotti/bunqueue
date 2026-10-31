@@ -27,8 +27,16 @@ describe('REPRO: deduplication.replace/extend ignored in embedded', () => {
     q.obliterate();
     await Bun.sleep(50);
 
-    const a = await q.add('r', { v: 'A' }, { deduplication: { id: 'RK', ttl: 60_000, replace: true } });
-    const b = await q.add('r', { v: 'B' }, { deduplication: { id: 'RK', ttl: 60_000, replace: true } });
+    const a = await q.add(
+      'r',
+      { v: 'A' },
+      { deduplication: { id: 'RK', ttl: 60_000, replace: true } }
+    );
+    const b = await q.add(
+      'r',
+      { v: 'B' },
+      { deduplication: { id: 'RK', ttl: 60_000, replace: true } }
+    );
 
     // Replace must produce a NEW job, evict the old one, and keep exactly one.
     expect(a.id).not.toBe(b.id); // RED: both collapse to the dedup id 'RK'
@@ -67,8 +75,16 @@ describe('REPRO: deduplication.replace/extend ignored in embedded', () => {
     q.obliterate();
     await Bun.sleep(50);
 
-    const a = await q.add('r', { v: 'A' }, { deduplication: { id: 'DK1', ttl: 60_000, replace: true } });
-    const b = await q.add('r', { v: 'B' }, { deduplication: { id: 'DK2', ttl: 60_000, replace: true } });
+    const a = await q.add(
+      'r',
+      { v: 'A' },
+      { deduplication: { id: 'DK1', ttl: 60_000, replace: true } }
+    );
+    const b = await q.add(
+      'r',
+      { v: 'B' },
+      { deduplication: { id: 'DK2', ttl: 60_000, replace: true } }
+    );
 
     expect(a.id).not.toBe(b.id);
     const counts = await q.getJobCounts();

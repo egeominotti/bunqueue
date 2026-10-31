@@ -29,9 +29,7 @@ import { Workflow } from '../src/client/workflow';
 
 describe('retry must be a positive attempt count', () => {
   test('retry: 0 is refused where it is written, not at run time', () => {
-    expect(() =>
-      new Workflow('r0').step('a', async () => ({}), { retry: 0 })
-    ).toThrow(/retry/);
+    expect(() => new Workflow('r0').step('a', async () => ({}), { retry: 0 })).toThrow(/retry/);
   });
 
   test('a negative or fractional retry is refused too', () => {
@@ -39,9 +37,9 @@ describe('retry must be a positive attempt count', () => {
     expect(() => new Workflow('r-frac').step('a', async () => ({}), { retry: 1.5 })).toThrow(
       /retry/
     );
-    expect(() =>
-      new Workflow('r-nan').step('a', async () => ({}), { retry: Number.NaN })
-    ).toThrow(/retry/);
+    expect(() => new Workflow('r-nan').step('a', async () => ({}), { retry: Number.NaN })).toThrow(
+      /retry/
+    );
   });
 
   test('the message says what to write instead', () => {

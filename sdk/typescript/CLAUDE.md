@@ -24,7 +24,9 @@ serialization, Queue, Worker, FlowProducer, query, or admin code.
    Node ESM cannot resolve.
 6. **Format and types**: `bun run check` (`bun fmt --check` and `bun run
    typecheck`, which runs `bun check`) must be clean before any change is
-   considered done.
+   considered done. These are the only type-check and format tools: never add
+   `tsc --noEmit`, ESLint, Prettier, Biome, oxlint, oxfmt or lint-suppression
+   comments. `tsc` stays only for the build that emits files.
 7. **Protocol source of truth**: `../../src/domain/types/command.ts`
    (commands), `../../src/domain/types/response.ts` (responses),
    `../../src/infrastructure/server/handlers/` (actual shapes). When in

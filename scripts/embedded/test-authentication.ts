@@ -75,10 +75,14 @@ async function main() {
     await queue.add('process-test', { message: 'process me' });
 
     let processed = false;
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async (job) => {
-      processed = true;
-      return { success: true };
-    }, { concurrency: 1 });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async (job) => {
+        processed = true;
+        return { success: true };
+      },
+      { concurrency: 1 }
+    );
 
     await Bun.sleep(500);
     await worker.close();

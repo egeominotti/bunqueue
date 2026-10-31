@@ -10,8 +10,7 @@ describe('engine.recover()', () => {
   });
 
   test('recovers nothing when all executions are terminal', async () => {
-    const wf = new Workflow('done-wf')
-      .step('a', async () => ({ done: true }));
+    const wf = new Workflow('done-wf').step('a', async () => ({ done: true }));
 
     engine = new Engine({ embedded: true });
     engine.register(wf);
@@ -71,8 +70,7 @@ describe('engine.recover()', () => {
   });
 
   test('recover() is idempotent', async () => {
-    const wf = new Workflow('idemp-wf')
-      .step('a', async () => ({ done: true }));
+    const wf = new Workflow('idemp-wf').step('a', async () => ({ done: true }));
 
     engine = new Engine({ embedded: true });
     engine.register(wf);
@@ -86,11 +84,8 @@ describe('engine.recover()', () => {
   });
 
   test('recover() reports correct counts for mixed states', async () => {
-    const wfDone = new Workflow('mix-done')
-      .step('a', async () => ({ done: true }));
-    const wfWait = new Workflow('mix-wait')
-      .step('a', async () => ({ ok: true }))
-      .waitFor('signal');
+    const wfDone = new Workflow('mix-done').step('a', async () => ({ done: true }));
+    const wfWait = new Workflow('mix-wait').step('a', async () => ({ ok: true })).waitFor('signal');
 
     engine = new Engine({ embedded: true });
     engine.register(wfDone);
@@ -126,9 +121,13 @@ describe('engine.recover()', () => {
     let compensated = false;
     const wf = new Workflow('comp-wf')
       .step('create', async () => ({ id: 1 }), {
-        compensate: async () => { compensated = true; },
+        compensate: async () => {
+          compensated = true;
+        },
       })
-      .step('boom', async () => { throw new Error('fail'); });
+      .step('boom', async () => {
+        throw new Error('fail');
+      });
 
     engine = new Engine({ embedded: true });
     engine.register(wf);

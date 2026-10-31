@@ -54,7 +54,9 @@ async function main() {
           console.log('   ✅ Delayed job promoted to waiting');
           passed++;
         } else {
-          console.log(`   ❌ Job state after promote: ${afterStateResponse.state} (expected: waiting)`);
+          console.log(
+            `   ❌ Job state after promote: ${afterStateResponse.state} (expected: waiting)`
+          );
           failed++;
         }
       } else {
@@ -114,7 +116,7 @@ async function main() {
       // Check DLQ via TCP
       const dlqResponse = await tcp.send({ cmd: 'Dlq', queue: QUEUE_NAME });
       const dlqJobs = (dlqResponse.jobs as Array<{ id: string | number | bigint }>) || [];
-      const inDlq = dlqJobs.some(j => String(j.id) === String(job.id));
+      const inDlq = dlqJobs.some((j) => String(j.id) === String(job.id));
 
       if (inDlq) {
         console.log('   ✅ Job discarded to DLQ');
@@ -192,11 +194,15 @@ async function main() {
     if (response.ok) {
       // Process jobs and verify order - use useLocks: true for proper tracking
       const processedOrder: number[] = [];
-      const worker = new Worker<{ value: number }>(QUEUE_NAME, async (j) => {
-        processedOrder.push((j.data as { value: number }).value);
-        await Bun.sleep(50); // Small delay to ensure order
-        return {};
-      }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: true });
+      const worker = new Worker<{ value: number }>(
+        QUEUE_NAME,
+        async (j) => {
+          processedOrder.push((j.data as { value: number }).value);
+          await Bun.sleep(50); // Small delay to ensure order
+          return {};
+        },
+        { concurrency: 1, connection: { port: TCP_PORT }, useLocks: true }
+      );
 
       // Wait for both jobs to complete
       await Bun.sleep(1500);
@@ -245,10 +251,14 @@ async function main() {
       if (response.ok) {
         // Verify job is not processable
         let processed = false;
-        const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-          processed = true;
-          return {};
-        }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: true });
+        const worker = new Worker<{ value: number }>(
+          QUEUE_NAME,
+          async () => {
+            processed = true;
+            return {};
+          },
+          { concurrency: 1, connection: { port: TCP_PORT }, useLocks: true }
+        );
 
         await Bun.sleep(800);
         await worker.close();

@@ -83,11 +83,22 @@ export async function loadSystem(name: SystemName): Promise<System> {
           },
           async addBulk(items) {
             await queue.addBulk(
-              items.map((item) => ({ name: 'job', data: item.data, opts: { ...REMOVE, ...bullOptions(item.options) } }))
+              items.map((item) => ({
+                name: 'job',
+                data: item.data,
+                opts: { ...REMOVE, ...bullOptions(item.options) },
+              }))
             );
           },
           async counts() {
-            const c = await queue.getJobCounts('wait', 'prioritized', 'active', 'delayed', 'completed', 'failed');
+            const c = await queue.getJobCounts(
+              'wait',
+              'prioritized',
+              'active',
+              'delayed',
+              'completed',
+              'failed'
+            );
             return {
               waiting: (c.wait ?? 0) + (c.prioritized ?? 0),
               active: c.active ?? 0,
@@ -101,12 +112,17 @@ export async function loadSystem(name: SystemName): Promise<System> {
         };
       },
       async consumer(queueName, processor, concurrency, extra = {}) {
-        const worker = new Worker(queueName, async (job) => processor({ id: String(job.id), data: job.data, attemptsMade: job.attemptsMade }), {
-          connection: connection(),
-          concurrency,
-          autorun: false,
-          ...extra,
-        });
+        const worker = new Worker(
+          queueName,
+          async (job) =>
+            processor({ id: String(job.id), data: job.data, attemptsMade: job.attemptsMade }),
+          {
+            connection: connection(),
+            concurrency,
+            autorun: false,
+            ...extra,
+          }
+        );
         worker.on('error', (error) => console.error('[bullmq worker]', error));
         await worker.waitUntilReady();
         return {
@@ -131,7 +147,13 @@ export async function loadSystem(name: SystemName): Promise<System> {
           return String(job.id);
         },
         async addBulk(items) {
-          await queue.addBulk(items.map((item) => ({ name: 'job', data: item.data, opts: { ...REMOVE, ...item.options } })));
+          await queue.addBulk(
+            items.map((item) => ({
+              name: 'job',
+              data: item.data,
+              opts: { ...REMOVE, ...item.options },
+            }))
+          );
         },
         async counts() {
           const c = await queue.getJobCountsAsync();
@@ -149,15 +171,21 @@ export async function loadSystem(name: SystemName): Promise<System> {
       };
     },
     async consumer(queueName, processor, concurrency, extra = {}) {
-      const worker = new Worker(queueName, async (job: any) => processor({ id: String(job.id), data: job.data, attemptsMade: job.attemptsMade }), {
-        embedded: false,
-        connection,
-        concurrency,
-        autorun: false,
-        ...extra,
-      });
+      const worker = new Worker(
+        queueName,
+        async (job: any) =>
+          processor({ id: String(job.id), data: job.data, attemptsMade: job.attemptsMade }),
+        {
+          embedded: false,
+          connection,
+          concurrency,
+          autorun: false,
+          ...extra,
+        }
+      );
       worker.on('error', (error: unknown) => console.error('[bunqueue worker]', error));
-      if (typeof (worker as any).waitUntilReady === 'function') await (worker as any).waitUntilReady();
+      if (typeof (worker as any).waitUntilReady === 'function')
+        await (worker as any).waitUntilReady();
       return {
         run: () => void worker.run(),
         close: () => worker.close(),

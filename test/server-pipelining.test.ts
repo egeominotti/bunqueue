@@ -115,7 +115,9 @@ describe('Server Pipelining', () => {
 
     expect(results.length).toBe(iterations);
 
-    console.log(`  ${iterations} ops with server pipelining: ${elapsed}ms (${opsPerSec.toLocaleString()} ops/sec)`);
+    console.log(
+      `  ${iterations} ops with server pipelining: ${elapsed}ms (${opsPerSec.toLocaleString()} ops/sec)`
+    );
 
     // Should be fast with both client and server pipelining
     expect(opsPerSec).toBeGreaterThan(5000);
@@ -164,9 +166,7 @@ describe('Server Pipelining', () => {
 
   it('should handle error responses correctly in parallel', async () => {
     // Try to get non-existent jobs in parallel
-    const promises = Array.from({ length: 20 }, (_, i) =>
-      queue.getJob(`non-existent-job-${i}`)
-    );
+    const promises = Array.from({ length: 20 }, (_, i) => queue.getJob(`non-existent-job-${i}`));
 
     const results = await Promise.all(promises);
 

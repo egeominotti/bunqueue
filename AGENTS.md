@@ -41,6 +41,13 @@ clients may run in other runtimes through the network protocol.
   source edits.
 - Runtime source is TypeScript ESM. Follow the existing 2-space, single-quote,
   semicolon style; `bun fmt` (configured in `bunfig.toml`) is authoritative.
+- **MANDATORY:** type check only with `bun check` and format only with
+  `bun fmt`, in every directory and every SDK (`bun run typecheck`,
+  `bun run format:check`; `--no-script` inside scripts and CI). Never use
+  `tsc --noEmit`, ESLint, Prettier, Biome, oxlint, oxfmt or lint-suppression
+  comments. `tsc` remains only where files are emitted (`build:lib`, the SDK
+  build), for typedoc and for compiler-API tests; non-JS SDKs keep their
+  language's own toolchain.
 - Keep hot queue paths synchronous while a shard lock is held. Do not introduce
   an `await` inside a synchronous critical section.
 - Maintain queue invariants together: heap membership, `jobIndex`, processing

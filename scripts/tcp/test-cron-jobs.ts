@@ -26,14 +26,22 @@ async function main() {
   try {
     let executions = 0;
 
-    await queue.add('repeat-job', { type: 'interval' }, {
-      repeat: { every: 200, limit: 5 }
-    });
+    await queue.add(
+      'repeat-job',
+      { type: 'interval' },
+      {
+        repeat: { every: 200, limit: 5 },
+      }
+    );
 
-    const worker = new Worker<{ type: string }>(QUEUE_NAME, async () => {
-      executions++;
-      return { executed: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ type: string }>(
+      QUEUE_NAME,
+      async () => {
+        executions++;
+        return { executed: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -57,14 +65,22 @@ async function main() {
     await Bun.sleep(100);
     let executions = 0;
 
-    await queue.add('limited-repeat', { type: 'limited' }, {
-      repeat: { every: 100, limit: 3 }
-    });
+    await queue.add(
+      'limited-repeat',
+      { type: 'limited' },
+      {
+        repeat: { every: 100, limit: 3 },
+      }
+    );
 
-    const worker = new Worker<{ type: string }>(QUEUE_NAME, async () => {
-      executions++;
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ type: string }>(
+      QUEUE_NAME,
+      async () => {
+        executions++;
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -91,10 +107,14 @@ async function main() {
     await queue.add('high-priority', { type: 'high' }, { priority: 10 });
 
     const order: string[] = [];
-    const worker = new Worker<{ type: string }>(QUEUE_NAME, async (job) => {
-      order.push((job.data as { type: string }).type);
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ type: string }>(
+      QUEUE_NAME,
+      async (job) => {
+        order.push((job.data as { type: string }).type);
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -119,14 +139,22 @@ async function main() {
     const start = Date.now();
     let firstExecution = 0;
 
-    await queue.add('delayed-repeat', { type: 'delayed' }, {
-      delay: 300,
-    });
+    await queue.add(
+      'delayed-repeat',
+      { type: 'delayed' },
+      {
+        delay: 300,
+      }
+    );
 
-    const worker = new Worker<{ type: string }>(QUEUE_NAME, async () => {
-      if (firstExecution === 0) firstExecution = Date.now();
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ type: string }>(
+      QUEUE_NAME,
+      async () => {
+        if (firstExecution === 0) firstExecution = Date.now();
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -161,10 +189,14 @@ async function main() {
     await Bun.sleep(100);
 
     let processed = 0;
-    const worker = new Worker<{ type: string }>(QUEUE_NAME, async () => {
-      processed++;
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ type: string }>(
+      QUEUE_NAME,
+      async () => {
+        processed++;
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(500);
     await worker.close();

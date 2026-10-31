@@ -395,10 +395,7 @@ describe('Pull Operations', () => {
       }
 
       // Pull in concurrent batches
-      const promises = [
-        qm.pullBatch('tasks', 10, 0),
-        qm.pullBatch('tasks', 10, 0),
-      ];
+      const promises = [qm.pullBatch('tasks', 10, 0), qm.pullBatch('tasks', 10, 0)];
       const [batch1, batch2] = await Promise.all(promises);
 
       // All job IDs across batches should be unique
@@ -485,9 +482,9 @@ describe('Pull Operations', () => {
       expect(job).not.toBeNull();
 
       // Ack with wrong token should throw
-      await expect(
-        qm.ack(job!.id, { done: true }, 'wrong-token')
-      ).rejects.toThrow('Invalid or expired lock token');
+      await expect(qm.ack(job!.id, { done: true }, 'wrong-token')).rejects.toThrow(
+        'Invalid or expired lock token'
+      );
     });
   });
 

@@ -20,8 +20,13 @@ import type { HandlerContext } from '../src/infrastructure/server/types';
 describe('HTTP clientJobs memory leak', () => {
   let qm: QueueManager;
 
-  beforeEach(() => { qm = new QueueManager(); });
-  afterEach(async () => { qm.shutdown(); await Bun.sleep(50); });
+  beforeEach(() => {
+    qm = new QueueManager();
+  });
+  afterEach(async () => {
+    qm.shutdown();
+    await Bun.sleep(50);
+  });
 
   test('HTTP without clientId does NOT leak', async () => {
     const queue = 'no-leak-http';
@@ -63,7 +68,9 @@ describe('HTTP clientJobs memory leak', () => {
 
       // Pull with unique clientId (old HTTP behavior)
       const pullCtx: HandlerContext = {
-        queueManager: qm, authTokens: new Set(), authenticated: true,
+        queueManager: qm,
+        authTokens: new Set(),
+        authenticated: true,
         clientId: `pull-${i}`,
       };
       const pull = await handleCommand({ cmd: 'PULL', queue }, pullCtx);
@@ -71,7 +78,9 @@ describe('HTTP clientJobs memory leak', () => {
 
       // ACK with DIFFERENT clientId (old HTTP behavior - new request)
       const ackCtx: HandlerContext = {
-        queueManager: qm, authTokens: new Set(), authenticated: true,
+        queueManager: qm,
+        authTokens: new Set(),
+        authenticated: true,
         clientId: `ack-${i}`,
       };
       await handleCommand({ cmd: 'ACK', id: job.id }, ackCtx);
@@ -86,7 +95,9 @@ describe('HTTP clientJobs memory leak', () => {
   test('TCP/WS with persistent clientId does NOT leak', async () => {
     const queue = 'no-leak-tcp';
     const tcpCtx: HandlerContext = {
-      queueManager: qm, authTokens: new Set(), authenticated: true,
+      queueManager: qm,
+      authTokens: new Set(),
+      authenticated: true,
       clientId: 'tcp-connection-1', // same clientId for all operations
     };
 

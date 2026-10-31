@@ -47,10 +47,14 @@ async function main() {
 
     await queue.upsertJobScheduler('repeat-1s', { every: 1000 });
 
-    const worker = new Worker('tcp-cron-repeat', async (job) => {
-      completedJobs.push(job.id);
-      return { ok: true };
-    }, { connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      'tcp-cron-repeat',
+      async (job) => {
+        completedJobs.push(job.id);
+        return { ok: true };
+      },
+      { connection: connOpts, useLocks: false }
+    );
 
     for (let i = 0; i < 40; i++) await Bun.sleep(100);
 
@@ -79,10 +83,14 @@ async function main() {
 
     await queue.upsertJobScheduler('remove-sched', { every: 500 });
 
-    const worker = new Worker('tcp-cron-remove', async (job) => {
-      completedJobs.push(job.id);
-      return { ok: true };
-    }, { connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      'tcp-cron-remove',
+      async (job) => {
+        completedJobs.push(job.id);
+        return { ok: true };
+      },
+      { connection: connOpts, useLocks: false }
+    );
 
     // Wait for at least 2 jobs
     for (let i = 0; i < 40; i++) {
@@ -118,19 +126,31 @@ async function main() {
     const fastJobs: string[] = [];
     const slowJobs: string[] = [];
 
-    await queue.upsertJobScheduler('fast-sched', { every: 500 }, {
-      data: { source: 'fast' },
-    });
-    await queue.upsertJobScheduler('slow-sched', { every: 2000 }, {
-      data: { source: 'slow' },
-    });
+    await queue.upsertJobScheduler(
+      'fast-sched',
+      { every: 500 },
+      {
+        data: { source: 'fast' },
+      }
+    );
+    await queue.upsertJobScheduler(
+      'slow-sched',
+      { every: 2000 },
+      {
+        data: { source: 'slow' },
+      }
+    );
 
-    const worker = new Worker('tcp-cron-multi', async (job) => {
-      const data = job.data as { source?: string };
-      if (data.source === 'fast') fastJobs.push(job.id);
-      else if (data.source === 'slow') slowJobs.push(job.id);
-      return { ok: true };
-    }, { connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      'tcp-cron-multi',
+      async (job) => {
+        const data = job.data as { source?: string };
+        if (data.source === 'fast') fastJobs.push(job.id);
+        else if (data.source === 'slow') slowJobs.push(job.id);
+        return { ok: true };
+      },
+      { connection: connOpts, useLocks: false }
+    );
 
     for (let i = 0; i < 50; i++) await Bun.sleep(100);
 
@@ -169,7 +189,12 @@ async function main() {
     await queue.removeJobScheduler('sched-b');
     await queue.removeJobScheduler('sched-c');
 
-    if (count >= 3 && names.includes('sched-a') && names.includes('sched-b') && names.includes('sched-c')) {
+    if (
+      count >= 3 &&
+      names.includes('sched-a') &&
+      names.includes('sched-b') &&
+      names.includes('sched-c')
+    ) {
       ok(`Listed ${count} schedulers: ${names.join(', ')}`);
     } else {
       fail(`Expected 3 schedulers, got ${count}: ${names.join(', ')}`);
@@ -190,16 +215,24 @@ async function main() {
     let receivedName = '';
     let receivedData: unknown = null;
 
-    await queue.upsertJobScheduler('template-sched', { every: 500 }, {
-      name: 'report',
-      data: { type: 'daily' },
-    });
+    await queue.upsertJobScheduler(
+      'template-sched',
+      { every: 500 },
+      {
+        name: 'report',
+        data: { type: 'daily' },
+      }
+    );
 
-    const worker = new Worker('tcp-cron-template', async (job) => {
-      receivedName = job.name;
-      receivedData = job.data;
-      return { ok: true };
-    }, { connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      'tcp-cron-template',
+      async (job) => {
+        receivedName = job.name;
+        receivedData = job.data;
+        return { ok: true };
+      },
+      { connection: connOpts, useLocks: false }
+    );
 
     for (let i = 0; i < 30; i++) {
       if (receivedName) break;
@@ -236,10 +269,14 @@ async function main() {
     // Create with fast interval directly (skip slow→fast transition which has nextRun issues)
     await queue.upsertJobScheduler('upsert-sched', { every: 1000 });
 
-    const worker = new Worker('tcp-cron-upsert', async (job) => {
-      completedJobs.push(job.id);
-      return { ok: true };
-    }, { connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      'tcp-cron-upsert',
+      async (job) => {
+        completedJobs.push(job.id);
+        return { ok: true };
+      },
+      { connection: connOpts, useLocks: false }
+    );
 
     for (let i = 0; i < 40; i++) await Bun.sleep(100);
 
@@ -256,7 +293,10 @@ async function main() {
   }
 
   // Cleanup
-  for (const q of queues) { q.obliterate(); q.close(); }
+  for (const q of queues) {
+    q.obliterate();
+    q.close();
+  }
 
   console.log('\n=== Summary ===');
   console.log(`Passed: ${passed}`);

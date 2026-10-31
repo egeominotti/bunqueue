@@ -22,34 +22,28 @@ function removeDbFiles(dbPath: string): void {
 }
 
 describe('LimiterManager duration/ttl guards (domain-level)', () => {
-  test.each([
-    Number.NaN,
-    Number.POSITIVE_INFINITY,
-    0,
-    -1000,
-    undefined,
-  ])('invalid duration %p degrades to the default 1s window', (duration) => {
-    const lm = new LimiterManager();
-    lm.setRateLimit('q', 1, duration as number | undefined);
+  test.each([Number.NaN, Number.POSITIVE_INFINITY, 0, -1000, undefined])(
+    'invalid duration %p degrades to the default 1s window',
+    (duration) => {
+      const lm = new LimiterManager();
+      lm.setRateLimit('q', 1, duration as number | undefined);
 
-    expect(lm.getState('q').rateLimitDuration).toBeNull();
-    // Default window still enforces the limit within the same instant.
-    expect(lm.tryAcquireRateLimit('q')).toBe(true);
-    expect(lm.tryAcquireRateLimit('q')).toBe(false);
-  });
+      expect(lm.getState('q').rateLimitDuration).toBeNull();
+      // Default window still enforces the limit within the same instant.
+      expect(lm.tryAcquireRateLimit('q')).toBe(true);
+      expect(lm.tryAcquireRateLimit('q')).toBe(false);
+    }
+  );
 
-  test.each([
-    Number.NaN,
-    Number.POSITIVE_INFINITY,
-    0,
-    -50,
-    undefined,
-  ])('invalid ttl %p means permanent (no expiry timestamp)', (ttl) => {
-    const lm = new LimiterManager();
-    lm.setRateLimit('q', 1, undefined, ttl as number | undefined);
+  test.each([Number.NaN, Number.POSITIVE_INFINITY, 0, -50, undefined])(
+    'invalid ttl %p means permanent (no expiry timestamp)',
+    (ttl) => {
+      const lm = new LimiterManager();
+      lm.setRateLimit('q', 1, undefined, ttl as number | undefined);
 
-    expect(lm.getState('q').rateLimitExpiresAt).toBeNull();
-  });
+      expect(lm.getState('q').rateLimitExpiresAt).toBeNull();
+    }
+  );
 
   test('a valid ttl sets an expiry in the future and lazily clears', async () => {
     const lm = new LimiterManager();

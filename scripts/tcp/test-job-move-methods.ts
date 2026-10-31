@@ -37,10 +37,14 @@ async function main() {
 
     const job = await queue.add('test', { value: 42 });
 
-    const worker = new Worker('tcp-move-methods', async (j) => {
-      await j.moveToCompleted({ result: 'done' });
-      return null;
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      'tcp-move-methods',
+      async (j) => {
+        await j.moveToCompleted({ result: 'done' });
+        return null;
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
     await Bun.sleep(1000);
 
@@ -66,10 +70,14 @@ async function main() {
 
     const job = await queue.add('test', { value: 42 }, { attempts: 1 });
 
-    const worker = new Worker('tcp-move-methods', async (j) => {
-      await j.moveToFailed(new Error('Intentional failure'));
-      throw new Error('Should not reach here');
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      'tcp-move-methods',
+      async (j) => {
+        await j.moveToFailed(new Error('Intentional failure'));
+        throw new Error('Should not reach here');
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
     await Bun.sleep(1000);
 
@@ -103,7 +111,9 @@ async function main() {
     if (counts.waiting >= 1) {
       ok(`moveJobToWait: ${state1} -> waiting (waiting=${counts.waiting})`);
     } else {
-      fail(`Expected at least 1 waiting job, got ${counts.waiting} (moveJobToWait returned ${result})`);
+      fail(
+        `Expected at least 1 waiting job, got ${counts.waiting} (moveJobToWait returned ${result})`
+      );
     }
   } catch (e) {
     fail(`moveJobToWait test failed: ${e}`);
@@ -142,8 +152,17 @@ async function main() {
 
     const job = await queue.add('test', { value: 1 });
 
-    const methods = ['moveToCompleted', 'moveToFailed', 'moveToWait', 'moveToDelayed', 'moveToWaitingChildren', 'waitUntilFinished'];
-    const missing = methods.filter((m) => typeof (job as Record<string, unknown>)[m] !== 'function');
+    const methods = [
+      'moveToCompleted',
+      'moveToFailed',
+      'moveToWait',
+      'moveToDelayed',
+      'moveToWaitingChildren',
+      'waitUntilFinished',
+    ];
+    const missing = methods.filter(
+      (m) => typeof (job as Record<string, unknown>)[m] !== 'function'
+    );
 
     if (missing.length === 0) {
       ok(`All ${methods.length} move methods present`);
@@ -164,10 +183,14 @@ async function main() {
 
     const job = await queue.add('test', { value: 99 });
 
-    const worker = new Worker('tcp-move-methods', async (j) => {
-      await j.moveToCompleted({ answer: 42 });
-      return null;
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      'tcp-move-methods',
+      async (j) => {
+        await j.moveToCompleted({ answer: 42 });
+        return null;
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
     await Bun.sleep(1000);
 

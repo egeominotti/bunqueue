@@ -224,7 +224,9 @@ async function main() {
         if (fetched1 && fetched1.id === customId1 && fetched2 && fetched2.id === customId2) {
           ok(`Custom IDs assigned correctly and retrievable: ${customId1}, ${customId2}`);
         } else {
-          fail(`Custom ID jobs not retrievable: fetched1=${fetched1?.id}, fetched2=${fetched2?.id}`);
+          fail(
+            `Custom ID jobs not retrievable: fetched1=${fetched1?.id}, fetched2=${fetched2?.id}`
+          );
         }
       } else {
         fail(`Custom IDs not assigned: [${result[0].id}, ${result[1].id}, ${result[2].id}]`);

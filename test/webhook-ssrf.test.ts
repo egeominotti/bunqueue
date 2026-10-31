@@ -288,7 +288,9 @@ describe('Webhook SSRF Prevention', () => {
     });
 
     test('rejects URL without protocol in embedded mode', () => {
-      expect(() => manager.add('example.com/hook', ['job.completed'])).toThrow('Invalid URL format');
+      expect(() => manager.add('example.com/hook', ['job.completed'])).toThrow(
+        'Invalid URL format'
+      );
     });
 
     test('accepts URL with credentials to external host', () => {
@@ -303,9 +305,9 @@ describe('Webhook SSRF Prevention', () => {
     });
 
     test('blocks .internal domains', () => {
-      expect(() =>
-        manager.add('http://some-service.internal/webhook', ['job.completed'])
-      ).toThrow('Webhook URL cannot point to cloud metadata endpoints');
+      expect(() => manager.add('http://some-service.internal/webhook', ['job.completed'])).toThrow(
+        'Webhook URL cannot point to cloud metadata endpoints'
+      );
     });
   });
 });

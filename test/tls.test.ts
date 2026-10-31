@@ -103,10 +103,22 @@ beforeAll(() => {
   CERT = join(certDir, 'cert.pem');
   KEY = join(certDir, 'key.pem');
   const gen = Bun.spawnSync([
-    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
-    '-keyout', KEY, '-out', CERT, '-days', '7', '-nodes',
-    '-subj', '/CN=localhost',
-    '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1',
+    'openssl',
+    'req',
+    '-x509',
+    '-newkey',
+    'rsa:2048',
+    '-keyout',
+    KEY,
+    '-out',
+    CERT,
+    '-days',
+    '7',
+    '-nodes',
+    '-subj',
+    '/CN=localhost',
+    '-addext',
+    'subjectAltName=DNS:localhost,IP:127.0.0.1',
   ]);
   if (gen.exitCode !== 0) {
     throw new Error(`openssl cert generation failed: ${gen.stderr.toString()}`);
@@ -296,8 +308,7 @@ describe('TLS config resolution', () => {
   test('resolveTlsServerOptions: null when unset, throws on partial config', async () => {
     const mod = (await import('../src/config')) as unknown as Record<string, unknown>;
     const resolveTls = mod.resolveTlsServerOptions as
-      | ((cfg: { tlsCertFile?: string; tlsKeyFile?: string }) => unknown)
-      | undefined;
+      ((cfg: { tlsCertFile?: string; tlsKeyFile?: string }) => unknown) | undefined;
     expect(typeof resolveTls).toBe('function');
     expect(resolveTls?.({})).toBeNull();
     expect(resolveTls?.({ tlsCertFile: CERT, tlsKeyFile: KEY })).toEqual({

@@ -42,7 +42,7 @@ console.log('defineConfig:' + typeof mod.defineConfig);
 // Give any (buggy) async startup enough time to bind ports and emit logs.
 await Bun.sleep(1500);
 process.exit(0);
-`,
+`
     );
 
     // Use a unique port to avoid colliding with any local dev server.
@@ -62,7 +62,7 @@ process.exit(0);
       });
 
       const timeoutPromise = new Promise<'timeout'>((res) =>
-        setTimeout(() => res('timeout'), 8000),
+        setTimeout(() => res('timeout'), 8000)
       );
       const exitPromise = proc.exited.then((code) => ({ code }));
       const winner = await Promise.race([exitPromise, timeoutPromise]);
@@ -70,7 +70,7 @@ process.exit(0);
       if (winner === 'timeout') {
         proc.kill();
         throw new Error(
-          'Subprocess hung — importing main.ts kept event loop alive (server started on import).',
+          'Subprocess hung — importing main.ts kept event loop alive (server started on import).'
         );
       }
 

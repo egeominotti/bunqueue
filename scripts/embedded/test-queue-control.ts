@@ -30,10 +30,14 @@ async function main() {
     queue.pause();
 
     const processed: number[] = [];
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (job) => {
-      processed.push(job.data.value);
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        processed.push(job.data.value);
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(300);
 
@@ -57,10 +61,14 @@ async function main() {
     queue.resume();
 
     const processed: number[] = [];
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (job) => {
-      processed.push(job.data.value);
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        processed.push(job.data.value);
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -142,10 +150,14 @@ async function main() {
     await queue2.add('check-job', { value: 555 });
 
     let processed = false;
-    const worker = new Worker<{ value: number }>('test-pause-check', async () => {
-      processed = true;
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      'test-pause-check',
+      async () => {
+        processed = true;
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(300);
     const whilePaused = processed;
@@ -180,10 +192,14 @@ async function main() {
     queue.resume();
 
     const processed: number[] = [];
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (job) => {
-      processed.push(job.data.value);
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        processed.push(job.data.value);
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(300);
     await worker.close();

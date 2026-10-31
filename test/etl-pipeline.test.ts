@@ -181,9 +181,21 @@ describe('ETL Pipeline - Embedded', () => {
     // Push 20 independent 3-step chains
     for (let i = 0; i < RECORD_COUNT; i++) {
       await flow.addChain([
-        { name: `ingest-${i}`, queueName: 'etl-multi-record', data: { recordId: i, tags: [], stage: 'ingest' } },
-        { name: `enrich-${i}`, queueName: 'etl-multi-record', data: { recordId: i, tags: [], stage: 'enrich' } },
-        { name: `store-${i}`, queueName: 'etl-multi-record', data: { recordId: i, tags: [], stage: 'store' } },
+        {
+          name: `ingest-${i}`,
+          queueName: 'etl-multi-record',
+          data: { recordId: i, tags: [], stage: 'ingest' },
+        },
+        {
+          name: `enrich-${i}`,
+          queueName: 'etl-multi-record',
+          data: { recordId: i, tags: [], stage: 'enrich' },
+        },
+        {
+          name: `store-${i}`,
+          queueName: 'etl-multi-record',
+          data: { recordId: i, tags: [], stage: 'store' },
+        },
       ]);
     }
 
@@ -256,13 +268,13 @@ describe('ETL Pipeline - Embedded', () => {
     // Push 10 records: 7 valid (positive), 3 invalid (negative)
     const records = [
       { recordId: 0, value: 100 },
-      { recordId: 1, value: -1 },   // invalid
+      { recordId: 1, value: -1 }, // invalid
       { recordId: 2, value: 200 },
       { recordId: 3, value: 300 },
-      { recordId: 4, value: -5 },   // invalid
+      { recordId: 4, value: -5 }, // invalid
       { recordId: 5, value: 400 },
       { recordId: 6, value: 500 },
-      { recordId: 7, value: -10 },  // invalid
+      { recordId: 7, value: -10 }, // invalid
       { recordId: 8, value: 600 },
       { recordId: 9, value: 700 },
     ];
@@ -309,10 +321,16 @@ describe('ETL Pipeline - Embedded', () => {
           return { value: 10, steps: ['ingest'] };
         }
 
-        const parentResult = flow.getParentResult<{ value: number; steps: string[] }>(data.__flowParentId!);
+        const parentResult = flow.getParentResult<{ value: number; steps: string[] }>(
+          data.__flowParentId!
+        );
 
         if (data.stage === 'validate') {
-          return { value: parentResult!.value, steps: [...parentResult!.steps, 'validate'], valid: true };
+          return {
+            value: parentResult!.value,
+            steps: [...parentResult!.steps, 'validate'],
+            valid: true,
+          };
         }
 
         if (data.stage === 'enrich') {
@@ -406,9 +424,21 @@ describe('ETL Pipeline - Embedded', () => {
     await Promise.all(
       Array.from({ length: PIPELINE_COUNT }, (_, i) =>
         flow.addChain([
-          { name: `extract-${i}`, queueName: 'etl-parallel-pipes', data: { pipelineId: i, stage: 'extract' } },
-          { name: `transform-${i}`, queueName: 'etl-parallel-pipes', data: { pipelineId: i, stage: 'transform' } },
-          { name: `load-${i}`, queueName: 'etl-parallel-pipes', data: { pipelineId: i, stage: 'load' } },
+          {
+            name: `extract-${i}`,
+            queueName: 'etl-parallel-pipes',
+            data: { pipelineId: i, stage: 'extract' },
+          },
+          {
+            name: `transform-${i}`,
+            queueName: 'etl-parallel-pipes',
+            data: { pipelineId: i, stage: 'transform' },
+          },
+          {
+            name: `load-${i}`,
+            queueName: 'etl-parallel-pipes',
+            data: { pipelineId: i, stage: 'load' },
+          },
         ])
       )
     );

@@ -159,7 +159,17 @@ describe('queue / cron / webhook / limits', () => {
   });
 
   test('cron add shows name and next run; list shows it; delete removes it', async () => {
-    const added = await cli(['cron', 'add', 'e2e-cron', '-q', 'e2e-q', '-d', '{}', '-s', '0 3 * * *']);
+    const added = await cli([
+      'cron',
+      'add',
+      'e2e-cron',
+      '-q',
+      'e2e-q',
+      '-d',
+      '{}',
+      '-s',
+      '0 3 * * *',
+    ]);
     expect(added.exitCode).toBe(0);
     expect(added.stdout).toContain('e2e-cron');
     expect(added.stdout.toLowerCase()).toContain('next run');
@@ -175,7 +185,11 @@ describe('queue / cron / webhook / limits', () => {
     // NB: loopback/private URLs are rejected by the server's SSRF guard —
     // use a public-looking host (delivery is never attempted in this test).
     const added = await cli([
-      'webhook', 'add', 'http://example.com/e2e-hook', '-e', 'job.completed,job.progress',
+      'webhook',
+      'add',
+      'http://example.com/e2e-hook',
+      '-e',
+      'job.completed,job.progress',
     ]);
     expect(added.exitCode).toBe(0);
     const m = /Webhook added:\s*(\S+)/.exec(added.stdout);

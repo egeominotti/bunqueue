@@ -121,6 +121,11 @@ jobs:
         run: |
           deno run -A tests/integration.ts
           deno run -A tests/e2e.ts
+      - name: Conformance type check
+        if: matrix.runtime == 'bun'
+        # The TypeScript driver imports the SDK build (sdk/typescript/dist), so it
+        # is type-checked here, after the SDK is built, not in the root typecheck.
+        run: bun check --no-script sdk/conformance
       - name: Protocol conformance
         if: matrix.runtime == 'bun'
         working-directory: sdk/conformance

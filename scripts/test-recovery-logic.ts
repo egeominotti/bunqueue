@@ -53,10 +53,14 @@ async function runTests() {
     let queue = new Queue(QUEUE, { embedded: true });
     queue.obliterate();
 
-    const job1 = await queue.add('task', { value: 1 }, {
-      jobId: 'unique-job-123',
-      delay: 60000
-    });
+    const job1 = await queue.add(
+      'task',
+      { value: 1 },
+      {
+        jobId: 'unique-job-123',
+        delay: 60000,
+      }
+    );
     const originalId = job1.id;
 
     // Verify dedup works before restart
@@ -79,10 +83,14 @@ async function runTests() {
     }
 
     // Try to add duplicate - should return existing
-    const job2 = await queue.add('task', { value: 2 }, {
-      jobId: 'unique-job-123',
-      delay: 60000
-    });
+    const job2 = await queue.add(
+      'task',
+      { value: 2 },
+      {
+        jobId: 'unique-job-123',
+        delay: 60000,
+      }
+    );
 
     if (String(job2.id) !== String(originalId)) {
       throw new Error(`Duplicate created! Original: ${originalId}, New: ${job2.id}`);
@@ -112,10 +120,14 @@ async function runTests() {
     let queue = new Queue(QUEUE, { embedded: true });
     queue.obliterate();
 
-    const job1 = await queue.add('task', { value: 1 }, {
-      deduplication: { id: 'dedup-key-456', ttl: 300000 },
-      delay: 60000
-    });
+    const job1 = await queue.add(
+      'task',
+      { value: 1 },
+      {
+        deduplication: { id: 'dedup-key-456', ttl: 300000 },
+        delay: 60000,
+      }
+    );
     const originalId = job1.id;
 
     // Simulate restart
@@ -127,10 +139,14 @@ async function runTests() {
     queue = new Queue(QUEUE, { embedded: true });
 
     // Try to add duplicate with same uniqueKey
-    const job2 = await queue.add('task', { value: 2 }, {
-      deduplication: { id: 'dedup-key-456', ttl: 300000 },
-      delay: 60000
-    });
+    const job2 = await queue.add(
+      'task',
+      { value: 2 },
+      {
+        deduplication: { id: 'dedup-key-456', ttl: 300000 },
+        delay: 60000,
+      }
+    );
 
     if (String(job2.id) !== String(originalId)) {
       throw new Error(`Duplicate created! Original: ${originalId}, New: ${job2.id}`);
@@ -182,9 +198,13 @@ async function runTests() {
 
     // Create child job that depends on completed parent
     // At this point, parent is completed and in job_results
-    const childJob = await queue.add('child', { value: 'child' }, {
-      delay: 60000 // Delayed so it won't be processed yet
-    });
+    const childJob = await queue.add(
+      'child',
+      { value: 'child' },
+      {
+        delay: 60000, // Delayed so it won't be processed yet
+      }
+    );
     const childId = childJob.id;
 
     // Verify child is in queue (not waiting for deps since parent is done)
@@ -203,7 +223,7 @@ async function runTests() {
 
     // The child job should be recoverable
     const jobs = await queue.getJobs(['waiting', 'delayed']);
-    const childFound = jobs.some(j => String(j.id) === String(childId));
+    const childFound = jobs.some((j) => String(j.id) === String(childId));
 
     if (!childFound) {
       throw new Error(`Child job ${childId} not found in queue after restart`);
@@ -229,23 +249,35 @@ async function runTests() {
     queue.obliterate();
 
     // Job A: Simple job with jobId
-    const jobA = await queue.add('taskA', { type: 'A' }, {
-      jobId: 'job-a',
-      delay: 60000
-    });
+    const jobA = await queue.add(
+      'taskA',
+      { type: 'A' },
+      {
+        jobId: 'job-a',
+        delay: 60000,
+      }
+    );
 
     // Job B: Job with uniqueKey deduplication
-    const jobB = await queue.add('taskB', { type: 'B' }, {
-      deduplication: { id: 'key-b', ttl: 300000 },
-      delay: 60000
-    });
+    const jobB = await queue.add(
+      'taskB',
+      { type: 'B' },
+      {
+        deduplication: { id: 'key-b', ttl: 300000 },
+        delay: 60000,
+      }
+    );
 
     // Job C: Job with both jobId and deduplication
-    const jobC = await queue.add('taskC', { type: 'C' }, {
-      jobId: 'job-c',
-      deduplication: { id: 'key-c', ttl: 300000 },
-      delay: 60000
-    });
+    const jobC = await queue.add(
+      'taskC',
+      { type: 'C' },
+      {
+        jobId: 'job-c',
+        deduplication: { id: 'key-c', ttl: 300000 },
+        delay: 60000,
+      }
+    );
 
     const countBefore = await queue.count();
     if (countBefore !== 3) {
@@ -261,21 +293,33 @@ async function runTests() {
     queue = new Queue(QUEUE, { embedded: true });
 
     // Try to add duplicates
-    const jobA2 = await queue.add('taskA', { type: 'A2' }, {
-      jobId: 'job-a',
-      delay: 60000
-    });
+    const jobA2 = await queue.add(
+      'taskA',
+      { type: 'A2' },
+      {
+        jobId: 'job-a',
+        delay: 60000,
+      }
+    );
 
-    const jobB2 = await queue.add('taskB', { type: 'B2' }, {
-      deduplication: { id: 'key-b', ttl: 300000 },
-      delay: 60000
-    });
+    const jobB2 = await queue.add(
+      'taskB',
+      { type: 'B2' },
+      {
+        deduplication: { id: 'key-b', ttl: 300000 },
+        delay: 60000,
+      }
+    );
 
-    const jobC2 = await queue.add('taskC', { type: 'C2' }, {
-      jobId: 'job-c',
-      deduplication: { id: 'key-c', ttl: 300000 },
-      delay: 60000
-    });
+    const jobC2 = await queue.add(
+      'taskC',
+      { type: 'C2' },
+      {
+        jobId: 'job-c',
+        deduplication: { id: 'key-c', ttl: 300000 },
+        delay: 60000,
+      }
+    );
 
     // All should return existing jobs
     if (String(jobA2.id) !== String(jobA.id)) {
@@ -377,10 +421,14 @@ async function runTests() {
     let queue = new Queue(QUEUE, { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('task', { value: 1 }, {
-      jobId: 'persist-id',
-      delay: 60000
-    });
+    const job = await queue.add(
+      'task',
+      { value: 1 },
+      {
+        jobId: 'persist-id',
+        delay: 60000,
+      }
+    );
     const originalId = job.id;
 
     // Multiple restarts
@@ -413,8 +461,8 @@ async function runTests() {
   console.log('\n' + '='.repeat(60));
   console.log('\n📊 Results:\n');
 
-  const passed = results.filter(r => r.passed).length;
-  const failed = results.filter(r => !r.passed).length;
+  const passed = results.filter((r) => r.passed).length;
+  const failed = results.filter((r) => !r.passed).length;
 
   console.log(`   Passed: ${passed}`);
   console.log(`   Failed: ${failed}`);
@@ -422,10 +470,12 @@ async function runTests() {
 
   if (failed > 0) {
     console.log('\n❌ Failed tests:');
-    results.filter(r => !r.passed).forEach(r => {
-      console.log(`   - ${r.name}`);
-      console.log(`     Error: ${r.error}`);
-    });
+    results
+      .filter((r) => !r.passed)
+      .forEach((r) => {
+        console.log(`   - ${r.name}`);
+        console.log(`     Error: ${r.error}`);
+      });
   }
 
   // Cleanup
@@ -436,7 +486,7 @@ async function runTests() {
   process.exit(failed === 0 ? 0 : 1);
 }
 
-runTests().catch(err => {
+runTests().catch((err) => {
   console.error('Fatal error:', err);
   await cleanup();
   process.exit(1);

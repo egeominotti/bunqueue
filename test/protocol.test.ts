@@ -236,8 +236,19 @@ describe('FrameParser', () => {
     const parser = new FrameParser();
     // Two frames: "hi" and "bye"
     const data = new Uint8Array([
-      0, 0, 0, 2, 104, 105, // "hi"
-      0, 0, 0, 3, 98, 121, 101, // "bye"
+      0,
+      0,
+      0,
+      2,
+      104,
+      105, // "hi"
+      0,
+      0,
+      0,
+      3,
+      98,
+      121,
+      101, // "bye"
     ]);
     const frames = parser.addData(data);
     expect(frames.length).toBe(2);

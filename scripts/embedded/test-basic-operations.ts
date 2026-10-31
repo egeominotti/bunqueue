@@ -41,12 +41,16 @@ async function main() {
   try {
     let processed = false;
     let processedMessage = '';
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async (job) => {
-      console.log(`   Processing job ${job.id}: ${(job.data as { message: string }).message}`);
-      processed = true;
-      processedMessage = (job.data as { message: string }).message;
-      return { success: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async (job) => {
+        console.log(`   Processing job ${job.id}: ${(job.data as { message: string }).message}`);
+        processed = true;
+        processedMessage = (job.data as { message: string }).message;
+        return { success: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     // Wait for job to be processed
     await Bun.sleep(500);
@@ -71,10 +75,14 @@ async function main() {
     await queue.add('fail-job', { message: 'This will fail' }, { attempts: 1 });
 
     let failedJob = false;
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async () => {
-      failedJob = true;
-      throw new Error('Intentional failure');
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async () => {
+        failedJob = true;
+        throw new Error('Intentional failure');
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -99,10 +107,14 @@ async function main() {
     await queue.add('high-priority', { message: 'High' }, { priority: 10 });
 
     const jobs: string[] = [];
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async (job) => {
-      jobs.push((job.data as { message: string }).message);
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async (job) => {
+        jobs.push((job.data as { message: string }).message);
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -127,10 +139,14 @@ async function main() {
     await queue.add('delayed-job', { message: 'Delayed' }, { delay: 300 });
 
     let processedAt = 0;
-    const worker = new Worker<{ message: string }>(QUEUE_NAME, async () => {
-      processedAt = Date.now();
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ message: string }>(
+      QUEUE_NAME,
+      async () => {
+        processedAt = Date.now();
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(600);
     await worker.close();

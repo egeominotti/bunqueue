@@ -16,7 +16,10 @@ const QUEUE_NAME = 'test-retry';
  * cadence can exceed a blind budget); polling keeps the fast path fast and
  * gives slow runners room without weakening any assertion.
  */
-async function waitFor(cond: () => boolean | Promise<boolean>, timeoutMs = 15000): Promise<boolean> {
+async function waitFor(
+  cond: () => boolean | Promise<boolean>,
+  timeoutMs = 15000
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await cond()) return true;
@@ -37,22 +40,30 @@ async function main() {
     const queue = new Queue<{ attempt: number }>(QUEUE_NAME, { embedded: true });
     queue.obliterate();
 
-    await queue.add('fixed-job', { attempt: 0 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 100 },
-    });
+    await queue.add(
+      'fixed-job',
+      { attempt: 0 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 100 },
+      }
+    );
 
     const attempts: number[] = [];
     const timestamps: number[] = [];
 
-    const worker = new Worker<{ attempt: number }>(QUEUE_NAME, async () => {
-      attempts.push(attempts.length + 1);
-      timestamps.push(Date.now());
-      if (attempts.length < 3) {
-        throw new Error(`Attempt ${attempts.length} failed`);
-      }
-      return { success: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ attempt: number }>(
+      QUEUE_NAME,
+      async () => {
+        attempts.push(attempts.length + 1);
+        timestamps.push(Date.now());
+        if (attempts.length < 3) {
+          throw new Error(`Attempt ${attempts.length} failed`);
+        }
+        return { success: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await waitFor(() => attempts.length === 3);
     await worker.close();
@@ -61,7 +72,9 @@ async function main() {
       const delay1 = timestamps[1] - timestamps[0];
       const delay2 = timestamps[2] - timestamps[1];
       if (delay1 >= 72 && delay2 >= 72) {
-        console.log(`   ✅ Fixed backoff: ${attempts.length} attempts, delays: ~${delay1}ms, ~${delay2}ms`);
+        console.log(
+          `   ✅ Fixed backoff: ${attempts.length} attempts, delays: ~${delay1}ms, ~${delay2}ms`
+        );
         passed++;
       } else {
         console.log(`   ❌ Fixed backoff below its jitter floor: ${delay1}ms, ${delay2}ms`);
@@ -84,20 +97,28 @@ async function main() {
     const queue = new Queue<{ attempt: number }>(QUEUE_NAME, { embedded: true });
     queue.obliterate();
 
-    await queue.add('exp-job', { attempt: 0 }, {
-      attempts: 4,
-      backoff: 50,
-    });
+    await queue.add(
+      'exp-job',
+      { attempt: 0 },
+      {
+        attempts: 4,
+        backoff: 50,
+      }
+    );
 
     const timestamps: number[] = [];
 
-    const worker = new Worker<{ attempt: number }>(QUEUE_NAME, async () => {
-      timestamps.push(Date.now());
-      if (timestamps.length < 4) {
-        throw new Error(`Attempt ${timestamps.length} failed`);
-      }
-      return { success: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ attempt: number }>(
+      QUEUE_NAME,
+      async () => {
+        timestamps.push(Date.now());
+        if (timestamps.length < 4) {
+          throw new Error(`Attempt ${timestamps.length} failed`);
+        }
+        return { success: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await waitFor(() => timestamps.length >= 4);
     await worker.close();
@@ -107,7 +128,7 @@ async function main() {
       const floors = [45, 90, 180];
       const respectsWindows = floors.every((floor, i) => delays[i] >= floor);
       if (respectsWindows) {
-        console.log(`   ✅ Exponential backoff delays: ${delays.map(d => `~${d}ms`).join(', ')}`);
+        console.log(`   ✅ Exponential backoff delays: ${delays.map((d) => `~${d}ms`).join(', ')}`);
         passed++;
       } else {
         console.log(`   ❌ Backoff below its exponential floor: ${delays.join(', ')}ms`);
@@ -130,20 +151,28 @@ async function main() {
     const queue = new Queue<{ attempt: number }>(QUEUE_NAME, { embedded: true });
     queue.obliterate();
 
-    await queue.add('custom-job', { attempt: 0 }, {
-      attempts: 3,
-      backoff: 200,
-    });
+    await queue.add(
+      'custom-job',
+      { attempt: 0 },
+      {
+        attempts: 3,
+        backoff: 200,
+      }
+    );
 
     let attemptCount = 0;
 
-    const worker = new Worker<{ attempt: number }>(QUEUE_NAME, async () => {
-      attemptCount++;
-      if (attemptCount < 3) {
-        throw new Error(`Fail ${attemptCount}`);
-      }
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ attempt: number }>(
+      QUEUE_NAME,
+      async () => {
+        attemptCount++;
+        if (attemptCount < 3) {
+          throw new Error(`Fail ${attemptCount}`);
+        }
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await waitFor(() => attemptCount === 3);
     await worker.close();
@@ -172,10 +201,14 @@ async function main() {
 
     let attemptCount = 0;
 
-    const worker = new Worker<{ attempt: number }>(QUEUE_NAME, async () => {
-      attemptCount++;
-      throw new Error('Always fails');
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ attempt: number }>(
+      QUEUE_NAME,
+      async () => {
+        attemptCount++;
+        throw new Error('Always fails');
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     // Wait for the DLQ entry (positive signal), then settle briefly to catch
     // a spurious second attempt before asserting the count stayed at 1.
@@ -205,22 +238,30 @@ async function main() {
     const queue = new Queue<{ attempt: number }>(QUEUE_NAME, { embedded: true });
     queue.obliterate();
 
-    await queue.add('success-retry-job', { attempt: 0 }, {
-      attempts: 5,
-      backoff: 50, // 50ms backoff between retries
-    });
+    await queue.add(
+      'success-retry-job',
+      { attempt: 0 },
+      {
+        attempts: 5,
+        backoff: 50, // 50ms backoff between retries
+      }
+    );
 
     let attemptCount = 0;
     let succeeded = false;
 
-    const worker = new Worker<{ attempt: number }>(QUEUE_NAME, async () => {
-      attemptCount++;
-      if (attemptCount < 3) {
-        throw new Error(`Fail ${attemptCount}`);
-      }
-      succeeded = true;
-      return { success: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ attempt: number }>(
+      QUEUE_NAME,
+      async () => {
+        attemptCount++;
+        if (attemptCount < 3) {
+          throw new Error(`Fail ${attemptCount}`);
+        }
+        succeeded = true;
+        return { success: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await waitFor(() => succeeded);
     await worker.close();
@@ -245,14 +286,22 @@ async function main() {
     const queue = new Queue<{ value: number }>(QUEUE_NAME, { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('remove-job', { value: 1 }, {
-      removeOnComplete: true,
-    });
+    const job = await queue.add(
+      'remove-job',
+      { value: 1 },
+      {
+        removeOnComplete: true,
+      }
+    );
 
     let completedEvent = false;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      return { done: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        return { done: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
     worker.on('completed', () => {
       completedEvent = true;
     });

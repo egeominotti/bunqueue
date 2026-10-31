@@ -94,8 +94,12 @@ describe('Stress Advanced - Embedded', () => {
       { embedded: true, concurrency: 10 }
     );
 
-    worker.on('completed', () => { completedCount++; });
-    worker.on('failed', () => { failedCount++; });
+    worker.on('completed', () => {
+      completedCount++;
+    });
+    worker.on('failed', () => {
+      failedCount++;
+    });
 
     // Wait for all jobs to settle
     for (let i = 0; i < 300; i++) {

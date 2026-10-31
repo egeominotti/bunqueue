@@ -120,7 +120,10 @@ describe('AUDIT M2: unregistered sub-workflow fails fast (not a 300s hang)', () 
     const fastWindowMs = 5000;
     const deadline = Date.now() + fastWindowMs;
     let exec = engine.getExecution(run.id);
-    while ((!exec || exec.state === 'running' || exec.state === 'waiting') && Date.now() < deadline) {
+    while (
+      (!exec || exec.state === 'running' || exec.state === 'waiting') &&
+      Date.now() < deadline
+    ) {
       await new Promise((r) => setTimeout(r, 50));
       exec = engine.getExecution(run.id);
     }

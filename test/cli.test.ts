@@ -225,7 +225,14 @@ describe('CLI', () => {
     test('should build Clean command', async () => {
       const { buildQueueCommand } = await import('../src/cli/commands/queue');
 
-      const cmd = buildQueueCommand(['clean', 'emails', '--grace', '3600000', '--state', 'completed']);
+      const cmd = buildQueueCommand([
+        'clean',
+        'emails',
+        '--grace',
+        '3600000',
+        '--state',
+        'completed',
+      ]);
 
       expect(cmd.cmd).toBe('Clean');
       expect(cmd.queue).toBe('emails');
@@ -334,7 +341,9 @@ describe('CLI', () => {
     test('should throw on missing queue for cron add', async () => {
       const { buildCronCommand } = await import('../src/cli/commands/cron');
 
-      expect(() => buildCronCommand(['add', 'test', '-d', '{}'])).toThrow('--queue (-q) is required');
+      expect(() => buildCronCommand(['add', 'test', '-d', '{}'])).toThrow(
+        '--queue (-q) is required'
+      );
     });
 
     test('should build CronDelete command', async () => {

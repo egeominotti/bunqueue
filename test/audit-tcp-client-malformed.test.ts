@@ -157,9 +157,7 @@ describe('BUG H6: TcpClient pipelining leaks in-flight commands on malformed fra
 
     const outcome = await Promise.race([allSettled, deadline]);
 
-    const hung = settled
-      .map((s, i) => (s ? -1 : i))
-      .filter((i) => i >= 0);
+    const hung = settled.map((s, i) => (s ? -1 : i)).filter((i) => i >= 0);
 
     // CORRECT behavior: every concurrent command settled promptly.
     // BUGGY behavior: handleData() only checks `currentCommand` (null in

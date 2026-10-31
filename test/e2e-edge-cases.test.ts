@@ -24,7 +24,11 @@ function setup() {
     manager.shutdown();
     await cleanup();
   });
-  return { get mgr() { return manager; } };
+  return {
+    get mgr() {
+      return manager;
+    },
+  };
 }
 
 describe('E2E Edge Cases', () => {
@@ -58,7 +62,9 @@ describe('E2E Edge Cases', () => {
 
     test('webhook tracks failureCount for invalid URL', async () => {
       const wh = ctx.mgr.webhookManager.add(
-        'http://localhost:1/nonexistent', ['job.failed'], 'wh-fail-q'
+        'http://localhost:1/nonexistent',
+        ['job.failed'],
+        'wh-fail-q'
       );
       await ctx.mgr.webhookManager.trigger('job.failed', 'job-2', 'wh-fail-q');
       await Bun.sleep(8000);
@@ -70,7 +76,9 @@ describe('E2E Edge Cases', () => {
 
     test('disabled webhook does not trigger', async () => {
       const wh = ctx.mgr.webhookManager.add(
-        'http://localhost:1/nonexistent', ['job.completed'], 'wh-off-q'
+        'http://localhost:1/nonexistent',
+        ['job.completed'],
+        'wh-off-q'
       );
       ctx.mgr.webhookManager.setEnabled(wh.id, false);
       await ctx.mgr.webhookManager.trigger('job.completed', 'job-3', 'wh-off-q');
@@ -83,7 +91,9 @@ describe('E2E Edge Cases', () => {
 
     test('webhook filters by queue correctly', async () => {
       const wh = ctx.mgr.webhookManager.add(
-        'http://localhost:1/nonexistent', ['job.completed'], 'specific-queue'
+        'http://localhost:1/nonexistent',
+        ['job.completed'],
+        'specific-queue'
       );
       await ctx.mgr.webhookManager.trigger('job.completed', 'job-4', 'other-queue');
       await Bun.sleep(500);

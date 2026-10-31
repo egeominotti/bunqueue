@@ -7,7 +7,8 @@ state. Performance benchmarks use a different isolation model; see
 
 ## Validation layers
 
-The normal project typecheck excludes test files. When auditing changed tests,
+`bun run typecheck` covers all of `src`, including `src/mcp`, but not `test/`;
+`sdk/conformance` is type-checked by the SDK workflow after the SDK build. When auditing changed tests,
 also run `bun check --no-script -p .changed-audit-tsconfig.json` in the
 isolated Machine with an explicit configuration including every changed
 TypeScript file and its imports. Keep fixtures faithful to the actual APIs:

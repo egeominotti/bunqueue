@@ -3,21 +3,50 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import type { HandlerContext } from '../src/infrastructure/server/types';
 import { handlePush, handlePull, handleFail } from '../src/infrastructure/server/handlers/core';
-import { handleDlq, handleRetryDlq, handlePurgeDlq, handleRemoveDlqJob, handleRetryCompleted } from '../src/infrastructure/server/handlers/dlq';
-import { handleCron, handleCronDelete, handleCronList } from '../src/infrastructure/server/handlers/cron';
-import { handlePing, handleHeartbeat, handleJobHeartbeat, handleRegisterWorker,
-  handleUnregisterWorker, handleListWorkers, handleAddWebhook, handleRemoveWebhook,
-  handleListWebhooks, handlePrometheus } from '../src/infrastructure/server/handlers/monitoring';
+import {
+  handleDlq,
+  handleRetryDlq,
+  handlePurgeDlq,
+  handleRemoveDlqJob,
+  handleRetryCompleted,
+} from '../src/infrastructure/server/handlers/dlq';
+import {
+  handleCron,
+  handleCronDelete,
+  handleCronList,
+} from '../src/infrastructure/server/handlers/cron';
+import {
+  handlePing,
+  handleHeartbeat,
+  handleJobHeartbeat,
+  handleRegisterWorker,
+  handleUnregisterWorker,
+  handleListWorkers,
+  handleAddWebhook,
+  handleRemoveWebhook,
+  handleListWebhooks,
+  handlePrometheus,
+} from '../src/infrastructure/server/handlers/monitoring';
 
 function createContext(qm: QueueManager): HandlerContext {
-  return { queueManager: qm, authTokens: new Set<string>(), authenticated: false, clientId: 'test-1' };
+  return {
+    queueManager: qm,
+    authTokens: new Set<string>(),
+    authenticated: false,
+    clientId: 'test-1',
+  };
 }
 
 describe('DLQ Handlers (direct)', () => {
   let qm: QueueManager;
   let ctx: HandlerContext;
-  beforeEach(() => { qm = new QueueManager(); ctx = createContext(qm); });
-  afterEach(() => { qm.shutdown(); });
+  beforeEach(() => {
+    qm = new QueueManager();
+    ctx = createContext(qm);
+  });
+  afterEach(() => {
+    qm.shutdown();
+  });
 
   describe('handleDlq', () => {
     test('should return empty list for queue with no DLQ entries', () => {
@@ -50,7 +79,11 @@ describe('DLQ Handlers (direct)', () => {
       expect((res as any).count).toBe(0);
     });
     test('should accept optional jobId and propagate reqId', () => {
-      const res = handleRetryDlq({ cmd: 'RetryDlq', queue: 'q', jobId: 'x', reqId: 'r2' }, ctx, 'r2');
+      const res = handleRetryDlq(
+        { cmd: 'RetryDlq', queue: 'q', jobId: 'x', reqId: 'r2' },
+        ctx,
+        'r2'
+      );
       expect(res.ok).toBe(true);
       expect((res as any).count).toBe(0);
       expect(res.reqId).toBe('r2');
@@ -86,10 +119,10 @@ describe('DLQ Handlers (direct)', () => {
       expect(res.ok).toBe(true);
       expect((res as any).data.removed).toBe(true);
       expect(res.reqId).toBe('r-remove');
-      expect((handleRemoveDlqJob(
-        { cmd: 'RemoveDlqJob', queue: 'remove-dlq', jobId: id },
-        ctx
-      ) as any).data.removed).toBe(false);
+      expect(
+        (handleRemoveDlqJob({ cmd: 'RemoveDlqJob', queue: 'remove-dlq', jobId: id }, ctx) as any)
+          .data.removed
+      ).toBe(false);
     });
   });
 
@@ -100,7 +133,11 @@ describe('DLQ Handlers (direct)', () => {
       expect((res as any).count).toBe(0);
     });
     test('should propagate reqId', () => {
-      const res = handleRetryCompleted({ cmd: 'RetryCompleted', queue: 'q', reqId: 'r4' }, ctx, 'r4');
+      const res = handleRetryCompleted(
+        { cmd: 'RetryCompleted', queue: 'q', reqId: 'r4' },
+        ctx,
+        'r4'
+      );
       expect(res.reqId).toBe('r4');
     });
   });
@@ -109,25 +146,44 @@ describe('DLQ Handlers (direct)', () => {
 describe('Cron Handlers (direct)', () => {
   let qm: QueueManager;
   let ctx: HandlerContext;
-  beforeEach(() => { qm = new QueueManager(); ctx = createContext(qm); });
-  afterEach(() => { qm.shutdown(); });
+  beforeEach(() => {
+    qm = new QueueManager();
+    ctx = createContext(qm);
+  });
+  afterEach(() => {
+    qm.shutdown();
+  });
 
   describe('handleCron', () => {
     test('should add a cron job with repeatEvery', () => {
-      const res = handleCron({ cmd: 'Cron', name: 'r-cron', queue: 'q1', data: {}, repeatEvery: 60000 }, ctx);
+      const res = handleCron(
+        { cmd: 'Cron', name: 'r-cron', queue: 'q1', data: {}, repeatEvery: 60000 },
+        ctx
+      );
       expect(res.ok).toBe(true);
       expect((res as any).cron.name).toBe('r-cron');
       expect((res as any).cron.repeatEvery).toBe(60000);
       expect((res as any).cron.nextRun).toBeGreaterThan(0);
     });
     test('should add a cron job with schedule expression', () => {
-      const res = handleCron({ cmd: 'Cron', name: 's-cron', queue: 'q1', data: {}, schedule: '0 0 * * *' }, ctx);
+      const res = handleCron(
+        { cmd: 'Cron', name: 's-cron', queue: 'q1', data: {}, schedule: '0 0 * * *' },
+        ctx
+      );
       expect(res.ok).toBe(true);
       expect((res as any).cron.schedule).toBe('0 0 * * *');
     });
     test('should add a cron job with timezone', () => {
       const res = handleCron(
-        { cmd: 'Cron', name: 'tz-cron', queue: 'q1', data: {}, schedule: '0 9 * * *', timezone: 'America/New_York' }, ctx
+        {
+          cmd: 'Cron',
+          name: 'tz-cron',
+          queue: 'q1',
+          data: {},
+          schedule: '0 9 * * *',
+          timezone: 'America/New_York',
+        },
+        ctx
       );
       expect(res.ok).toBe(true);
       expect((res as any).cron.timezone).toBe('America/New_York');
@@ -138,7 +194,11 @@ describe('Cron Handlers (direct)', () => {
       expect((res as any).error).toBeDefined();
     });
     test('should propagate reqId', () => {
-      const res = handleCron({ cmd: 'Cron', name: 'rq', queue: 'q1', data: {}, repeatEvery: 5000, reqId: 'c1' }, ctx, 'c1');
+      const res = handleCron(
+        { cmd: 'Cron', name: 'rq', queue: 'q1', data: {}, repeatEvery: 5000, reqId: 'c1' },
+        ctx,
+        'c1'
+      );
       expect(res.reqId).toBe('c1');
     });
   });
@@ -185,8 +245,13 @@ describe('Cron Handlers (direct)', () => {
 describe('Monitoring Handlers (direct)', () => {
   let qm: QueueManager;
   let ctx: HandlerContext;
-  beforeEach(() => { qm = new QueueManager(); ctx = createContext(qm); });
-  afterEach(() => { qm.shutdown(); });
+  beforeEach(() => {
+    qm = new QueueManager();
+    ctx = createContext(qm);
+  });
+  afterEach(() => {
+    qm.shutdown();
+  });
 
   describe('handlePing', () => {
     test('should return pong with timestamp and propagate reqId', () => {
@@ -231,7 +296,10 @@ describe('Monitoring Handlers (direct)', () => {
 
   describe('handleRegisterWorker / handleUnregisterWorker', () => {
     test('should register and return worker info', () => {
-      const res = handleRegisterWorker({ cmd: 'RegisterWorker', name: 'w1', queues: ['emails', 'sms'] }, ctx);
+      const res = handleRegisterWorker(
+        { cmd: 'RegisterWorker', name: 'w1', queues: ['emails', 'sms'] },
+        ctx
+      );
       expect(res.ok).toBe(true);
       expect((res as any).data.workerId).toBeDefined();
       expect((res as any).data.name).toBe('w1');
@@ -239,7 +307,10 @@ describe('Monitoring Handlers (direct)', () => {
     });
     test('should unregister an existing worker', () => {
       const reg = handleRegisterWorker({ cmd: 'RegisterWorker', name: 'w2', queues: ['q1'] }, ctx);
-      const res = handleUnregisterWorker({ cmd: 'UnregisterWorker', workerId: (reg as any).data.workerId }, ctx);
+      const res = handleUnregisterWorker(
+        { cmd: 'UnregisterWorker', workerId: (reg as any).data.workerId },
+        ctx
+      );
       expect(res.ok).toBe(true);
       expect((res as any).data.removed).toBe(true);
     });
@@ -267,20 +338,32 @@ describe('Monitoring Handlers (direct)', () => {
 
   describe('handleAddWebhook / handleRemoveWebhook / handleListWebhooks', () => {
     test('should add a webhook and return its info', () => {
-      const res = handleAddWebhook({ cmd: 'AddWebhook', url: 'https://example.com/hook', events: ['job.completed'] }, ctx);
+      const res = handleAddWebhook(
+        { cmd: 'AddWebhook', url: 'https://example.com/hook', events: ['job.completed'] },
+        ctx
+      );
       expect(res.ok).toBe(true);
       expect((res as any).data.webhookId).toBeDefined();
       expect((res as any).data.url).toBe('https://example.com/hook');
     });
     test('should reject invalid and empty webhook URLs', () => {
-      const r1 = handleAddWebhook({ cmd: 'AddWebhook', url: 'not-a-url', events: ['job.completed'] }, ctx);
+      const r1 = handleAddWebhook(
+        { cmd: 'AddWebhook', url: 'not-a-url', events: ['job.completed'] },
+        ctx
+      );
       expect(r1.ok).toBe(false);
       const r2 = handleAddWebhook({ cmd: 'AddWebhook', url: '', events: ['job.completed'] }, ctx);
       expect(r2.ok).toBe(false);
     });
     test('should remove an existing webhook', () => {
-      const add = handleAddWebhook({ cmd: 'AddWebhook', url: 'https://example.com/rm', events: ['job.failed'] }, ctx);
-      const res = handleRemoveWebhook({ cmd: 'RemoveWebhook', webhookId: (add as any).data.webhookId }, ctx);
+      const add = handleAddWebhook(
+        { cmd: 'AddWebhook', url: 'https://example.com/rm', events: ['job.failed'] },
+        ctx
+      );
+      const res = handleRemoveWebhook(
+        { cmd: 'RemoveWebhook', webhookId: (add as any).data.webhookId },
+        ctx
+      );
       expect(res.ok).toBe(true);
       expect((res as any).data.removed).toBe(true);
     });
@@ -293,7 +376,10 @@ describe('Monitoring Handlers (direct)', () => {
       const empty = handleListWebhooks({ cmd: 'ListWebhooks' }, ctx);
       expect(empty.ok).toBe(true);
       expect((empty as any).data.webhooks).toEqual([]);
-      handleAddWebhook({ cmd: 'AddWebhook', url: 'https://example.com/a', events: ['job.completed'] }, ctx);
+      handleAddWebhook(
+        { cmd: 'AddWebhook', url: 'https://example.com/a', events: ['job.completed'] },
+        ctx
+      );
       const res = handleListWebhooks({ cmd: 'ListWebhooks' }, ctx);
       const wh = (res as any).data.webhooks[0];
       expect(wh.id).toBeDefined();

@@ -55,7 +55,10 @@ describe('REPRO: branch paths must not silently drop nodes', () => {
         .step('classify', () => ({ tier: 'vip' }))
         .branch((ctx) => (ctx.steps.classify as { tier: string }).tier)
         .path('vip', (w) =>
-          w.step('vip-a', () => ({ a: 1 })).waitFor('human-check').step('vip-b', () => ({ b: 1 }))
+          w
+            .step('vip-a', () => ({ a: 1 }))
+            .waitFor('human-check')
+            .step('vip-b', () => ({ b: 1 }))
         );
 
     // RED on current code: the waitFor is dropped and build() succeeds, so the

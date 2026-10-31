@@ -47,11 +47,10 @@ describe('QueueEvents - Core Events', () => {
       emittedReturnValue = returnvalue;
     });
 
-    const worker = new Worker(
-      'events-test',
-      async (job) => job.data.value * 2,
-      { embedded: true, autorun: true }
-    );
+    const worker = new Worker('events-test', async (job) => job.data.value * 2, {
+      embedded: true,
+      autorun: true,
+    });
 
     const job = await queue.add('test', { value: 21 });
 
@@ -257,11 +256,10 @@ describe('Worker - Stalled Event', () => {
   test('worker should emit stalled event when subscribed', async () => {
     // This test just verifies the subscription mechanism works
     // Actual stall detection requires longer timeouts
-    const worker = new Worker(
-      'stalled-test',
-      async (job) => job.data.value,
-      { embedded: true, autorun: true }
-    );
+    const worker = new Worker('stalled-test', async (job) => job.data.value, {
+      embedded: true,
+      autorun: true,
+    });
 
     let stalledCount = 0;
     worker.on('stalled', () => {

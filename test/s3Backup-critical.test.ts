@@ -16,10 +16,7 @@ import { unlink, stat } from 'fs/promises';
 import { existsSync } from 'fs';
 import type { S3BackupConfig, BackupMetadata } from '../src/infrastructure/backup/s3BackupConfig';
 import { DEFAULTS } from '../src/infrastructure/backup/s3BackupConfig';
-import {
-  performBackup,
-  restoreBackup,
-} from '../src/infrastructure/backup/s3BackupOperations';
+import { performBackup, restoreBackup } from '../src/infrastructure/backup/s3BackupOperations';
 import { S3BackupManager } from '../src/infrastructure/backup/s3Backup';
 import type { S3Client } from 'bun';
 
@@ -142,9 +139,21 @@ describe('CRITICAL BUG 1: WAL checkpoint silent failure', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
-      try { await unlink(f + '-wal'); } catch { /* ok */ }
-      try { await unlink(f + '-shm'); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
+      try {
+        await unlink(f + '-wal');
+      } catch {
+        /* ok */
+      }
+      try {
+        await unlink(f + '-shm');
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -237,7 +246,11 @@ describe('CRITICAL BUG 2: Write buffer not flushed before backup', () => {
     expect(result.success).toBe(true);
 
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -264,7 +277,11 @@ describe('CRITICAL BUG 3: Non-atomic restore', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -337,7 +354,11 @@ describe('CRITICAL BUG 3: Non-atomic restore', () => {
 describe('CRITICAL BUG 4: No retry/backoff on transient failures', () => {
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -351,10 +372,7 @@ describe('CRITICAL BUG 4: No retry/backoff on transient failures', () => {
     // Mock client that fails first 2 uploads then succeeds
     const client = createMockS3Client({ failUploadCount: 2 });
 
-    const result = await performBackup(
-      cfg({ databasePath: dbPath }),
-      client
-    );
+    const result = await performBackup(cfg({ databasePath: dbPath }), client);
 
     // BUG: performBackup doesn't retry, so first S3 error = permanent failure
     expect(result.success).toBe(true);
@@ -410,7 +428,11 @@ describe('CRITICAL BUG 5: Restore without full validation', () => {
 
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -465,7 +487,11 @@ describe('CRITICAL BUG 5: Restore without full validation', () => {
 describe('CRITICAL BUG 6: No S3 operation timeouts', () => {
   afterEach(async () => {
     for (const f of tempFiles) {
-      try { await unlink(f); } catch { /* ok */ }
+      try {
+        await unlink(f);
+      } catch {
+        /* ok */
+      }
     }
     tempFiles = [];
   });
@@ -474,10 +500,7 @@ describe('CRITICAL BUG 6: No S3 operation timeouts', () => {
     const hangClient = createMockS3Client({ hangDownload: true });
 
     // Upload a fake backup entry so exists() returns true
-    (hangClient as any)._storage.set(
-      'backups/hung-test.db',
-      new Uint8Array([1, 2, 3])
-    );
+    (hangClient as any)._storage.set('backups/hung-test.db', new Uint8Array([1, 2, 3]));
 
     const restorePath = tmpPath('timeout-dl');
 

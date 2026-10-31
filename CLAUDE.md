@@ -7,6 +7,21 @@ and verify race conditions, error handling, idempotency, type safety and test
 coverage. `FAIL` blocks commit and push; `CONDITIONAL` requires the user's
 explicit confirmation. The project profile is `.claude/agents/skeptic.md`.
 
+**MANDATORY — BUN-NATIVE TOOLING ONLY**: type check exclusively with
+`bun check` and format exclusively with `bun fmt`, everywhere in the repository
+and in every SDK: `src`, `test`, `scripts`, `bench`, `examples`,
+`sdk/typescript` and `sdk/conformance`. Use the scripts (`bun run typecheck`,
+`bun run format`, `bun run format:check`, `bun run check`); inside scripts,
+hooks and CI always pass `--no-script`. Never add or run `tsc --noEmit`, ESLint,
+Prettier, Biome, oxlint, oxfmt, dprint or any other type-check, lint or format
+library, and never add lint-suppression comments. The only exceptions:
+`typescript`/`tsc` stays where files must be emitted (`build:lib` and SDK
+`.d.ts` builds, typedoc, compiler-API tests), because `bun check` never writes;
+and SDKs in languages Bun cannot format keep their language's own toolchain
+(`gofmt`/`go vet`, `cargo fmt`/`clippy`, `mix format`, `php -l`); the
+TypeScript in `sdk/conformance` still goes through `bun fmt`, and through
+`bun check` in the SDK workflow once the SDK it imports is built.
+
 **ENGLISH ONLY**: keep all repository content in English, including source
 comments, tests, technical documentation, user documentation and agent
 configuration.

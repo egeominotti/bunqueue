@@ -23,15 +23,12 @@ describe('Issue #53 - Worker log event', () => {
 
     const queue = new Queue(queueName);
 
-    const worker = new Worker(
-      queueName,
-      async (job) => {
-        await job.log('step-1: starting');
-        await job.log('step-2: processing');
-        await job.log('step-3: done');
-        return { ok: true };
-      },
-    );
+    const worker = new Worker(queueName, async (job) => {
+      await job.log('step-1: starting');
+      await job.log('step-2: processing');
+      await job.log('step-3: done');
+      return { ok: true };
+    });
 
     worker.on('log', (_job, message) => {
       logMessages.push(message);
@@ -66,13 +63,10 @@ describe('Issue #53 - Worker log event', () => {
 
     const queue = new Queue(queueName);
 
-    const worker = new Worker(
-      queueName,
-      async (job) => {
-        await job.log('hello from job');
-        return {};
-      },
-    );
+    const worker = new Worker(queueName, async (job) => {
+      await job.log('hello from job');
+      return {};
+    });
 
     worker.on('log', (job, message) => {
       logJob = job;
@@ -105,14 +99,11 @@ describe('Issue #53 - Worker log event', () => {
 
     const queue = new Queue(queueName);
 
-    const worker = new Worker(
-      queueName,
-      async (job) => {
-        await job.log('persisted-log-1');
-        await job.log('persisted-log-2');
-        return {};
-      },
-    );
+    const worker = new Worker(queueName, async (job) => {
+      await job.log('persisted-log-1');
+      await job.log('persisted-log-2');
+      return {};
+    });
 
     worker.on('completed', (job) => {
       completedJobId = job.id;

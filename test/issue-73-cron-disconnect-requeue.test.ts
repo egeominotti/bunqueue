@@ -27,7 +27,9 @@ function cleanup() {
   for (const suffix of ['', '-wal', '-shm']) {
     const p = TEST_DB_PATH + suffix;
     if (existsSync(p)) {
-      try { unlinkSync(p); } catch {}
+      try {
+        unlinkSync(p);
+      } catch {}
     }
   }
 }

@@ -25,13 +25,13 @@ tokens use ceil(bytes/4), **not a model tokenizer**. Client retention of text,
 structured content and refreshed lists varies; disclosure cost is separate from
 the next tools/list size. Earlier ~16,000/~850 estimates omitted output schemas.
 
-| Surface | Tool count | Bytes | Approx. tokens |
-| --- | ---: | ---: | ---: |
-| Default primary tools/list, no profile/workflow | 79 | 144,912 | 36,228 |
-| Agent profile, initial dynamic discovery | 2 | 5,264 | 1,316 |
-| Agent catalog + one default group (range) | 6–15 | 11,185–31,267 | 2,797–7,817 |
-| Optional workflow descriptors, embedded | +2 (81 total) | 4,266 | 1,067 |
-| Optional workflow descriptors, supported TCP | +3 (82 total) | 6,659 | 1,665 |
+| Surface                                         |    Tool count |         Bytes | Approx. tokens |
+| ----------------------------------------------- | ------------: | ------------: | -------------: |
+| Default primary tools/list, no profile/workflow |            79 |       144,912 |         36,228 |
+| Agent profile, initial dynamic discovery        |             2 |         5,264 |          1,316 |
+| Agent catalog + one default group (range)       |          6–15 | 11,185–31,267 |    2,797–7,817 |
+| Optional workflow descriptors, embedded         | +2 (81 total) |         4,266 |          1,067 |
+| Optional workflow descriptors, supported TCP    | +3 (82 total) |         6,659 |          1,665 |
 
 Dynamic discovery adds two descriptors; optional decision-model `find_tools`
 adds another only when configured. It was not configured/called in this run.
@@ -39,18 +39,18 @@ Workflow descriptor bytes above include their own `{ tools }` wrapper, rather
 than subtracting two full catalogs.
 
 | Loaded group | Complete next tools/list bytes | Actual disclosure response bytes |
-| --- | ---: | ---: |
-| jobs | 31,267 | 82,862 |
-| job-control | 16,036 | 33,504 |
-| processing | 20,025 | 46,350 |
-| queues | 24,798 | 64,280 |
-| dlq | 13,799 | 27,852 |
-| cron | 15,076 | 30,307 |
-| limits | 13,482 | 26,869 |
-| flows | 24,502 | 63,707 |
-| workers | 15,744 | 34,352 |
-| webhooks | 11,185 | 19,645 |
-| monitoring | 18,363 | 43,023 |
+| ------------ | -----------------------------: | -------------------------------: |
+| jobs         |                         31,267 |                           82,862 |
+| job-control  |                         16,036 |                           33,504 |
+| processing   |                         20,025 |                           46,350 |
+| queues       |                         24,798 |                           64,280 |
+| dlq          |                         13,799 |                           27,852 |
+| cron         |                         15,076 |                           30,307 |
+| limits       |                         13,482 |                           26,869 |
+| flows        |                         24,502 |                           63,707 |
+| workers      |                         15,744 |                           34,352 |
+| webhooks     |                         11,185 |                           19,645 |
+| monitoring   |                         18,363 |                           43,023 |
 
 Optional workflow dynamic disclosure measured separately: 13,195 bytes embedded
 (2 tools), 20,470 bytes TCP (3 tools). Embedded signal omission prints its
@@ -72,10 +72,10 @@ Measured with TypeSafe's `jev_classify` tool, using the toolset catalog of
 `bunqueue_find_tools` uses; the question wording differs from
 `FIND_TOOLS_QUESTION`), one request per item.
 
-| Run | Catalog | Development | Held-out |
-| --- | --- | ---: | ---: |
-| 1 | `queues`: "count and list jobs by state" | 36/36 | 35/36 |
-| 2 | `queues`: "count and list a queue's jobs in any state (waiting, delayed, active, completed, failed)" | 36/36 | 36/36 |
+| Run | Catalog                                                                                              | Development | Held-out |
+| --- | ---------------------------------------------------------------------------------------------------- | ----------: | -------: |
+| 1   | `queues`: "count and list jobs by state"                                                             |       36/36 |    35/36 |
+| 2   | `queues`: "count and list a queue's jobs in any state (waiting, delayed, active, completed, failed)" |       36/36 |    36/36 |
 
 - Run 1's miss: "list the failed jobs in the webhooks queue, page 2", labelled
   `get_jobs` (`queues`), went to `dlq` with probability 0.51 against 0.48. The

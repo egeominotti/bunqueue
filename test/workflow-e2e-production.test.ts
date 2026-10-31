@@ -157,7 +157,13 @@ describe('Workflow E2E - Production Scenarios', () => {
 
     inventory.setStock('WIDGET-A', 100);
 
-    type OrderInput = { customerId: string; sku: string; qty: number; amount: number; email: string };
+    type OrderInput = {
+      customerId: string;
+      sku: string;
+      qty: number;
+      amount: number;
+      email: string;
+    };
 
     const orderPipeline = new Workflow<OrderInput>('order-pipeline')
       .step('validate-order', async (ctx) => {
@@ -167,42 +173,55 @@ describe('Workflow E2E - Production Scenarios', () => {
         if (input.qty <= 0) throw new Error('Invalid quantity');
         return { validated: true };
       })
-      .step('create-order-record', async (ctx) => {
-        const input = ctx.input as OrderInput;
-        const orderId = await db.insert('orders', {
-          customerId: input.customerId,
-          sku: input.sku,
-          qty: input.qty,
-          amount: input.amount,
-          status: 'pending',
-        });
-        return { orderId };
-      }, {
-        compensate: async (ctx) => {
-          const orderId = (ctx.steps['create-order-record'] as { orderId: string }).orderId;
-          await db.update(orderId, { status: 'cancelled' });
+      .step(
+        'create-order-record',
+        async (ctx) => {
+          const input = ctx.input as OrderInput;
+          const orderId = await db.insert('orders', {
+            customerId: input.customerId,
+            sku: input.sku,
+            qty: input.qty,
+            amount: input.amount,
+            status: 'pending',
+          });
+          return { orderId };
         },
-      })
-      .step('reserve-inventory', async (ctx) => {
-        const input = ctx.input as OrderInput;
-        const reservationId = await inventory.reserve(input.sku, input.qty);
-        return { reservationId };
-      }, {
-        compensate: async (ctx) => {
-          const resId = (ctx.steps['reserve-inventory'] as { reservationId: string }).reservationId;
-          await inventory.release(resId);
+        {
+          compensate: async (ctx) => {
+            const orderId = (ctx.steps['create-order-record'] as { orderId: string }).orderId;
+            await db.update(orderId, { status: 'cancelled' });
+          },
+        }
+      )
+      .step(
+        'reserve-inventory',
+        async (ctx) => {
+          const input = ctx.input as OrderInput;
+          const reservationId = await inventory.reserve(input.sku, input.qty);
+          return { reservationId };
         },
-      })
-      .step('process-payment', async (ctx) => {
-        const input = ctx.input as OrderInput;
-        const transactionId = await payments.charge(input.amount, 'EUR');
-        return { transactionId };
-      }, {
-        compensate: async (ctx) => {
-          const txId = (ctx.steps['process-payment'] as { transactionId: string }).transactionId;
-          await payments.refund(txId);
+        {
+          compensate: async (ctx) => {
+            const resId = (ctx.steps['reserve-inventory'] as { reservationId: string })
+              .reservationId;
+            await inventory.release(resId);
+          },
+        }
+      )
+      .step(
+        'process-payment',
+        async (ctx) => {
+          const input = ctx.input as OrderInput;
+          const transactionId = await payments.charge(input.amount, 'EUR');
+          return { transactionId };
         },
-      })
+        {
+          compensate: async (ctx) => {
+            const txId = (ctx.steps['process-payment'] as { transactionId: string }).transactionId;
+            await payments.refund(txId);
+          },
+        }
+      )
       .step('finalize-order', async (ctx) => {
         const orderId = (ctx.steps['create-order-record'] as { orderId: string }).orderId;
         const txId = (ctx.steps['process-payment'] as { transactionId: string }).transactionId;
@@ -237,7 +256,14 @@ describe('Workflow E2E - Production Scenarios', () => {
     expect(exec!.state).toBe('completed');
 
     // Verify all steps completed
-    for (const name of ['validate-order', 'create-order-record', 'reserve-inventory', 'process-payment', 'finalize-order', 'send-confirmation-email']) {
+    for (const name of [
+      'validate-order',
+      'create-order-record',
+      'reserve-inventory',
+      'process-payment',
+      'finalize-order',
+      'send-confirmation-email',
+    ]) {
       expect(exec!.steps[name]?.status).toBe('completed');
     }
 
@@ -264,26 +290,34 @@ describe('Workflow E2E - Production Scenarios', () => {
     const compensationLog: string[] = [];
 
     const orderFlow = new Workflow('order-compensate')
-      .step('create-order', async () => {
-        const id = await db.insert('orders', { status: 'pending' });
-        return { orderId: id };
-      }, {
-        compensate: async (ctx) => {
-          compensationLog.push('cancel-order');
-          const id = (ctx.steps['create-order'] as { orderId: string }).orderId;
-          await db.update(id, { status: 'cancelled' });
+      .step(
+        'create-order',
+        async () => {
+          const id = await db.insert('orders', { status: 'pending' });
+          return { orderId: id };
         },
-      })
-      .step('reserve-stock', async () => {
-        const resId = await inventory.reserve('GADGET-B', 10);
-        return { reservationId: resId };
-      }, {
-        compensate: async (ctx) => {
-          compensationLog.push('release-stock');
-          const resId = (ctx.steps['reserve-stock'] as { reservationId: string }).reservationId;
-          await inventory.release(resId);
+        {
+          compensate: async (ctx) => {
+            compensationLog.push('cancel-order');
+            const id = (ctx.steps['create-order'] as { orderId: string }).orderId;
+            await db.update(id, { status: 'cancelled' });
+          },
+        }
+      )
+      .step(
+        'reserve-stock',
+        async () => {
+          const resId = await inventory.reserve('GADGET-B', 10);
+          return { reservationId: resId };
         },
-      })
+        {
+          compensate: async (ctx) => {
+            compensationLog.push('release-stock');
+            const resId = (ctx.steps['reserve-stock'] as { reservationId: string }).reservationId;
+            await inventory.release(resId);
+          },
+        }
+      )
       .step('charge-card', async () => {
         // This will always fail
         await payments.charge(199.99, 'EUR');
@@ -333,7 +367,11 @@ describe('Workflow E2E - Production Scenarios', () => {
       })
       .waitFor('kyc-review')
       .step('process-review', async (ctx) => {
-        const review = ctx.signals['kyc-review'] as { approved: boolean; reviewer: string; notes?: string };
+        const review = ctx.signals['kyc-review'] as {
+          approved: boolean;
+          reviewer: string;
+          notes?: string;
+        };
         const userId = (ctx.steps['create-account'] as { userId: string }).userId;
         const kycId = (ctx.steps['submit-kyc'] as { kycId: string }).kycId;
 
@@ -342,7 +380,11 @@ describe('Workflow E2E - Production Scenarios', () => {
           await db.update(kycId, { status: 'approved', reviewer: review.reviewer });
         } else {
           await db.update(userId, { status: 'rejected' });
-          await db.update(kycId, { status: 'rejected', reviewer: review.reviewer, notes: review.notes });
+          await db.update(kycId, {
+            status: 'rejected',
+            reviewer: review.reviewer,
+            notes: review.notes,
+          });
         }
         return { approved: review.approved };
       })
@@ -484,16 +526,20 @@ describe('Workflow E2E - Production Scenarios', () => {
     const failedOrders: string[] = [];
 
     const orderFlow = new Workflow('limited-stock-order')
-      .step('reserve', async (ctx) => {
-        const input = ctx.input as { orderId: string };
-        const resId = await inventory.reserve('LIMITED-ITEM', 1);
-        return { reservationId: resId, orderId: input.orderId };
-      }, {
-        compensate: async (ctx) => {
-          const resId = (ctx.steps['reserve'] as { reservationId: string }).reservationId;
-          await inventory.release(resId);
+      .step(
+        'reserve',
+        async (ctx) => {
+          const input = ctx.input as { orderId: string };
+          const resId = await inventory.reserve('LIMITED-ITEM', 1);
+          return { reservationId: resId, orderId: input.orderId };
         },
-      })
+        {
+          compensate: async (ctx) => {
+            const resId = (ctx.steps['reserve'] as { reservationId: string }).reservationId;
+            await inventory.release(resId);
+          },
+        }
+      )
       .step('process', async (ctx) => {
         const orderId = (ctx.steps['reserve'] as { orderId: string }).orderId;
         await new Promise((r) => setTimeout(r, 50));
@@ -618,7 +664,9 @@ describe('Workflow E2E - Production Scenarios', () => {
         return { records, totalSources: input.sources.length };
       })
       .step('transform', async (ctx) => {
-        const extracted = ctx.steps['extract'] as { records: Array<{ source: string; count: number }> };
+        const extracted = ctx.steps['extract'] as {
+          records: Array<{ source: string; count: number }>;
+        };
         await new Promise((r) => setTimeout(r, 20));
         const transformed = extracted.records.map((r) => ({
           ...r,

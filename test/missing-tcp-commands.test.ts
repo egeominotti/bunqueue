@@ -42,10 +42,7 @@ describe('ClearLogs command', () => {
     qm.addLog(job.id, 'test log message');
     expect(qm.getLogs(job.id).length).toBe(1);
 
-    const res = await handleCommand(
-      { cmd: 'ClearLogs', id: String(job.id) } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'ClearLogs', id: String(job.id) } as Command, ctx);
 
     expect(res.ok).toBe(true);
     expect(qm.getLogs(job.id).length).toBe(0);
@@ -104,7 +101,12 @@ describe('ExtendLock command', () => {
     const { job } = await qm.pullWithLock('test-queue', 'worker-1');
 
     const res = await handleCommand(
-      { cmd: 'ExtendLock', id: String(job!.id), token: 'invalid-token', duration: 60000 } as Command,
+      {
+        cmd: 'ExtendLock',
+        id: String(job!.id),
+        token: 'invalid-token',
+        duration: 60000,
+      } as Command,
       ctx
     );
 
@@ -249,10 +251,7 @@ describe('CompactMemory command', () => {
   });
 
   test('should compact memory via handleCommand', async () => {
-    const res = await handleCommand(
-      { cmd: 'CompactMemory' } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'CompactMemory' } as Command, ctx);
 
     expect(res.ok).toBe(true);
   });
@@ -278,19 +277,13 @@ describe('MoveToWait command', () => {
   test('should move a delayed job to waiting via handleCommand', async () => {
     const job = await qm.push('test-queue', { data: { x: 1 }, delay: 999999 });
 
-    const res = await handleCommand(
-      { cmd: 'MoveToWait', id: String(job.id) } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'MoveToWait', id: String(job.id) } as Command, ctx);
 
     expect(res.ok).toBe(true);
   });
 
   test('should fail for non-existent job', async () => {
-    const res = await handleCommand(
-      { cmd: 'MoveToWait', id: '99999' } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'MoveToWait', id: '99999' } as Command, ctx);
     expect(res.ok).toBe(false);
   });
 });
@@ -316,10 +309,7 @@ describe('PromoteJobs command', () => {
     await qm.push('test-queue', { data: { x: 1 }, delay: 999999 });
     await qm.push('test-queue', { data: { x: 2 }, delay: 999999 });
 
-    const res = await handleCommand(
-      { cmd: 'PromoteJobs', queue: 'test-queue' } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'PromoteJobs', queue: 'test-queue' } as Command, ctx);
 
     expect(res.ok).toBe(true);
     const data = res as Record<string, unknown>;

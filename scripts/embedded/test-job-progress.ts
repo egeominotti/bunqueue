@@ -23,24 +23,28 @@ async function main() {
     const job = await queue.add('progress-job', { task: 'test' });
     const progressUpdates: number[] = [];
 
-    const worker = new Worker<{ task: string }>(QUEUE_NAME, async (j) => {
-      await j.updateProgress(25);
-      progressUpdates.push(25);
-      await Bun.sleep(50);
+    const worker = new Worker<{ task: string }>(
+      QUEUE_NAME,
+      async (j) => {
+        await j.updateProgress(25);
+        progressUpdates.push(25);
+        await Bun.sleep(50);
 
-      await j.updateProgress(50);
-      progressUpdates.push(50);
-      await Bun.sleep(50);
+        await j.updateProgress(50);
+        progressUpdates.push(50);
+        await Bun.sleep(50);
 
-      await j.updateProgress(75);
-      progressUpdates.push(75);
-      await Bun.sleep(50);
+        await j.updateProgress(75);
+        progressUpdates.push(75);
+        await Bun.sleep(50);
 
-      await j.updateProgress(100);
-      progressUpdates.push(100);
+        await j.updateProgress(100);
+        progressUpdates.push(100);
 
-      return { completed: true };
-    }, { concurrency: 1, embedded: true });
+        return { completed: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -63,11 +67,15 @@ async function main() {
     await queue.add('progress-msg-job', { task: 'with-message' });
 
     let lastMessage = '';
-    const worker = new Worker<{ task: string }>(QUEUE_NAME, async (j) => {
-      await j.updateProgress(50, 'Halfway there!');
-      lastMessage = 'Halfway there!';
-      return { done: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ task: string }>(
+      QUEUE_NAME,
+      async (j) => {
+        await j.updateProgress(50, 'Halfway there!');
+        lastMessage = 'Halfway there!';
+        return { done: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(300);
     await worker.close();
@@ -89,14 +97,18 @@ async function main() {
   try {
     const job = await queue.add('log-job', { task: 'logging' });
 
-    const worker = new Worker<{ task: string }>(QUEUE_NAME, async (j) => {
-      await j.log('Starting job...');
-      await Bun.sleep(50);
-      await j.log('Processing data...');
-      await Bun.sleep(50);
-      await j.log('Finishing up...');
-      return { logged: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ task: string }>(
+      QUEUE_NAME,
+      async (j) => {
+        await j.log('Starting job...');
+        await Bun.sleep(50);
+        await j.log('Processing data...');
+        await Bun.sleep(50);
+        await j.log('Finishing up...');
+        return { logged: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -118,9 +130,13 @@ async function main() {
     const initialJob = await queue.getJob(job.id);
     const initialState = initialJob ? 'found' : 'not found';
 
-    const worker = new Worker<{ task: string }>(QUEUE_NAME, async () => {
-      return { processed: true };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ task: string }>(
+      QUEUE_NAME,
+      async () => {
+        return { processed: true };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(300);
     await worker.close();
@@ -151,12 +167,16 @@ async function main() {
 
     await queue.add('event-job', { task: 'emit-progress' });
 
-    const worker = new Worker<{ task: string }>(QUEUE_NAME, async (j) => {
-      await j.updateProgress(33);
-      await j.updateProgress(66);
-      await j.updateProgress(100);
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ task: string }>(
+      QUEUE_NAME,
+      async (j) => {
+        await j.updateProgress(33);
+        await j.updateProgress(66);
+        await j.updateProgress(100);
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -187,9 +207,13 @@ async function main() {
 
     await queue.add('complete-event-job', { task: 'emit-complete' });
 
-    const worker = new Worker<{ task: string }>(QUEUE_NAME, async () => {
-      return { result: 'done' };
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ task: string }>(
+      QUEUE_NAME,
+      async () => {
+        return { result: 'done' };
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();

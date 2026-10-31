@@ -111,7 +111,9 @@ for (const mode of ['embedded', 'tcp'] as const) {
         outcomes.push(await settledWithin(job.waitUntilFinished(null, 10_000), 8_000));
       }
 
-      expect(outcomes).toEqual(Array.from({ length: 40 }, (_, n) => ({ value: { answer: n * 2 } })));
+      expect(outcomes).toEqual(
+        Array.from({ length: 40 }, (_, n) => ({ value: { answer: n * 2 } }))
+      );
     });
 
     test('a new generation under the same custom ID never gets the old result', async () => {

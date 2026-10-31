@@ -55,8 +55,14 @@ async function connectWs(): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(WS_URL);
     const t = setTimeout(() => reject(new Error('WS connect timeout')), 5000);
-    ws.addEventListener('open', () => { clearTimeout(t); resolve(ws); });
-    ws.addEventListener('error', (e) => { clearTimeout(t); reject(e); });
+    ws.addEventListener('open', () => {
+      clearTimeout(t);
+      resolve(ws);
+    });
+    ws.addEventListener('error', (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
   });
 }
 
@@ -74,7 +80,10 @@ async function api(method: string, path: string, body?: unknown): Promise<Record
   return res.json() as Promise<Record<string, unknown>>;
 }
 
-async function pushJob(data: unknown = { x: 1 }, opts: Record<string, unknown> = {}): Promise<string> {
+async function pushJob(
+  data: unknown = { x: 1 },
+  opts: Record<string, unknown> = {}
+): Promise<string> {
   const res = await api('POST', `/queues/${Q}/jobs`, { data, ...opts });
   return res.id as string;
 }
@@ -122,7 +131,10 @@ async function main() {
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
     ok(typeof ev.data.jobId === 'string', `jobId=${ev.data.jobId}`);
     ok(typeof ev.ts === 'number', `ts=${ev.ts}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.2 job:active
   console.log('\n2. job:active');
@@ -133,7 +145,10 @@ async function main() {
     await pullJob();
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.3 job:completed
   console.log('\n3. job:completed');
@@ -145,7 +160,10 @@ async function main() {
     await api('POST', `/jobs/${id}/ack`, { result: { done: true } });
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.4 job:failed
   console.log('\n4. job:failed');
@@ -158,7 +176,10 @@ async function main() {
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
     ok(typeof ev.data.error === 'string', `error=${ev.data.error}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.5 job:removed
   console.log('\n5. job:removed');
@@ -169,7 +190,10 @@ async function main() {
     await api('DELETE', `/jobs/${id}`);
     const ev = await ep;
     ok(ev.data.jobId === id, `jobId=${ev.data.jobId}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.6 job:promoted
   console.log('\n6. job:promoted');
@@ -180,7 +204,10 @@ async function main() {
     await api('POST', `/jobs/${id}/promote`);
     const ev = await ep;
     ok(typeof ev.data.jobId === 'string', `jobId present`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.7 job:progress
   console.log('\n7. job:progress');
@@ -192,7 +219,10 @@ async function main() {
     await api('POST', `/jobs/${id}/progress`, { progress: 50 });
     const ev = await ep;
     ok(ev.data.progress !== undefined, `progress=${ev.data.progress}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.8 job:discarded
   console.log('\n8. job:discarded');
@@ -203,7 +233,10 @@ async function main() {
     await api('POST', `/jobs/${id}/discard`);
     const ev = await ep;
     ok(typeof ev.data.jobId === 'string', `jobId present`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.9 job:priority-changed
   console.log('\n9. job:priority-changed');
@@ -214,7 +247,10 @@ async function main() {
     await api('PUT', `/jobs/${id}/priority`, { priority: 99 });
     const ev = await ep;
     ok(typeof ev.data.jobId === 'string', `jobId present`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.10 job:data-updated
   console.log('\n10. job:data-updated');
@@ -225,7 +261,10 @@ async function main() {
     await api('PUT', `/jobs/${id}/data`, { data: { updated: true } });
     const ev = await ep;
     ok(typeof ev.data.jobId === 'string', `jobId present`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.11 job:delay-changed
   console.log('\n11. job:delay-changed');
@@ -237,7 +276,10 @@ async function main() {
     await api('PUT', `/jobs/${id}/delay`, { delay: 5000 });
     const ev = await ep;
     ok(typeof ev.data.jobId === 'string', `jobId present`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 1.12 queue:counts (auto-emitted on state change)
   console.log('\n12. queue:counts');
@@ -248,7 +290,10 @@ async function main() {
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
     ok(typeof ev.data.waiting === 'number', `waiting=${ev.data.waiting}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 2. Queue Events ──────────────────────────────────
   console.log('\n── Queue Events ──');
@@ -262,7 +307,10 @@ async function main() {
     await api('POST', `/queues/${Q}/pause`);
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 2.2 queue:resumed
   console.log('\n14. queue:resumed');
@@ -271,7 +319,10 @@ async function main() {
     await api('POST', `/queues/${Q}/resume`);
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 2.3 queue:drained
   console.log('\n15. queue:drained');
@@ -282,20 +333,28 @@ async function main() {
     await api('POST', `/queues/${Q}/drain`);
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 2.4 queue:cleaned (clean waiting jobs — completed don't persist in memory-only mode)
   console.log('\n16. queue:cleaned');
   try {
     await cleanup();
     // Push multiple waiting jobs, then clean them
-    await pushJob(); await pushJob(); await pushJob();
+    await pushJob();
+    await pushJob();
+    await pushJob();
     await Bun.sleep(100);
     const ep = waitEvent(ws, 'queue:cleaned');
     await api('POST', `/queues/${Q}/clean`, { grace: 0, state: 'waiting' });
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 2.5 queue:obliterated
   console.log('\n17. queue:obliterated');
@@ -305,7 +364,10 @@ async function main() {
     await api('POST', `/queues/${Q}/obliterate`);
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 3. DLQ Events ────────────────────────────────────
   console.log('\n── DLQ Events ──');
@@ -321,7 +383,10 @@ async function main() {
     await api('POST', `/jobs/${id}/fail`, { error: 'dlq test' });
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 3.2 dlq:retried (retry-all emits dlq:retry-all when count > 0)
   console.log('\n19. dlq:retry-all');
@@ -336,7 +401,10 @@ async function main() {
     await api('POST', `/queues/${Q}/dlq/retry`);
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 3.3 dlq:purged
   console.log('\n20. dlq:purged');
@@ -351,7 +419,10 @@ async function main() {
     await api('POST', `/queues/${Q}/dlq/purge`);
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 4. Cron Events ───────────────────────────────────
   console.log('\n── Cron Events ──');
@@ -363,7 +434,10 @@ async function main() {
     await api('POST', '/crons', { name: 'ws-cron', queue: Q, data: { t: 1 }, repeatEvery: 60000 });
     const ev = await ep;
     ok(ev.data.name === 'ws-cron', `name=${ev.data.name}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 4.2 cron:deleted
   console.log('\n22. cron:deleted');
@@ -372,7 +446,10 @@ async function main() {
     await api('DELETE', '/crons/ws-cron');
     const ev = await ep;
     ok(ev.data.name === 'ws-cron', `name=${ev.data.name}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 5. Worker Events ─────────────────────────────────
   console.log('\n── Worker Events ──');
@@ -384,7 +461,10 @@ async function main() {
     await api('POST', '/workers', { name: 'ws-worker', queues: [Q] });
     const ev = await ep;
     ok(typeof ev.data.workerId === 'string', `workerId=${ev.data.workerId}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // 5.2 worker:disconnected
   console.log('\n24. worker:disconnected');
@@ -400,7 +480,10 @@ async function main() {
     } else {
       ok(false, 'No worker found');
     }
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 6. Rate Limit & Concurrency ──────────────────────
   console.log('\n── Rate Limit & Concurrency ──');
@@ -411,7 +494,10 @@ async function main() {
     await api('PUT', `/queues/${Q}/rate-limit`, { limit: 100 });
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n26. ratelimit:cleared');
   try {
@@ -419,7 +505,10 @@ async function main() {
     await api('DELETE', `/queues/${Q}/rate-limit`);
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n27. concurrency:set');
   try {
@@ -427,7 +516,10 @@ async function main() {
     await api('PUT', `/queues/${Q}/concurrency`, { concurrency: 5 });
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n28. concurrency:cleared');
   try {
@@ -435,7 +527,10 @@ async function main() {
     await api('DELETE', `/queues/${Q}/concurrency`);
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 7. Webhook Events ────────────────────────────────
   console.log('\n── Webhook Events ──');
@@ -444,12 +539,18 @@ async function main() {
   let webhookId = '';
   try {
     const ep = waitEvent(ws, 'webhook:added');
-    const res = await api('POST', '/webhooks', { url: 'https://example.com/hook', events: ['job.completed'] });
+    const res = await api('POST', '/webhooks', {
+      url: 'https://example.com/hook',
+      events: ['job.completed'],
+    });
     const data = res.data as { webhookId: string } | undefined;
     webhookId = data?.webhookId ?? '';
     const ev = await ep;
     ok(typeof ev.data.id === 'string', `id=${ev.data.id}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n30. webhook:removed');
   try {
@@ -461,7 +562,10 @@ async function main() {
     } else {
       ok(false, 'No webhook to remove');
     }
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 8. Config Changes ────────────────────────────────
   console.log('\n── Config Events ──');
@@ -469,10 +573,15 @@ async function main() {
   console.log('\n31. config:stall-changed');
   try {
     const ep = waitEvent(ws, 'config:stall-changed');
-    await api('PUT', `/queues/${Q}/stall-config`, { config: { enabled: true, stallInterval: 20000 } });
+    await api('PUT', `/queues/${Q}/stall-config`, {
+      config: { enabled: true, stallInterval: 20000 },
+    });
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n32. config:dlq-changed');
   try {
@@ -480,7 +589,10 @@ async function main() {
     await api('PUT', `/queues/${Q}/dlq-config`, { config: { autoRetry: true } });
     const ev = await ep;
     ok(ev.data.queue === Q, `queue=${ev.data.queue}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 9. System Periodic ───────────────────────────────
   console.log('\n── System Periodic Events ──');
@@ -491,14 +603,20 @@ async function main() {
     ok(typeof ev.data.waiting === 'number', `waiting=${ev.data.waiting}`);
     ok(typeof ev.data.totalPushed === 'number', `totalPushed=${ev.data.totalPushed}`);
     ok(ev.data.queues !== undefined, 'has queues breakdown');
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n34. health:status (≤11s)');
   try {
     const ev = await waitEvent(ws, 'health:status', 12000);
     ok(typeof ev.data.ok === 'boolean', `ok=${ev.data.ok}`);
     ok(typeof ev.data.uptime === 'number', `uptime=${ev.data.uptime}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   // ── 10. Protocol Tests ───────────────────────────────
   console.log('\n── Protocol Tests ──');
@@ -509,14 +627,22 @@ async function main() {
     await Bun.sleep(200);
     let received = false;
     const h = (ev: MessageEvent) => {
-      try { const p = JSON.parse(String(ev.data)) as { event?: string }; if (p.event) received = true; } catch { /* */ }
+      try {
+        const p = JSON.parse(String(ev.data)) as { event?: string };
+        if (p.event) received = true;
+      } catch {
+        /* */
+      }
     };
     ws.addEventListener('message', h);
     await pushJob();
     await Bun.sleep(500);
     ws.removeEventListener('message', h);
     ok(!received, 'No events after unsubscribe all');
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n36. Wildcard job:*');
   try {
@@ -525,20 +651,34 @@ async function main() {
     await pushJob();
     await ep;
     ok(true, 'Wildcard received job:pushed');
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n37. Invalid pattern rejected');
   try {
     const rp = new Promise<Record<string, unknown>>((resolve) => {
       function h(ev: MessageEvent) {
-        try { const p = JSON.parse(String(ev.data)) as Record<string, unknown>; if (p.ok === false) { ws.removeEventListener('message', h); resolve(p); } } catch { /* */ }
+        try {
+          const p = JSON.parse(String(ev.data)) as Record<string, unknown>;
+          if (p.ok === false) {
+            ws.removeEventListener('message', h);
+            resolve(p);
+          }
+        } catch {
+          /* */
+        }
       }
       ws.addEventListener('message', h);
     });
     ws.send(JSON.stringify({ cmd: 'Subscribe', events: ['bad:pattern:here'] }));
     const resp = await rp;
     ok(resp.ok === false, `Rejected: ${resp.error}`);
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n38. Ping over WebSocket');
   try {
@@ -546,12 +686,24 @@ async function main() {
     const pong = await new Promise<Record<string, unknown>>((resolve, reject) => {
       const t = setTimeout(() => reject(new Error('Ping timeout')), 3000);
       function h(ev: MessageEvent) {
-        try { const p = JSON.parse(String(ev.data)) as Record<string, unknown>; if (p.ok === true) { clearTimeout(t); ws.removeEventListener('message', h); resolve(p); } } catch { /* */ }
+        try {
+          const p = JSON.parse(String(ev.data)) as Record<string, unknown>;
+          if (p.ok === true) {
+            clearTimeout(t);
+            ws.removeEventListener('message', h);
+            resolve(p);
+          }
+        } catch {
+          /* */
+        }
       }
       ws.addEventListener('message', h);
     });
     ok(pong.ok === true, 'Ping ok');
-  } catch (e) { console.log(`   ❌ ${e}`); failed++; }
+  } catch (e) {
+    console.log(`   ❌ ${e}`);
+    failed++;
+  }
 
   console.log('\n39. WebSocket close');
   ws.close();
@@ -568,4 +720,7 @@ function printSummary() {
   if (failed > 0) process.exit(1);
 }
 
-main().catch((err) => { console.error('Fatal error:', err); process.exit(1); });
+main().catch((err) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});

@@ -25,7 +25,12 @@ describe('webhook.ts', () => {
   describe('createWebhook', () => {
     test('should create a webhook with all parameters', () => {
       const before = Date.now();
-      const wh = createWebhook('https://example.com/hook', ['job.completed', 'job.failed'], 'emails', 'secret');
+      const wh = createWebhook(
+        'https://example.com/hook',
+        ['job.completed', 'job.failed'],
+        'emails',
+        'secret'
+      );
       const after = Date.now();
 
       expect(typeof wh.id).toBe('string');
@@ -56,7 +61,12 @@ describe('webhook.ts', () => {
 
     test('should accept all valid event types', () => {
       const allEvents: WebhookEvent[] = [
-        'job.pushed', 'job.started', 'job.completed', 'job.failed', 'job.progress', 'job.stalled',
+        'job.pushed',
+        'job.started',
+        'job.completed',
+        'job.failed',
+        'job.progress',
+        'job.stalled',
       ];
       const wh = createWebhook('https://example.com', allEvents);
       expect(wh.events).toEqual(allEvents);

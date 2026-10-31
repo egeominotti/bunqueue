@@ -37,8 +37,14 @@ async function main() {
       schedule: '*/5 * * * * *', // Every 5 seconds (6-part cron with seconds)
     });
 
-    if (cron.name === 'cron-expr-test' && cron.schedule === '*/5 * * * * *' && cron.nextRun > Date.now()) {
-      console.log(`   ✅ Cron job added with schedule, nextRun: ${new Date(cron.nextRun).toISOString()}`);
+    if (
+      cron.name === 'cron-expr-test' &&
+      cron.schedule === '*/5 * * * * *' &&
+      cron.nextRun > Date.now()
+    ) {
+      console.log(
+        `   ✅ Cron job added with schedule, nextRun: ${new Date(cron.nextRun).toISOString()}`
+      );
       passed++;
     } else {
       console.log(`   ❌ Cron job not created correctly: ${JSON.stringify(cron)}`);
@@ -91,7 +97,7 @@ async function main() {
     });
 
     const cronList = manager.listCrons();
-    const names = cronList.map(c => c.name);
+    const names = cronList.map((c) => c.name);
 
     if (names.includes('list-test-1') && names.includes('list-test-2')) {
       console.log(`   ✅ CronList returned ${cronList.length} cron jobs: ${names.join(', ')}`);

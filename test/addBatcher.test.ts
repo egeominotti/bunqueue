@@ -7,7 +7,21 @@ import type { Job } from '../src/client/types';
 type D = { value: number };
 
 function mockJob(id: string, name: string, data: D): Job<D> {
-  return { id, name, data, queueName: 'test', attemptsMade: 0, timestamp: Date.now(), progress: 0, delay: 0, stacktrace: null, stalledCounter: 0, priority: 0, opts: {}, attemptsStarted: 0 } as Job<D>;
+  return {
+    id,
+    name,
+    data,
+    queueName: 'test',
+    attemptsMade: 0,
+    timestamp: Date.now(),
+    progress: 0,
+    delay: 0,
+    stacktrace: null,
+    stalledCounter: 0,
+    priority: 0,
+    opts: {},
+    attemptsStarted: 0,
+  } as Job<D>;
 }
 
 /** Auto-resolving flush: resolves immediately with generated Job objects */
@@ -34,7 +48,7 @@ function controlledFlush() {
 
   const cb: FlushCallback<D> = (jobs) =>
     new Promise<Job<D>[]>((resolve, reject) => {
-      calls.push({ jobs: jobs as typeof calls[0]['jobs'], resolve, reject });
+      calls.push({ jobs: jobs as (typeof calls)[0]['jobs'], resolve, reject });
     });
 
   return { cb, calls };
@@ -43,7 +57,7 @@ function controlledFlush() {
 /** Resolve a controlled flush handle with auto-generated Job IDs */
 function resolveHandle(
   handle: { jobs: Array<{ name: string; data: D }>; resolve: (j: Job<D>[]) => void },
-  prefix = '',
+  prefix = ''
 ) {
   handle.resolve(handle.jobs.map((j, i) => mockJob(`${prefix}${i + 1}`, j.name, j.data)));
 }
@@ -60,7 +74,11 @@ describe('AddBatcher', () => {
 
   afterEach(() => {
     // stop() may reject pending promises — no-op if already stopped/null
-    try { batcher?.stop(); } catch { /* ignore */ }
+    try {
+      batcher?.stop();
+    } catch {
+      /* ignore */
+    }
     batcher = null;
   });
 
@@ -345,7 +363,9 @@ describe('AddBatcher', () => {
       batcher.enqueue('a', { value: 1 }).catch(() => {});
 
       let waited = false;
-      const waitP = batcher.waitForInFlight().then(() => { waited = true; });
+      const waitP = batcher.waitForInFlight().then(() => {
+        waited = true;
+      });
 
       await Promise.resolve();
       expect(waited).toBe(false);

@@ -302,7 +302,9 @@ describe('Lock Expiration', () => {
       }
 
       // Pull all with short lock TTL
-      const pulled: Array<{ job: ReturnType<typeof qm.pullWithLock> extends Promise<infer T> ? T : never }> = [];
+      const pulled: Array<{
+        job: ReturnType<typeof qm.pullWithLock> extends Promise<infer T> ? T : never;
+      }> = [];
       for (let i = 0; i < pushCount; i++) {
         const result = await pullWithLock(queue, 50);
         pulled.push(result);

@@ -17,9 +17,11 @@ import { createCronJob } from '../src/domain/types/cron';
 import type { CronScheduler } from '../src/infrastructure/scheduler/cronScheduler';
 
 function tick(manager: QueueManager): Promise<void> {
-  return ((manager as unknown as { cronScheduler: CronScheduler }).cronScheduler as unknown as {
-    tick(): Promise<void>;
-  }).tick();
+  return (
+    (manager as unknown as { cronScheduler: CronScheduler }).cronScheduler as unknown as {
+      tick(): Promise<void>;
+    }
+  ).tick();
 }
 
 describe('Issue #86: cron jobs honor job options', () => {
@@ -104,11 +106,7 @@ describe('Issue #86: embedded Queue forwards defaultJobOptions to cron', () => {
       defaultJobOptions: { attempts: 1, removeOnComplete: true, removeOnFail: true },
     });
 
-    await queue.upsertJobScheduler(
-      'e2e-cron',
-      { every: 30_000 },
-      { data: { type: 'scheduled' } }
-    );
+    await queue.upsertJobScheduler('e2e-cron', { every: 30_000 }, { data: { type: 'scheduled' } });
 
     const cron = getSharedManager()
       .listCrons()

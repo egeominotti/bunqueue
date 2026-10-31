@@ -56,16 +56,12 @@ describe('AUDIT: waitFor timeout must not double-run saga compensation', () => {
     const compensated: string[] = [];
 
     const flow = new Workflow('waitfor-timeout-double-compensate')
-      .step(
-        'prep',
-        async () => ({ ok: true }),
-        {
-          // CORRECT: this must run exactly once during saga rollback.
-          compensate: async () => {
-            compensated.push('prep');
-          },
-        }
-      )
+      .step('prep', async () => ({ ok: true }), {
+        // CORRECT: this must run exactly once during saga rollback.
+        compensate: async () => {
+          compensated.push('prep');
+        },
+      })
       // Short timeout; we deliberately never signal -> this node times out.
       .waitFor('approval', { timeout: 200 });
 
@@ -94,15 +90,11 @@ describe('AUDIT: waitFor timeout must not double-run saga compensation', () => {
     const compensated: string[] = [];
 
     const flow = new Workflow('normal-failure-single-compensate')
-      .step(
-        'prep',
-        async () => ({ ok: true }),
-        {
-          compensate: async () => {
-            compensated.push('prep');
-          },
-        }
-      )
+      .step('prep', async () => ({ ok: true }), {
+        compensate: async () => {
+          compensated.push('prep');
+        },
+      })
       // A later step that always fails -> triggers saga compensation via the
       // normal step-failure path (not the waitFor-timeout path).
       .step(

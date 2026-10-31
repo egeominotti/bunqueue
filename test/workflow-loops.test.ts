@@ -21,15 +21,18 @@ afterEach(async () => {
 describe('Workflow Engine - doUntil', () => {
   test('loops until condition returns true', async () => {
     let counter = 0;
-    const flow = new Workflow('count-until')
-      .doUntil(
-        (ctx) => (ctx.steps['increment'] as { count: number })?.count >= 3,
-        (w) =>
-          w.step('increment', async (ctx) => {
+    const flow = new Workflow('count-until').doUntil(
+      (ctx) => (ctx.steps['increment'] as { count: number })?.count >= 3,
+      (w) =>
+        w.step(
+          'increment',
+          async (ctx) => {
             counter++;
             return { count: counter };
-          }, { retry: 1 }),
-      );
+          },
+          { retry: 1 }
+        )
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -42,12 +45,11 @@ describe('Workflow Engine - doUntil', () => {
   });
 
   test('throws on maxIterations exceeded', async () => {
-    const flow = new Workflow('infinite')
-      .doUntil(
-        () => false,
-        (w) => w.step('loop', async () => ({}), { retry: 1 }),
-        { maxIterations: 3 },
-      );
+    const flow = new Workflow('infinite').doUntil(
+      () => false,
+      (w) => w.step('loop', async () => ({}), { retry: 1 }),
+      { maxIterations: 3 }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -70,10 +72,14 @@ describe('Workflow Engine - doWhile', () => {
           return val < 3;
         },
         (w) =>
-          w.step('process', async () => {
-            counter++;
-            return { value: counter };
-          }, { retry: 1 }),
+          w.step(
+            'process',
+            async () => {
+              counter++;
+              return { value: counter };
+            },
+            { retry: 1 }
+          )
       );
 
     engine = new Engine({ embedded: true });
@@ -92,10 +98,14 @@ describe('Workflow Engine - doWhile', () => {
       .doWhile(
         () => false,
         (w) =>
-          w.step('never-run', async () => {
-            executed = true;
-            return {};
-          }, { retry: 1 }),
+          w.step(
+            'never-run',
+            async () => {
+              executed = true;
+              return {};
+            },
+            { retry: 1 }
+          )
       )
       .step('after', async () => ({ done: true }), { retry: 1 });
 
@@ -114,17 +124,16 @@ describe('Workflow Engine - doWhile', () => {
 describe('Workflow Engine - forEach', () => {
   test('iterates over items', async () => {
     const processed: string[] = [];
-    const flow = new Workflow<{ items: string[] }>('process-items')
-      .forEach(
-        (ctx) => (ctx.input as { items: string[] }).items,
-        'handle',
-        async (ctx) => {
-          const item = ctx.steps.__item as string;
-          processed.push(item);
-          return { handled: item };
-        },
-        { retry: 1 },
-      );
+    const flow = new Workflow<{ items: string[] }>('process-items').forEach(
+      (ctx) => (ctx.input as { items: string[] }).items,
+      'handle',
+      async (ctx) => {
+        const item = ctx.steps.__item as string;
+        processed.push(item);
+        return { handled: item };
+      },
+      { retry: 1 }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -142,16 +151,15 @@ describe('Workflow Engine - forEach', () => {
 
   test('provides __index in context', async () => {
     const indices: number[] = [];
-    const flow = new Workflow<{ items: string[] }>('index-test')
-      .forEach(
-        (ctx) => (ctx.input as { items: string[] }).items,
-        'idx-step',
-        async (ctx) => {
-          indices.push(ctx.steps.__index as number);
-          return {};
-        },
-        { retry: 1 },
-      );
+    const flow = new Workflow<{ items: string[] }>('index-test').forEach(
+      (ctx) => (ctx.input as { items: string[] }).items,
+      'idx-step',
+      async (ctx) => {
+        indices.push(ctx.steps.__index as number);
+        return {};
+      },
+      { retry: 1 }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -172,10 +180,14 @@ describe('Workflow Engine - map', () => {
         const vals = (ctx.steps['fetch'] as { values: number[] }).values;
         return { total: vals.reduce((a, b) => a + b, 0) };
       })
-      .step('use', async (ctx) => {
-        const total = (ctx.steps['sum'] as { total: number }).total;
-        return { doubled: total * 2 };
-      }, { retry: 1 });
+      .step(
+        'use',
+        async (ctx) => {
+          const total = (ctx.steps['sum'] as { total: number }).total;
+          return { doubled: total * 2 };
+        },
+        { retry: 1 }
+      );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -215,10 +227,8 @@ describe('Workflow Engine - subscribe', () => {
 
   test('does not receive events for other executions', async () => {
     const events: string[] = [];
-    const flow1 = new Workflow('sub-a')
-      .step('x', async () => ({}), { retry: 1 });
-    const flow2 = new Workflow('sub-b')
-      .step('y', async () => ({}), { retry: 1 });
+    const flow1 = new Workflow('sub-a').step('x', async () => ({}), { retry: 1 });
+    const flow2 = new Workflow('sub-b').step('y', async () => ({}), { retry: 1 });
 
     engine = new Engine({ embedded: true });
     engine.register(flow1);
@@ -251,8 +261,10 @@ describe('Workflow Engine - Schema Validation', () => {
       },
     };
 
-    const flow = new Workflow('schema-input')
-      .step('validate', async (ctx) => ctx.input, { retry: 1, inputSchema: schema });
+    const flow = new Workflow('schema-input').step('validate', async (ctx) => ctx.input, {
+      retry: 1,
+      inputSchema: schema,
+    });
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -277,8 +289,11 @@ describe('Workflow Engine - Schema Validation', () => {
       },
     };
 
-    const flow = new Workflow('schema-output')
-      .step('bad-output', async () => ({ id: 'not-a-number' }), { retry: 1, outputSchema: schema });
+    const flow = new Workflow('schema-output').step(
+      'bad-output',
+      async () => ({ id: 'not-a-number' }),
+      { retry: 1, outputSchema: schema }
+    );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);

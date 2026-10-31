@@ -27,9 +27,9 @@ describe('Histogram', () => {
     const h = new Histogram([1, 5, 10, 50, 100]);
 
     // Add values that fall into specific buckets
-    for (let i = 0; i < 50; i++) h.observe(3);   // <= 5 bucket
-    for (let i = 0; i < 40; i++) h.observe(8);   // <= 10 bucket
-    for (let i = 0; i < 10; i++) h.observe(80);  // <= 100 bucket
+    for (let i = 0; i < 50; i++) h.observe(3); // <= 5 bucket
+    for (let i = 0; i < 40; i++) h.observe(8); // <= 10 bucket
+    for (let i = 0; i < 10; i++) h.observe(80); // <= 100 bucket
 
     // p50 should be in the 5ms bucket (50th percentile of 100 observations)
     expect(h.percentile(50)).toBe(5);
@@ -63,9 +63,9 @@ describe('Histogram', () => {
 
   test('should have cumulative bucket counts', () => {
     const h = new Histogram([10, 50, 100]);
-    h.observe(5);   // goes into le=10, le=50, le=100, +Inf
-    h.observe(30);  // goes into le=50, le=100, +Inf
-    h.observe(80);  // goes into le=100, +Inf
+    h.observe(5); // goes into le=10, le=50, le=100, +Inf
+    h.observe(30); // goes into le=50, le=100, +Inf
+    h.observe(80); // goes into le=100, +Inf
     h.observe(200); // goes into +Inf only
 
     const output = h.toPrometheus('test', 'test');

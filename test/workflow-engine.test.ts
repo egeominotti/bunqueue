@@ -94,21 +94,37 @@ describe('Workflow Engine', () => {
     const log: string[] = [];
 
     const flow = new Workflow('test-compensate')
-      .step('create', async () => {
-        log.push('create');
-        return { id: 42 };
-      }, {
-        compensate: async () => { log.push('undo-create'); },
-      })
-      .step('charge', async () => {
-        log.push('charge');
-        return { txId: 'abc' };
-      }, {
-        compensate: async () => { log.push('refund'); },
-      })
-      .step('fail-step', async () => {
-        throw new Error('boom');
-      }, { retry: 1 });
+      .step(
+        'create',
+        async () => {
+          log.push('create');
+          return { id: 42 };
+        },
+        {
+          compensate: async () => {
+            log.push('undo-create');
+          },
+        }
+      )
+      .step(
+        'charge',
+        async () => {
+          log.push('charge');
+          return { txId: 'abc' };
+        },
+        {
+          compensate: async () => {
+            log.push('refund');
+          },
+        }
+      )
+      .step(
+        'fail-step',
+        async () => {
+          throw new Error('boom');
+        },
+        { retry: 1 }
+      );
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -158,7 +174,9 @@ describe('Workflow Engine', () => {
     exec = engine.getExecution(run.id);
     expect(exec!.state).toBe('completed');
     expect(log).toEqual(['submit', 'process']);
-    expect((exec!.steps['process'].result as { approved: unknown }).approved).toEqual({ by: 'manager' });
+    expect((exec!.steps['process'].result as { approved: unknown }).approved).toEqual({
+      by: 'manager',
+    });
   });
 
   test('workflow step context has input and step results', async () => {
@@ -177,15 +195,18 @@ describe('Workflow Engine', () => {
     const run = await engine.start('test-ctx', { name: 'test' });
     await new Promise((r) => setTimeout(r, 800));
 
-    const ctx = capturedCtx as { input: unknown; steps: Record<string, unknown>; executionId: string };
+    const ctx = capturedCtx as {
+      input: unknown;
+      steps: Record<string, unknown>;
+      executionId: string;
+    };
     expect(ctx.input).toEqual({ name: 'test' });
     expect(ctx.steps['a']).toEqual({ x: 10 });
     expect(ctx.executionId).toBe(run.id);
   });
 
   test('list executions', async () => {
-    const flow = new Workflow('test-list')
-      .step('do', async () => ({ done: true }));
+    const flow = new Workflow('test-list').step('do', async () => ({ done: true }));
 
     engine = new Engine({ embedded: true });
     engine.register(flow);
@@ -202,9 +223,7 @@ describe('Workflow Engine', () => {
   });
 
   test('register rejects duplicate step names', () => {
-    const flow = new Workflow('test-dup')
-      .step('same', async () => {})
-      .step('same', async () => {});
+    const flow = new Workflow('test-dup').step('same', async () => {}).step('same', async () => {});
 
     engine = new Engine({ embedded: true });
     expect(() => engine.register(flow)).toThrow('Duplicate step names');

@@ -31,11 +31,15 @@ async function main() {
     ]);
 
     const timestamps: number[] = [];
-    const worker = new Worker<{ delay: number }>(QUEUE_NAME, async (job) => {
-      timestamps.push(Date.now());
-      await Bun.sleep((job.data as { delay: number }).delay);
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ delay: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        timestamps.push(Date.now());
+        await Bun.sleep((job.data as { delay: number }).delay);
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -75,11 +79,15 @@ async function main() {
     ]);
 
     const startTimes: number[] = [];
-    const worker = new Worker<{ delay: number }>(QUEUE_NAME, async (job) => {
-      startTimes.push(Date.now());
-      await Bun.sleep((job.data as { delay: number }).delay);
-      return {};
-    }, { concurrency: 5, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ delay: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        startTimes.push(Date.now());
+        await Bun.sleep((job.data as { delay: number }).delay);
+        return {};
+      },
+      { concurrency: 5, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -120,13 +128,17 @@ async function main() {
     let maxConcurrent = 0;
     let currentConcurrent = 0;
 
-    const worker = new Worker<{ delay: number }>(QUEUE_NAME, async (job) => {
-      currentConcurrent++;
-      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-      await Bun.sleep((job.data as { delay: number }).delay);
-      currentConcurrent--;
-      return {};
-    }, { concurrency: 3, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ delay: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await Bun.sleep((job.data as { delay: number }).delay);
+        currentConcurrent--;
+        return {};
+      },
+      { concurrency: 3, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -159,17 +171,25 @@ async function main() {
     let worker1Count = 0;
     let worker2Count = 0;
 
-    const worker1 = new Worker<{ delay: number }>(QUEUE_NAME, async (job) => {
-      worker1Count++;
-      await Bun.sleep((job.data as { delay: number }).delay);
-      return {};
-    }, { concurrency: 2, connection: { port: TCP_PORT }, useLocks: false });
+    const worker1 = new Worker<{ delay: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        worker1Count++;
+        await Bun.sleep((job.data as { delay: number }).delay);
+        return {};
+      },
+      { concurrency: 2, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
-    const worker2 = new Worker<{ delay: number }>(QUEUE_NAME, async (job) => {
-      worker2Count++;
-      await Bun.sleep((job.data as { delay: number }).delay);
-      return {};
-    }, { concurrency: 2, connection: { port: TCP_PORT }, useLocks: false });
+    const worker2 = new Worker<{ delay: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        worker2Count++;
+        await Bun.sleep((job.data as { delay: number }).delay);
+        return {};
+      },
+      { concurrency: 2, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1500);
     await worker1.close();
@@ -180,7 +200,9 @@ async function main() {
       console.log(`   ✅ Work distributed: W1=${worker1Count}, W2=${worker2Count}`);
       passed++;
     } else {
-      console.log(`   ❌ Distribution issue: W1=${worker1Count}, W2=${worker2Count}, total=${total}`);
+      console.log(
+        `   ❌ Distribution issue: W1=${worker1Count}, W2=${worker2Count}, total=${total}`
+      );
       failed++;
     }
   } catch (e) {
@@ -202,10 +224,14 @@ async function main() {
     );
 
     let count = 0;
-    const worker = new Worker<{ delay: number }>(QUEUE_NAME, async () => {
-      count++;
-      return {};
-    }, { concurrency: 10, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ delay: number }>(
+      QUEUE_NAME,
+      async () => {
+        count++;
+        return {};
+      },
+      { concurrency: 10, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -236,11 +262,15 @@ async function main() {
     );
 
     let processed = 0;
-    const worker = new Worker<{ delay: number }>(QUEUE_NAME, async (job) => {
-      await Bun.sleep((job.data as { delay: number }).delay);
-      processed++;
-      return {};
-    }, { concurrency: 2, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ delay: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        await Bun.sleep((job.data as { delay: number }).delay);
+        processed++;
+        return {};
+      },
+      { concurrency: 2, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     // Wait a bit then force close
     await Bun.sleep(200);

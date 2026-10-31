@@ -33,11 +33,7 @@ async function main() {
   try {
     const ids: string[] = [];
     for (let i = 0; i < 10; i++) {
-      const job = await queue.add(
-        'dedup-task',
-        { ts: Date.now() },
-        { jobId: 'test-dedup-key' }
-      );
+      const job = await queue.add('dedup-task', { ts: Date.now() }, { jobId: 'test-dedup-key' });
       ids.push(job.id);
     }
 

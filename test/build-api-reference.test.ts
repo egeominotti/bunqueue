@@ -68,7 +68,8 @@ describe('shouldNoindex', () => {
 });
 
 describe('injectHead', () => {
-  const PAGE = '<!DOCTYPE html><html><head><title>Worker | bunqueue</title></head><body><p>x</p></body></html>';
+  const PAGE =
+    '<!DOCTYPE html><html><head><title>Worker | bunqueue</title></head><body><p>x</p></body></html>';
 
   test('fresh typedoc output of an old version gets both banner and robots', () => {
     const out = injectHead(PAGE, 'v2.7', 0, true);
@@ -154,7 +155,8 @@ describe('sortVersions', () => {
         (pairs) => {
           const names = pairs.map(([major, minor]) => `v${major}.${minor}`);
           return (
-            JSON.stringify(sortVersions(names)) === JSON.stringify(sortVersions([...names].reverse()))
+            JSON.stringify(sortVersions(names)) ===
+            JSON.stringify(sortVersions([...names].reverse()))
           );
         }
       )

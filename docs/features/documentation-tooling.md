@@ -81,7 +81,10 @@ The root project and the TypeScript SDK use only Bun's built-in tools; there is
 no separate linter.
 
 - **Type checking**: `bun run typecheck` runs `bun check --no-script` on the
-  nearest `tsconfig.json`. Its checker follows TypeScript 7, so it can report
+  root `tsconfig.json` (all of `src`, including `src/mcp`). `sdk/conformance`
+  imports the built SDK (`sdk/typescript/dist`, gitignored), so the SDK
+  workflow type-checks it after building the SDK. `test/` is not type-checked yet: it has about 1,000
+  pre-existing type errors. The checker follows TypeScript 7, so it can report
   errors `tsc` 5.9 accepts (for example the `Uint8Array<ArrayBuffer>` cast in
   `src/infrastructure/cloud/wsSender.ts`); `build:lib` still compiles with
   `tsc`, so both must stay clean.
@@ -92,8 +95,11 @@ no separate linter.
   compiler-API tests.
 - **Formatting**: `bun fmt`, `bun run fmt`, `bun run format` and
   `bun run format:check` run
-  `bun fmt --no-script` (with `--check` for the latter) over `src` at the root
-  and over `src tests` in the SDK. The options live in the `[fmt]` section of
+  `bun fmt --no-script` (with `--check` for the latter) over `src`, `test`,
+  `scripts`, `bench`, `examples` and `sdk/conformance` at the root and over
+  `src tests` in the SDK. Generated benchmark reports
+  (`bench/vs-bullmq/results/`) are excluded so they stay byte-identical to the
+  generator's output. The options live in the `[fmt]` section of
   each project's `bunfig.toml`: two spaces, single quotes, semicolons,
   100 columns, `es5` trailing commas, `as-needed` property quotes and
   `always` arrow parentheses, on top of Prettier's defaults. `bun fmt` also

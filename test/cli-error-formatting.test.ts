@@ -10,7 +10,13 @@
  */
 import { describe, test, expect } from 'bun:test';
 import { formatOutput, formatError } from '../src/cli/output';
-import { CommandError, requireArg, parseJsonArg, parseNumberArg, parseBigIntArg } from '../src/cli/commands/types';
+import {
+  CommandError,
+  requireArg,
+  parseJsonArg,
+  parseNumberArg,
+  parseBigIntArg,
+} from '../src/cli/commands/types';
 
 const strip = (t: string) => t.replace(/\x1b\[[0-9;]*m/g, '');
 
@@ -21,9 +27,18 @@ describe('Invalid command shows helpful error', () => {
     const { buildMonitorCommand } = await import('../src/cli/commands/monitor');
     function route(cmd: string, args: string[]) {
       switch (cmd) {
-        case 'push': case 'pull': case 'ack': case 'fail': return buildCoreCommand(cmd, args);
-        case 'stats': case 'metrics': case 'health': case 'ping': return buildMonitorCommand(cmd);
-        default: return null;
+        case 'push':
+        case 'pull':
+        case 'ack':
+        case 'fail':
+          return buildCoreCommand(cmd, args);
+        case 'stats':
+        case 'metrics':
+        case 'health':
+        case 'ping':
+          return buildMonitorCommand(cmd);
+        default:
+          return null;
       }
     }
     expect(route('nonexistent', [])).toBeNull();
@@ -32,7 +47,9 @@ describe('Invalid command shows helpful error', () => {
   });
 
   test('formatError produces user-friendly text and JSON for unknown command', () => {
-    expect(strip(formatError('Unknown command: frobnicate', false))).toBe('Error: Unknown command: frobnicate');
+    expect(strip(formatError('Unknown command: frobnicate', false))).toBe(
+      'Error: Unknown command: frobnicate'
+    );
     const parsed = JSON.parse(formatError('Unknown command: frobnicate', true));
     expect(parsed).toEqual({ ok: false, error: 'Unknown command: frobnicate' });
   });
@@ -54,7 +71,10 @@ describe('Missing required arguments show usage hint', () => {
 
   test('job without subcommand lists available subcommands', () => {
     const { buildJobCommand } = require('../src/cli/commands/job');
-    try { buildJobCommand([]); expect(true).toBe(false); } catch (err: unknown) {
+    try {
+      buildJobCommand([]);
+      expect(true).toBe(false);
+    } catch (err: unknown) {
       const msg = (err as Error).message;
       expect(msg).toContain('Missing subcommand');
       for (const s of ['get', 'state', 'cancel', 'wait']) expect(msg).toContain(s);
@@ -63,7 +83,10 @@ describe('Missing required arguments show usage hint', () => {
 
   test('queue without subcommand lists available subcommands', () => {
     const { buildQueueCommand } = require('../src/cli/commands/queue');
-    try { buildQueueCommand([]); expect(true).toBe(false); } catch (err: unknown) {
+    try {
+      buildQueueCommand([]);
+      expect(true).toBe(false);
+    } catch (err: unknown) {
       const msg = (err as Error).message;
       expect(msg).toContain('Missing subcommand');
       for (const s of ['pause', 'resume', 'clean']) expect(msg).toContain(s);
@@ -114,7 +137,9 @@ describe('Connection refused error is formatted', () => {
   });
 
   test('connection timeout and close errors are formatted', () => {
-    expect(strip(formatError('Connection timeout to localhost:6789', false))).toContain('Connection timeout');
+    expect(strip(formatError('Connection timeout to localhost:6789', false))).toContain(
+      'Connection timeout'
+    );
     expect(strip(formatError('Connection closed', false))).toBe('Error: Connection closed');
   });
 });
@@ -133,7 +158,10 @@ describe('Authentication error is formatted', () => {
 
   test('client.ts includes server error in auth failure message', async () => {
     const source = await Bun.file(new URL('../src/cli/client.ts', import.meta.url).pathname).text();
-    const authSection = source.slice(source.indexOf('authResponse'), source.indexOf('authResponse') + 500);
+    const authSection = source.slice(
+      source.indexOf('authResponse'),
+      source.indexOf('authResponse') + 500
+    );
     expect(authSection).toContain('authResponse.error');
   });
 });
@@ -157,7 +185,9 @@ describe('Invalid port number handling', () => {
     // UUIDs, numeric IDs, and custom IDs are all valid
     expect(parseBigIntArg('abc', 'id')).toBe('abc');
     expect(parseBigIntArg('123', 'id')).toBe('123');
-    expect(parseBigIntArg('019ce984-5cef-7000-976f-8cd68b3cdc66', 'id')).toBe('019ce984-5cef-7000-976f-8cd68b3cdc66');
+    expect(parseBigIntArg('019ce984-5cef-7000-976f-8cd68b3cdc66', 'id')).toBe(
+      '019ce984-5cef-7000-976f-8cd68b3cdc66'
+    );
     // Empty/whitespace should throw
     expect(() => parseBigIntArg('', 'id')).toThrow('Invalid ID for id');
     expect(() => parseBigIntArg('   ', 'id')).toThrow('Invalid ID for id');
@@ -180,7 +210,9 @@ describe('Invalid port number handling', () => {
 // ---------------------------------------------------------------------------
 describe('Output formatting for different result types', () => {
   test('success: job created and batch', () => {
-    expect(strip(formatOutput({ ok: true, id: 'job-42' }, 'push', false))).toBe('Job created: job-42');
+    expect(strip(formatOutput({ ok: true, id: 'job-42' }, 'push', false))).toBe(
+      'Job created: job-42'
+    );
     const batch = strip(formatOutput({ ok: true, ids: ['a', 'b'] }, 'push', false));
     expect(batch).toContain('Created 2 jobs');
     expect(batch).toContain('a, b');
@@ -191,7 +223,9 @@ describe('Output formatting for different result types', () => {
   });
 
   test('error: ok=false with and without message', () => {
-    expect(strip(formatOutput({ ok: false, error: 'Queue not found' }, 'queue', false))).toContain('Queue not found');
+    expect(strip(formatOutput({ ok: false, error: 'Queue not found' }, 'queue', false))).toContain(
+      'Queue not found'
+    );
     expect(strip(formatOutput({ ok: false } as any, 'queue', false))).toContain('Unknown error');
   });
 
@@ -206,14 +240,18 @@ describe('Output formatting for different result types', () => {
   });
 
   test('special response types: null job, empty lists, paused, count, state, progress', () => {
-    expect(strip(formatOutput({ ok: true, job: null } as any, 'pull', false))).toBe('No job available');
+    expect(strip(formatOutput({ ok: true, job: null } as any, 'pull', false))).toBe(
+      'No job available'
+    );
     expect(strip(formatOutput({ ok: true, jobs: [] }, 'queue', false))).toBe('No jobs found');
     expect(strip(formatOutput({ ok: true, dlqJobs: [] }, 'dlq', false))).toBe('DLQ is empty');
     expect(strip(formatOutput({ ok: true, paused: true }, 'q', false))).toBe('Queue is paused');
     expect(strip(formatOutput({ ok: true, paused: false }, 'q', false))).toBe('Queue is active');
     expect(formatOutput({ ok: true, count: 99 }, 'q', false)).toBe('Count: 99');
     expect(formatOutput({ ok: true, state: 'waiting' }, 'j', false)).toBe('State: waiting');
-    expect(formatOutput({ ok: true, progress: 50, message: 'Half' }, 'j', false)).toBe('Progress: 50% - Half');
+    expect(formatOutput({ ok: true, progress: 50, message: 'Half' }, 'j', false)).toBe(
+      'Progress: 50% - Half'
+    );
     expect(formatOutput({ ok: true, progress: 10 }, 'j', false)).toBe('Progress: 10%');
   });
 });
@@ -224,17 +262,30 @@ describe('Help text contains all commands', () => {
     const logs: string[] = [];
     const origLog = console.log;
     console.log = (...args: unknown[]) => logs.push(args.join(' '));
-    try { require('../src/cli/help').printHelp(); } finally { console.log = origLog; }
+    try {
+      require('../src/cli/help').printHelp();
+    } finally {
+      console.log = origLog;
+    }
     return logs.join('\n');
   }
 
   test('help lists all major sections', () => {
     const help = captureHelp();
     for (const s of [
-      'CORE COMMANDS:', 'JOB COMMANDS:', 'QUEUE COMMANDS:', 'DLQ COMMANDS:',
-      'CRON COMMANDS:', 'WORKER COMMANDS:', 'WEBHOOK COMMANDS:', 'MONITORING:',
-      'GLOBAL OPTIONS:', 'RATE LIMITING:', 'BACKUP (S3):',
-    ]) expect(help).toContain(s);
+      'CORE COMMANDS:',
+      'JOB COMMANDS:',
+      'QUEUE COMMANDS:',
+      'DLQ COMMANDS:',
+      'CRON COMMANDS:',
+      'WORKER COMMANDS:',
+      'WEBHOOK COMMANDS:',
+      'MONITORING:',
+      'GLOBAL OPTIONS:',
+      'RATE LIMITING:',
+      'BACKUP (S3):',
+    ])
+      expect(help).toContain(s);
   });
 
   test('help lists all core and monitor commands', () => {
@@ -247,18 +298,37 @@ describe('Help text contains all commands', () => {
   test('help lists all job subcommands', () => {
     const help = captureHelp();
     for (const sub of [
-      'job get', 'job state', 'job result', 'job cancel', 'job progress',
-      'job update', 'job priority', 'job promote', 'job delay', 'job discard',
-      'job logs', 'job log', 'job wait',
-    ]) expect(help).toContain(sub);
+      'job get',
+      'job state',
+      'job result',
+      'job cancel',
+      'job progress',
+      'job update',
+      'job priority',
+      'job promote',
+      'job delay',
+      'job discard',
+      'job logs',
+      'job log',
+      'job wait',
+    ])
+      expect(help).toContain(sub);
   });
 
   test('help lists all queue subcommands', () => {
     const help = captureHelp();
     for (const sub of [
-      'queue list', 'queue pause', 'queue resume', 'queue drain',
-      'queue obliterate', 'queue clean', 'queue count', 'queue jobs', 'queue paused',
-    ]) expect(help).toContain(sub);
+      'queue list',
+      'queue pause',
+      'queue resume',
+      'queue drain',
+      'queue obliterate',
+      'queue clean',
+      'queue count',
+      'queue jobs',
+      'queue paused',
+    ])
+      expect(help).toContain(sub);
   });
 
   test('help lists all global options', () => {

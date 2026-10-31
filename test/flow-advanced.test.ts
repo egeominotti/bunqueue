@@ -107,7 +107,9 @@ describe('Advanced Flow - Embedded', () => {
     await done;
     await Bun.sleep(200);
 
-    const values = Object.values(parentChildrenValues).map((v: any) => v.childResult).sort();
+    const values = Object.values(parentChildrenValues)
+      .map((v: any) => v.childResult)
+      .sort();
     expect(values).toEqual([30, 50, 70]);
 
     await worker.close();
@@ -258,7 +260,12 @@ describe('Advanced Flow - Embedded', () => {
 
     await flow.addChain([
       { name: 'step-0', queueName: 'flow-retry', data: { step: 0 } },
-      { name: 'step-1', queueName: 'flow-retry', data: { step: 1 }, opts: { attempts: 5, backoff: 100 } },
+      {
+        name: 'step-1',
+        queueName: 'flow-retry',
+        data: { step: 1 },
+        opts: { attempts: 5, backoff: 100 },
+      },
       { name: 'step-2', queueName: 'flow-retry', data: { step: 2 } },
     ]);
 
@@ -313,9 +320,13 @@ describe('Advanced Flow - Embedded', () => {
     // Each step reports 4 progress updates (25, 50, 75, 100)
     expect(progressUpdates).toHaveLength(8);
     // Step 0 updates
-    expect(progressUpdates.filter((u) => u.step === 0).map((u) => u.progress)).toEqual([25, 50, 75, 100]);
+    expect(progressUpdates.filter((u) => u.step === 0).map((u) => u.progress)).toEqual([
+      25, 50, 75, 100,
+    ]);
     // Step 1 updates
-    expect(progressUpdates.filter((u) => u.step === 1).map((u) => u.progress)).toEqual([25, 50, 75, 100]);
+    expect(progressUpdates.filter((u) => u.step === 1).map((u) => u.progress)).toEqual([
+      25, 50, 75, 100,
+    ]);
 
     await worker.close();
     flow.close();

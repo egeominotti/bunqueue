@@ -44,9 +44,7 @@ describe('Bug #16 follow-up - Flow job updateData should be functional', () => {
     // Use Queue.updateJobData to update (this works - proves server-side is fine)
     queue.updateJobData(jobId, { customerId: 'updated-via-queue' });
     const jobAfterQueue = await queue.getJob(jobId);
-    expect((jobAfterQueue!.data as Record<string, unknown>).customerId).toBe(
-      'updated-via-queue'
-    );
+    expect((jobAfterQueue!.data as Record<string, unknown>).customerId).toBe('updated-via-queue');
   });
 
   test('updateData on add() flow job should actually update the job', async () => {

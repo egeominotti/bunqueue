@@ -94,9 +94,15 @@ describe('Semaphore', () => {
 
       const order: number[] = [];
 
-      const p1 = sem.acquire().then(() => { order.push(1); });
-      const p2 = sem.acquire().then(() => { order.push(2); });
-      const p3 = sem.acquire().then(() => { order.push(3); });
+      const p1 = sem.acquire().then(() => {
+        order.push(1);
+      });
+      const p2 = sem.acquire().then(() => {
+        order.push(2);
+      });
+      const p3 = sem.acquire().then(() => {
+        order.push(3);
+      });
 
       expect(sem.waiting()).toBe(3);
 
@@ -122,9 +128,15 @@ describe('Semaphore', () => {
 
       const order: string[] = [];
 
-      const pA = sem.acquire().then(() => { order.push('A'); });
-      const pB = sem.acquire().then(() => { order.push('B'); });
-      const pC = sem.acquire().then(() => { order.push('C'); });
+      const pA = sem.acquire().then(() => {
+        order.push('A');
+      });
+      const pB = sem.acquire().then(() => {
+        order.push('B');
+      });
+      const pC = sem.acquire().then(() => {
+        order.push('C');
+      });
 
       // Release all three permits
       sem.release();
@@ -367,7 +379,9 @@ describe('Semaphore', () => {
 
       // 6th should block
       let sixthAcquired = false;
-      const p = sem.acquire().then(() => { sixthAcquired = true; });
+      const p = sem.acquire().then(() => {
+        sixthAcquired = true;
+      });
 
       await Bun.sleep(10);
       expect(sixthAcquired).toBe(false);

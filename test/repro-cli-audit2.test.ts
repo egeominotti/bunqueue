@@ -93,14 +93,32 @@ describe('#1 main.ts dispatch never falls through to the server', () => {
 describe('#2 cron add --max-limit 0 means unlimited', () => {
   test('--max-limit 0 is omitted from the Cron command (server: null = unlimited)', () => {
     const cmd = buildCronCommand([
-      'add', 'job1', '-q', 'q1', '-d', '{}', '-s', '* * * * *', '--max-limit', '0',
+      'add',
+      'job1',
+      '-q',
+      'q1',
+      '-d',
+      '{}',
+      '-s',
+      '* * * * *',
+      '--max-limit',
+      '0',
     ]);
     expect(cmd.maxLimit).toBeUndefined();
   });
 
   test('--max-limit 5 still passes through', () => {
     const cmd = buildCronCommand([
-      'add', 'job1', '-q', 'q1', '-d', '{}', '-s', '* * * * *', '--max-limit', '5',
+      'add',
+      'job1',
+      '-q',
+      'q1',
+      '-d',
+      '{}',
+      '-s',
+      '* * * * *',
+      '--max-limit',
+      '5',
     ]);
     expect(cmd.maxLimit).toBe(5);
   });
@@ -157,9 +175,9 @@ describe('global value flags do not swallow a following flag', () => {
 describe('builder validations (audit pass 2)', () => {
   test('cron add --every rejects non-positive intervals', () => {
     for (const bad of ['0', '-60000']) {
-      expect(() =>
-        buildCronCommand(['add', 'j', '-q', 'q1', '-d', '{}', '-e', bad])
-      ).toThrow(/every/i);
+      expect(() => buildCronCommand(['add', 'j', '-q', 'q1', '-d', '{}', '-e', bad])).toThrow(
+        /every/i
+      );
     }
   });
 
@@ -172,20 +190,26 @@ describe('builder validations (audit pass 2)', () => {
 describe('#4 webhook events match what the server actually emits', () => {
   test('accepts the five triggered events (incl. job.progress via updateProgress)', () => {
     const cmd = buildWebhookCommand([
-      'add', 'http://example.com/hook',
-      '-e', 'job.pushed,job.started,job.completed,job.failed,job.progress',
+      'add',
+      'http://example.com/hook',
+      '-e',
+      'job.pushed,job.started,job.completed,job.failed,job.progress',
     ]);
     expect(cmd.cmd).toBe('AddWebhook');
     expect(cmd.events).toEqual([
-      'job.pushed', 'job.started', 'job.completed', 'job.failed', 'job.progress',
+      'job.pushed',
+      'job.started',
+      'job.completed',
+      'job.failed',
+      'job.progress',
     ]);
   });
 
   for (const dead of ['job.active', 'job.waiting', 'job.delayed']) {
     test(`rejects non-existent event ${dead}`, () => {
-      expect(() =>
-        buildWebhookCommand(['add', 'http://example.com/hook', '-e', dead])
-      ).toThrow(/invalid event/i);
+      expect(() => buildWebhookCommand(['add', 'http://example.com/hook', '-e', dead])).toThrow(
+        /invalid event/i
+      );
     });
   }
 });

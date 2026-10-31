@@ -51,9 +51,13 @@ const tests = [
     const queue = new Queue('test-fixed-backoff', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      backoff: { type: 'fixed', delay: 1000 }
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        backoff: { type: 'fixed', delay: 1000 },
+      }
+    );
 
     const backoff = job.opts.backoff as { type: string; delay: number };
     if (backoff.type !== 'fixed') throw new Error(`Expected type fixed, got ${backoff.type}`);
@@ -66,9 +70,13 @@ const tests = [
     const queue = new Queue('test-exp-backoff', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      backoff: { type: 'exponential', delay: 500 }
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        backoff: { type: 'exponential', delay: 500 },
+      }
+    );
 
     const backoff = job.opts.backoff as { type: string; delay: number };
     if (backoff.type !== 'exponential') throw new Error(`Expected type exponential`);
@@ -85,24 +93,32 @@ const tests = [
     const retryTimes: number[] = [];
     let lastTime = Date.now();
 
-    const worker = new Worker('test-fixed-retry', async () => {
-      const now = Date.now();
-      if (attempts > 0) {
-        retryTimes.push(now - lastTime);
-      }
-      lastTime = now;
-      attempts++;
+    const worker = new Worker(
+      'test-fixed-retry',
+      async () => {
+        const now = Date.now();
+        if (attempts > 0) {
+          retryTimes.push(now - lastTime);
+        }
+        lastTime = now;
+        attempts++;
 
-      if (attempts < 3) {
-        throw new Error('Retry please');
-      }
-      return { done: true };
-    }, { embedded: true, autorun: true });
+        if (attempts < 3) {
+          throw new Error('Retry please');
+        }
+        return { done: true };
+      },
+      { embedded: true, autorun: true }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 100 }
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 100 },
+      }
+    );
 
     await Bun.sleep(1500);
 
@@ -127,24 +143,32 @@ const tests = [
     const retryTimes: number[] = [];
     let lastTime = Date.now();
 
-    const worker = new Worker('test-exp-retry', async () => {
-      const now = Date.now();
-      if (attempts > 0) {
-        retryTimes.push(now - lastTime);
-      }
-      lastTime = now;
-      attempts++;
+    const worker = new Worker(
+      'test-exp-retry',
+      async () => {
+        const now = Date.now();
+        if (attempts > 0) {
+          retryTimes.push(now - lastTime);
+        }
+        lastTime = now;
+        attempts++;
 
-      if (attempts < 4) {
-        throw new Error('Retry please');
-      }
-      return { done: true };
-    }, { embedded: true, autorun: true });
+        if (attempts < 4) {
+          throw new Error('Retry please');
+        }
+        return { done: true };
+      },
+      { embedded: true, autorun: true }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 4,
-      backoff: { type: 'exponential', delay: 50 }
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 4,
+        backoff: { type: 'exponential', delay: 50 },
+      }
+    );
 
     await Bun.sleep(2000);
 
@@ -171,15 +195,23 @@ const tests = [
 
     let attempts = 0;
 
-    const worker = new Worker('test-backoff-limit', async () => {
-      attempts++;
-      throw new Error('Always fail');
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-backoff-limit',
+      async () => {
+        attempts++;
+        throw new Error('Always fail');
+      },
+      { embedded: true, autorun: true }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 50 }
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 50 },
+      }
+    );
 
     await Bun.sleep(1000);
 
@@ -197,18 +229,26 @@ const tests = [
     let attempts = 0;
     const startTime = Date.now();
 
-    const worker = new Worker('test-zero-backoff', async () => {
-      attempts++;
-      if (attempts < 3) {
-        throw new Error('Retry');
-      }
-      return { done: true };
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-zero-backoff',
+      async () => {
+        attempts++;
+        if (attempts < 3) {
+          throw new Error('Retry');
+        }
+        return { done: true };
+      },
+      { embedded: true, autorun: true }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 0 }
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 0 },
+      }
+    );
 
     await Bun.sleep(500);
 
@@ -230,18 +270,26 @@ const tests = [
 
     const seenData: number[] = [];
 
-    const worker = new Worker('test-backoff-data', async (job) => {
-      seenData.push(job.data.counter);
-      if (seenData.length < 3) {
-        throw new Error('Retry');
-      }
-      return { done: true };
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-backoff-data',
+      async (job) => {
+        seenData.push(job.data.counter);
+        if (seenData.length < 3) {
+          throw new Error('Retry');
+        }
+        return { done: true };
+      },
+      { embedded: true, autorun: true }
+    );
 
-    await queue.add('test', { counter: 42 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 50 }
-    });
+    await queue.add(
+      'test',
+      { counter: 42 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 50 },
+      }
+    );
 
     await Bun.sleep(500);
 
@@ -258,12 +306,20 @@ const tests = [
     const queue = new Queue<{ id: number }>('test-mixed-backoff', { embedded: true });
     queue.obliterate();
 
-    const job1 = await queue.add('fixed', { id: 1 }, {
-      backoff: { type: 'fixed', delay: 100 }
-    });
-    const job2 = await queue.add('exponential', { id: 2 }, {
-      backoff: { type: 'exponential', delay: 100 }
-    });
+    const job1 = await queue.add(
+      'fixed',
+      { id: 1 },
+      {
+        backoff: { type: 'fixed', delay: 100 },
+      }
+    );
+    const job2 = await queue.add(
+      'exponential',
+      { id: 2 },
+      {
+        backoff: { type: 'exponential', delay: 100 },
+      }
+    );
     const job3 = await queue.add('number', { id: 3 }, { backoff: 200 });
 
     const backoff1 = job1.opts.backoff as { type: string };
@@ -280,9 +336,13 @@ const tests = [
     const queue = new Queue('test-high-backoff', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      backoff: { type: 'fixed', delay: 60000 } // 1 minute
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        backoff: { type: 'fixed', delay: 60000 }, // 1 minute
+      }
+    );
 
     const backoff = job.opts.backoff as { delay: number };
     if (backoff.delay !== 60000) throw new Error(`Expected delay 60000, got ${backoff.delay}`);
@@ -294,9 +354,13 @@ const tests = [
     const queue = new Queue('test-small-exp', { embedded: true });
     queue.obliterate();
 
-    const job = await queue.add('test', { value: 1 }, {
-      backoff: { type: 'exponential', delay: 10 } // 10ms base
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        backoff: { type: 'exponential', delay: 10 }, // 10ms base
+      }
+    );
 
     const backoff = job.opts.backoff as { type: string; delay: number };
     if (backoff.type !== 'exponential') throw new Error('Should be exponential');
@@ -311,15 +375,23 @@ const tests = [
 
     let attempts = 0;
 
-    const worker = new Worker('test-success-first', async () => {
-      attempts++;
-      return { success: true };
-    }, { embedded: true, autorun: true });
+    const worker = new Worker(
+      'test-success-first',
+      async () => {
+        attempts++;
+        return { success: true };
+      },
+      { embedded: true, autorun: true }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 1000 }
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 1000 },
+      }
+    );
 
     await Bun.sleep(300);
 

@@ -15,24 +15,152 @@ const TCP_OPTS = { port: TCP_PORT, commandTimeout: 60000, pingInterval: 0 };
 
 const QUEUES = [
   // High throughput queues
-  { name: 'emails',           pushRate: 20, errorRate: 0.03, minMs: 30,   maxMs: 300,  concurrency: 8,  workers: 5 },
-  { name: 'payments',         pushRate: 15, errorRate: 0.07, minMs: 80,   maxMs: 500,  concurrency: 6,  workers: 4 },
-  { name: 'notifications',    pushRate: 30, errorRate: 0.02, minMs: 10,   maxMs: 100,  concurrency: 10, workers: 5 },
-  { name: 'webhooks',         pushRate: 25, errorRate: 0.12, minMs: 20,   maxMs: 250,  concurrency: 8,  workers: 5 },
-  { name: 'analytics',        pushRate: 20, errorRate: 0.01, minMs: 30,   maxMs: 300,  concurrency: 6,  workers: 4 },
+  {
+    name: 'emails',
+    pushRate: 20,
+    errorRate: 0.03,
+    minMs: 30,
+    maxMs: 300,
+    concurrency: 8,
+    workers: 5,
+  },
+  {
+    name: 'payments',
+    pushRate: 15,
+    errorRate: 0.07,
+    minMs: 80,
+    maxMs: 500,
+    concurrency: 6,
+    workers: 4,
+  },
+  {
+    name: 'notifications',
+    pushRate: 30,
+    errorRate: 0.02,
+    minMs: 10,
+    maxMs: 100,
+    concurrency: 10,
+    workers: 5,
+  },
+  {
+    name: 'webhooks',
+    pushRate: 25,
+    errorRate: 0.12,
+    minMs: 20,
+    maxMs: 250,
+    concurrency: 8,
+    workers: 5,
+  },
+  {
+    name: 'analytics',
+    pushRate: 20,
+    errorRate: 0.01,
+    minMs: 30,
+    maxMs: 300,
+    concurrency: 6,
+    workers: 4,
+  },
   // Medium throughput queues
-  { name: 'reports',          pushRate: 8,  errorRate: 0.05, minMs: 200,  maxMs: 1500, concurrency: 4,  workers: 3 },
-  { name: 'image-resize',     pushRate: 12, errorRate: 0.06, minMs: 150,  maxMs: 800,  concurrency: 6,  workers: 4 },
-  { name: 'exports',          pushRate: 6,  errorRate: 0.08, minMs: 400,  maxMs: 2000, concurrency: 4,  workers: 3 },
-  { name: 'video-transcode',  pushRate: 4,  errorRate: 0.10, minMs: 500,  maxMs: 3000, concurrency: 3,  workers: 2 },
-  { name: 'pdf-generation',   pushRate: 8,  errorRate: 0.04, minMs: 200,  maxMs: 1200, concurrency: 4,  workers: 3 },
+  {
+    name: 'reports',
+    pushRate: 8,
+    errorRate: 0.05,
+    minMs: 200,
+    maxMs: 1500,
+    concurrency: 4,
+    workers: 3,
+  },
+  {
+    name: 'image-resize',
+    pushRate: 12,
+    errorRate: 0.06,
+    minMs: 150,
+    maxMs: 800,
+    concurrency: 6,
+    workers: 4,
+  },
+  {
+    name: 'exports',
+    pushRate: 6,
+    errorRate: 0.08,
+    minMs: 400,
+    maxMs: 2000,
+    concurrency: 4,
+    workers: 3,
+  },
+  {
+    name: 'video-transcode',
+    pushRate: 4,
+    errorRate: 0.1,
+    minMs: 500,
+    maxMs: 3000,
+    concurrency: 3,
+    workers: 2,
+  },
+  {
+    name: 'pdf-generation',
+    pushRate: 8,
+    errorRate: 0.04,
+    minMs: 200,
+    maxMs: 1200,
+    concurrency: 4,
+    workers: 3,
+  },
   // Low throughput / heavy processing
-  { name: 'ml-inference',     pushRate: 3,  errorRate: 0.15, minMs: 800,  maxMs: 5000, concurrency: 2,  workers: 2 },
-  { name: 'data-pipeline',    pushRate: 5,  errorRate: 0.06, minMs: 300,  maxMs: 2000, concurrency: 3,  workers: 2 },
-  { name: 'search-index',     pushRate: 10, errorRate: 0.03, minMs: 50,   maxMs: 400,  concurrency: 5,  workers: 3 },
-  { name: 'audit-log',        pushRate: 15, errorRate: 0.01, minMs: 10,   maxMs: 80,   concurrency: 8,  workers: 4 },
-  { name: 'cache-invalidate', pushRate: 18, errorRate: 0.02, minMs: 5,    maxMs: 50,   concurrency: 10, workers: 4 },
-  { name: 'billing-sync',     pushRate: 6,  errorRate: 0.09, minMs: 100,  maxMs: 600,  concurrency: 4,  workers: 3 },
+  {
+    name: 'ml-inference',
+    pushRate: 3,
+    errorRate: 0.15,
+    minMs: 800,
+    maxMs: 5000,
+    concurrency: 2,
+    workers: 2,
+  },
+  {
+    name: 'data-pipeline',
+    pushRate: 5,
+    errorRate: 0.06,
+    minMs: 300,
+    maxMs: 2000,
+    concurrency: 3,
+    workers: 2,
+  },
+  {
+    name: 'search-index',
+    pushRate: 10,
+    errorRate: 0.03,
+    minMs: 50,
+    maxMs: 400,
+    concurrency: 5,
+    workers: 3,
+  },
+  {
+    name: 'audit-log',
+    pushRate: 15,
+    errorRate: 0.01,
+    minMs: 10,
+    maxMs: 80,
+    concurrency: 8,
+    workers: 4,
+  },
+  {
+    name: 'cache-invalidate',
+    pushRate: 18,
+    errorRate: 0.02,
+    minMs: 5,
+    maxMs: 50,
+    concurrency: 10,
+    workers: 4,
+  },
+  {
+    name: 'billing-sync',
+    pushRate: 6,
+    errorRate: 0.09,
+    minMs: 100,
+    maxMs: 600,
+    concurrency: 4,
+    workers: 3,
+  },
 ];
 
 const ERRORS = [
@@ -72,7 +200,9 @@ async function main() {
   const totalRate = QUEUES.reduce((s, q) => s + q.pushRate, 0);
   const totalWorkers = QUEUES.reduce((s, q) => s + q.workers, 0);
   console.log(`=== Cloud Dashboard Simulation — HEAVY ===`);
-  console.log(`${QUEUES.length} queues | ${totalWorkers} workers | ~${Math.round(totalRate * (1000 / PUSH_INTERVAL_MS))} jobs/s\n`);
+  console.log(
+    `${QUEUES.length} queues | ${totalWorkers} workers | ~${Math.round(totalRate * (1000 / PUSH_INTERVAL_MS))} jobs/s\n`
+  );
 
   for (const q of QUEUES) {
     queues.push(new Queue(q.name, { connection: TCP_OPTS }));
@@ -80,31 +210,125 @@ async function main() {
 
   // --- Cron jobs ---
   const CRONS = [
-    { id: 'daily-cleanup',       queue: 'reports',       pattern: '0 3 * * *',    data: { task: 'cleanup', target: 'old-reports' } },
-    { id: 'health-check',        queue: 'notifications', pattern: '*/2 * * * *',  data: { task: 'health-check', services: ['db', 'redis', 'api'] } },
-    { id: 'hourly-digest',       queue: 'emails',        pattern: '0 * * * *',    data: { task: 'digest', type: 'hourly-summary' } },
-    { id: 'invoice-generation',  queue: 'payments',      pattern: '0 9 * * 1-5',  data: { task: 'generate-invoices', currency: 'EUR' } },
-    { id: 'image-cache-purge',   queue: 'image-resize',  pattern: '30 4 * * *',   data: { task: 'purge-cache', olderThanDays: 7 } },
-    { id: 'webhook-retry-sweep', queue: 'webhooks',      pattern: '*/15 * * * *', data: { task: 'retry-failed-webhooks', maxRetries: 5 } },
-    { id: 'analytics-rollup',    queue: 'analytics',     pattern: '0 */6 * * *',  data: { task: 'rollup', granularity: '1h' } },
-    { id: 'export-stale-check',  queue: 'exports',       pattern: '*/30 * * * *', data: { task: 'check-stale-exports', maxAgeMins: 60 } },
-    { id: 'nightly-backup',      queue: 'reports',          pattern: '0 2 * * *',    data: { task: 'backup', destination: 's3://bunqueue-backups' } },
-    { id: 'payment-reconcile',   queue: 'payments',         pattern: '0 0 * * *',    data: { task: 'reconcile', provider: 'stripe' } },
-    { id: 'ml-model-refresh',    queue: 'ml-inference',     pattern: '0 4 * * *',    data: { task: 'refresh-model', version: 'v3.2' } },
-    { id: 'pipeline-compaction', queue: 'data-pipeline',    pattern: '0 3 * * 0',    data: { task: 'compact', retention: '90d' } },
-    { id: 'search-reindex',      queue: 'search-index',     pattern: '0 5 * * 1',    data: { task: 'full-reindex', index: 'products' } },
-    { id: 'audit-archive',       queue: 'audit-log',        pattern: '0 1 * * *',    data: { task: 'archive', olderThanDays: 30 } },
-    { id: 'cache-warmup',        queue: 'cache-invalidate', pattern: '0 6 * * *',    data: { task: 'warmup', regions: ['us', 'eu', 'ap'] } },
-    { id: 'billing-month-close', queue: 'billing-sync',     pattern: '0 0 1 * *',    data: { task: 'month-close', generateInvoices: true } },
-    { id: 'video-cleanup',       queue: 'video-transcode',  pattern: '0 4 * * *',    data: { task: 'cleanup-temp', maxAgeMins: 120 } },
-    { id: 'pdf-template-sync',   queue: 'pdf-generation',   pattern: '*/30 * * * *', data: { task: 'sync-templates', source: 'git' } },
+    {
+      id: 'daily-cleanup',
+      queue: 'reports',
+      pattern: '0 3 * * *',
+      data: { task: 'cleanup', target: 'old-reports' },
+    },
+    {
+      id: 'health-check',
+      queue: 'notifications',
+      pattern: '*/2 * * * *',
+      data: { task: 'health-check', services: ['db', 'redis', 'api'] },
+    },
+    {
+      id: 'hourly-digest',
+      queue: 'emails',
+      pattern: '0 * * * *',
+      data: { task: 'digest', type: 'hourly-summary' },
+    },
+    {
+      id: 'invoice-generation',
+      queue: 'payments',
+      pattern: '0 9 * * 1-5',
+      data: { task: 'generate-invoices', currency: 'EUR' },
+    },
+    {
+      id: 'image-cache-purge',
+      queue: 'image-resize',
+      pattern: '30 4 * * *',
+      data: { task: 'purge-cache', olderThanDays: 7 },
+    },
+    {
+      id: 'webhook-retry-sweep',
+      queue: 'webhooks',
+      pattern: '*/15 * * * *',
+      data: { task: 'retry-failed-webhooks', maxRetries: 5 },
+    },
+    {
+      id: 'analytics-rollup',
+      queue: 'analytics',
+      pattern: '0 */6 * * *',
+      data: { task: 'rollup', granularity: '1h' },
+    },
+    {
+      id: 'export-stale-check',
+      queue: 'exports',
+      pattern: '*/30 * * * *',
+      data: { task: 'check-stale-exports', maxAgeMins: 60 },
+    },
+    {
+      id: 'nightly-backup',
+      queue: 'reports',
+      pattern: '0 2 * * *',
+      data: { task: 'backup', destination: 's3://bunqueue-backups' },
+    },
+    {
+      id: 'payment-reconcile',
+      queue: 'payments',
+      pattern: '0 0 * * *',
+      data: { task: 'reconcile', provider: 'stripe' },
+    },
+    {
+      id: 'ml-model-refresh',
+      queue: 'ml-inference',
+      pattern: '0 4 * * *',
+      data: { task: 'refresh-model', version: 'v3.2' },
+    },
+    {
+      id: 'pipeline-compaction',
+      queue: 'data-pipeline',
+      pattern: '0 3 * * 0',
+      data: { task: 'compact', retention: '90d' },
+    },
+    {
+      id: 'search-reindex',
+      queue: 'search-index',
+      pattern: '0 5 * * 1',
+      data: { task: 'full-reindex', index: 'products' },
+    },
+    {
+      id: 'audit-archive',
+      queue: 'audit-log',
+      pattern: '0 1 * * *',
+      data: { task: 'archive', olderThanDays: 30 },
+    },
+    {
+      id: 'cache-warmup',
+      queue: 'cache-invalidate',
+      pattern: '0 6 * * *',
+      data: { task: 'warmup', regions: ['us', 'eu', 'ap'] },
+    },
+    {
+      id: 'billing-month-close',
+      queue: 'billing-sync',
+      pattern: '0 0 1 * *',
+      data: { task: 'month-close', generateInvoices: true },
+    },
+    {
+      id: 'video-cleanup',
+      queue: 'video-transcode',
+      pattern: '0 4 * * *',
+      data: { task: 'cleanup-temp', maxAgeMins: 120 },
+    },
+    {
+      id: 'pdf-template-sync',
+      queue: 'pdf-generation',
+      pattern: '*/30 * * * *',
+      data: { task: 'sync-templates', source: 'git' },
+    },
   ];
 
   const cronQueue = queues[0]; // use first queue's connection for cron setup
   for (const cron of CRONS) {
     const targetQueue = queues.find((_, i) => QUEUES[i].name === cron.queue) ?? cronQueue;
     try {
-      await targetQueue.upsertJobScheduler(cron.id, { pattern: cron.pattern }, { name: cron.id, data: cron.data });
+      await targetQueue.upsertJobScheduler(
+        cron.id,
+        { pattern: cron.pattern },
+        { name: cron.id, data: cron.data }
+      );
       console.log(`  cron: ${cron.id} → ${cron.queue} (${cron.pattern})`);
     } catch (e) {
       console.error(`  cron FAIL: ${cron.id}`, (e as Error).message);
@@ -153,11 +377,15 @@ async function main() {
           connection: TCP_OPTS,
           heartbeatInterval: 10000,
           useLocks: true,
-        },
+        }
       );
 
-      worker.on('completed', () => { totalCompleted++; });
-      worker.on('failed', () => { totalFailed++; });
+      worker.on('completed', () => {
+        totalCompleted++;
+      });
+      worker.on('failed', () => {
+        totalFailed++;
+      });
       worker.on('error', () => {});
       workers.push(worker);
     }
@@ -346,14 +574,49 @@ async function main() {
     for (let i = 0; i < QUEUES.length; i++) {
       const q = QUEUES[i];
       const queue = queues[i];
-      const batch: { name: string; data: Record<string, unknown>; opts?: Record<string, unknown> }[] = [];
+      const batch: {
+        name: string;
+        data: Record<string, unknown>;
+        opts?: Record<string, unknown>;
+      }[] = [];
 
       for (let j = 0; j < q.pushRate; j++) {
         const isDelayed = Math.random() < 0.12;
         const uid = Math.random().toString(36).slice(2, 10);
-        const GROUPS = ['billing', 'onboarding', 'support', 'enterprise', 'free-tier', 'internal', 'partner', 'vip'];
-        const TAG_POOL = ['urgent', 'batch', 'retry', 'scheduled', 'manual', 'api', 'webhook', 'cron', 'high-value', 'internal', 'bulk', 'realtime', 'low-priority', 'idempotent'];
-        const REGIONS = ['us-east-1', 'us-west-2', 'eu-west-1', 'eu-central-1', 'ap-south-1', 'ap-northeast-1'];
+        const GROUPS = [
+          'billing',
+          'onboarding',
+          'support',
+          'enterprise',
+          'free-tier',
+          'internal',
+          'partner',
+          'vip',
+        ];
+        const TAG_POOL = [
+          'urgent',
+          'batch',
+          'retry',
+          'scheduled',
+          'manual',
+          'api',
+          'webhook',
+          'cron',
+          'high-value',
+          'internal',
+          'bulk',
+          'realtime',
+          'low-priority',
+          'idempotent',
+        ];
+        const REGIONS = [
+          'us-east-1',
+          'us-west-2',
+          'eu-west-1',
+          'eu-central-1',
+          'ap-south-1',
+          'ap-northeast-1',
+        ];
         const tags = TAG_POOL.filter(() => Math.random() < 0.25);
         batch.push({
           name: `${q.name}-${Date.now()}-${j}`,
@@ -379,7 +642,9 @@ async function main() {
             ...(isDelayed ? { delay: 1000 + Math.floor(Math.random() * 10000) } : {}),
             ...(Math.random() < 0.12 ? { jobId: `custom-${q.name}-${uid}` } : {}),
             ...(tags.length > 0 ? { tags } : {}),
-            ...(Math.random() < 0.2 ? { groupId: GROUPS[Math.floor(Math.random() * GROUPS.length)] } : {}),
+            ...(Math.random() < 0.2
+              ? { groupId: GROUPS[Math.floor(Math.random() * GROUPS.length)] }
+              : {}),
             ...(Math.random() < 0.1 ? { timeout: 15000 + Math.floor(Math.random() * 45000) } : {}),
             ...(Math.random() < 0.05 ? { ttl: 60000 + Math.floor(Math.random() * 300000) } : {}),
             ...(Math.random() < 0.03 ? { lifo: true } : {}),
@@ -399,7 +664,9 @@ async function main() {
   const statusTimer = setInterval(() => {
     const elapsed = Math.round((Date.now() - startTime) / 1000);
     const rate = Math.round(totalPushed / elapsed);
-    console.log(`[${elapsed}s] pushed=${totalPushed} (${rate}/s) completed=${totalCompleted} failed=${totalFailed} flows=${totalFlows}`);
+    console.log(
+      `[${elapsed}s] pushed=${totalPushed} (${rate}/s) completed=${totalCompleted} failed=${totalFailed} flows=${totalFlows}`
+    );
   }, 60_000);
 
   await Bun.sleep(DURATION_MS);
@@ -411,12 +678,24 @@ async function main() {
 
   clearInterval(statusTimer);
   const elapsed = Math.round((Date.now() - startTime) / 1000);
-  console.log(`[${elapsed}s] pushed=${totalPushed} (${Math.round(totalPushed / elapsed)}/s) completed=${totalCompleted} failed=${totalFailed} flows=${totalFlows}`);
-  console.log(`DONE — pushed=${totalPushed} completed=${totalCompleted} failed=${totalFailed} flows=${totalFlows}`);
+  console.log(
+    `[${elapsed}s] pushed=${totalPushed} (${Math.round(totalPushed / elapsed)}/s) completed=${totalCompleted} failed=${totalFailed} flows=${totalFlows}`
+  );
+  console.log(
+    `DONE — pushed=${totalPushed} completed=${totalCompleted} failed=${totalFailed} flows=${totalFlows}`
+  );
 
-  try { flowProducer.close(); } catch {}
-  for (const w of workers) try { await w.close(); } catch {}
-  for (const q of queues) try { q.obliterate(); } catch {}
+  try {
+    flowProducer.close();
+  } catch {}
+  for (const w of workers)
+    try {
+      await w.close();
+    } catch {}
+  for (const q of queues)
+    try {
+      q.obliterate();
+    } catch {}
   await Bun.sleep(500);
   process.exit(0);
 }

@@ -8,8 +8,12 @@ import { QueueManager } from '../src/application/queueManager';
 describe('Rate Limiting Enforcement', () => {
   let qm: QueueManager;
 
-  beforeEach(() => { qm = new QueueManager(); });
-  afterEach(() => { qm.shutdown(); });
+  beforeEach(() => {
+    qm = new QueueManager();
+  });
+  afterEach(() => {
+    qm.shutdown();
+  });
 
   async function pushJobs(queue: string, count: number) {
     for (let i = 0; i < count; i++) {

@@ -27,15 +27,19 @@ async function main() {
     await queue.add('progress-job', { steps: 5 });
 
     let lastProgress = 0;
-    const worker = new Worker<{ steps: number }>(QUEUE_NAME, async (job) => {
-      const steps = (job.data as { steps: number }).steps;
-      for (let i = 1; i <= steps; i++) {
-        await job.updateProgress((i / steps) * 100);
-        lastProgress = (i / steps) * 100;
-        await Bun.sleep(50);
-      }
-      return { completed: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ steps: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        const steps = (job.data as { steps: number }).steps;
+        for (let i = 1; i <= steps; i++) {
+          await job.updateProgress((i / steps) * 100);
+          lastProgress = (i / steps) * 100;
+          await Bun.sleep(50);
+        }
+        return { completed: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -61,15 +65,19 @@ async function main() {
     await queue.add('progress-msg-job', { steps: 3 });
 
     const messages: string[] = [];
-    const worker = new Worker<{ steps: number }>(QUEUE_NAME, async (job) => {
-      const msgs = ['Starting...', 'Processing...', 'Finishing...'];
-      for (let i = 0; i < msgs.length; i++) {
-        await job.updateProgress(((i + 1) / 3) * 100, msgs[i]);
-        messages.push(msgs[i]);
-        await Bun.sleep(50);
-      }
-      return { done: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ steps: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        const msgs = ['Starting...', 'Processing...', 'Finishing...'];
+        for (let i = 0; i < msgs.length; i++) {
+          await job.updateProgress(((i + 1) / 3) * 100, msgs[i]);
+          messages.push(msgs[i]);
+          await Bun.sleep(50);
+        }
+        return { done: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -95,15 +103,19 @@ async function main() {
     await queue.add('logging-job', { steps: 3 });
 
     let logCount = 0;
-    const worker = new Worker<{ steps: number }>(QUEUE_NAME, async (job) => {
-      await job.log('Step 1 started');
-      logCount++;
-      await job.log('Step 2 processing');
-      logCount++;
-      await job.log('Step 3 completed');
-      logCount++;
-      return { logged: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ steps: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        await job.log('Step 1 started');
+        logCount++;
+        await job.log('Step 2 processing');
+        logCount++;
+        await job.log('Step 3 completed');
+        logCount++;
+        return { logged: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(500);
     await worker.close();
@@ -129,19 +141,25 @@ async function main() {
     await queue.add('incremental-job', { steps: 10 });
 
     const progressValues: number[] = [];
-    const worker = new Worker<{ steps: number }>(QUEUE_NAME, async (job) => {
-      for (let i = 1; i <= 10; i++) {
-        await job.updateProgress(i * 10);
-        progressValues.push(i * 10);
-      }
-      return {};
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ steps: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        for (let i = 1; i <= 10; i++) {
+          await job.updateProgress(i * 10);
+          progressValues.push(i * 10);
+        }
+        return {};
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(500);
     await worker.close();
 
     if (progressValues.length === 10 && progressValues[9] === 100) {
-      console.log(`   ✅ Progress incremented correctly: ${progressValues[0]}% -> ${progressValues[9]}%`);
+      console.log(
+        `   ✅ Progress incremented correctly: ${progressValues[0]}% -> ${progressValues[9]}%`
+      );
       passed++;
     } else {
       console.log(`   ❌ Progress values: ${progressValues.join(', ')}`);
@@ -165,12 +183,16 @@ async function main() {
     ]);
 
     let completedJobs = 0;
-    const worker = new Worker<{ steps: number }>(QUEUE_NAME, async (job) => {
-      await job.updateProgress(50);
-      await job.updateProgress(100);
-      completedJobs++;
-      return {};
-    }, { concurrency: 3, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ steps: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        await job.updateProgress(50);
+        await job.updateProgress(100);
+        completedJobs++;
+        return {};
+      },
+      { concurrency: 3, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -197,17 +219,21 @@ async function main() {
 
     let progressDone = false;
     let logsDone = false;
-    const worker = new Worker<{ steps: number }>(QUEUE_NAME, async (job) => {
-      await job.log('Starting job');
-      await job.updateProgress(25, 'Quarter done');
-      await job.log('Still working');
-      await job.updateProgress(75, 'Almost there');
-      await job.log('Finishing up');
-      await job.updateProgress(100, 'Complete');
-      progressDone = true;
-      logsDone = true;
-      return { success: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ steps: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        await job.log('Starting job');
+        await job.updateProgress(25, 'Quarter done');
+        await job.log('Still working');
+        await job.updateProgress(75, 'Almost there');
+        await job.log('Finishing up');
+        await job.updateProgress(100, 'Complete');
+        progressDone = true;
+        logsDone = true;
+        return { success: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(500);
     await worker.close();

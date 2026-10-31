@@ -131,7 +131,7 @@ async function main() {
 
       // Check DLQ
       const dlqJobs = manager.getDlq(QUEUE_NAME);
-      const inDlq = dlqJobs.some(j => j.id === job.id);
+      const inDlq = dlqJobs.some((j) => j.id === job.id);
 
       if (inDlq) {
         console.log('   ✅ Job discarded to DLQ');
@@ -209,7 +209,9 @@ async function main() {
         console.log('   ✅ Job priority changed from 1 to 100');
         passed++;
       } else {
-        console.log(`   ❌ Priority not changed: initial=${initialPriority}, after=${afterJob?.priority}`);
+        console.log(
+          `   ❌ Priority not changed: initial=${initialPriority}, after=${afterJob?.priority}`
+        );
         failed++;
       }
     } else {
@@ -247,10 +249,14 @@ async function main() {
 
         // Job should not be processable
         let processed = false;
-        const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-          processed = true;
-          return {};
-        }, { concurrency: 1, embedded: true });
+        const worker = new Worker<{ value: number }>(
+          QUEUE_NAME,
+          async () => {
+            processed = true;
+            return {};
+          },
+          { concurrency: 1, embedded: true }
+        );
 
         await Bun.sleep(300);
         await worker.close();

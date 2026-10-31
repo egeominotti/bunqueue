@@ -96,10 +96,7 @@ describe('CronGet command', () => {
       schedule: '*/5 * * * *',
     });
 
-    const res = await handleCommand(
-      { cmd: 'CronGet', name: 'routed-cron' } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'CronGet', name: 'routed-cron' } as Command, ctx);
 
     expect(res.ok).toBe(true);
     const cron = (res as Record<string, unknown>).cron as Record<string, unknown>;
@@ -142,10 +139,7 @@ describe('GetChildrenValues command', () => {
 
   test('should return empty values for non-existent job', async () => {
     const res = await handleGetChildrenValues(
-      { cmd: 'GetChildrenValues', id: '99999' } as Extract<
-        Command,
-        { cmd: 'GetChildrenValues' }
-      >,
+      { cmd: 'GetChildrenValues', id: '99999' } as Extract<Command, { cmd: 'GetChildrenValues' }>,
       ctx
     );
 
@@ -197,10 +191,7 @@ describe('StorageStatus command', () => {
   });
 
   test('should be routable via handleCommand', async () => {
-    const res = await handleCommand(
-      { cmd: 'StorageStatus' } as Command,
-      ctx
-    );
+    const res = await handleCommand({ cmd: 'StorageStatus' } as Command, ctx);
 
     expect(res.ok).toBe(true);
     const data = (res as Record<string, unknown>).data as Record<string, unknown>;

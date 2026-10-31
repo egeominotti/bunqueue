@@ -43,9 +43,13 @@ async function runTests() {
 
   // Test 1: Accept continueParentOnFailure option with true
   await test('Accept continueParentOnFailure option with true', async () => {
-    const job = await queue.add('test', { value: 1 }, {
-      continueParentOnFailure: true,
-    });
+    const job = await queue.add(
+      'test',
+      { value: 1 },
+      {
+        continueParentOnFailure: true,
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -54,9 +58,13 @@ async function runTests() {
 
   // Test 2: Accept continueParentOnFailure option with false
   await test('Accept continueParentOnFailure option with false', async () => {
-    const job = await queue.add('test', { value: 2 }, {
-      continueParentOnFailure: false,
-    });
+    const job = await queue.add(
+      'test',
+      { value: 2 },
+      {
+        continueParentOnFailure: false,
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -65,9 +73,13 @@ async function runTests() {
 
   // Test 3: Accept ignoreDependencyOnFailure option with true
   await test('Accept ignoreDependencyOnFailure option with true', async () => {
-    const job = await queue.add('test', { value: 3 }, {
-      ignoreDependencyOnFailure: true,
-    });
+    const job = await queue.add(
+      'test',
+      { value: 3 },
+      {
+        ignoreDependencyOnFailure: true,
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -76,9 +88,13 @@ async function runTests() {
 
   // Test 4: Accept ignoreDependencyOnFailure option with false
   await test('Accept ignoreDependencyOnFailure option with false', async () => {
-    const job = await queue.add('test', { value: 4 }, {
-      ignoreDependencyOnFailure: false,
-    });
+    const job = await queue.add(
+      'test',
+      { value: 4 },
+      {
+        ignoreDependencyOnFailure: false,
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -87,10 +103,14 @@ async function runTests() {
 
   // Test 5: Accept both options together
   await test('Accept both failure options together', async () => {
-    const job = await queue.add('test', { value: 5 }, {
-      continueParentOnFailure: true,
-      ignoreDependencyOnFailure: true,
-    });
+    const job = await queue.add(
+      'test',
+      { value: 5 },
+      {
+        continueParentOnFailure: true,
+        ignoreDependencyOnFailure: true,
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -100,9 +120,13 @@ async function runTests() {
   // Test 6: Accept custom timestamp option
   await test('Accept custom timestamp option', async () => {
     const customTimestamp = Date.now() - 10000; // 10 seconds ago
-    const job = await queue.add('test', { value: 6 }, {
-      timestamp: customTimestamp,
-    });
+    const job = await queue.add(
+      'test',
+      { value: 6 },
+      {
+        timestamp: customTimestamp,
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -116,13 +140,17 @@ async function runTests() {
 
   // Test 7: Accept all failure and dedup options together
   await test('Accept all advanced options together', async () => {
-    const job = await queue.add('test', { value: 7 }, {
-      continueParentOnFailure: true,
-      ignoreDependencyOnFailure: true,
-      failParentOnFailure: false,
-      removeDependencyOnFailure: false,
-      timestamp: Date.now(),
-    });
+    const job = await queue.add(
+      'test',
+      { value: 7 },
+      {
+        continueParentOnFailure: true,
+        ignoreDependencyOnFailure: true,
+        failParentOnFailure: false,
+        removeDependencyOnFailure: false,
+        timestamp: Date.now(),
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -131,13 +159,17 @@ async function runTests() {
 
   // Test 8: Deduplication extend option
   await test('Accept deduplication extend option', async () => {
-    const job = await queue.add('test', { value: 8 }, {
-      deduplication: {
-        id: 'test-extend',
-        ttl: 1000,
-        extend: true,
-      },
-    });
+    const job = await queue.add(
+      'test',
+      { value: 8 },
+      {
+        deduplication: {
+          id: 'test-extend',
+          ttl: 1000,
+          extend: true,
+        },
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -146,13 +178,17 @@ async function runTests() {
 
   // Test 9: Deduplication replace option
   await test('Accept deduplication replace option', async () => {
-    const job = await queue.add('test', { value: 9 }, {
-      deduplication: {
-        id: 'test-replace',
-        ttl: 1000,
-        replace: true,
-      },
-    });
+    const job = await queue.add(
+      'test',
+      { value: 9 },
+      {
+        deduplication: {
+          id: 'test-replace',
+          ttl: 1000,
+          replace: true,
+        },
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');
@@ -161,14 +197,18 @@ async function runTests() {
 
   // Test 10: Deduplication with both extend and replace
   await test('Accept deduplication with extend and replace', async () => {
-    const job = await queue.add('test', { value: 10 }, {
-      deduplication: {
-        id: 'test-both',
-        ttl: 1000,
-        extend: true,
-        replace: true,
-      },
-    });
+    const job = await queue.add(
+      'test',
+      { value: 10 },
+      {
+        deduplication: {
+          id: 'test-both',
+          ttl: 1000,
+          extend: true,
+          replace: true,
+        },
+      }
+    );
 
     if (!job || !job.id) {
       throw new Error('Job not created');

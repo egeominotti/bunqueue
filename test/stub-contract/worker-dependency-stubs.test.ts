@@ -87,13 +87,13 @@ describe('dependency query error boundaries', () => {
     return { send } as unknown as TcpConnectionPool;
   }
 
-  test.each([
-    'backend unavailable',
-    'Job not found or forbidden',
-  ])('a non-matching broker error is propagated: %s', async (error) => {
-    const tcp = fakeTcp(async () => ({ ok: false, error }));
-    await expect(getFlowDependencies('parent', 'queue', false, tcp)).rejects.toThrow(error);
-  });
+  test.each(['backend unavailable', 'Job not found or forbidden'])(
+    'a non-matching broker error is propagated: %s',
+    async (error) => {
+      const tcp = fakeTcp(async () => ({ ok: false, error }));
+      await expect(getFlowDependencies('parent', 'queue', false, tcp)).rejects.toThrow(error);
+    }
+  );
 
   test('an error without a message uses the operation fallback', async () => {
     const tcp = fakeTcp(async () => ({ ok: false }));

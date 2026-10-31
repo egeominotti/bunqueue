@@ -86,12 +86,7 @@ export function shouldNoindex(version: string, current: string): boolean {
  * in both directions: an already-bannered tree would never receive the meta, and a tree
  * that has the meta but predates the banner would never get chrome.
  */
-export function injectHead(
-  html: string,
-  version: string,
-  depth: number,
-  noindex: boolean
-): string {
+export function injectHead(html: string, version: string, depth: number, noindex: boolean): string {
   let out = html;
   if (!out.includes('bq-ref-banner')) {
     out = out.replace(/<body([^>]*)>/, `<body$1>${banner(version, depth)}`);

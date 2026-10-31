@@ -199,11 +199,42 @@ function makeSnapshot(seq: number): CloudSnapshot {
     startedAt: 0,
     timestamp: Date.now(),
     sequenceId: seq,
-    stats: { waiting: 0, delayed: 0, active: 0, dlq: 0, completed: 0, totalPushed: '0', totalPulled: '0', totalCompleted: '0', totalFailed: '0', uptime: 0, cronJobs: 0, cronPending: 0 },
+    stats: {
+      waiting: 0,
+      delayed: 0,
+      active: 0,
+      dlq: 0,
+      completed: 0,
+      totalPushed: '0',
+      totalPulled: '0',
+      totalCompleted: '0',
+      totalFailed: '0',
+      uptime: 0,
+      cronJobs: 0,
+      cronPending: 0,
+    },
     throughput: { pushPerSec: 0, pullPerSec: 0, completePerSec: 0, failPerSec: 0 },
-    latency: { averages: { pushMs: 0, pullMs: 0, ackMs: 0 }, percentiles: { push: { p50: 0, p95: 0, p99: 0 }, pull: { p50: 0, p95: 0, p99: 0 }, ack: { p50: 0, p95: 0, p99: 0 } } },
+    latency: {
+      averages: { pushMs: 0, pullMs: 0, ackMs: 0 },
+      percentiles: {
+        push: { p50: 0, p95: 0, p99: 0 },
+        pull: { p50: 0, p95: 0, p99: 0 },
+        ack: { p50: 0, p95: 0, p99: 0 },
+      },
+    },
     memory: { heapUsed: 0, heapTotal: 0, rss: 0, external: 0 },
-    collections: { jobIndex: 0, completedJobs: 0, jobResults: 0, jobLogs: 0, customIdMap: 0, jobLocks: 0, processingTotal: 0, queuedTotal: 0, temporalIndexTotal: 0, delayedHeapTotal: 0 },
+    collections: {
+      jobIndex: 0,
+      completedJobs: 0,
+      jobResults: 0,
+      jobLogs: 0,
+      customIdMap: 0,
+      jobLocks: 0,
+      processingTotal: 0,
+      queuedTotal: 0,
+      temporalIndexTotal: 0,
+      delayedHeapTotal: 0,
+    },
     queues: [],
     workers: { total: 0, active: 0, totalProcessed: 0, totalFailed: 0, activeJobs: 0 },
     crons: [],
@@ -278,7 +309,11 @@ describe('HttpSender', () => {
         const encoding = req.headers.get('content-encoding');
         const buf = encoding === 'zstd' ? Buffer.from(await Bun.zstdDecompress(raw)) : raw;
         const body = unpack(buf);
-        received.push({ url: new URL(req.url).pathname, body, headers: Object.fromEntries(req.headers) });
+        received.push({
+          url: new URL(req.url).pathname,
+          body,
+          headers: Object.fromEntries(req.headers),
+        });
         return new Response('ok', { status: statusCode });
       },
     });

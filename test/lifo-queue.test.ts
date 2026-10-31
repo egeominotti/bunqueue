@@ -9,19 +9,26 @@ import { QueueManager } from '../src/application/queueManager';
 describe('LIFO Queue Mode', () => {
   let qm: QueueManager;
 
-  beforeEach(() => { qm = new QueueManager(); });
-  afterEach(() => { qm.shutdown(); });
+  beforeEach(() => {
+    qm = new QueueManager();
+  });
+  afterEach(() => {
+    qm.shutdown();
+  });
 
   /** Push N jobs with a small delay between each so UUID7 timestamps differ. */
   async function pushJobs(
-    queue: string, count: number,
+    queue: string,
+    count: number,
     opts: { priority?: number; lifo?: boolean; delay?: number } = {}
   ): Promise<string[]> {
     const ids: string[] = [];
     for (let i = 0; i < count; i++) {
       const job = await qm.push(queue, {
-        data: { seq: i }, priority: opts.priority ?? 0,
-        lifo: opts.lifo ?? false, delay: opts.delay,
+        data: { seq: i },
+        priority: opts.priority ?? 0,
+        lifo: opts.lifo ?? false,
+        delay: opts.delay,
       });
       ids.push(job.id);
       if (i < count - 1) await Bun.sleep(2);
@@ -156,7 +163,9 @@ describe('LIFO Queue Mode', () => {
 
   test('bulk push with lifo contains all pushed jobs', async () => {
     const inputs = Array.from({ length: 4 }, (_, i) => ({
-      data: { seq: i }, priority: 0, lifo: true,
+      data: { seq: i },
+      priority: 0,
+      lifo: true,
     }));
     const ids = await qm.pushBatch('bulk-lifo', inputs);
     const pullOrder = await pullAll('bulk-lifo', 4);

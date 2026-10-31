@@ -380,9 +380,7 @@ describe('BUG 6: Output formatting with missing dates', () => {
 describe('BUG 7: Timeout management in client', () => {
   test('sendCommand timeout is stored and can be cleared', async () => {
     // We test this indirectly: verify the code structure
-    const source = await Bun.file(
-      new URL('../src/cli/client.ts', import.meta.url).pathname
-    ).text();
+    const source = await Bun.file(new URL('../src/cli/client.ts', import.meta.url).pathname).text();
 
     // BUG: setTimeout is called but return value is never stored
     // Look for pattern: the setTimeout ID should be stored in a variable
@@ -399,9 +397,7 @@ describe('BUG 7: Timeout management in client', () => {
 // =============================================================================
 describe('BUG 8: Error check before output', () => {
   test('error responses are printed to stderr not stdout', async () => {
-    const source = await Bun.file(
-      new URL('../src/cli/client.ts', import.meta.url).pathname
-    ).text();
+    const source = await Bun.file(new URL('../src/cli/client.ts', import.meta.url).pathname).text();
 
     // BUG: console.log(formatOutput(...)) happens BEFORE checking response.ok
     // The code should check response.ok FIRST, then output

@@ -39,13 +39,16 @@ function report(name: string, results: Result[], maxAcceptable: number) {
   const gotJob = results.filter((r) => r.got);
   const maxWakeup = Math.max(...results.map((r) => r.wakeup));
   const avgWakeup = Math.round(results.reduce((s, r) => s + r.wakeup, 0) / results.length);
-  const p99 = results.sort((a, b) => a.wakeup - b.wakeup)[Math.floor(results.length * 0.99)]?.wakeup ?? 0;
+  const p99 =
+    results.sort((a, b) => a.wakeup - b.wakeup)[Math.floor(results.length * 0.99)]?.wakeup ?? 0;
 
   const pass = fast.length === results.length;
   const icon = pass ? '✓' : '✗';
 
   console.log(`  ${icon} ${name}`);
-  console.log(`    Workers: ${results.length} | Got job: ${gotJob.length} | Avg: ${avgWakeup}ms | P99: ${p99}ms | Max: ${maxWakeup}ms`);
+  console.log(
+    `    Workers: ${results.length} | Got job: ${gotJob.length} | Avg: ${avgWakeup}ms | P99: ${p99}ms | Max: ${maxWakeup}ms`
+  );
   if (!pass) {
     const slow = results.filter((r) => r.wakeup >= maxAcceptable);
     console.log(`    SLOW: ${slow.length} workers waited >= ${maxAcceptable}ms`);
@@ -59,7 +62,10 @@ async function test1() {
   const queue = 'stress-1';
   const workerPromises = await runWorkers(queue, 50, 3000);
 
-  await qm.pushBatch(queue, Array.from({ length: 200 }, (_, i) => ({ data: { i } })));
+  await qm.pushBatch(
+    queue,
+    Array.from({ length: 200 }, (_, i) => ({ data: { i } }))
+  );
 
   const results = await Promise.all(workerPromises);
   return report('50 workers, 200 jobs batch push (timeout 3s)', results, 200);
@@ -92,7 +98,10 @@ async function test3() {
 
   // Producers fire batches concurrently
   const producerPromises = Array.from({ length: 5 }, (_, batch) =>
-    qm.pushBatch(queue, Array.from({ length: 20 }, (_, j) => ({ data: { batch, j } })))
+    qm.pushBatch(
+      queue,
+      Array.from({ length: 20 }, (_, j) => ({ data: { batch, j } }))
+    )
   );
 
   await Promise.all(producerPromises);
@@ -109,7 +118,10 @@ async function test4() {
   for (let cycle = 0; cycle < 5; cycle++) {
     const workerPromises = await runWorkers(queue, 10, 2000);
 
-    await qm.pushBatch(queue, Array.from({ length: 10 }, (_, i) => ({ data: { cycle, i } })));
+    await qm.pushBatch(
+      queue,
+      Array.from({ length: 10 }, (_, i) => ({ data: { cycle, i } }))
+    );
 
     const results = await Promise.all(workerPromises);
     allResults = allResults.concat(results.map((r, i) => ({ ...r, id: cycle * 10 + i })));

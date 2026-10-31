@@ -18,12 +18,12 @@ Node.js, and `taskset`.
 
 ## What is compared
 
-| | Version | Notes |
-| --- | --- | --- |
-| bunqueue | 2.9.20 (npm) | server started with `bunqueue start`, clients from `bunqueue/client` on Bun |
-| BullMQ | 6.4.2 (npm) | clients on Node.js 24 and on Bun, both reported |
-| Redis | 8.10.2 (official image) | host networking, single instance |
-| ioredis | 6.0.0 | BullMQ's connection library (peer dependency) |
+|          | Version                 | Notes                                                                       |
+| -------- | ----------------------- | --------------------------------------------------------------------------- |
+| bunqueue | 2.9.20 (npm)            | server started with `bunqueue start`, clients from `bunqueue/client` on Bun |
+| BullMQ   | 6.4.2 (npm)             | clients on Node.js 24 and on Bun, both reported                             |
+| Redis    | 8.10.2 (official image) | host networking, single instance                                            |
+| ioredis  | 6.0.0                   | BullMQ's connection library (peer dependency)                               |
 
 Both queues use their documented defaults. The only settings passed are the ones a
 scenario varies (concurrency, attempts, delay) plus `removeOnComplete` and
@@ -40,9 +40,9 @@ client; Redis has no equivalent, and the limit would cap any throughput test.
 
 ## Storage modes
 
-| Mode | bunqueue | Redis |
-| --- | --- | --- |
-| memory | in-memory engine (no data path) | `--save "" --appendonly no` |
+| Mode    | bunqueue                           | Redis                             |
+| ------- | ---------------------------------- | --------------------------------- |
+| memory  | in-memory engine (no data path)    | `--save "" --appendonly no`       |
 | durable | SQLite in WAL mode (`--data-path`) | AOF with `--appendfsync everysec` |
 
 Both durable stores write to the same local disk.
@@ -59,16 +59,16 @@ Both durable stores write to the same local disk.
 
 ## Scenarios
 
-| Scenario | What it measures |
-| --- | --- |
-| `enqueue-serial` | One `add` at a time: round-trip cost, with per-call latency percentiles |
-| `enqueue-concurrent` | 64 `add` calls in flight |
-| `enqueue-bulk` | `addBulk` in batches of 100 |
-| `drain-{1,4,8}x50` | A prefilled backlog drained by 1, 4 or 8 worker processes with 50 concurrency each; timed until the queue holds nothing waiting, active or delayed |
-| `latency-{1k,5k,10k}` | Open-loop producer at a fixed rate for 15 s, two worker processes; pickup latency is measured from each job's *scheduled* send time, so a broker that falls behind shows up as latency instead of lowering the offered load |
-| `delayed` | 20,000 jobs due 1-4 s after they are added: how late each one starts |
-| `retry` | Every job fails twice and succeeds on its third attempt (`attempts: 3`, no backoff) |
-| `memory-1m` | Broker resident memory idle and with a 1,000,000-job backlog |
+| Scenario              | What it measures                                                                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enqueue-serial`      | One `add` at a time: round-trip cost, with per-call latency percentiles                                                                                                                                                     |
+| `enqueue-concurrent`  | 64 `add` calls in flight                                                                                                                                                                                                    |
+| `enqueue-bulk`        | `addBulk` in batches of 100                                                                                                                                                                                                 |
+| `drain-{1,4,8}x50`    | A prefilled backlog drained by 1, 4 or 8 worker processes with 50 concurrency each; timed until the queue holds nothing waiting, active or delayed                                                                          |
+| `latency-{1k,5k,10k}` | Open-loop producer at a fixed rate for 15 s, two worker processes; pickup latency is measured from each job's _scheduled_ send time, so a broker that falls behind shows up as latency instead of lowering the offered load |
+| `delayed`             | 20,000 jobs due 1-4 s after they are added: how late each one starts                                                                                                                                                        |
+| `retry`               | Every job fails twice and succeeds on its third attempt (`attempts: 3`, no backoff)                                                                                                                                         |
+| `memory-1m`           | Broker resident memory idle and with a 1,000,000-job backlog                                                                                                                                                                |
 
 Every consuming scenario checks exact delivery: each accepted job is processed
 exactly once (three times in `retry`). A run that loses or duplicates a job fails

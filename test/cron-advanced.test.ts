@@ -24,10 +24,14 @@ describe('Cron Advanced - Embedded', () => {
 
     const completedJobs: string[] = [];
 
-    await queue.upsertJobScheduler('repeat-1s', { every: 1000 }, {
-      name: 'tick',
-      data: { source: 'repeat' },
-    });
+    await queue.upsertJobScheduler(
+      'repeat-1s',
+      { every: 1000 },
+      {
+        name: 'tick',
+        data: { source: 'repeat' },
+      }
+    );
 
     const worker = new Worker(
       'cron-adv-repeat',
@@ -57,16 +61,24 @@ describe('Cron Advanced - Embedded', () => {
     const completedJobs: string[] = [];
 
     // Create scheduler with slow interval (5s)
-    await queue.upsertJobScheduler('upsert-sched', { every: 5000 }, {
-      name: 'slow',
-      data: { version: 1 },
-    });
+    await queue.upsertJobScheduler(
+      'upsert-sched',
+      { every: 5000 },
+      {
+        name: 'slow',
+        data: { version: 1 },
+      }
+    );
 
     // Upsert same ID with fast interval (1s)
-    await queue.upsertJobScheduler('upsert-sched', { every: 1000 }, {
-      name: 'fast',
-      data: { version: 2 },
-    });
+    await queue.upsertJobScheduler(
+      'upsert-sched',
+      { every: 1000 },
+      {
+        name: 'fast',
+        data: { version: 2 },
+      }
+    );
 
     const worker = new Worker(
       'cron-adv-upsert',
@@ -95,10 +107,14 @@ describe('Cron Advanced - Embedded', () => {
 
     const completedJobs: string[] = [];
 
-    await queue.upsertJobScheduler('remove-sched', { every: 500 }, {
-      name: 'removable',
-      data: { source: 'remove-test' },
-    });
+    await queue.upsertJobScheduler(
+      'remove-sched',
+      { every: 500 },
+      {
+        name: 'removable',
+        data: { source: 'remove-test' },
+      }
+    );
 
     const worker = new Worker(
       'cron-adv-remove',
@@ -139,15 +155,23 @@ describe('Cron Advanced - Embedded', () => {
     const fastJobs: string[] = [];
     const slowJobs: string[] = [];
 
-    await queue.upsertJobScheduler('fast', { every: 500 }, {
-      name: 'fast-job',
-      data: { scheduler: 'fast' },
-    });
+    await queue.upsertJobScheduler(
+      'fast',
+      { every: 500 },
+      {
+        name: 'fast-job',
+        data: { scheduler: 'fast' },
+      }
+    );
 
-    await queue.upsertJobScheduler('slow', { every: 2000 }, {
-      name: 'slow-job',
-      data: { scheduler: 'slow' },
-    });
+    await queue.upsertJobScheduler(
+      'slow',
+      { every: 2000 },
+      {
+        name: 'slow-job',
+        data: { scheduler: 'slow' },
+      }
+    );
 
     const worker = new Worker(
       'cron-adv-multi',
@@ -181,18 +205,30 @@ describe('Cron Advanced - Embedded', () => {
     const queue = new Queue('cron-adv-list', { embedded: true });
     queue.obliterate();
 
-    await queue.upsertJobScheduler('sched-a', { every: 60000 }, {
-      name: 'job-a',
-      data: { id: 'a' },
-    });
-    await queue.upsertJobScheduler('sched-b', { every: 60000 }, {
-      name: 'job-b',
-      data: { id: 'b' },
-    });
-    await queue.upsertJobScheduler('sched-c', { every: 60000 }, {
-      name: 'job-c',
-      data: { id: 'c' },
-    });
+    await queue.upsertJobScheduler(
+      'sched-a',
+      { every: 60000 },
+      {
+        name: 'job-a',
+        data: { id: 'a' },
+      }
+    );
+    await queue.upsertJobScheduler(
+      'sched-b',
+      { every: 60000 },
+      {
+        name: 'job-b',
+        data: { id: 'b' },
+      }
+    );
+    await queue.upsertJobScheduler(
+      'sched-c',
+      { every: 60000 },
+      {
+        name: 'job-c',
+        data: { id: 'c' },
+      }
+    );
 
     const schedulers = await queue.getJobSchedulers();
     const ids = schedulers.map((s) => s.id).sort();
@@ -215,10 +251,14 @@ describe('Cron Advanced - Embedded', () => {
     const queue = new Queue('cron-adv-template', { embedded: true });
     queue.obliterate();
 
-    await queue.upsertJobScheduler('template-sched', { every: 500 }, {
-      name: 'report',
-      data: { type: 'daily' },
-    });
+    await queue.upsertJobScheduler(
+      'template-sched',
+      { every: 500 },
+      {
+        name: 'report',
+        data: { type: 'daily' },
+      }
+    );
 
     let receivedName = '';
     let receivedData: unknown = null;

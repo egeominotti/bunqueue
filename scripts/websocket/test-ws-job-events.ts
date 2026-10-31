@@ -12,20 +12,35 @@ let passed = 0;
 let failed = 0;
 
 function ok(condition: boolean, msg: string): void {
-  if (condition) { console.log(`   ✅ ${msg}`); passed++; }
-  else { console.log(`   ❌ ${msg}`); failed++; }
+  if (condition) {
+    console.log(`   ✅ ${msg}`);
+    passed++;
+  } else {
+    console.log(`   ❌ ${msg}`);
+    failed++;
+  }
 }
 
 async function connectWs(): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(WS_URL);
     const t = setTimeout(() => reject(new Error('WS connect timeout')), 5000);
-    ws.addEventListener('open', () => { clearTimeout(t); resolve(ws); });
-    ws.addEventListener('error', (e) => { clearTimeout(t); reject(e); });
+    ws.addEventListener('open', () => {
+      clearTimeout(t);
+      resolve(ws);
+    });
+    ws.addEventListener('error', (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
   });
 }
 
-async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Promise<Record<string, unknown>> {
+async function waitEvent(
+  ws: WebSocket,
+  eventName: string,
+  timeoutMs = 5000
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       ws.removeEventListener('message', handler);
@@ -39,7 +54,9 @@ async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 5000): Pr
           ws.removeEventListener('message', handler);
           resolve(parsed);
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     }
     ws.addEventListener('message', handler);
   });
@@ -54,7 +71,10 @@ async function api(method: string, path: string, body?: unknown): Promise<Record
   return res.json() as Promise<Record<string, unknown>>;
 }
 
-async function pushJob(data: unknown = { x: 1 }, opts: Record<string, unknown> = {}): Promise<string> {
+async function pushJob(
+  data: unknown = { x: 1 },
+  opts: Record<string, unknown> = {}
+): Promise<string> {
   const res = await api('POST', `/queues/${Q}/jobs`, { data, ...opts });
   return res.id as string;
 }
@@ -92,10 +112,15 @@ async function main() {
     const ep = waitEvent(ws, 'job:pushed');
     await pushJob();
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
     ok(typeof (ev.data as Record<string, unknown>).jobId === 'string', 'has jobId');
     ok(typeof ev.ts === 'number', 'has timestamp');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 2. job:active
   console.log('\n2. job:active');
@@ -105,8 +130,13 @@ async function main() {
     const ep = waitEvent(ws, 'job:active');
     await pullJob();
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 3. job:completed
   console.log('\n3. job:completed');
@@ -117,8 +147,13 @@ async function main() {
     const ep = waitEvent(ws, 'job:completed');
     await api('POST', `/jobs/${id}/ack`, { result: { done: true } });
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 4. job:failed
   console.log('\n4. job:failed');
@@ -129,9 +164,14 @@ async function main() {
     const ep = waitEvent(ws, 'job:failed');
     await api('POST', `/jobs/${id}/fail`, { error: 'test failure' });
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
     ok(typeof (ev.data as Record<string, unknown>).error === 'string', 'has error');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 5. job:removed
   console.log('\n5. job:removed');
@@ -141,8 +181,13 @@ async function main() {
     const ep = waitEvent(ws, 'job:removed');
     await api('DELETE', `/jobs/${id}`);
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).jobId === id, `jobId=${(ev.data as Record<string, unknown>).jobId}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).jobId === id,
+      `jobId=${(ev.data as Record<string, unknown>).jobId}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 6. job:promoted
   console.log('\n6. job:promoted');
@@ -153,7 +198,9 @@ async function main() {
     await api('POST', `/jobs/${id}/promote`);
     const ev = await ep;
     ok(typeof (ev.data as Record<string, unknown>).jobId === 'string', 'has jobId');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 7. job:progress
   console.log('\n7. job:progress');
@@ -164,8 +211,13 @@ async function main() {
     const ep = waitEvent(ws, 'job:progress');
     await api('POST', `/jobs/${id}/progress`, { progress: 50 });
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).progress !== undefined, `progress=${(ev.data as Record<string, unknown>).progress}`);
-  } catch (e) { ok(false, `${e}`); }
+    ok(
+      (ev.data as Record<string, unknown>).progress !== undefined,
+      `progress=${(ev.data as Record<string, unknown>).progress}`
+    );
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 8. job:discarded
   console.log('\n8. job:discarded');
@@ -176,7 +228,9 @@ async function main() {
     await api('POST', `/jobs/${id}/discard`);
     const ev = await ep;
     ok(typeof (ev.data as Record<string, unknown>).jobId === 'string', 'has jobId');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 9. job:priority-changed
   console.log('\n9. job:priority-changed');
@@ -187,7 +241,9 @@ async function main() {
     await api('PUT', `/jobs/${id}/priority`, { priority: 99 });
     const ev = await ep;
     ok(typeof (ev.data as Record<string, unknown>).jobId === 'string', 'has jobId');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 10. job:data-updated
   console.log('\n10. job:data-updated');
@@ -198,7 +254,9 @@ async function main() {
     await api('PUT', `/jobs/${id}/data`, { data: { updated: true } });
     const ev = await ep;
     ok(typeof (ev.data as Record<string, unknown>).jobId === 'string', 'has jobId');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 11. job:delay-changed
   console.log('\n11. job:delay-changed');
@@ -210,7 +268,9 @@ async function main() {
     await api('PUT', `/jobs/${id}/delay`, { delay: 5000 });
     const ev = await ep;
     ok(typeof (ev.data as Record<string, unknown>).jobId === 'string', 'has jobId');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 12. queue:counts auto-emitted on state change
   console.log('\n12. queue:counts (auto-emitted)');
@@ -219,9 +279,14 @@ async function main() {
     const ep = waitEvent(ws, 'queue:counts');
     await pushJob();
     const ev = await ep;
-    ok((ev.data as Record<string, unknown>).queue === Q, `queue=${(ev.data as Record<string, unknown>).queue}`);
+    ok(
+      (ev.data as Record<string, unknown>).queue === Q,
+      `queue=${(ev.data as Record<string, unknown>).queue}`
+    );
     ok(typeof (ev.data as Record<string, unknown>).waiting === 'number', 'has waiting count');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   ws.close();
   await cleanup();
@@ -234,4 +299,7 @@ function printSummary() {
   if (failed > 0) process.exit(1);
 }
 
-main().catch((err) => { console.error('Fatal:', err); process.exit(1); });
+main().catch((err) => {
+  console.error('Fatal:', err);
+  process.exit(1);
+});

@@ -31,8 +31,11 @@ bun run format:check
 
 `typecheck` runs Bun's built-in type checker (`bun check`) and `format:check`
 runs Bun's built-in formatter (`bun fmt --check`, configured in the `[fmt]`
-section of `bunfig.toml`). The pre-commit hook runs both. There is no separate
-linter.
+section of `bunfig.toml`). The pre-commit hook and CI run both. They cover
+`src`, `test`, `scripts`, `bench`, `examples` and `sdk/conformance`; the
+TypeScript SDK runs the same commands from `sdk/typescript`. These are the only
+type-check and format tools: do not add `tsc --noEmit`, ESLint, Prettier,
+Biome, oxlint or oxfmt, or lint-suppression comments. There is no linter.
 
 ## Code guidelines
 

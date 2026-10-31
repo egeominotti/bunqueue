@@ -406,9 +406,7 @@ describe('EventsManager - extended', () => {
         capturedExtra = extra;
       };
 
-      em.broadcast(
-        makeEvent(EventType.Failed, { error: 'timeout', data: { attempt: 3 } })
-      );
+      em.broadcast(makeEvent(EventType.Failed, { error: 'timeout', data: { attempt: 3 } }));
       await Bun.sleep(10);
 
       expect(capturedExtra).toBeDefined();

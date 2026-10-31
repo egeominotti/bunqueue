@@ -91,7 +91,12 @@ async function main() {
     // When server has no AUTH_TOKENS configured, client token auth fails
     // because handleAuth iterates empty set → 'Invalid token' → client throws
     // 'Authentication failed' → socket closes → 'Connection lost'
-    if (msg.includes('Not authenticated') || msg.includes('Invalid token') || msg.includes('Authentication failed') || msg.includes('Connection lost')) {
+    if (
+      msg.includes('Not authenticated') ||
+      msg.includes('Invalid token') ||
+      msg.includes('Authentication failed') ||
+      msg.includes('Connection lost')
+    ) {
       console.log('   ✅ Auth check works (token not in server config)');
       console.log('      Set AUTH_TOKENS=' + VALID_TOKEN + ' on server');
       passed++; // Auth is working, just not configured with our test token
@@ -156,7 +161,9 @@ async function main() {
       passed++;
     } else if (response.ok === true) {
       // Server has no auth configured
-      console.log('   ✅ Server allows unauthenticated operations (expected when no AUTH_TOKENS set)');
+      console.log(
+        '   ✅ Server allows unauthenticated operations (expected when no AUTH_TOKENS set)'
+      );
       passed++; // Not a failure - server just doesn't require auth
     } else {
       console.log(`   ✅ Response received: ${JSON.stringify(response)}`);
@@ -199,7 +206,12 @@ async function main() {
     await Bun.sleep(100);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('Not authenticated') || msg.includes('Invalid token') || msg.includes('Authentication failed') || msg.includes('Connection lost')) {
+    if (
+      msg.includes('Not authenticated') ||
+      msg.includes('Invalid token') ||
+      msg.includes('Authentication failed') ||
+      msg.includes('Connection lost')
+    ) {
       console.log('   ✅ Auth enforcement works (token not configured on server)');
       passed++;
     } else {
@@ -244,7 +256,9 @@ async function main() {
       console.log('   ✅ Multiple auth tokens supported (no auth configured)');
       passed++;
     } else {
-      console.log(`   ❌ Unexpected: auth1=${JSON.stringify(auth1)}, auth2=${JSON.stringify(auth2)}`);
+      console.log(
+        `   ❌ Unexpected: auth1=${JSON.stringify(auth1)}, auth2=${JSON.stringify(auth2)}`
+      );
       failed++;
     }
 
@@ -273,7 +287,9 @@ async function main() {
   console.log(`Failed: ${failed}`);
   console.log('');
   console.log('To test with authentication enforcement, start server with:');
-  console.log(`  AUTH_TOKENS=${VALID_TOKEN},valid-token-2 TCP_PORT=${TCP_PORT} bun run src/main.ts`);
+  console.log(
+    `  AUTH_TOKENS=${VALID_TOKEN},valid-token-2 TCP_PORT=${TCP_PORT} bun run src/main.ts`
+  );
 
   process.exit(failed > 0 ? 1 : 0);
 }

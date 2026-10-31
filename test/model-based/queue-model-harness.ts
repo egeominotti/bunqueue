@@ -8,13 +8,7 @@ import { assertAggregateCounts, assertInternalCollections } from './queue-model-
 import { startModelBroker, stopModelBroker, type StartedModelBroker } from './queue-model-broker';
 
 export type ModelState =
-  | 'waiting'
-  | 'prioritized'
-  | 'waiting-children'
-  | 'delayed'
-  | 'active'
-  | 'completed'
-  | 'failed';
+  'waiting' | 'prioritized' | 'waiting-children' | 'delayed' | 'active' | 'completed' | 'failed';
 
 export interface ModelJob {
   attempts: number;

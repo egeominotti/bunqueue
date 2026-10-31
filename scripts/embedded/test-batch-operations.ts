@@ -59,10 +59,14 @@ async function main() {
   console.log('\n3. Testing CONCURRENT PROCESSING...');
   try {
     const processed = new Set<number>();
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async (job) => {
-      processed.add(job.data.index);
-      return { processed: job.data.index };
-    }, { concurrency: 10, embedded: true });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        processed.add(job.data.index);
+        return { processed: job.data.index };
+      },
+      { concurrency: 10, embedded: true }
+    );
 
     // Wait for all jobs to be processed
     const start = Date.now();
@@ -95,10 +99,14 @@ async function main() {
     await queue.addBulk(jobs);
 
     const order: number[] = [];
-    const worker = new Worker<{ index: number }>(QUEUE_NAME, async (job) => {
-      order.push(job.data.index);
-      return {};
-    }, { concurrency: 1, embedded: true });
+    const worker = new Worker<{ index: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        order.push(job.data.index);
+        return {};
+      },
+      { concurrency: 1, embedded: true }
+    );
 
     await Bun.sleep(500);
     await worker.close();

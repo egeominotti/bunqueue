@@ -88,7 +88,7 @@ describe('Client Pipelining', () => {
       connection: {
         host: 'localhost',
         port: 6789,
-        maxInFlight: 10 // Low limit
+        maxInFlight: 10, // Low limit
       },
     });
 
@@ -192,7 +192,9 @@ describe('Client Pipelining', () => {
 
     expect(results.length).toBe(iterations);
 
-    console.log(`  ${iterations} ops pipelined: ${elapsed}ms (${opsPerSec.toLocaleString()} ops/sec)`);
+    console.log(
+      `  ${iterations} ops pipelined: ${elapsed}ms (${opsPerSec.toLocaleString()} ops/sec)`
+    );
 
     // Should be reasonably fast with pipelining (> 1000 ops/sec at minimum)
     expect(opsPerSec).toBeGreaterThan(1000);

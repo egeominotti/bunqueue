@@ -35,7 +35,8 @@ const YIELD_EVERY = 500;
 
 async function fibonacci(n: number): Promise<number> {
   if (n <= 1) return n;
-  let a = 0, b = 1;
+  let a = 0,
+    b = 1;
   for (let i = 2; i <= n; i++) {
     const t = a + b;
     a = b;
@@ -165,7 +166,9 @@ async function main() {
 
   await queue.addBulk(jobs);
   const pushDuration = Date.now() - pushStart;
-  console.log(`✅ Pushed ${TOTAL_JOBS} jobs in ${pushDuration}ms (${Math.round(TOTAL_JOBS / (pushDuration / 1000))} jobs/s)\n`);
+  console.log(
+    `✅ Pushed ${TOTAL_JOBS} jobs in ${pushDuration}ms (${Math.round(TOTAL_JOBS / (pushDuration / 1000))} jobs/s)\n`
+  );
 
   // ---------- Worker ----------
   let completed = 0;
@@ -218,7 +221,7 @@ async function main() {
       connection: TCP_OPTS,
       useLocks: false,
       heartbeatInterval: 0,
-    },
+    }
   );
 
   worker.on('completed', () => {
@@ -229,8 +232,12 @@ async function main() {
       const avgCpu = (totalCpuMs / completed).toFixed(0);
       const avgDelay = (totalDelayMs / completed).toFixed(0);
       const pct = ((completed / TOTAL_JOBS) * 100).toFixed(0);
-      const bar = '█'.repeat(Math.floor(completed / TOTAL_JOBS * 30)) + '░'.repeat(30 - Math.floor(completed / TOTAL_JOBS * 30));
-      console.log(`  [${bar}] ${pct}% | ${completed}/${TOTAL_JOBS} | ${elapsed}s | ${rate} jobs/s | cpu ${avgCpu}ms | delay ${avgDelay}ms`);
+      const bar =
+        '█'.repeat(Math.floor((completed / TOTAL_JOBS) * 30)) +
+        '░'.repeat(30 - Math.floor((completed / TOTAL_JOBS) * 30));
+      console.log(
+        `  [${bar}] ${pct}% | ${completed}/${TOTAL_JOBS} | ${elapsed}s | ${rate} jobs/s | cpu ${avgCpu}ms | delay ${avgDelay}ms`
+      );
     }
   });
 
@@ -257,7 +264,9 @@ async function main() {
   console.log(`║  Completed:        ${completed.toString().padEnd(29)}║`);
   console.log(`║  Failed:           ${failed.toString().padEnd(29)}║`);
   console.log(`║  Total time:       ${(totalTime + 's').padEnd(29)}║`);
-  console.log(`║  Throughput:       ${(completed / parseFloat(totalTime)).toFixed(1).padEnd(25) + ' j/s '}║`);
+  console.log(
+    `║  Throughput:       ${(completed / parseFloat(totalTime)).toFixed(1).padEnd(25) + ' j/s '}║`
+  );
   console.log(`║  Avg CPU/job:      ${((totalCpuMs / completed).toFixed(0) + 'ms').padEnd(29)}║`);
   console.log(`║  Avg delay/job:    ${((totalDelayMs / completed).toFixed(0) + 'ms').padEnd(29)}║`);
   console.log(`║  Concurrency:      ${WORKER_CONCURRENCY.toString().padEnd(29)}║`);

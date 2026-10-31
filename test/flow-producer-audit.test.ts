@@ -69,14 +69,7 @@ describe('FlowProducer.addChain', () => {
     expect(ok).toBe(true);
 
     // Strict sequencing: each step ends before the next begins (no overlap).
-    expect(order).toEqual([
-      'start:s0',
-      'end:s0',
-      'start:s1',
-      'end:s1',
-      'start:s2',
-      'end:s2',
-    ]);
+    expect(order).toEqual(['start:s0', 'end:s0', 'start:s1', 'end:s1', 'start:s2', 'end:s2']);
 
     await worker.close();
     flow.close();
@@ -234,9 +227,9 @@ describe('FlowProducer.add — cross-queue parent linkage', () => {
     expect(order.filter((o) => o.startsWith('child:'))).toHaveLength(2);
 
     // getChildrenValues keyed by the CHILD queue
-    const vals = Object.values(parentChildren).map((v) => (v as { doubled: number }).doubled).sort(
-      (a, b) => a - b
-    );
+    const vals = Object.values(parentChildren)
+      .map((v) => (v as { doubled: number }).doubled)
+      .sort((a, b) => a - b);
     expect(vals).toEqual([20, 40]);
     const keys = Object.keys(parentChildren);
     expect(keys.every((k) => k.startsWith('xq-child:'))).toBe(true);
@@ -331,7 +324,9 @@ describe('FlowProducer.addBulkThen', () => {
     expect(ok).toBe(true);
 
     // The whole point of fan-in: the merge step should see all 3 results.
-    const ns = Object.values(finalChildren).map((v) => (v as { n: number }).n).sort();
+    const ns = Object.values(finalChildren)
+      .map((v) => (v as { n: number }).n)
+      .sort();
     expect(ns).toEqual([1, 2, 3]);
 
     await worker.close();
@@ -475,8 +470,18 @@ describe('FlowProducer.addBulk', () => {
     );
 
     const nodes = await flow.addBulk([
-      { name: 'p1', queueName: 'audit-bulk', data: {}, children: [{ name: 'c1', queueName: 'audit-bulk', data: {} }] },
-      { name: 'p2', queueName: 'audit-bulk', data: {}, children: [{ name: 'c2', queueName: 'audit-bulk', data: {} }] },
+      {
+        name: 'p1',
+        queueName: 'audit-bulk',
+        data: {},
+        children: [{ name: 'c1', queueName: 'audit-bulk', data: {} }],
+      },
+      {
+        name: 'p2',
+        queueName: 'audit-bulk',
+        data: {},
+        children: [{ name: 'c2', queueName: 'audit-bulk', data: {} }],
+      },
     ]);
     expect(nodes).toHaveLength(2);
 

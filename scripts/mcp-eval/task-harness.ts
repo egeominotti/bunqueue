@@ -82,8 +82,7 @@ export async function openTaskHarness(mode: EvalMode, env: Record<string, string
         responseBytes += bytes;
         const text = (result.content as Array<{ type: string; text?: string }>)[0]?.text;
         const envelope = result.structuredContent as
-          | { outcome: string; data: Record<string, unknown> }
-          | undefined;
+          { outcome: string; data: Record<string, unknown> } | undefined;
         let legacy: Record<string, unknown> = {};
         if (!envelope && text) {
           try {

@@ -10,20 +10,35 @@ let passed = 0;
 let failed = 0;
 
 function ok(condition: boolean, msg: string): void {
-  if (condition) { console.log(`   ✅ ${msg}`); passed++; }
-  else { console.log(`   ❌ ${msg}`); failed++; }
+  if (condition) {
+    console.log(`   ✅ ${msg}`);
+    passed++;
+  } else {
+    console.log(`   ❌ ${msg}`);
+    failed++;
+  }
 }
 
 async function connectWs(): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(WS_URL);
     const t = setTimeout(() => reject(new Error('WS connect timeout')), 5000);
-    ws.addEventListener('open', () => { clearTimeout(t); resolve(ws); });
-    ws.addEventListener('error', (e) => { clearTimeout(t); reject(e); });
+    ws.addEventListener('open', () => {
+      clearTimeout(t);
+      resolve(ws);
+    });
+    ws.addEventListener('error', (e) => {
+      clearTimeout(t);
+      reject(e);
+    });
   });
 }
 
-async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 15000): Promise<Record<string, unknown>> {
+async function waitEvent(
+  ws: WebSocket,
+  eventName: string,
+  timeoutMs = 15000
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       ws.removeEventListener('message', handler);
@@ -37,7 +52,9 @@ async function waitEvent(ws: WebSocket, eventName: string, timeoutMs = 15000): P
           ws.removeEventListener('message', handler);
           resolve(parsed);
         }
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
     }
     ws.addEventListener('message', handler);
   });
@@ -65,7 +82,9 @@ async function main() {
     ok(typeof data.waiting === 'number', `waiting=${data.waiting}`);
     ok(typeof data.totalPushed === 'number', `totalPushed=${data.totalPushed}`);
     ok(data.queues !== undefined, 'has queues breakdown');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 2. health:status (every ~10s)
   console.log('\n2. health:status (waiting up to 12s)');
@@ -75,7 +94,9 @@ async function main() {
     ok(typeof data.ok === 'boolean', `ok=${data.ok}`);
     ok(typeof data.uptime === 'number', `uptime=${data.uptime}`);
     ok(data.memory !== undefined, 'has memory info');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   // 3. storage:status (every ~30s) — use shorter timeout, may not fire in CI
   console.log('\n3. storage:status (waiting up to 35s)');
@@ -83,7 +104,9 @@ async function main() {
     const ev = await waitEvent(ws, 'storage:status', 36000);
     const data = ev.data as Record<string, unknown>;
     ok(data.collections !== undefined, 'has collections info');
-  } catch (e) { ok(false, `${e}`); }
+  } catch (e) {
+    ok(false, `${e}`);
+  }
 
   ws.close();
   printSummary();
@@ -95,4 +118,7 @@ function printSummary() {
   if (failed > 0) process.exit(1);
 }
 
-main().catch((err) => { console.error('Fatal:', err); process.exit(1); });
+main().catch((err) => {
+  console.error('Fatal:', err);
+  process.exit(1);
+});

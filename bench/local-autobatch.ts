@@ -9,7 +9,13 @@
 import { Queue } from '../src/client';
 
 const PORT = 16789;
-const CONNECTION = { host: 'localhost', port: PORT, poolSize: 4, pingInterval: 0, commandTimeout: 30000 };
+const CONNECTION = {
+  host: 'localhost',
+  port: PORT,
+  poolSize: 4,
+  pingInterval: 0,
+  commandTimeout: 30000,
+};
 
 const PAYLOAD = { type: 'email', to: 'user@test.com', body: 'hello' };
 

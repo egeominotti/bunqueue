@@ -81,9 +81,7 @@ describe('Issue #31 - Parent result in chained jobs', () => {
         };
 
         if (data.__flowParentId) {
-          const parentResult = flow.getParentResult<{ value: number }>(
-            data.__flowParentId
-          );
+          const parentResult = flow.getParentResult<{ value: number }>(data.__flowParentId);
           if (parentResult === undefined) {
             failures.push(
               `Chain ${data.chainId} step ${data.step}: parent result undefined (parentId: ${data.__flowParentId})`

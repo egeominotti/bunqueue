@@ -73,10 +73,14 @@ async function main() {
     await queue.add('process-test', { value: 1 }, { jobId: 'process-key' });
 
     let processed = false;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async () => {
-      processed = true;
-      return { done: true };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async () => {
+        processed = true;
+        return { done: true };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -125,10 +129,14 @@ async function main() {
     await queue.add('process-unique', { value: 1 }, { jobId: 'process-key-5' });
 
     let processed = false;
-    const worker = new Worker<{ value: number }>(QUEUE_NAME, async (job) => {
-      processed = true;
-      return { value: (job.data as { value: number }).value * 2 };
-    }, { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false });
+    const worker = new Worker<{ value: number }>(
+      QUEUE_NAME,
+      async (job) => {
+        processed = true;
+        return { value: (job.data as { value: number }).value * 2 };
+      },
+      { concurrency: 1, connection: { port: TCP_PORT }, useLocks: false }
+    );
 
     await Bun.sleep(1000);
     await worker.close();

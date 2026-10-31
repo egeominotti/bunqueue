@@ -40,19 +40,27 @@ async function main() {
     const retryTimes: number[] = [];
     let lastTime = Date.now();
 
-    const worker = new Worker(QUEUE_NAME, async () => {
-      const now = Date.now();
-      if (attempts > 0) retryTimes.push(now - lastTime);
-      lastTime = now;
-      attempts++;
-      if (attempts < 3) throw new Error('Retry please');
-      return { done: true };
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      QUEUE_NAME,
+      async () => {
+        const now = Date.now();
+        if (attempts > 0) retryTimes.push(now - lastTime);
+        lastTime = now;
+        attempts++;
+        if (attempts < 3) throw new Error('Retry please');
+        return { done: true };
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 100 },
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 100 },
+      }
+    );
 
     await Bun.sleep(2000);
     await worker.close();
@@ -62,7 +70,9 @@ async function main() {
     } else {
       const allInRange = retryTimes.every((d) => d >= 80 && d <= 500);
       if (allInRange) {
-        ok(`Fixed backoff: ${attempts} attempts, delays: ${retryTimes.map((d) => `${d}ms`).join(', ')}`);
+        ok(
+          `Fixed backoff: ${attempts} attempts, delays: ${retryTimes.map((d) => `${d}ms`).join(', ')}`
+        );
       } else {
         fail(`Fixed delay out of range: ${retryTimes.join(', ')}ms`);
       }
@@ -83,19 +93,27 @@ async function main() {
     const retryTimes: number[] = [];
     let lastTime = Date.now();
 
-    const worker = new Worker(QUEUE_NAME, async () => {
-      const now = Date.now();
-      if (attempts > 0) retryTimes.push(now - lastTime);
-      lastTime = now;
-      attempts++;
-      if (attempts < 4) throw new Error('Retry please');
-      return { done: true };
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      QUEUE_NAME,
+      async () => {
+        const now = Date.now();
+        if (attempts > 0) retryTimes.push(now - lastTime);
+        lastTime = now;
+        attempts++;
+        if (attempts < 4) throw new Error('Retry please');
+        return { done: true };
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 4,
-      backoff: { type: 'exponential', delay: 50 },
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 4,
+        backoff: { type: 'exponential', delay: 50 },
+      }
+    );
 
     await Bun.sleep(3000);
     await worker.close();
@@ -105,7 +123,9 @@ async function main() {
     } else if (retryTimes.length >= 2) {
       const firstDelay = retryTimes[0];
       const lastDelay = retryTimes[retryTimes.length - 1];
-      ok(`Exponential backoff: delays ${retryTimes.map((d) => `${d}ms`).join(', ')} (${lastDelay >= firstDelay ? 'increasing' : 'timing variance'})`);
+      ok(
+        `Exponential backoff: delays ${retryTimes.map((d) => `${d}ms`).join(', ')} (${lastDelay >= firstDelay ? 'increasing' : 'timing variance'})`
+      );
     } else {
       fail(`Not enough retry data: ${retryTimes.length} entries`);
     }
@@ -123,15 +143,23 @@ async function main() {
 
     let attempts = 0;
 
-    const worker = new Worker(QUEUE_NAME, async () => {
-      attempts++;
-      throw new Error('Always fail');
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      QUEUE_NAME,
+      async () => {
+        attempts++;
+        throw new Error('Always fail');
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 50 },
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 50 },
+      }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -155,16 +183,24 @@ async function main() {
 
     const seenData: number[] = [];
 
-    const worker = new Worker(QUEUE_NAME, async (job) => {
-      seenData.push((job.data as { value: number }).value);
-      if (seenData.length < 3) throw new Error('Retry');
-      return { done: true };
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      QUEUE_NAME,
+      async (job) => {
+        seenData.push((job.data as { value: number }).value);
+        if (seenData.length < 3) throw new Error('Retry');
+        return { done: true };
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
-    await queue.add('test', { value: 42 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 50 },
-    });
+    await queue.add(
+      'test',
+      { value: 42 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 50 },
+      }
+    );
 
     await Bun.sleep(1500);
     await worker.close();
@@ -190,16 +226,24 @@ async function main() {
     let attempts = 0;
     const startTime = Date.now();
 
-    const worker = new Worker(QUEUE_NAME, async () => {
-      attempts++;
-      if (attempts < 3) throw new Error('Retry');
-      return { done: true };
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      QUEUE_NAME,
+      async () => {
+        attempts++;
+        if (attempts < 3) throw new Error('Retry');
+        return { done: true };
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 0 },
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 0 },
+      }
+    );
 
     await Bun.sleep(1000);
     await worker.close();
@@ -223,15 +267,23 @@ async function main() {
 
     let attempts = 0;
 
-    const worker = new Worker(QUEUE_NAME, async () => {
-      attempts++;
-      return { success: true };
-    }, { concurrency: 1, connection: connOpts, useLocks: false });
+    const worker = new Worker(
+      QUEUE_NAME,
+      async () => {
+        attempts++;
+        return { success: true };
+      },
+      { concurrency: 1, connection: connOpts, useLocks: false }
+    );
 
-    await queue.add('test', { value: 1 }, {
-      attempts: 3,
-      backoff: { type: 'fixed', delay: 1000 },
-    });
+    await queue.add(
+      'test',
+      { value: 1 },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 1000 },
+      }
+    );
 
     await Bun.sleep(500);
     await worker.close();

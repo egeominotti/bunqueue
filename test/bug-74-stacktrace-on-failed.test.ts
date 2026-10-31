@@ -71,10 +71,18 @@ describe('Bug #74 - Stacktrace on failed job', () => {
       'bug-74-limit-test',
       async () => {
         // Create a deep call stack
-        function a() { return b(); }
-        function b() { return c(); }
-        function c() { return d(); }
-        function d() { throw new Error('Deep error'); }
+        function a() {
+          return b();
+        }
+        function b() {
+          return c();
+        }
+        function c() {
+          return d();
+        }
+        function d() {
+          throw new Error('Deep error');
+        }
         a();
       },
       { embedded: true, autorun: false }

@@ -23,30 +23,80 @@ let backend: EmbeddedBackend;
 let server: McpServer;
 let handlerRegistry: HttpHandlerRegistry;
 const EXPECTED_TOOLS = [
-  'bunqueue_add_job', 'bunqueue_add_jobs_bulk', 'bunqueue_get_job', 'bunqueue_get_job_state',
-  'bunqueue_get_job_result', 'bunqueue_cancel_job', 'bunqueue_promote_job',
-  'bunqueue_update_progress', 'bunqueue_get_children_values', 'bunqueue_get_job_by_custom_id',
-  'bunqueue_wait_for_job', 'bunqueue_update_job_data', 'bunqueue_change_job_priority',
-  'bunqueue_move_to_delayed', 'bunqueue_discard_job', 'bunqueue_get_progress',
-  'bunqueue_change_delay', 'bunqueue_pull_job', 'bunqueue_pull_job_batch', 'bunqueue_ack_job',
-  'bunqueue_ack_job_batch', 'bunqueue_fail_job', 'bunqueue_job_heartbeat',
-  'bunqueue_job_heartbeat_batch', 'bunqueue_extend_lock', 'bunqueue_list_queues',
-  'bunqueue_count_jobs', 'bunqueue_get_jobs', 'bunqueue_get_job_counts',
-  'bunqueue_pause_queue', 'bunqueue_resume_queue', 'bunqueue_drain_queue',
-  'bunqueue_obliterate_queue', 'bunqueue_clean_queue', 'bunqueue_is_paused',
-  'bunqueue_get_counts_per_priority', 'bunqueue_get_dlq', 'bunqueue_get_dlq_stats',
-  'bunqueue_retry_dlq', 'bunqueue_purge_dlq', 'bunqueue_retry_completed',
-  'bunqueue_set_rate_limit', 'bunqueue_clear_rate_limit', 'bunqueue_set_concurrency',
-  'bunqueue_clear_concurrency', 'bunqueue_get_queue_limits',
-  'bunqueue_add_cron', 'bunqueue_list_crons', 'bunqueue_get_cron', 'bunqueue_delete_cron',
-  'bunqueue_add_webhook', 'bunqueue_remove_webhook', 'bunqueue_list_webhooks',
-  'bunqueue_set_webhook_enabled', 'bunqueue_register_worker', 'bunqueue_unregister_worker',
-  'bunqueue_worker_heartbeat', 'bunqueue_get_stats', 'bunqueue_get_queue_stats',
-  'bunqueue_list_workers', 'bunqueue_get_job_logs', 'bunqueue_add_job_log',
-  'bunqueue_get_storage_status', 'bunqueue_get_per_queue_stats', 'bunqueue_get_memory_stats',
-  'bunqueue_get_prometheus_metrics', 'bunqueue_clear_job_logs', 'bunqueue_compact_memory',
-  'bunqueue_add_flow', 'bunqueue_add_flow_chain', 'bunqueue_add_flow_bulk_then',
-  'bunqueue_get_flow', 'bunqueue_register_handler', 'bunqueue_unregister_handler',
+  'bunqueue_add_job',
+  'bunqueue_add_jobs_bulk',
+  'bunqueue_get_job',
+  'bunqueue_get_job_state',
+  'bunqueue_get_job_result',
+  'bunqueue_cancel_job',
+  'bunqueue_promote_job',
+  'bunqueue_update_progress',
+  'bunqueue_get_children_values',
+  'bunqueue_get_job_by_custom_id',
+  'bunqueue_wait_for_job',
+  'bunqueue_update_job_data',
+  'bunqueue_change_job_priority',
+  'bunqueue_move_to_delayed',
+  'bunqueue_discard_job',
+  'bunqueue_get_progress',
+  'bunqueue_change_delay',
+  'bunqueue_pull_job',
+  'bunqueue_pull_job_batch',
+  'bunqueue_ack_job',
+  'bunqueue_ack_job_batch',
+  'bunqueue_fail_job',
+  'bunqueue_job_heartbeat',
+  'bunqueue_job_heartbeat_batch',
+  'bunqueue_extend_lock',
+  'bunqueue_list_queues',
+  'bunqueue_count_jobs',
+  'bunqueue_get_jobs',
+  'bunqueue_get_job_counts',
+  'bunqueue_pause_queue',
+  'bunqueue_resume_queue',
+  'bunqueue_drain_queue',
+  'bunqueue_obliterate_queue',
+  'bunqueue_clean_queue',
+  'bunqueue_is_paused',
+  'bunqueue_get_counts_per_priority',
+  'bunqueue_get_dlq',
+  'bunqueue_get_dlq_stats',
+  'bunqueue_retry_dlq',
+  'bunqueue_purge_dlq',
+  'bunqueue_retry_completed',
+  'bunqueue_set_rate_limit',
+  'bunqueue_clear_rate_limit',
+  'bunqueue_set_concurrency',
+  'bunqueue_clear_concurrency',
+  'bunqueue_get_queue_limits',
+  'bunqueue_add_cron',
+  'bunqueue_list_crons',
+  'bunqueue_get_cron',
+  'bunqueue_delete_cron',
+  'bunqueue_add_webhook',
+  'bunqueue_remove_webhook',
+  'bunqueue_list_webhooks',
+  'bunqueue_set_webhook_enabled',
+  'bunqueue_register_worker',
+  'bunqueue_unregister_worker',
+  'bunqueue_worker_heartbeat',
+  'bunqueue_get_stats',
+  'bunqueue_get_queue_stats',
+  'bunqueue_list_workers',
+  'bunqueue_get_job_logs',
+  'bunqueue_add_job_log',
+  'bunqueue_get_storage_status',
+  'bunqueue_get_per_queue_stats',
+  'bunqueue_get_memory_stats',
+  'bunqueue_get_prometheus_metrics',
+  'bunqueue_clear_job_logs',
+  'bunqueue_compact_memory',
+  'bunqueue_add_flow',
+  'bunqueue_add_flow_chain',
+  'bunqueue_add_flow_bulk_then',
+  'bunqueue_get_flow',
+  'bunqueue_register_handler',
+  'bunqueue_unregister_handler',
   'bunqueue_list_handlers',
 ];
 type ToolMap = { _registeredTools: Record<string, unknown> };
@@ -58,15 +108,25 @@ beforeEach(() => {
   backend = new EmbeddedBackend();
   server = new McpServer({ name: 'test', version: '0.0.0' });
   handlerRegistry = new HttpHandlerRegistry();
-  registerJobTools(server, backend); registerJobMgmtTools(server, backend);
-  registerConsumptionTools(server, backend); registerQueueTools(server, backend);
-  registerDlqTools(server, backend); registerCronTools(server, backend);
-  registerRateLimitTools(server, backend); registerWebhookTools(server, backend);
-  registerWorkerMgmtTools(server, backend); registerMonitoringTools(server, backend);
-  registerFlowTools(server, backend); registerHandlerTools(server, handlerRegistry);
+  registerJobTools(server, backend);
+  registerJobMgmtTools(server, backend);
+  registerConsumptionTools(server, backend);
+  registerQueueTools(server, backend);
+  registerDlqTools(server, backend);
+  registerCronTools(server, backend);
+  registerRateLimitTools(server, backend);
+  registerWebhookTools(server, backend);
+  registerWorkerMgmtTools(server, backend);
+  registerMonitoringTools(server, backend);
+  registerFlowTools(server, backend);
+  registerHandlerTools(server, handlerRegistry);
   registerResources(server, backend);
 });
-afterEach(async () => { handlerRegistry.shutdown(); await Bun.sleep(50); backend.shutdown(); });
+afterEach(async () => {
+  handlerRegistry.shutdown();
+  await Bun.sleep(50);
+  backend.shutdown();
+});
 
 // 1. List tools returns all expected tools
 describe('MCP Tool Listing', () => {
@@ -108,7 +168,9 @@ describe('Invalid Queue Names', () => {
   });
   test('getJobCounts for non-existent queue returns all zeros', async () => {
     const c = await backend.getJobCounts('no-such-queue');
-    expect(c.waiting).toBe(0); expect(c.delayed).toBe(0); expect(c.active).toBe(0);
+    expect(c.waiting).toBe(0);
+    expect(c.delayed).toBe(0);
+    expect(c.active).toBe(0);
   });
   test('drainQueue on non-existent queue returns 0', async () => {
     expect(await backend.drainQueue('non-existent')).toBe(0);
@@ -162,7 +224,10 @@ describe('Multiple Rapid Tool Calls', () => {
   test('rapid add then pull returns correct count', async () => {
     await Promise.all(Array.from({ length: 20 }, (_, i) => backend.addJob('pr', `j-${i}`, { i })));
     const pulled: string[] = [];
-    for (let i = 0; i < 20; i++) { const j = await backend.pullJob('pr'); if (j) pulled.push(j.id); }
+    for (let i = 0; i < 20; i++) {
+      const j = await backend.pullJob('pr');
+      if (j) pulled.push(j.id);
+    }
     expect(pulled).toHaveLength(20);
   });
 });
@@ -175,7 +240,10 @@ describe('Empty Data Object', () => {
     expect(await backend.getJob(r.jobId)).not.toBeNull();
   });
   test('addJobsBulk with empty data and empty array', async () => {
-    const r = await backend.addJobsBulk('eb', [{ name: 'a', data: {} }, { name: 'b', data: {} }]);
+    const r = await backend.addJobsBulk('eb', [
+      { name: 'a', data: {} },
+      { name: 'b', data: {} },
+    ]);
     expect(r.jobIds).toHaveLength(2);
     expect((await backend.addJobsBulk('eb', [])).jobIds).toHaveLength(0);
   });
@@ -189,13 +257,21 @@ describe('Empty Data Object', () => {
 describe('MCP Resources', () => {
   test('all five resources are registered', () => {
     const names = Object.keys((server as unknown as ResMap)._registeredResources);
-    for (const u of ['bunqueue://stats', 'bunqueue://queues', 'bunqueue://crons',
-      'bunqueue://workers', 'bunqueue://webhooks']) expect(names).toContain(u);
+    for (const u of [
+      'bunqueue://stats',
+      'bunqueue://queues',
+      'bunqueue://crons',
+      'bunqueue://workers',
+      'bunqueue://webhooks',
+    ])
+      expect(names).toContain(u);
   });
   test('queues resource reflects added jobs', async () => {
-    await backend.addJob('ra', 'j1', {}); await backend.addJob('rb', 'j2', {});
+    await backend.addJob('ra', 'j1', {});
+    await backend.addJob('rb', 'j2', {});
     const q = await backend.listQueues();
-    expect(q).toContain('ra'); expect(q).toContain('rb');
+    expect(q).toContain('ra');
+    expect(q).toContain('rb');
     expect((await backend.getJobCounts('ra')).waiting).toBe(1);
   });
 });
@@ -203,12 +279,16 @@ describe('MCP Resources', () => {
 // 9-11. HTTP handler with invalid JSON / wrong content type / missing method (via withErrorHandler)
 describe('withErrorHandler Edge Cases', () => {
   test('wraps thrown Error into isError response', async () => {
-    const r = await withErrorHandler('test_throw', async () => { throw new Error('broke'); })({} as never);
+    const r = await withErrorHandler('test_throw', async () => {
+      throw new Error('broke');
+    })({} as never);
     expect(r.isError).toBe(true);
     expect(JSON.parse(r.content[0].text).error).toBe('broke');
   });
   test('wraps non-Error throw into isError response', async () => {
-    const r = await withErrorHandler('test_throw_str', async () => { throw 'str error'; })({} as never);
+    const r = await withErrorHandler('test_throw_str', async () => {
+      throw 'str error';
+    })({} as never);
     expect(r.isError).toBe(true);
     expect(JSON.parse(r.content[0].text).error).toBe('str error');
   });
@@ -224,14 +304,18 @@ describe('withErrorHandler Edge Cases', () => {
 // 10. HTTP handler edge cases
 describe('HTTP Handler Edge Cases', () => {
   test('register with invalid URL does not throw', () => {
-    expect(() => handlerRegistry.register('bad', { url: 'not-valid', method: 'GET' })).not.toThrow();
+    expect(() =>
+      handlerRegistry.register('bad', { url: 'not-valid', method: 'GET' })
+    ).not.toThrow();
     expect(handlerRegistry.list()).toHaveLength(1);
   });
   test('unregister non-existent returns false', () => {
     expect(handlerRegistry.unregister('ghost')).toBe(false);
   });
   test('list empty registry returns empty array', () => {
-    const r = new HttpHandlerRegistry(); expect(r.list()).toEqual([]); r.shutdown();
+    const r = new HttpHandlerRegistry();
+    expect(r.list()).toEqual([]);
+    r.shutdown();
   });
   test('shutdown clears all handlers', () => {
     handlerRegistry.register('q1', { url: 'http://localhost/a', method: 'GET' });
@@ -245,7 +329,8 @@ describe('HTTP Handler Edge Cases', () => {
 // 11. Backend lifecycle edge cases
 describe('Backend Lifecycle', () => {
   test('operations after obliterate return empty', async () => {
-    await backend.addJob('oq', 'j1', {}); await backend.addJob('oq', 'j2', {});
+    await backend.addJob('oq', 'j1', {});
+    await backend.addJob('oq', 'j2', {});
     await backend.obliterateQueue('oq');
     expect(await backend.countJobs('oq')).toBe(0);
     expect(await backend.getJobs('oq')).toHaveLength(0);

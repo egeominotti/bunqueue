@@ -30,9 +30,9 @@ function jobExistsInSqlite(jobId: string): boolean {
 function countJobsInSqlite(queue: string): number {
   const db = new Database(DB_PATH, { readonly: true });
   try {
-    const row = db.query<{ cnt: number }, [string]>(
-      'SELECT COUNT(*) as cnt FROM jobs WHERE queue = ?'
-    ).get(queue);
+    const row = db
+      .query<{ cnt: number }, [string]>('SELECT COUNT(*) as cnt FROM jobs WHERE queue = ?')
+      .get(queue);
     return row?.cnt ?? 0;
   } finally {
     db.close();
@@ -82,7 +82,9 @@ describe('Durable Jobs', () => {
     test('durable job with priority', async () => {
       qm = new QueueManager({ dataPath: DB_PATH });
       const job = await qm.push('durable-q', {
-        data: { task: 'priority' }, durable: true, priority: 10,
+        data: { task: 'priority' },
+        durable: true,
+        priority: 10,
       });
       expect(job.priority).toBe(10);
       expect(jobExistsInSqlite(job.id)).toBe(true);
@@ -92,7 +94,9 @@ describe('Durable Jobs', () => {
       qm = new QueueManager({ dataPath: DB_PATH });
       const before = Date.now();
       const job = await qm.push('durable-q', {
-        data: { task: 'delayed' }, durable: true, delay: 5000,
+        data: { task: 'delayed' },
+        durable: true,
+        delay: 5000,
       });
       expect(job.runAt).toBeGreaterThanOrEqual(before + 5000);
       expect(jobExistsInSqlite(job.id)).toBe(true);
@@ -102,7 +106,9 @@ describe('Durable Jobs', () => {
     test('durable job with custom ID', async () => {
       qm = new QueueManager({ dataPath: DB_PATH });
       const job = await qm.push('durable-q', {
-        data: {}, durable: true, customId: 'durable-custom-123',
+        data: {},
+        durable: true,
+        customId: 'durable-custom-123',
       });
       expect(job.id).toBe('durable-custom-123');
       expect(jobExistsInSqlite('durable-custom-123')).toBe(true);
@@ -174,7 +180,9 @@ describe('Durable Jobs', () => {
     test('durable job survives server restart with all properties', async () => {
       qm = new QueueManager({ dataPath: DB_PATH });
       const job = await qm.push('persist-q', {
-        data: { important: 'data', value: 42 }, durable: true, priority: 7,
+        data: { important: 'data', value: 42 },
+        durable: true,
+        priority: 7,
       });
       const jobId = job.id;
       qm.shutdown();
@@ -214,10 +222,14 @@ describe('Durable Jobs', () => {
     test('duplicate durable custom ID returns existing job and only one on disk', async () => {
       qm = new QueueManager({ dataPath: DB_PATH });
       const job1 = await qm.push('dedup-q', {
-        data: { msg: 'first' }, durable: true, customId: 'durable-dedup-id',
+        data: { msg: 'first' },
+        durable: true,
+        customId: 'durable-dedup-id',
       });
       const job2 = await qm.push('dedup-q', {
-        data: { msg: 'second' }, durable: true, customId: 'durable-dedup-id',
+        data: { msg: 'second' },
+        durable: true,
+        customId: 'durable-dedup-id',
       });
 
       expect(job2.id).toBe(job1.id);

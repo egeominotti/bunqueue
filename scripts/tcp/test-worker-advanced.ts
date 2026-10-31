@@ -33,7 +33,9 @@ async function main() {
   console.log('1. Testing Worker has rateLimit method...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     if (typeof worker.rateLimit === 'function') {
@@ -51,7 +53,9 @@ async function main() {
   console.log('\n2. Testing rateLimit APPLIES limiting...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     worker.rateLimit(1000);
@@ -71,7 +75,9 @@ async function main() {
   console.log('\n3. Testing isRateLimited FALSE initially...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     if (!worker.isRateLimited()) {
@@ -89,7 +95,9 @@ async function main() {
   console.log('\n4. Testing isRateLimited EXPIRES...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     worker.rateLimit(50);
@@ -114,7 +122,9 @@ async function main() {
   console.log('\n5. Testing Worker has startStalledCheckTimer...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     if (typeof worker.startStalledCheckTimer === 'function') {
@@ -132,7 +142,9 @@ async function main() {
   console.log('\n6. Testing startStalledCheckTimer NO THROW...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     try {
@@ -151,7 +163,9 @@ async function main() {
   console.log('\n7. Testing Worker has delay method...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     if (typeof worker.delay === 'function') {
@@ -169,7 +183,9 @@ async function main() {
   console.log('\n8. Testing delay(0) resolves immediately...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     const start = Date.now();
@@ -191,7 +207,9 @@ async function main() {
   console.log('\n9. Testing delay(100) waits...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     const start = Date.now();
@@ -213,7 +231,9 @@ async function main() {
   console.log('\n10. Testing delay ABORT...');
   {
     const worker = new Worker(queueName, async () => ({ done: true }), {
-      connection: connOpts, autorun: false, useLocks: false,
+      connection: connOpts,
+      autorun: false,
+      useLocks: false,
     });
 
     const abortController = new AbortController();

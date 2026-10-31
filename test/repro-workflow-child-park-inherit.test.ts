@@ -69,9 +69,13 @@ describe('a parent inherits a child parked mid-rollback', () => {
             throw new Error('warehouse refused the release');
           },
         })
-        .step('child-boom', async () => {
-          throw new Error('child failed');
-        }, { retry: 1 })
+        .step(
+          'child-boom',
+          async () => {
+            throw new Error('child failed');
+          },
+          { retry: 1 }
+        )
     );
     engine.register(
       new Workflow('inh-parent')
@@ -99,12 +103,18 @@ describe('a parent inherits a child parked mid-rollback', () => {
   test("a failed child leaves the parent's sub record settled, not in flight", async () => {
     engine = new Engine({ embedded: true });
     engine.register(
-      new Workflow('run-child').step('c', async () => {
-        throw new Error('child failed');
-      }, { retry: 1 })
+      new Workflow('run-child').step(
+        'c',
+        async () => {
+          throw new Error('child failed');
+        },
+        { retry: 1 }
+      )
     );
     engine.register(
-      new Workflow('run-parent').subWorkflow('run-child', () => ({})).step('after', async () => ({}))
+      new Workflow('run-parent')
+        .subWorkflow('run-child', () => ({}))
+        .step('after', async () => ({}))
     );
 
     const run = await engine.start('run-parent', {});
@@ -135,9 +145,13 @@ describe('a parent inherits a child parked mid-rollback', () => {
             released++;
           },
         })
-        .step('kaboom', async () => {
-          throw new Error('child failed');
-        }, { retry: 1 })
+        .step(
+          'kaboom',
+          async () => {
+            throw new Error('child failed');
+          },
+          { retry: 1 }
+        )
     );
     engine.register(
       new Workflow('twice-parent')
@@ -168,9 +182,15 @@ describe('a parent inherits a child parked mid-rollback', () => {
       })
     );
     engine.register(
-      new Workflow('ok-parent').subWorkflow('ok-child', () => ({})).step('boom', async () => {
-        throw new Error('parent failed after the child was done');
-      }, { retry: 1 })
+      new Workflow('ok-parent')
+        .subWorkflow('ok-child', () => ({}))
+        .step(
+          'boom',
+          async () => {
+            throw new Error('parent failed after the child was done');
+          },
+          { retry: 1 }
+        )
     );
 
     const run = await engine.start('ok-parent', {});
@@ -234,7 +254,10 @@ describe('a live child is never rolled back under its own feet', () => {
       createdAt: 0,
       updatedAt: 0,
     };
-    const store = { update() {}, get: (id: string) => (id === 'child-1' ? child : parent) } as never;
+    const store = {
+      update() {},
+      get: (id: string) => (id === 'child-1' ? child : parent),
+    } as never;
 
     await runCompensation(
       parent,
@@ -248,7 +271,7 @@ describe('a live child is never rolled back under its own feet', () => {
     ).catch(() => {});
 
     expect(released, 'a live child was rolled back while it was still running').toEqual([]);
-    expect(child.state, "and its own state must not have been rewritten").toBe('running');
+    expect(child.state, 'and its own state must not have been rewritten').toBe('running');
     // The parent still refuses to claim a clean rollback: it parks for an operator.
     expect(parent.rollbackStatus).toBe('stuck');
     expect(parent.steps['sub:live-child']?.compensation?.status).toBe('compensation-failed');
@@ -287,7 +310,10 @@ describe('a live child is never rolled back under its own feet', () => {
       createdAt: 0,
       updatedAt: 0,
     };
-    const store = { update() {}, get: (id: string) => (id === 'child-2' ? child : parent) } as never;
+    const store = {
+      update() {},
+      get: (id: string) => (id === 'child-2' ? child : parent),
+    } as never;
 
     await runCompensation(
       parent,
