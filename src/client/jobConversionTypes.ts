@@ -16,7 +16,7 @@ import type {
 export interface CreatePublicJobOptions {
   job: InternalJob;
   name: string;
-  updateProgress: (id: string, progress: number, message?: string) => Promise<void>;
+  updateProgress: (id: string, progress: number | object, message?: string) => Promise<void>;
   log: (id: string, message: string) => Promise<void>;
   getState?: (id: string) => Promise<JobStateType>;
   remove?: (id: string) => Promise<void>;
@@ -69,7 +69,7 @@ export type PublicJobMethodContext = Required<
 export interface ToPublicJobOptions {
   job: InternalJob;
   name: string;
-  updateProgress?: (id: string, progress: number, message?: string) => Promise<void>;
+  updateProgress?: (id: string, progress: number | object, message?: string) => Promise<void>;
   log?: (id: string, message: string) => Promise<void>;
   getState?: (id: string) => Promise<JobStateType>;
   remove?: (id: string) => Promise<void>;

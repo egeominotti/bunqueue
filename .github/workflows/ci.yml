@@ -105,6 +105,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
+      # The test tree imports generated output: the portable SDK build
+      # (sdk/typescript/dist), the package's own build (dist, for the examples'
+      # `bunqueue/client` imports) and the docs dependencies (astro).
+      - name: Prepare what the test tree imports
+        run: bun run typecheck:prepare
+
       - name: Run type check
         run: bun run typecheck
 

@@ -1,62 +1,49 @@
 /**
- * `tsconfig.test.json` excludes, by name, the test files whose remaining type errors
- * are genuine test defects that a type-only change cannot fix. That list may only
- * shrink: an excluded file gets no type checking at all, so a new entry would hide
- * every future error in it. Remove a file from both lists when its defect is fixed.
+ * `bun run typecheck` type-checks the whole test tree through `tsconfig.test.json`.
+ * Every test file is covered: excluding one, or weakening the project's compiler
+ * options, would silently hide its type errors. Fix the error instead.
  */
 import { expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
 
-const REPO = join(import.meta.dir, '..');
-const CONFIG = join(REPO, 'tsconfig.test.json');
-
-/** Always excluded: not test sources. */
-const BASE = ['node_modules', 'dist'];
-
-/** The files excluded when the test tree became type-checked (2026-10-31). */
-const ALLOWED = new Set([
-  'test/bug-15-worker-event-types.test.ts',
-  'test/cli-invariants-runtime.test.ts',
-  'test/deduplicationRecovery.test.ts',
-  'test/flow-producer-real-e2e.test.ts',
-  'test/issue-82-moveToFailed.test.ts',
-  'test/issue34-parent-result-missing.test.ts',
-  'test/postgres-lease-renewal-batching.test.ts',
-  'test/postgres-public-api-queue-worker.test.ts',
-  'test/production-backpressure-torture.test.ts',
-  'test/production-readiness-e2e.test.ts',
-  'test/recoveryLogic.test.ts',
-  'test/repro-defect-stale-ack-timeout-resurrection.test.ts',
-  'test/repro-flow-producer-api-parity.test.ts',
-  'test/retry-resilience.test.ts',
-  'test/tcp-process-sweep-integrity.test.ts',
-]);
+const ROOT = join(import.meta.dir, '..');
+const CONFIG = join(ROOT, 'tsconfig.test.json');
 
 /** Parsed with TypeScript's own JSONC reader, so comments and formatting cannot fool it. */
-function config(): { include?: unknown; exclude?: unknown } {
+function config(): Record<string, unknown> {
   const parsed = ts.parseConfigFileTextToJson(CONFIG, readFileSync(CONFIG, 'utf8'));
   if (parsed.error)
     throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n'));
-  return parsed.config as { include?: unknown; exclude?: unknown };
+  return parsed.config as Record<string, unknown>;
 }
 
-test('the type-checked project still covers every source and test file', () => {
+test('the test project includes every source and test file', () => {
   expect(config().include).toEqual(['src/**/*', 'test/**/*']);
 });
 
-test('the exclusion list only ever shrinks', () => {
-  const exclude = config().exclude;
-  expect(Array.isArray(exclude)).toBe(true);
-  const entries = exclude as string[];
-  expect(entries.slice(0, BASE.length)).toEqual(BASE);
-  // Any spelling or glob that is not an allowed exact path fails, e.g. `./test/x.ts`.
-  const unexpected = entries.slice(BASE.length).filter((entry) => !ALLOWED.has(entry));
-  expect(unexpected).toEqual([]);
+test('no test file is excluded from type checking', () => {
+  expect(config().exclude).toEqual(['node_modules', 'dist']);
+  expect(config().files).toBeUndefined();
 });
 
-test('every excluded test file still exists', () => {
-  const entries = (config().exclude as string[]).slice(BASE.length);
-  expect(entries.filter((file) => !existsSync(join(REPO, file)))).toEqual([]);
+test('the test project does not weaken the checks it inherits', () => {
+  // Only output settings may differ from tsconfig.json; anything else (noCheck,
+  // strict: false, skipLibCheck, ...) could turn checking off without a visible error.
+  expect(config().compilerOptions).toEqual({
+    rootDir: '.',
+    outDir: './dist-test',
+    declaration: false,
+    declarationMap: false,
+    noEmit: true,
+  });
+  expect(config().extends).toBe('./tsconfig.json');
+});
+
+test('bun run typecheck runs the test project, not only src', () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+    scripts: Record<string, string>;
+  };
+  expect(pkg.scripts.typecheck).toContain('bun check --no-script -p tsconfig.test.json');
 });

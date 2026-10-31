@@ -3,7 +3,7 @@
  *
  * Reproduces the bug where parent result data is unavailable in flow chains.
  *
- * Root cause: jobResults uses BoundedMap with FIFO eviction (5,000 limit).
+ * Root cause: jobResults is a bounded map (maxJobResults, 5,000 at the time).
  * Without storage fallback (no DATA_PATH in embedded mode), evicted results
  * are permanently lost. getParentResult() returns undefined.
  *
@@ -13,13 +13,28 @@
  *    is evicted from completedJobs (50,000 limit)
  */
 
-import { describe, test, expect, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach, afterAll } from 'bun:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DEFAULT_CONFIG } from '../src/application/types/config';
 import { Queue, Worker, FlowProducer, shutdownManager } from '../src/client';
 import { BoundedMap } from '../src/shared/boundedMap';
+
+const tempDirs: string[] = [];
+/** A fresh SQLite file for one test; removed after the run. */
+function tempDataPath(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'bunqueue-issue34-'));
+  tempDirs.push(dir);
+  return join(dir, 'queue.db');
+}
 
 describe('Issue #34 - Parent result data missing', () => {
   afterEach(() => {
     shutdownManager();
+  });
+  afterAll(() => {
+    for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
   });
 
   test('BoundedMap FIFO eviction loses results that are still needed', () => {
@@ -42,19 +57,22 @@ describe('Issue #34 - Parent result data missing', () => {
   });
 
   test('parent result lost after high throughput fills jobResults cache', async () => {
+    // The guarantee of #34 holds with persistence: an evicted result is read back
+    // from SQLite. (Memory-only mode bounds results by design.) The Queue comes
+    // first so the shared embedded manager opens this database.
+    const queue = new Queue('issue34-eviction', { embedded: true, dataPath: tempDataPath() });
     const flow = new FlowProducer({ embedded: true });
-    const queue = new Queue('issue34-eviction', { embedded: true });
     queue.obliterate();
 
     // First: create a chain where we'll check parent result later
-    const targetResults: Array<{ step: number; parentResult: unknown }> = [];
-    let targetChainDone = false;
+    const targetResults: Array<{ step: number; parentId: string; parentResult: unknown }> = [];
     let resolve: () => void;
     const done = new Promise<void>((r) => (resolve = r));
 
     // Track how many filler jobs completed
     let fillerCompleted = 0;
-    const FILLER_COUNT = 5100; // Exceeds maxJobResults (5,000)
+    // Must exceed the result cache (maxJobResults) so the flood really evicts.
+    const FILLER_COUNT = DEFAULT_CONFIG.maxJobResults + 100;
 
     const worker = new Worker(
       'issue34-eviction',
@@ -74,10 +92,9 @@ describe('Issue #34 - Parent result data missing', () => {
         if (data.type === 'target') {
           if (data.__flowParentId) {
             const parentResult = flow.getParentResult(data.__flowParentId);
-            targetResults.push({ step: data.step!, parentResult });
+            targetResults.push({ step: data.step!, parentId: data.__flowParentId, parentResult });
           }
           if (data.step === 1) {
-            targetChainDone = true;
             resolve!();
           }
           return { targetStep: data.step };
@@ -135,17 +152,14 @@ describe('Issue #34 - Parent result data missing', () => {
     await fillerDone;
     await Bun.sleep(500);
 
-    // Step 3: Now try to get the target chain's parent result again
-    // The first chain's step-0 result should have been evicted by FIFO
-    const step0Id = targetResults[0]?.parentResult
-      ? 'still-available'
-      : 'already-gone-before-filler';
+    // Step 3: Now try to get the target chain's parent result again.
+    // Issue #34: FIFO eviction used to lose it once the filler jobs completed;
+    // it must still be readable after the flood.
+    expect(await flow.getParentResult<{ targetStep: number }>(targetResults[0].parentId)).toEqual({
+      targetStep: 0,
+    });
 
     // Create another chain that depends on results still being available
-    const lateResults: Array<{ step: number; parentResult: unknown }> = [];
-    let lateResolve: () => void;
-    const lateDone = new Promise<void>((r) => (lateResolve = r));
-
     // Create a new chain - step-0 result will be stored
     await flow.addChain([
       {
@@ -182,8 +196,8 @@ describe('Issue #34 - Parent result data missing', () => {
   }, 60000);
 
   test('getChildrenValues returns empty when children results are evicted', async () => {
+    const queue = new Queue('issue34-children-evict', { embedded: true, dataPath: tempDataPath() });
     const flow = new FlowProducer({ embedded: true });
-    const queue = new Queue('issue34-children-evict', { embedded: true });
     queue.obliterate();
 
     let parentChildrenValues: Record<string, unknown> = {};
@@ -191,7 +205,7 @@ describe('Issue #34 - Parent result data missing', () => {
     const done = new Promise<void>((r) => (resolve = r));
 
     let fillerCompleted = 0;
-    const FILLER_COUNT = 5100;
+    const FILLER_COUNT = DEFAULT_CONFIG.maxJobResults + 100;
 
     const worker = new Worker(
       'issue34-children-evict',

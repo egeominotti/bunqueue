@@ -81,6 +81,9 @@ describe('Issue #82: moveToFailed inside processor', () => {
 
     const state = await queue.getJobState(job.id);
     expect(state).toBe('completed');
+    // The custom moveToCompleted() value, not the processor's undefined return,
+    // is the result delivered to the 'completed' listener.
+    expect(capturedResult).toEqual({ custom: 'result' });
 
     await worker.close();
   });

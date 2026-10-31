@@ -756,7 +756,7 @@ describe('jobConversion', () => {
     // Method delegation tests
 
     test('updateProgress should delegate to provided callback', async () => {
-      const calls: Array<{ id: string; progress: number; message?: string }> = [];
+      const calls: Array<{ id: string; progress: number | object; message?: string }> = [];
       const internalJob = makeInternalJob({ id: jobId('job-1') });
 
       const publicJob = createPublicJob({

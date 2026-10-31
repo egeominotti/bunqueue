@@ -52,7 +52,7 @@ describe('TCP process sweep integrity', () => {
         'waiting-children': 0,
       });
     } finally {
-      server.stop(true);
+      server.stop();
       manager.shutdown();
       rmSync(directory, { recursive: true, force: true });
     }
@@ -81,7 +81,7 @@ describe('TCP process sweep integrity', () => {
       expect(result.duplicateInvocations).toBe(0);
       expect(result.finalCounts.completed).toBe(1_000);
     } finally {
-      server.stop(true);
+      server.stop();
       manager.shutdown();
       rmSync(directory, { recursive: true, force: true });
     }

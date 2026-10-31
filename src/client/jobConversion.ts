@@ -82,7 +82,8 @@ export function createPublicJob<T>(opts: CreatePublicJobOptions): Job<T> {
     ...serialization,
 
     // Core methods
-    updateProgress: (progress: number, message?: string) => updateProgress(id, progress, message),
+    updateProgress: (progress: number | object, message?: string) =>
+      updateProgress(id, progress, message),
     log: (message: string) => log(id, message),
     getState: () => (getState ? getState(id) : Promise.resolve('unknown' as JobStateType)),
     remove: () => (remove ? remove(id) : Promise.resolve()),
@@ -213,7 +214,7 @@ export function toPublicJob<T>(opts: ToPublicJobOptions): Job<T> {
     ...serialization,
 
     // Core methods
-    updateProgress: (progress: number, message?: string) =>
+    updateProgress: (progress: number | object, message?: string) =>
       updateProgress ? updateProgress(id, progress, message) : Promise.resolve(),
     log: (message: string) => (log ? log(id, message) : Promise.resolve()),
     getState: () => (getState ? getState(id) : Promise.resolve('unknown' as JobStateType)),

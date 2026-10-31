@@ -244,7 +244,7 @@ describe('Recovery Logic', () => {
       queue = new Queue(QUEUE, { embedded: true });
 
       // Child should be in queue
-      const jobs = await queue.getJobs(['waiting', 'delayed']);
+      const jobs = await queue.getJobs({ state: ['waiting', 'delayed'] });
       const childFound = jobs.some((j) => String(j.id) === childId);
 
       expect(childFound).toBe(true);
@@ -273,7 +273,7 @@ describe('Recovery Logic', () => {
       Bun.env.DATA_PATH = DB_PATH;
       queue = new Queue(QUEUE, { embedded: true });
 
-      const delayedJobs = await queue.getJobs(['delayed']);
+      const delayedJobs = await queue.getJobs({ state: 'delayed' });
       expect(delayedJobs.length).toBe(1);
 
       queue.obliterate();

@@ -25,6 +25,7 @@ for the isolated test gates.
 git clone https://github.com/egeominotti/bunqueue.git
 cd bunqueue
 bun install --frozen-lockfile
+bun run typecheck:prepare   # builds what the test tree imports; re-run after changing src/ or sdk/typescript/
 bun run typecheck
 bun run format:check
 ```

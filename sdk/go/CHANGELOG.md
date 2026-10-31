@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Testing
+
+- The e2e test server binds `127.0.0.1` and is ready only when the process is
+  alive and both of its listeners answer (TCP, then HTTP `/healthz`). If it
+  exits on a port another process took between `freePort()` and its bind, the
+  harness relaunches it on fresh ports within a second instead of failing
+  after 15 s ("bunqueue server did not start within 15s", seen on
+  `TestSpecAuth` in CI). A restart keeps its port. Startup errors now include
+  the server's output.
+
 ### Security
 
 - CI, the SDK workflows and the SDK test image build with Go 1.26.10 instead

@@ -146,6 +146,7 @@
     "format": "bun fmt --no-script src test scripts bench examples sdk/conformance",
     "format:check": "bun fmt --check --no-script src test scripts bench examples sdk/conformance",
     "typecheck": "bun check --no-script && bun check --no-script -p tsconfig.test.json",
+    "typecheck:prepare": "bun run build:client && bun run build:lib && bun install --cwd docs --frozen-lockfile --ignore-scripts",
     "check": "bun run typecheck && bun run format:check && bun run check:docs-data",
     "prepublishOnly": "bun run build:lib"
   },

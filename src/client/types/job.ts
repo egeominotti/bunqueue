@@ -93,7 +93,7 @@ export interface Job<T = unknown> {
   repeatJobKey?: string;
   attemptsStarted: number;
 
-  updateProgress(progress: number, message?: string): Promise<void>;
+  updateProgress(progress: number | object, message?: string): Promise<void>;
   log(message: string): Promise<void>;
   getState(): Promise<JobStateType>;
   remove(): Promise<void>;

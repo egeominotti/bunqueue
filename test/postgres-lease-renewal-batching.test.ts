@@ -176,7 +176,7 @@ describe('PostgreSQL lease renewal batching', () => {
       try {
         await manager.waitUntilReady();
         const queue = 'lease-terminal-race';
-        const { id } = await manager.push(queue, { race: true });
+        const { id } = await manager.push(queue, { data: { race: true } });
         const claim = await manager.pullWithLock(queue, 'race-worker');
         expect(claim.job?.id).toBe(id);
         await pausePostgresEventStream(manager);
@@ -231,7 +231,7 @@ describe('PostgreSQL lease renewal batching', () => {
       try {
         await manager.waitUntilReady();
         const queue = 'lease-removed-race';
-        const { id } = await manager.push(queue, { race: true });
+        const { id } = await manager.push(queue, { data: { race: true } });
         const claim = await manager.pullWithLock(queue, 'race-worker');
         await pausePostgresEventStream(manager);
         await Bun.sleep(50);

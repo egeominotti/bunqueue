@@ -59,7 +59,7 @@ describe('Stability: stale ACK after timeout must not phantom-complete a retryin
 
     // Job with a short timeout and 2 attempts (so a timeout requeues for retry,
     // not straight to DLQ).
-    const pushed = await qm.push(QUEUE, { data: { n: 1 }, timeout: 40, attempts: 2 });
+    const pushed = await qm.push(QUEUE, { data: { n: 1 }, timeout: 40, maxAttempts: 2 });
     expect(pushed).not.toBeNull();
 
     // Worker pulls with a lock (default behavior). startedAt is set now.
@@ -114,7 +114,7 @@ describe('Stability: stale ACK after timeout must not phantom-complete a retryin
 
     // Push a job that recycles the custom id — this goes through the reuse path
     // in handleCustomId.
-    const j = await qm.push(QUEUE, { customId: CID, data: { v: 2 }, attempts: 3 });
+    const j = await qm.push(QUEUE, { customId: CID, data: { v: 2 }, maxAttempts: 3 });
     expect(j.id).toBe(jobId(CID));
 
     // CORRECT post-fix behavior: recycling the id clears the stale marker so the
@@ -130,7 +130,7 @@ describe('Stability: stale ACK after timeout must not phantom-complete a retryin
 
   test('CONTROL: a legit ACK of a normally-pulled job (no timeout) still completes', async () => {
     const QUEUE = 'timeout-q-ctrl';
-    const pushed = await qm.push(QUEUE, { data: { n: 2 }, attempts: 2 });
+    const pushed = await qm.push(QUEUE, { data: { n: 2 }, maxAttempts: 2 });
     const { job, token } = await qm.pullWithLock(QUEUE, 'worker-1', 0, 30000);
     expect(job!.id).toBe(pushed.id);
 

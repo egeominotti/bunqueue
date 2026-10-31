@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +20,12 @@ type testServer struct {
 	httpPort int
 	dataDir  string
 	cmd      *exec.Cmd
+	exited   chan struct{}
 	extraEnv map[string]string
+	// started is set after the first successful start: a restart (crash, then
+	// start) must keep the same ports and data dir, so it is never relaunched
+	// on fresh ports.
+	started bool
 }
 
 var shared *testServer
@@ -47,14 +54,49 @@ func newTestServer(extraEnv map[string]string) *testServer {
 	}
 }
 
+// launchAttempts bounds relaunches after losing the race for a port: freePort
+// releases its port before the server binds it, so a parallel process can take
+// it first and the server then exits on the bind error.
+const launchAttempts = 5
+
 func (s *testServer) start() error {
+	attempts := launchAttempts
+	if s.started {
+		attempts = 1
+	}
+	var lastErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			s.port, s.httpPort = freePort(), freePort()
+		}
+		output, err := s.launch()
+		if err == nil {
+			s.started = true
+			return nil
+		}
+		lastErr = err
+		if !isBindCollision(output) {
+			break
+		}
+	}
+	return lastErr
+}
+
+// launch spawns the server once. It is ready only while the process is alive
+// and both of ITS listeners answer: TCP binds before HTTP, so a healthy
+// /healthz plus an open TCP port cannot come from a process that stole either
+// port. A server that exits is reported at once, with its output.
+func (s *testServer) launch() (string, error) {
 	root, err := repoRoot()
 	if err != nil {
-		return err
+		return "", err
 	}
 	cmd := exec.Command("bun", "src/main.ts")
 	cmd.Dir = root
+	// Loopback only, as the tests connect: on 0.0.0.0, macOS lets the server share
+	// a port another process holds on 127.0.0.1, so a lost race goes unnoticed.
 	cmd.Env = append(os.Environ(),
+		"HOST=127.0.0.1",
 		"TCP_PORT="+fmt.Sprint(s.port),
 		"HTTP_PORT="+fmt.Sprint(s.httpPort),
 		"BUNQUEUE_DATA_PATH="+filepath.Join(s.dataDir, "bunq.db"),
@@ -62,33 +104,58 @@ func (s *testServer) start() error {
 	for key, value := range s.extraEnv {
 		cmd.Env = append(cmd.Env, key+"="+value)
 	}
-	cmd.Stdout = nil
-	cmd.Stderr = nil
+	output := &boundedOutput{}
+	cmd.Stdout = output
+	cmd.Stderr = output
 	if err := cmd.Start(); err != nil {
-		return err
+		return "", err
 	}
-	s.cmd = cmd
+	exited := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(exited)
+	}()
+	s.cmd, s.exited = cmd, exited
 	deadline := time.Now().Add(15 * time.Second)
-	address := fmt.Sprintf("127.0.0.1:%d", s.port)
 	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", address, 500*time.Millisecond)
-		if err == nil {
-			_ = conn.Close()
-			return nil
+		select {
+		case <-exited:
+			s.cmd, s.exited = nil, nil
+			return output.String(), fmt.Errorf("bunqueue server exited before it was ready: %s", output.String())
+		default:
+		}
+		if s.ready() {
+			return "", nil
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	s.stop()
-	return fmt.Errorf("bunqueue server did not start within 15s")
+	s.crash()
+	return output.String(), fmt.Errorf("bunqueue server did not start within 15s: %s", output.String())
+}
+
+func (s *testServer) ready() bool {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", s.port), 500*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	client := http.Client{Timeout: 500 * time.Millisecond}
+	response, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/healthz", s.httpPort))
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 16))
+	return response.StatusCode == http.StatusOK && string(body) == "OK"
 }
 
 // crash kills the process hard (crash simulation) keeping port + data dir.
 func (s *testServer) crash() {
 	if s.cmd != nil && s.cmd.Process != nil {
 		_ = s.cmd.Process.Kill()
-		_, _ = s.cmd.Process.Wait()
-		s.cmd = nil
+		<-s.exited
 	}
+	s.cmd, s.exited = nil, nil
 }
 
 func (s *testServer) stop() {

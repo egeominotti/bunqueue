@@ -170,7 +170,7 @@ interface Job<T = unknown> {
    * 0 with the text as the message, and an object is 0 with its JSON as the message. The
    * Worker's `progress` event carries the value you passed.
    */
-  updateProgress(progress: number, message?: string): Promise<void>;
+  updateProgress(progress: number | object, message?: string): Promise<void>;
 
   /** Add a log entry to the job */
   log(message: string): Promise<void>;
@@ -1068,7 +1068,7 @@ worker.on('ready', () => void);
 worker.on('active', (job: Job) => void);
 worker.on('completed', (job: Job, result: R) => void);
 worker.on('failed', (job: Job, error: Error) => void);
-worker.on('progress', (job: Job | null, progress: number) => void);
+worker.on('progress', (job: Job | null, progress: number) => void); // the value passed to updateProgress: annotate `number | object` if you pass objects
 worker.on('stalled', (jobId: string, reason: string) => void);
 worker.on('cancelled', (data: { jobId: string; reason: string }) => void);
 worker.on('log', (job: Job, message: string) => void);

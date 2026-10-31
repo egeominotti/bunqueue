@@ -34,8 +34,9 @@ function observableStats() {
     waiting: stats.waiting,
     active: stats.active,
     delayed: stats.delayed,
+    prioritized: stats.prioritized,
+    waitingChildren: stats['waiting-children'],
     completed: stats.completed,
-    failed: stats.failed,
     dlq: stats.dlq,
     totalPushed: stats.totalPushed,
     totalPulled: stats.totalPulled,
@@ -49,20 +50,26 @@ beforeAll(async () => {
   server = createTcpServer(manager, { port: 0, hostname: '127.0.0.1' });
   port = server.server.port;
 
-  const waiting = await manager.push(READ_ONLY_QUEUE, {
-    data: { fixture: true },
-    durable: true,
-    jobId: 'cli-read-waiting',
-  });
   const completed = await manager.push(READ_ONLY_QUEUE, {
     data: { completed: true },
     durable: true,
-    jobId: 'cli-read-completed',
+    customId: 'cli-read-completed',
+  });
+  const waiting = await manager.push(READ_ONLY_QUEUE, {
+    data: { fixture: true },
+    durable: true,
+    customId: 'cli-read-waiting',
   });
   const pulled = await manager.pull(READ_ONLY_QUEUE);
-  expect(pulled?.id).toBe(waiting.id);
-  await manager.ack(waiting.id, { done: true });
-  expect(completed.id).toBeDefined();
+  expect(pulled?.id).toBe(completed.id);
+  await manager.ack(completed.id, { done: true });
+  expect(await manager.getJobState(completed.id)).toBe('completed');
+  expect(await manager.getJobState(waiting.id)).toBe('waiting');
+  // The CLI reads below address the fixtures by these ids (a custom id becomes the
+  // job id): if that broke, every read would answer "not found" and the
+  // invariants would check nothing.
+  expect(String(waiting.id)).toBe('cli-read-waiting');
+  expect(String(completed.id)).toBe('cli-read-completed');
 });
 
 afterAll(() => {

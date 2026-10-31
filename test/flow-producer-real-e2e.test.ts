@@ -23,7 +23,6 @@ function startBroker(dbPath: string): Broker {
   const manager = new QueueManager({
     dataPath: dbPath,
     stallCheckMs: 100,
-    writeBufferFlushMs: 5,
   });
   const server = createTcpServer(manager, { hostname: '127.0.0.1', port: 0 });
   const broker: Broker = {

@@ -11,7 +11,7 @@ export function createProgressHandler<T extends FlowJobData>(
   emitter: EventEmitter,
   jobHolder: { current: Job<T> | null }
 ) {
-  return async (id: string, progress: number, message?: string) => {
+  return async (id: string, progress: number | object, message?: string) => {
     // Checked before sending: the TCP reply is not read, so NaN was dropped silently.
     const update = progressUpdate(progress, message);
     if (embedded) {

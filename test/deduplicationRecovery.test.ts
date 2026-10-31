@@ -95,7 +95,7 @@ describe('Deduplication Recovery', () => {
       expect(job2.id).toBe(job1.id);
 
       // Verify only one job exists in queue (not duplicates)
-      const jobs = await queue.getJobs(['waiting', 'delayed']);
+      const jobs = await queue.getJobs({ state: ['waiting', 'delayed'] });
       const matchingJobs = jobs.filter((j) => j.id === job1.id);
       expect(matchingJobs.length).toBe(1);
 

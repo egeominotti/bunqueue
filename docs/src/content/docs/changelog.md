@@ -64,8 +64,47 @@ head:
   of the same awaited value, removed side-effect-free expressions and one
   import alias; no test does or asserts anything different. The 31 remaining
   errors are genuine test defects that only a behavior change can fix, so their
-  15 files are excluded by name in `tsconfig.test.json`, and
-  `test/tsconfig-test-exclusions.test.ts` fails if that list ever grows.
+  15 files were excluded by name in `tsconfig.test.json` at first.
+- Those 31 test defects are now fixed, so no test file is excluded from type
+  checking:
+  - options the engine silently ignored: `attempts` → `maxAttempts` (the stale
+    ack timeout repro now really runs with 2 attempts), `jobId` → `customId`
+    (the CLI read invariants now read real jobs instead of "not found"; their
+    fixtures were also swapped so the `completed` job is the one acked),
+    `maxRetries` → `maxAutoRetries`, `{ race: true }` → `{ data: { race: true } }`;
+  - `getJobs([...])` → `getJobs({ state: [...] })`, so the restart and
+    dedup-recovery checks filter by state (they still pass: a delayed job stays
+    delayed after a restart);
+  - no-op arguments removed: `writeBufferFlushMs` passed to `QueueManager`
+    (not a config field) and `server.stop(true)` (`stop()` takes none and
+    already force-closes);
+  - write-only locals are now asserted: the bug-15 worker event test checks
+    each event's typed arguments with `expectTypeOf` and their runtime values,
+    issue 82 checks the `moveToCompleted()` result, and issue 34 re-reads the
+    first chain's parent result after the flood. The issue 34 floods now
+    exceed the real `maxJobResults` (they used 5,100 against a 10,000 cache, so
+    nothing was evicted) and run on SQLite: the parent-result test now fails if
+    an evicted result is not read back from storage (in memory-only mode
+    results are bounded by design). The `getChildrenValues` flood test still
+    does not reach the storage fallback, because the children's results stay
+    in memory;
+  - `Job.updateProgress` (and its handler types) now accept `number | object`,
+    as the runtime and the docs already did; the emitted JavaScript is
+    unchanged. The Worker `progress` listener keeps its `number` parameter so
+    existing `(job, p: number) => …` listeners still compile; a listener that
+    receives object progress can be annotated `number | object`.
+  `test/tsconfig-test-exclusions.test.ts` fails if `tsconfig.test.json` ever
+  excludes a file or weakens its compiler options.
+- The CI Type Check job failed since the test tree became type-checked: the
+  tests import generated output that only a developer checkout had (the
+  portable SDK build, the package build for the examples' `bunqueue/client`
+  imports, and the docs dependencies). The job now runs the new
+  `bun run typecheck:prepare` first; run it locally on a fresh clone and
+  after changing `src/` or `sdk/typescript/`, so the check never reads stale
+  builds.
+- The Go SDK e2e harness no longer fails after 15 s when another process takes
+  its port between `freePort()` and the server's bind: it binds `127.0.0.1`,
+  detects the exit at once and relaunches on fresh ports.
 
 ### Documentation
 

@@ -270,7 +270,7 @@ describe('Retry Resilience - Embedded', () => {
     const queue = new Queue<{ value: number }>('retry-res-dlq', { embedded: true });
     queue.obliterate();
 
-    queue.setDlqConfig({ maxRetries: 2 });
+    queue.setDlqConfig({ maxAutoRetries: 2 });
 
     let processCount = 0;
 

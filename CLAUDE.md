@@ -15,8 +15,8 @@ and in every SDK: `src`, `test`, `scripts`, `bench`, `examples`,
 hooks and CI always pass `--no-script`. Never add or run `tsc --noEmit`, ESLint,
 Prettier, Biome, oxlint, oxfmt, dprint or any other type-check, lint or format
 library, and never add lint-suppression comments. `bun run typecheck` also
-checks the test tree (`tsconfig.test.json`); never add a file to its exclusion
-list, and never fix a type error by changing what a test does. The only exceptions:
+checks the whole test tree (`tsconfig.test.json`); never exclude a file from it,
+and never fix a type error by changing what a test does. The only exceptions:
 `typescript`/`tsc` stays where files must be emitted (`build:lib` and SDK
 `.d.ts` builds, typedoc, compiler-API tests), because `bun check` never writes;
 and SDKs in languages Bun cannot format keep their language's own toolchain

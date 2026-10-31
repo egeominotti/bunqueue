@@ -10,9 +10,10 @@
  * similar to QueueEvents (which already has proper typing).
  */
 
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, expectTypeOf } from 'bun:test';
 import type { EventEmitter } from 'events';
 import { Worker } from '../src/client/worker';
+import type { Job } from '../src/client/types';
 
 describe('Bug #15 - Worker event type safety', () => {
   /**
@@ -84,48 +85,59 @@ describe('Bug #15 - Worker event type safety', () => {
   });
 
   test('Worker event callbacks should receive correct parameter types', () => {
-    // This test documents the expected callback signatures.
-    // When typed overloads are added, TypeScript will enforce these.
+    // This test documents the expected callback signatures. The listeners carry no
+    // parameter annotations, so the typed on() overloads infer them; expectTypeOf
+    // makes `bun check` fail if an overload is missing or degrades to `any`.
     const worker = new Worker<{ msg: string }, { ok: boolean }>(
       'test-typed-events',
       async () => ({ ok: true }),
       { autorun: false }
     );
 
-    let activeJob: unknown = null;
-    let completedResult: unknown = null;
-    let failedError: unknown = null;
-    let progressValue: unknown = null;
-    let stalledId: unknown = null;
-    let cancelledInfo: unknown = null;
+    let activeJob = null as Job<{ msg: string }> | null;
+    let completedResult = null as { ok: boolean } | null;
+    let failedError = null as Error | null;
+    let progressValue = null as number | null;
+    let stalledId = null as string | null;
+    let cancelledInfo = null as { jobId: string; reason: string } | null;
 
     // 'active' should receive (job: Job<T>)
-    worker.on('active', (job: any) => {
+    worker.on('active', (job) => {
+      expectTypeOf(job).toEqualTypeOf<Job<{ msg: string }>>();
       activeJob = job;
     });
 
     // 'completed' should receive (job: Job<T>, result: R)
-    worker.on('completed', (_job: any, result: any) => {
+    worker.on('completed', (job, result) => {
+      expectTypeOf(job).toEqualTypeOf<Job<{ msg: string }>>();
+      expectTypeOf(result).toEqualTypeOf<{ ok: boolean }>();
       completedResult = result;
     });
 
     // 'failed' should receive (job: Job<T>, error: Error)
-    worker.on('failed', (_job: any, error: any) => {
+    worker.on('failed', (job, error) => {
+      expectTypeOf(job).toEqualTypeOf<Job<{ msg: string }>>();
+      expectTypeOf(error).toEqualTypeOf<Error>();
       failedError = error;
     });
 
     // 'progress' should receive (job: Job<T> | null, progress: number)
-    worker.on('progress', (_job: any, progress: any) => {
+    worker.on('progress', (job, progress) => {
+      expectTypeOf(job).toEqualTypeOf<Job<{ msg: string }> | null>();
+      expectTypeOf(progress).toEqualTypeOf<number>();
       progressValue = progress;
     });
 
     // 'stalled' should receive (jobId: string, reason: string)
-    worker.on('stalled', (jobId: any, _reason: any) => {
+    worker.on('stalled', (jobId, reason) => {
+      expectTypeOf(jobId).toEqualTypeOf<string>();
+      expectTypeOf(reason).toEqualTypeOf<string>();
       stalledId = jobId;
     });
 
     // 'cancelled' should receive ({ jobId: string, reason: string })
-    worker.on('cancelled', (info: any) => {
+    worker.on('cancelled', (info) => {
+      expectTypeOf(info).toEqualTypeOf<{ jobId: string; reason: string }>();
       cancelledInfo = info;
     });
 
@@ -136,6 +148,33 @@ describe('Bug #15 - Worker event type safety', () => {
     expect(worker.listenerCount('progress')).toBe(1);
     expect(worker.listenerCount('stalled')).toBe(1);
     expect(worker.listenerCount('cancelled')).toBe(1);
+
+    // Nothing is delivered before an event is emitted.
+    expect(activeJob).toBeNull();
+    expect(completedResult).toBeNull();
+    expect(failedError).toBeNull();
+    expect(progressValue).toBeNull();
+    expect(stalledId).toBeNull();
+    expect(cancelledInfo).toBeNull();
+
+    // Emit each event with the documented argument list (the runtime emitters are
+    // exercised end to end in test/docs-worker-guide/events.test.ts) and verify each
+    // listener reads the documented argument position.
+    const job = { id: 'job-15', name: 'typed', data: { msg: 'hi' } } as Job<{ msg: string }>;
+    const error = new Error('boom');
+    worker.emit('active', job);
+    worker.emit('completed', job, { ok: true });
+    worker.emit('failed', job, error);
+    worker.emit('progress', job, 42);
+    worker.emit('stalled', 'job-15', 'active');
+    worker.emit('cancelled', { jobId: 'job-15', reason: 'stop' });
+
+    expect(activeJob).toBe(job);
+    expect(completedResult).toEqual({ ok: true });
+    expect(failedError).toBe(error);
+    expect(progressValue).toBe(42);
+    expect(stalledId).toBe('job-15');
+    expect(cancelledInfo).toEqual({ jobId: 'job-15', reason: 'stop' });
 
     worker.close();
   });
