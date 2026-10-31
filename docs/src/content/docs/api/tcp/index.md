@@ -189,6 +189,18 @@ The unsolicited event envelope has no `reqId`. Pipelined clients must recognize
 same connection replaces the previous queue. Slow subscribers are subject to
 the normal per-connection write-buffer limit.
 
+An optional `eventTypes` array (1 to 32 event type names of up to 64 characters;
+`null` means no filter) limits the stream to
+those types, which saves the broker the encoding and the client the decoding of
+everything else. The bunqueue Worker subscribes this way for `stalled` only:
+
+```typescript
+{ cmd: 'SubscribeEvents', queue: 'tasks', eventTypes: ['stalled'], reqId: 'events-3' }
+```
+
+A broker older than the filter ignores `eventTypes` and sends every type, so
+check `event.eventType` on the client side as well.
+
 ## Connection Lifecycle
 
 When a TCP connection closes, the server automatically releases all jobs that were being processed by that client back to their queues. This uses retry logic with exponential backoff (up to 3 attempts) to ensure jobs are not left in an inconsistent state.

@@ -1,4 +1,5 @@
-import { pack, unpack, Unpackr } from 'msgpackr';
+import { unpack, Unpackr } from 'msgpackr';
+import { packWithByteViews } from './msgpackByteViews';
 
 const unpackr = new Unpackr({ mapsAsObjects: false, useRecords: false });
 const PROTO_KEY_BYTES = new TextEncoder().encode('__proto__');
@@ -65,8 +66,12 @@ function materialize(value: unknown, seen: WeakMap<object, unknown>): unknown {
   return result;
 }
 
+/**
+ * Encode with msgpackr's default packer. A non-byte TypedArray or DataView is
+ * written as a `bin` of its own bytes (decoded as a Uint8Array); see msgpackByteViews.
+ */
 export function encodeMessagePack(value: unknown): Uint8Array {
-  return pack(value);
+  return packWithByteViews(value);
 }
 
 /** Decode maps through safe own properties, preserving keys such as `__proto__`. */

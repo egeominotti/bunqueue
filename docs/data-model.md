@@ -907,7 +907,8 @@ Command families (each is a `cmd`-tagged interface under `src/domain/types/comma
 `RemoveUnprocessedChildren`), **Monitoring** (`Stats`, `Metrics`, `Prometheus`,
 `StorageStatus`, `CompactMemory`), **Dashboard** (`DashboardOverview/Queues/Queue`),
 **Auth/Negotiation** (`Auth`, `Hello`), and **Events** (`SubscribeEvents`,
-`UnsubscribeEvents`). `SubscribeEvents` carries a validated queue key;
+`UnsubscribeEvents`). `SubscribeEvents` carries a validated queue key and an
+optional `eventTypes` filter (1 to 32 event type names; absent = every type);
 `UnsubscribeEvents` has no payload. Lease durations (`PULL`/`PULLB` `lockTtl`,
 `ExtendLock` `duration`, `ExtendLocks` `durations[i]`, a non-zero `JobHeartbeat`
 `duration`) must be finite numbers (any sign, passed through as on 2.9.10, so a 2.9.10
@@ -1979,7 +1980,10 @@ and SQLite serialization. The common path uses msgpackr directly. A frame/blob
 containing `__proto__` is decoded as maps and materialized with
 `Object.defineProperty`, preserving `__proto__` and `__proto_` as distinct own
 data properties without invoking prototype setters. The TCP transport frames
-the same msgpack-encoded `Command`/`Response` objects.
+the same msgpack-encoded `Command`/`Response` objects. Encoding writes a
+non-byte TypedArray or a `DataView` as a msgpack `bin` of exactly its own bytes
+(`src/shared/msgpackByteViews.ts`), decoded as a `Uint8Array`; every other
+value encodes exactly as with msgpackr's default `pack`.
 
 - `pack(data)` → `Uint8Array`; written into BLOB columns. The single-row and
   batch insert binders only pack non-empty arrays

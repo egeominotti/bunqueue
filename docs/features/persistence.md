@@ -128,7 +128,9 @@ Key methods (real signatures):
 - Flow transactions: `commitFailedJob(jobId, dlqEntry, flowFailure)`,
   `updateFlowLink(child, parent, state)`, `removeFlowLink(child, parent, state)`,
   `updateFlowParentResolution(parent)`, `saveFlowFailure(record)`,
-  `loadFlowFailures()`, `deleteFlowFailure(parentId, childId?)`.
+  `loadFlowFailures()`, `deleteFlowFailure(parentId, childId?)`. The last runs on
+  every single-job completion and failure, so it uses `db.query()` (compiled
+  once per connection) rather than `db.prepare()` (compiled on every call).
 - Removed-completion evidence:
   `commitRemovedCompletion(job, retentionLimit, completedAt?)`,
   `loadDependencyCompletions(retentionLimit)`,
@@ -241,7 +243,11 @@ All blob columns store MessagePack. Encoding and decoding use the canonical
 `src/shared/msgpack.ts` codec. Its normal path remains msgpackr's fast decoder;
 the rare `__proto__` path materializes maps with safe own-property definitions,
 so arbitrary JSON keys remain distinct across restart without prototype
-pollution. `rowToJob` rehydrates a full `Job`. Policies without a legacy column
+pollution. Encoding writes a non-byte TypedArray (`Float32Array`,
+`BigInt64Array`, ...) or a `DataView` in job data, results, progress or events
+as a `bin` of exactly its own bytes, so after a restart it is read back as a
+`Uint8Array` with those bytes (see the "Binary views" edge case in
+[tcp-protocol.md](./tcp-protocol.md)). `rowToJob` rehydrates a full `Job`. Policies without a legacy column
 (`backoffConfig` including `maxDelay`, `repeat`, `stackTraceLimit`,
 `keepLogs`/`sizeLimit`, dedup/debounce flags, `durable`) come from the
 `extended_options` blob (`jobOptionsBlob.ts`); a pre-migration-34 row without

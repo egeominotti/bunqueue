@@ -230,12 +230,13 @@ export abstract class SqliteFlows extends SqliteMutations {
 
   deleteFlowFailure(parentId: JobId, childId?: JobId): void {
     this.safeWrite(() => {
+      // Runs on every single-job completion and failure: `query` compiles it once.
       if (childId) {
         this.db
-          .prepare('DELETE FROM flow_failures WHERE parent_id = ? AND child_id = ?')
+          .query('DELETE FROM flow_failures WHERE parent_id = ? AND child_id = ?')
           .run(parentId, childId);
       } else {
-        this.db.prepare('DELETE FROM flow_failures WHERE parent_id = ?').run(parentId);
+        this.db.query('DELETE FROM flow_failures WHERE parent_id = ?').run(parentId);
       }
     });
   }

@@ -137,7 +137,7 @@ function forceReleaseClientJobs(clientId, ctx): number;        // lock-free fall
 | `AddLog`            | `id`, `message`, `level?`                      | Append a job log line                                        |
 | `GetLogs`           | `id`, `start?`, `end?`                         | Read logs (inclusive slice)                                  |
 | `ClearLogs`         | `id`, `keepLogs?`                              | Clear / trim logs                                            |
-| `SubscribeEvents`   | `queue`                                        | Select one queue's live `JobEvent` stream on this connection |
+| `SubscribeEvents`   | `queue`, `eventTypes?`                         | Select one queue's live `JobEvent` stream on this connection |
 | `UnsubscribeEvents` | —                                              | Stop that stream without closing the connection              |
 
 Command shapes: `src/domain/types/commands/monitoring.ts:3-28` (logs and webhooks) and `src/domain/types/commands/extended.ts:3-7` (`ClearLogs`). Handlers: `src/infrastructure/server/handlers/monitoring/health.ts:24-50` (`AddLog`/`GetLogs`), `src/infrastructure/server/handlers/monitoring/webhooks.ts:13-100`, and `src/infrastructure/server/handlers/monitoring/operations.ts:21-27` (`ClearLogs`). Routing: `src/infrastructure/server/handler-routes/monitoring.ts:45-87`.
@@ -160,8 +160,14 @@ Command shapes: `src/domain/types/commands/monitoring.ts:3-28` (logs and webhook
   socket gets the batch's frames for its queue concatenated in batch order and
   written once (`broadcastEvents` in `tcp/connections.ts`), so the number of
   socket writes no longer grows with events × subscribers. Every TCP Worker
-  subscribes to its queue's events (for `stalled`), so this is the path that
-  scales with the number of worker processes.
+  subscribes to its queue's events for `stalled` only (`eventTypes:
+  ["stalled"]`), so the pulled and completed events of the jobs it runs are
+  neither written to nor decoded by any worker. The optional `eventTypes` filter
+  (`tcp/eventFanout.ts`, validated in `tcp/eventSubscriptions.ts`) is stored on
+  the connection: an event that no subscriber of its queue accepts is not
+  encoded at all, a filtered socket gets only its accepted frames of a batch (in
+  batch order, no write when there are none), and an unfiltered socket gets
+  exactly the bytes it got before the filter existed.
 - **Dashboard events** emitted via `setDashboardEmit`: `webhook:fired`, `webhook:failed`, `webhook:enabled`, `webhook:disabled` (from `WebhookManager`); `webhook:added` / `webhook:removed` are emitted by the handler through `queueManager.emitDashboardEvent` (`handlers/monitoring/webhooks.ts:31-64`).
 
 ## Data Models

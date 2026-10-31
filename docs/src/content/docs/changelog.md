@@ -20,8 +20,100 @@ head:
 
 ## [Unreleased]
 
+### Performance
+
+- **TCP workers no longer receive every event of their queue.** A TCP Worker
+  subscribes to its queue's events only to report `stalled` jobs, yet the broker
+  encoded and wrote, and every worker process decoded and dropped, the `pulled`
+  and `completed` event of each job. `SubscribeEvents` takes an optional
+  `eventTypes` filter (1 to 32 event type names) and the Worker asks for
+  `stalled` only: the broker skips encoding an event no subscriber of its queue
+  accepts, a filtered connection gets only its accepted frames (in the same
+  order), and an unfiltered connection, such as `QueueEvents`, gets exactly the
+  bytes it got before. A broker without the filter ignores the field and sends
+  every type, which the Worker still filters itself, and a Worker from an
+  earlier release still receives every type from a new broker. Draining 200,000
+  prefilled jobs in memory mode over TCP (50 concurrency per worker process,
+  batch size 20, Apple M5 Max, macOS 27.2, Bun 1.4.4, alternating fresh brokers):
+  one worker process went from 76,329–78,216 to 87,722–89,644 jobs/s (+15%),
+  four from 97,370–99,671 to 134,102–135,074 (+37%), and eight from
+  79,970–82,334 to 115,737–129,962 (+51%). With SQLite the drain is bound by
+  disk writes and moves by under 1%. These are diagnostic host results, not
+  publication benchmarks.
+- **Single-job completions on SQLite do less work.** Every single-job
+  completion and failure (`ACK`, `FAIL` and the embedded Worker) deletes the
+  job's parent-side `flow_failures` rows; that statement went through
+  `db.prepare()`, which compiles it on every call (10,000 compilations for
+  10,000 jobs), and now goes through `db.query()`, which reuses one compiled
+  statement (the one job deletion and replacement already used). The
+  flow-completion check after each single-job completion read the job back
+  from SQLite and decoded it only to read `parentId`; it now reads the job the
+  completion has just retained in memory, settling on the same microtask as
+  the old lookup, and keeps the old lookup when the job is not retained. Rows,
+  job events and the order of dashboard events are unchanged (checked on a
+  three-child flow acked concurrently, in memory and on SQLite). Draining
+  20,000 jobs with an embedded Worker on SQLite (50 concurrency, batch size
+  20, Apple M5 Max, macOS 27.2, Bun 1.4.4, four alternating fresh-process
+  samples per version) went from 4,712–4,757 to 4,942–4,969 jobs/s, about 4%
+  faster; memory mode is unchanged. These are diagnostic host results, not
+  publication benchmarks.
+
+### Bugfixes
+
+- `queue.getDelayedCount()` in embedded mode counted the jobs of one default
+  `getJobs` page, so it never reported more than 100: a queue with 250 delayed
+  jobs answered 100 while `getJobCountsAsync().delayed` answered 250. It now reads
+  the same counts as `getJobCounts()`, as over TCP and as the other per-state
+  count helpers do. (`test/repro-embedded-delayed-count-cap.test.ts`)
+- A simple-mode (`Bunqueue`) processor now learns that its job ended elsewhere: a
+  broker-enforced job `timeout`, `app.worker.cancelJob(id)`, `cancelAllJobs()` and
+  a forced worker close abort `app.getSignal(job.id)` with the Worker's reason and
+  stop any pending in-process retry. The wrapper dropped the Worker's signal, so the
+  processor kept running after the broker had already timed the job out. When the
+  processor honours that abort, the rejection counts as a failure for the circuit
+  breaker, as `app.cancel()` already did, so cancelling many running jobs with
+  `cancelAllJobs()` can open the circuit. (`test/repro-bunqueue-worker-signal.test.ts`,
+  `test/bunqueue-cancellation-parent-signal.test.ts`)
+- **Typed arrays in job data no longer arrive corrupted.** A `Float32Array`,
+  `Uint16Array`, `Float64Array` or any other non-byte TypedArray (and a
+  `DataView`) in job data, results, progress or events reached workers over TCP,
+  and SQLite readers after a restart, as a Uint8Array of the wrong bytes, and a
+  `BigInt64Array` made a TCP or durable add throw (an embedded buffered add
+  succeeded, then its write-buffer flush failed). msgpackr writes such a view as a msgpack
+  `bin` of its byte length but copies it element by element, leaving stale bytes
+  of its shared output buffer in the frame (the bytes changed from run to run).
+  `encodeMessagePack` now writes such a view as a `bin` of exactly its own
+  bytes wherever it sits in plain objects (including `Object.create(...)`
+  objects), arrays, Maps, Sets and Errors, so readers get exactly those bytes (a
+  `Uint8Array` in JavaScript). Class instances (with or without a `toJSON`) and
+  subclasses of those built-ins are left to msgpackr exactly as before, and so is
+  a built-in type an app encodes with its own `addExtension`, detected with an
+  empty sample of that type (an extension that writes the built-in bytes for an
+  empty value is not detected); a view inside one keeps the previous encoding.
+  The rewrite visits each value once, so deeply nested Sets and Maps a client
+  sends cost linear time. Frames without a view are byte-identical to before
+  (53,547 compared values); frames with no Set, Error, RegExp, ArrayBuffer or
+  non-Buffer binary value are encoded in one pass at unchanged cost, a frame
+  that carries a plain `Uint8Array` pays one extra scan (about 9%), and one with
+  a Set or Error also packs an empty sample of that type to check for an app
+  extension. A frame that needs the rewrite is encoded twice, so a `toJSON` inside
+  it runs twice. Rows already stored with corrupt bytes are not repaired. The
+  TypeScript SDK (`bunqueue-client`) used to refuse these views with
+  `SerializationError` and now sends them the same way.
+  (`test/repro-typed-array-payload-bytes.test.ts`,
+  `test/msgpack-byte-views.test.ts`)
+
 ### Documentation
 
+- The `bunqueue-assistant` agent (`agents/bunqueue-assistant.md`) now carries an
+  API matrix of every public surface, checked against the source: Queue and its
+  options, job options, the Job object, QueueEvents, QueueGroup, Worker and its
+  options and events, SandboxedWorker, simple mode, flows, store-and-forward,
+  errors and helpers, the workflow engine, `bunqueue/agents`, every MCP tool,
+  resource and prompt, the 107 TCP commands, the HTTP endpoints, the CLI and
+  the server environment variables, each with what it does and how it behaves
+  embedded and over TCP, plus the known caveats found while checking. Its MCP
+  count now reads 86 tool registrations instead of 75.
 - A new [Benchmark vs BullMQ](/guide/bullmq-benchmark/) page reports bunqueue
   2.9.20 against BullMQ 6.4.2 on Redis 8.10.2 (ioredis 6.0.0; BullMQ on both
   Node.js 24.22.1 and Bun 1.4.4), in memory and on disk, with the machine (AMD

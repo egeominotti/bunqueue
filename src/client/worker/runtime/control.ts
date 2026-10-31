@@ -77,6 +77,8 @@ export abstract class WorkerControl<T = unknown, R = unknown> extends WorkerStat
     const subscription = new TcpEventSubscription({
       connection: this.opts.connection,
       queue: this.queueKey,
+      // Only `stalled` is handled: the broker skips the pulled/completed frames per job.
+      eventTypes: [EventType.Stalled],
       onEvent: handleEvent,
       onError: (error) => {
         if (this.listenerCount('error') > 0) this.emit('error', error);

@@ -15,6 +15,8 @@ export interface HelloCommand extends BaseCommand {
 export interface SubscribeEventsCommand extends BaseCommand {
   readonly cmd: 'SubscribeEvents';
   readonly queue: string;
+  /** Only these event types (1..32 names of 1..64 characters); absent or null receives every type. */
+  readonly eventTypes?: readonly string[] | null;
 }
 
 /** Remove the lifecycle event subscription owned by this TCP connection. */

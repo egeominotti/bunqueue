@@ -123,16 +123,14 @@ export async function getFailedCount(ctx: CountsContext): Promise<number> {
   return counts.failed;
 }
 
-/** Get delayed job count */
+/**
+ * Get delayed job count.
+ * Reads the same counts as getJobCounts in both modes (never a getJobs page, which
+ * is capped at 100). Delayed jobs keep their own bucket while the queue is paused.
+ */
 export async function getDelayedCount(ctx: CountsContext): Promise<number> {
-  if (ctx.embedded) {
-    const jobs = getSharedManager().getJobs(ctx.name, { state: 'delayed' });
-    return jobs.length;
-  }
-  // Use GetJobCounts for queue-specific counts
-  const response = await ctx.tcp!.send({ cmd: 'GetJobCounts', queue: ctx.name });
-  if (!response.ok) return 0;
-  return (response.counts as { delayed?: number } | undefined)?.delayed ?? 0;
+  const counts = await getJobCountsAsync(ctx);
+  return counts.delayed;
 }
 
 /** Get total job count for the queue */

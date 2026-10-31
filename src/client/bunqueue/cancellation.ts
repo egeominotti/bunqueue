@@ -5,6 +5,11 @@
  * Grace periods are armed with `safeTimeout` and compared on the same monotonic clock,
  * so one longer than the runtime's timer limit (about 24.8 days) aborts at its
  * deadline instead of after about 1 ms. `Bunqueue.cancel()` validates the value.
+ *
+ * A registration can follow a parent signal: the Worker's per-delivery signal, which
+ * aborts on a broker-enforced job `timeout`, `worker.cancelJob()` and a forced close.
+ * Its abort (and reason) reaches the job's controller, and the listener is removed
+ * when the registration ends, so nothing outlives the job.
  */
 
 import { safeTimeout, type SafeTimer } from '../../shared/timers';
@@ -14,18 +19,26 @@ interface CancellationRegistration {
   readonly controller: AbortController;
   timer: SafeTimer | null;
   deadline: number | null;
+  unlink: (() => void) | null;
 }
 
 export class CancellationManager {
   private readonly currentByJob = new Map<string, CancellationRegistration>();
   private readonly registrations = new Map<AbortController, CancellationRegistration>();
 
-  /** Register a new AbortController for a job */
-  register(jobId: string): AbortController {
+  /** Register a new AbortController for a job, aborted too when `parent` aborts */
+  register(jobId: string, parent?: AbortSignal): AbortController {
     const controller = new AbortController();
-    const registration = { jobId, controller, timer: null, deadline: null };
+    const registration: CancellationRegistration = {
+      jobId,
+      controller,
+      timer: null,
+      deadline: null,
+      unlink: null,
+    };
     this.currentByJob.set(jobId, registration);
     this.registrations.set(controller, registration);
+    if (parent) this.follow(registration, parent);
     return controller;
   }
 
@@ -36,6 +49,7 @@ export class CancellationManager {
       : this.currentByJob.get(jobId);
     if (!registration || registration.jobId !== jobId) return;
     this.clearTimer(registration);
+    this.unlink(registration);
     this.registrations.delete(registration.controller);
     if (this.currentByJob.get(jobId) === registration) this.currentByJob.delete(jobId);
   }
@@ -81,8 +95,32 @@ export class CancellationManager {
     const registrations = [...this.registrations.values()];
     this.currentByJob.clear();
     this.registrations.clear();
-    for (const registration of registrations) this.clearTimer(registration);
+    for (const registration of registrations) {
+      this.clearTimer(registration);
+      this.unlink(registration);
+    }
     for (const registration of registrations) registration.controller.abort();
+  }
+
+  /** Propagate the parent's abort; an already-aborted parent aborts at once. */
+  private follow(registration: CancellationRegistration, parent: AbortSignal): void {
+    if (parent.aborted) {
+      registration.controller.abort(parent.reason);
+      return;
+    }
+    const onAbort = () => {
+      registration.unlink = null;
+      this.clearTimer(registration);
+      registration.controller.abort(parent.reason);
+    };
+    parent.addEventListener('abort', onAbort, { once: true });
+    registration.unlink = () => parent.removeEventListener('abort', onAbort);
+  }
+
+  private unlink(registration: CancellationRegistration): void {
+    const unlink = registration.unlink;
+    registration.unlink = null;
+    unlink?.();
   }
 
   private clearTimer(registration: CancellationRegistration): void {

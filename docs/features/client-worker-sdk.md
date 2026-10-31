@@ -267,7 +267,8 @@ a mismatch throws synchronously before polling or worker registration begins.
 
 `run()` (`worker/runtime/control.ts`) sets `running`, defers a `ready` emit via
 `queueMicrotask` (so immediately attached listeners still fire), subscribes to
-queue-scoped stalled events, registers the worker, and starts job-lease and
+queue-scoped stalled events (over TCP with `eventTypes: ["stalled"]`, so the
+broker sends no other type on that connection), registers the worker, and starts job-lease and
 worker-registration heartbeat timers. Both are `safeInterval`s with period
 `heartbeatInterval` (the job-lease one only without `skipLockRenewal`, neither
 when it is `0`): the embedded lease timer calls `manager.jobHeartbeat` per pulled

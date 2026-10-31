@@ -65,6 +65,14 @@ queue engine. The historical SDK implementation is isolated at `/legacy`.
 - Wire values must be portable: reject `BigInt`, non-finite numbers, cycles,
   accessors, functions, symbols, non-string map keys, and custom object types
   before writing. Plain objects, arrays, dates, and binary values remain valid.
+- Binary values are `Uint8Array`, `Buffer`, `ArrayBuffer`, any other
+  TypedArray (`Float32Array`, `BigInt64Array`, ...) and `DataView`. Each is
+  sent as a msgpack `bin` of exactly its own bytes (respecting `byteOffset`
+  and `byteLength`) and is read back as a `Uint8Array`; the element type is
+  not preserved. As with `Uint8Array` and `Map`, a subclass of a view counts as
+  that view: this SDK has no msgpack extensions, so there is no app encoding to
+  preserve (the broker, which may run app extensions, leaves view subclasses
+  untouched).
 - `undefined` fields are omitted; meaningful `false`, `0`, empty strings, and
   explicit empty arrays are not removed accidentally.
 - `PUSH` and `PUSHB` send the job name in top-level `name` and preserve `data`

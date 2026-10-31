@@ -61,7 +61,9 @@ export abstract class BunqueueRuntime<T, R> {
         : (options.processor as Processor<T, R>);
     }
 
-    const wrappedProcessor: Processor<T, R> = (job: Job<T & FlowJobData>) => this.processJob(job);
+    // The Worker's signal aborts on a job timeout, worker.cancelJob() and a forced close.
+    const wrappedProcessor: Processor<T, R> = (job: Job<T & FlowJobData>, context) =>
+      this.processJob(job, context?.signal);
     this.queue = new Queue<T>(name, this.buildQueueOptions(options));
     let worker: Worker<T, R> | null = null;
     try {
@@ -132,13 +134,13 @@ export abstract class BunqueueRuntime<T, R> {
     };
   }
 
-  private processJob(job: Job<T & FlowJobData>): Promise<R> {
+  private processJob(job: Job<T & FlowJobData>, workerSignal?: AbortSignal): Promise<R> {
     if (this.cb?.isOpen()) return Promise.reject(new Error('Circuit breaker is open'));
     if (this.ttlChecker?.isExpired(job.name, job.timestamp)) {
       return Promise.reject(new Error(`Job expired (age: ${Date.now() - job.timestamp}ms)`));
     }
 
-    const abortController = this.cancellation.register(job.id);
+    const abortController = this.cancellation.register(job.id, workerSignal);
     const runChain = () => this.runMiddlewareChain(job, abortController);
     let execution: Promise<R>;
     try {

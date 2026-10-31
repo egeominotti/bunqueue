@@ -28,6 +28,11 @@ function normalizeWireValue(value: unknown, active: WeakSet<object>): unknown {
     return new Date(value.getTime());
   }
   if (value instanceof Uint8Array || value instanceof ArrayBuffer) return value;
+  // Any other TypedArray or DataView travels as a msgpack `bin` of exactly its own
+  // bytes (msgpackr's own copy of such a view is element-wise and corrupts them).
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
   if (active.has(objectValue)) invalid('cyclic structures are unsupported');
   active.add(objectValue);
   try {

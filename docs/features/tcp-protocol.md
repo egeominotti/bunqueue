@@ -1,6 +1,6 @@
 # TCP Wire Protocol & Framing
 
-> **Category:** Transport · **Source:** `src/infrastructure/server/tcp.ts`, `src/infrastructure/server/tcp/`, `src/infrastructure/server/protocol.ts`, `src/infrastructure/server/protocol/`, `src/infrastructure/server/socketWriteQueue.ts`, `src/domain/types/commands/`, `src/domain/types/responses/`, `src/domain/response/builders.ts`, `src/shared/msgpack.ts`, `src/shared/serialization.ts`
+> **Category:** Transport · **Source:** `src/infrastructure/server/tcp.ts`, `src/infrastructure/server/tcp/`, `src/infrastructure/server/protocol.ts`, `src/infrastructure/server/protocol/`, `src/infrastructure/server/socketWriteQueue.ts`, `src/domain/types/commands/`, `src/domain/types/responses/`, `src/domain/response/builders.ts`, `src/shared/msgpack.ts`, `src/shared/msgpackByteViews.ts`, `src/shared/msgpackByteViewRewrite.ts`, `src/shared/msgpackProbe.ts`, `src/shared/serialization.ts`
 
 ## Purpose
 
@@ -11,7 +11,7 @@ This module is the binary transport layer that carries every client/server inter
 Owns:
 
 - **Length-prefixed framing** — `FrameParser` (`protocol/frameParser.ts`) reassembles complete frames from arbitrary TCP segment boundaries, and `FrameParser.frame()` prepends the 4-byte big-endian length prefix on the way out.
-- **MessagePack (de)serialization of the wire body** — the hardened `encodeMessagePack`/`decodeMessagePack` helpers wrap `msgpackr` (`shared/msgpack.ts:68-76`); the server decodes inbound commands in `tcp.ts:58-64` and frames responses in `tcp/responses.ts:5-10`.
+- **MessagePack (de)serialization of the wire body** — the hardened `encodeMessagePack`/`decodeMessagePack` helpers wrap `msgpackr` (`shared/msgpack.ts:69-81`); the server decodes inbound commands in `tcp.ts:58-64` and frames responses in `tcp/responses.ts:5-10`. A non-byte TypedArray (`Float32Array`, `Uint16Array`, `BigInt64Array`, ...) or a `DataView` is encoded as a msgpack `bin` holding exactly its own bytes (respecting `byteOffset`/`byteLength`), so a reader gets a `Uint8Array` with those bytes; the element type is not preserved. `Uint8Array`/`Buffer`/`ArrayBuffer` encode as before. See "Binary views" under Edge cases.
 - **TCP listener lifecycle** — `createTcpServer()` (`tcp.ts:20-148`) wires `Bun.listen` with `open`/`data`/`close`/`error`/`drain` socket handlers, plus `broadcast()` and `stop()`.
 - **Per-connection pipelining** — frames in one read are decoded and processed in parallel, bounded by a `Semaphore` of `MAX_CONCURRENT_PER_CONNECTION = 50` (`tcp/constants.ts:6`, `tcp/connections.ts:52`, `tcp.ts:93-108`).
 - **Write-side backpressure** — `SocketWriteQueue` (`socketWriteQueue.ts:24`) buffers unwritten tails on short writes and flushes them on `drain`.
@@ -282,6 +282,54 @@ connections (`closeAll`) and stops the listener; see the shutdown order in
   distinct own data properties. They round-trip through TCP and SQLite without
   prototype mutation or key collision; encoding bytes remain compatible with
   non-JavaScript SDKs.
+- **Binary views:** `encodeMessagePack` (`shared/msgpackByteViews.ts`) writes
+  a non-byte TypedArray (`Float32Array`, `Uint16Array`, `BigInt64Array`, ...)
+  or a `DataView` as a msgpack `bin` of exactly its own bytes, respecting
+  `byteOffset`/`byteLength`; the receiver (a worker, `getJob`, a non-JS SDK)
+  gets a `Uint8Array` of those bytes, not the original element type. Plain
+  msgpackr copies such a view element by element, which wrote one byte per
+  element plus stale bytes of its shared output buffer, threw for
+  `BigInt64Array` and wrote an empty `bin` for a `DataView`. The hot path is
+  msgpackr's default packer whose `moreTypes` option is a getter that returns
+  `false` and counts the read: msgpackr reads that option only for a
+  non-`Buffer` TypedArray, `DataView`, `ArrayBuffer`, `Set`, `Error`, `RegExp`
+  or a BigInt beyond 64 bits, so a frame without them is encoded in one pass at
+  unchanged cost. After a frame that did read it, a scan (allocation-free over
+  plain objects and arrays, allocating for Maps and Sets)
+  looks for a non-byte view; with none (e.g. the plain `Uint8Array`s the broker
+  decodes from `bin`) the bytes already written are kept, otherwise the value
+  is rewritten copy-on-write (each non-byte view replaced by a `Uint8Array`
+  over its bytes, no data copy) and packed again. For every value without a
+  non-byte view the bytes are identical to plain msgpackr; a circular value
+  still fails with msgpackr's own `RangeError`. The rewrite
+  (`shared/msgpackByteViewRewrite.ts`) only descends into what msgpackr writes
+  itself (objects whose `constructor` is `Object`, whatever their prototype, such
+  as `Object.create(defaults)`; null-prototype objects; `Array`, `Map`, `Set`,
+  `Error`), only rewrites built-in views, and rewrites each child exactly once,
+  so its cost is linear even for deeply nested Sets and Maps a client sends as
+  msgpack extensions. Class instances (with or without a `toJSON`), subclasses
+  of those built-ins and subclassed views stay opaque, so msgpackr, and an app's
+  own `addExtension` for its classes, encodes them exactly as before; a view
+  inside one keeps msgpackr's previous encoding. An app's own extension on a
+  built-in type (`Set`, `Error`, `Float32Array`, `DataView`, ...) also wins, as
+  far as an empty sample can tell: once per encode, an empty sample of each such type met in the rewrite is
+  packed with the probe, and the type counts as built-in only if the sample read
+  `moreTypes` and produced exactly the built-in bytes (`90` for a `Set`, `c4 00`
+  for a view, the `[name, message, cause]` array for `Error('')`; a BigInt view
+  must throw, as msgpackr's built-in path does even when empty). An app
+  extension is checked first and normally writes an ext prefix, so its type stays
+  opaque; one that writes exactly the built-in bytes for an empty value (an empty
+  `bin` for an empty view) is not detected and its non-empty values are rewritten.
+  The sample is a value the app never sent, so the app's extension also runs on
+  it. In the fallback mode below, with no probe, the rewrite applies to those
+  types regardless. A frame that takes the rewrite is encoded twice (probe, then
+  `pack`), so a `toJSON` or getter on any value in it runs twice, and getters on
+  rewritten containers can be read more than once (probe, scan, rewrite). A
+  frame that reads `moreTypes` without a non-byte view (a `Set`, `Error`,
+  `RegExp`, `ArrayBuffer` or plain `Uint8Array`) pays the scan, and for a `Set`
+  or `Error` also the empty-sample check. A module-load self-check (a TypedArray and a `DataView` must
+  read the option, a plain frame must not) falls back to the rewrite for every
+  frame if msgpackr stops behaving this way (`test/msgpack-byte-views.test.ts`).
 - **Error sanitization:** handler and transport boundaries redact SQLSTATE,
   constraint, relation, driver, host, SQLite, and network diagnostics to
   `Internal server error` before framing. Non-throwing storage-status payloads

@@ -109,6 +109,20 @@ The server decodes msgpack with `msgpackr` under a JavaScript engine:
 - Binary strings SHOULD be avoided in job data (the server round-trips them,
   but cross-language behavior of msgpack `bin` vs `str` differs); prefer
   UTF-8 text or base64.
+- Binary data is carried as msgpack `bin` only; no ext type is used for it.
+  The reference clients and the server encode any JavaScript binary view
+  (`Uint8Array`, `Buffer`, `ArrayBuffer`, any other TypedArray such as
+  `Float32Array` or `BigInt64Array`, and `DataView`) as a `bin` holding
+  exactly its own bytes (its `byteOffset`/`byteLength` window, in the
+  platform's byte order, little-endian in practice). The element type is not
+  transmitted: a reader (worker, `GetJob`, SQLite after a restart, any SDK)
+  receives a byte array (`Uint8Array` in JavaScript) and must reinterpret it
+  itself. The server and the in-repo `bunqueue` client apply this to views in
+  plain objects, arrays, Maps, Sets and Errors; a view inside a class instance or
+  one returned by `toJSON` is encoded by msgpackr as before, and so, as far as an
+  empty-sample check can tell, is a type an app encodes with its own msgpackr
+  extension. `bunqueue-client` rejects Sets, Errors and class instances before
+  writing, so it only meets views in plain objects, arrays and Maps.
 
 This is the single most common way to write a broken client. The reference
 implementations name the guard `jsSafe` (PHP/TS) / `_js_safe` (Python); it
@@ -241,14 +255,20 @@ Client MUSTs:
 
 #### Queue event stream
 
-| Command             | Request | Response |
-| ------------------- | ------- | -------- |
-| `SubscribeEvents`   | `queue` | `{}`     |
-| `UnsubscribeEvents` | none    | `{}`     |
+| Command             | Request                | Response |
+| ------------------- | ---------------------- | -------- |
+| `SubscribeEvents`   | `queue`, `eventTypes?` | `{}`     |
+| `UnsubscribeEvents` | none                   | `{}`     |
 
 One TCP connection can subscribe to one queue at a time. A new subscription
-replaces the previous queue; unsubscribe leaves the connection usable for
-normal commands. Matching lifecycle events are server-initiated frames:
+replaces the previous queue and filter; unsubscribe leaves the connection usable
+for normal commands. `eventTypes` (optional, 1 to 32 event type names of 1 to
+64 characters, e.g. `["stalled"]`) limits the stream to those types; without it
+(absent or `null`) the connection receives every type. An invalid value is
+refused and leaves the previous subscription in place. Names are not checked against the broker's own types, so a
+type the broker never emits just never arrives. A broker older than the filter
+ignores the field and sends every type, so a client must still check
+`event.eventType`. Matching lifecycle events are server-initiated frames:
 
 ```text
 { type: "event", event: JobEvent }
