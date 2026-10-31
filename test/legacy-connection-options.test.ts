@@ -18,6 +18,7 @@ import {
 import { Engine } from '../src/client/workflow';
 
 // The portable bunqueue-client bundle is built from the same canonical source.
+// Its declarations are a separate copy, so its classes are nominally distinct.
 const portable =
   (await import('../sdk/typescript/dist/index.js')) as unknown as typeof import('../src/client');
 

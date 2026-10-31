@@ -542,6 +542,7 @@ describe('Workflow Engine - Nested Workflows', () => {
 
     const parent = new Workflow('parent-with-bad-child')
       .step('setup', async () => ({ ready: true }), {
+        // Resolves to push()'s count, not void; the value is never asserted.
         compensate: (async () =>
           compensations.push('undo-setup')) as unknown as () => Promise<void>,
       })
@@ -578,6 +579,7 @@ describe('Workflow Engine - Combined Features', () => {
           return { orderId: 'ORD-777' };
         },
         {
+          // Resolves to push()'s count, not void; the value is never asserted.
           compensate: (async () =>
             compensations.push('cancel-order')) as unknown as () => Promise<void>,
         }
@@ -591,6 +593,7 @@ describe('Workflow Engine - Combined Features', () => {
         },
         {
           retry: 3,
+          // Resolves to push()'s count, not void; the value is never asserted.
           compensate: (async () => compensations.push('refund')) as unknown as () => Promise<void>,
         }
       )

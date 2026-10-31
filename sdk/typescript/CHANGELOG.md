@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The legacy `Job.updateProgress` (from `bunqueue-client/legacy`) and its
+  `ProgressHook` accept `number | object`, like the main client's `Job`. The
+  broker already stored an object as 0, with its JSON as the message when none
+  is given, so the
+  behavior and the emitted JavaScript are unchanged; only the type widens.
 - A non-byte TypedArray (`Float32Array`, `Uint16Array`, `BigInt64Array`, ...) or a
   `DataView` in job data is now sent as a msgpack `bin` of exactly its own bytes,
   as the broker writes it, instead of being refused with `SerializationError`.

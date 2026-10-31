@@ -19,8 +19,10 @@ import {
 import type { Job, JobId } from '../src/domain/types/job';
 
 // Helper to create a mock job
+// Legacy-shaped mock (null progress/heartbeat, lock fields, no name): not a valid Job.
 function createMockJob(id: number): Job {
   return {
+    // Foreign value: a bigint id, not the branded string JobId.
     id: BigInt(id) as unknown as JobId,
     queue: 'test-queue',
     data: { test: id },

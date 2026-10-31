@@ -29,9 +29,9 @@ async function runExampleCli(selection: string) {
 }
 
 function fakeRunners(calls: Scenario[]): Record<Scenario, () => void> {
-  return Object.fromEntries(
+  return Object.fromEntries<() => void>(
     scenarioNames.map((name) => [name, () => calls.push(name)])
-  ) as unknown as Record<Scenario, () => void>;
+  ) as Record<Scenario, () => void>;
 }
 
 describe('PostgreSQL multi-broker example runner', () => {

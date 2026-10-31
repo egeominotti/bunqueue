@@ -7,7 +7,7 @@ import type { ConnectionLike, Response } from './connection-types.js';
 
 export type JobRaw = Record<string, unknown>;
 
-export type ProgressHook = (job: Job, progress: number) => void;
+export type ProgressHook = (job: Job, progress: number | object) => void;
 
 export class Job<T = unknown> {
   readonly raw: JobRaw;
@@ -144,8 +144,11 @@ export class Job<T = unknown> {
     return this.conn.call(command);
   }
 
-  /** Report processing progress (0-100) to the server. */
-  async updateProgress(progress: number, message?: string): Promise<void> {
+  /**
+   * Report processing progress (0-100) to the server. An object is accepted as by
+   * the main client: the broker stores 0 with the object's JSON as the message.
+   */
+  async updateProgress(progress: number | object, message?: string): Promise<void> {
     await this.call({ cmd: 'Progress', id: this.id, progress, message });
     this.onProgress?.(this, progress);
   }

@@ -16,6 +16,7 @@ import { QueueManager } from '../src/application/queueManager';
 import { createTcpServer } from '../src/infrastructure/server/tcp';
 
 // The shipped bundle drives the portable node:net transport even under Bun.
+// Its declarations are a separate copy, so its classes are nominally distinct.
 const portable = (await import('../sdk/typescript/dist/index.js')) as unknown as typeof native;
 
 async function freePort(): Promise<number> {

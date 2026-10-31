@@ -46,11 +46,11 @@ describe('stall count persistence', () => {
       timeout: null,
       uniqueKey: null,
       customId: null,
-      dependsOn: [],
+      dependsOn: [] as Job['dependsOn'],
       parentId: null,
-      childrenIds: [],
+      childrenIds: [] as Job['childrenIds'],
       childrenCompleted: 0,
-      tags: [],
+      tags: [] as string[],
       lifo: false,
       groupId: null,
       progress: 0,
@@ -74,8 +74,8 @@ describe('stall count persistence', () => {
       deduplicationReplace: false,
       debounceId: null,
       debounceTtl: null,
-      timeline: [],
-    } as unknown as Job);
+      timeline: [] as Job['timeline'],
+    } as Job); // The fixture omits name; this test asserts only attempts and stallCount.
 
     const job = storage.getJob(id)!;
     job.attempts = 2;

@@ -125,6 +125,7 @@ describe('PostgreSQL queue refresh retries', () => {
         () =>
           new PostgresQueueRefreshes(
             ready,
+            // Dummy loader with a foreign result (true, not void); only retryDelayMs is under test.
             (async () => true) as unknown as () => Promise<void>,
             () => undefined,
             retryDelayMs

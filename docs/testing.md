@@ -11,13 +11,13 @@ state. Performance benchmarks use a different isolation model; see
 through `tsconfig.test.json`; `sdk/conformance` is type-checked by the SDK
 workflow after the SDK build. The test tree imports generated output (the
 portable SDK build in `sdk/typescript/dist`, the package build in `dist` for
-the examples' `bunqueue/client` imports, and the docs dependencies), so run
-`bun run typecheck:prepare` on a fresh clone and again after changing `src/` or
-`sdk/typescript/` (otherwise the check reads stale builds); the CI Type Check
-job runs it before `bun run typecheck`. The Go SDK e2e harness has the same
+the examples' `bunqueue/client` imports, and the docs dependencies), so
+`bun run typecheck` first runs `bun run typecheck:prepare` (about 4 s) and never
+reads a stale build, locally, in the pre-commit hook and in CI. The Go SDK e2e harness has the same
 port-race policy as `runServer`: its server binds `127.0.0.1`, counts as ready
 only while alive with both listeners answering (TCP, then `/healthz`), and is
-relaunched on fresh ports after a bind collision, except on a restart. No test file is excluded:
+relaunched on fresh ports only when it exited on a bind collision (never after
+a timeout, never on a restart). No test file is excluded:
 `test/tsconfig-test-exclusions.test.ts` fails if `tsconfig.test.json` excludes
 a file or weakens the compiler options it inherits. When auditing changed tests,
 also run `bun check --no-script -p .changed-audit-tsconfig.json` in the

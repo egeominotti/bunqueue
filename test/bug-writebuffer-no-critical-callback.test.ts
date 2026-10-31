@@ -29,6 +29,7 @@ import { unlinkSync } from 'fs';
 
 function mockJob(id: number): Job {
   return {
+    // Foreign value: a bigint id, not the branded string JobId.
     id: BigInt(id) as unknown as JobId,
     queue: 'q',
     data: { i: id },
@@ -173,6 +174,7 @@ describe('WriteBuffer critical-loss handling at SqliteStorage', () => {
 
     expect(captured.length).toBe(1);
     expect(captured[0].jobs.length).toBe(1);
+    // Foreign value: a bigint id, not the branded string JobId.
     expect(captured[0].jobs[0].id).toBe(BigInt(42) as unknown as JobId);
     expect(captured[0].error.message).toBe('Boom');
 

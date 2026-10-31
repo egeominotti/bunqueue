@@ -92,6 +92,7 @@ describe('persisted mutation contracts', () => {
     legacy.run(MIGRATION_TABLE);
     legacy.run(
       'INSERT INTO migrations (version, applied_at) VALUES (21, ?)',
+      // bun-types types each variadic binding as an array; bun:sqlite binds scalars.
       Date.now() as unknown as SQLQueryBindings[]
     );
     legacy.close();

@@ -52,6 +52,7 @@ function createTestDependencies(overrides?: Partial<ContextDependencies>): Conte
     jobIndex: new Map<JobId, JobLocation>(),
     completedJobs: new BoundedSet<JobId>(DEFAULT_CONFIG.maxCompletedJobs),
     completedJobsData: new BoundedMap<JobId, Job>(DEFAULT_CONFIG.maxCompletedJobs),
+    // Foreign class: a BoundedMap stands in for the declared LRUMap.
     jobResults: new BoundedMap<JobId, unknown>(
       DEFAULT_CONFIG.maxJobResults
     ) as unknown as ContextDependencies['jobResults'],

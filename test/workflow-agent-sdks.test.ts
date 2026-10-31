@@ -417,6 +417,7 @@ describe('docs: Mastra', () => {
       name: 'refunder',
       instructions: 'Refund the customer.',
       model: new MockLanguageModelV3({
+        // Test double: the mock returns a legacy finish-reason shape (no `unified`).
         doGenerate: (async () => {
           turn++;
           if (turn === 1) {

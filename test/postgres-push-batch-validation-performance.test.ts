@@ -59,6 +59,7 @@ describe('PostgreSQL PUSHB validation hot path', () => {
         const jobs: JobInput[] = Array.from({ length: 100 }, (_, index) => ({
           data: { index },
         }));
+        // Deliberately partial context: validatePushBatchJobs reads only queueManager.
         const error = await validatePushBatchJobs(jobs, {
           queueManager: manager,
         } as unknown as HandlerContext);

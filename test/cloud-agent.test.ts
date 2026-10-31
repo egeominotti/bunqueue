@@ -236,12 +236,12 @@ function makeSnapshot(seq: number): CloudSnapshot {
       temporalIndexTotal: 0,
       delayedHeapTotal: 0,
     },
-    queues: [],
+    queues: [] as CloudSnapshot['queues'],
     workers: { total: 0, active: 0, totalProcessed: 0, totalFailed: 0, activeJobs: 0 },
-    crons: [],
+    crons: [] as CloudSnapshot['crons'],
     storage: { diskFull: false, error: null },
     taskErrors: {},
-  } as unknown as CloudSnapshot;
+  } as CloudSnapshot;
 }
 
 describe('SnapshotBuffer', () => {
@@ -336,15 +336,15 @@ describe('HttpSender', () => {
       instanceName: 'test',
       intervalMs: 15000,
       includeJobData: false,
-      redactFields: [],
-      eventFilter: [],
+      redactFields: [] as string[],
+      eventFilter: [] as string[],
       bufferSize: 10,
       circuitBreakerThreshold: 5,
       circuitBreakerResetMs: 60000,
       useWebSocket: false,
       useHttp: true,
       dataPath: null,
-    } as unknown as CloudConfig);
+    } as CloudConfig); // remoteCommands is omitted: HttpSender never reads it.
 
     const snapshot = makeSnapshot(1);
     await sender.send(snapshot);
@@ -368,15 +368,15 @@ describe('HttpSender', () => {
       instanceName: 'test',
       intervalMs: 15000,
       includeJobData: false,
-      redactFields: [],
-      eventFilter: [],
+      redactFields: [] as string[],
+      eventFilter: [] as string[],
       bufferSize: 10,
       circuitBreakerThreshold: 5,
       circuitBreakerResetMs: 60000,
       useWebSocket: false,
       useHttp: true,
       dataPath: null,
-    } as unknown as CloudConfig);
+    } as CloudConfig); // remoteCommands is omitted: HttpSender never reads it.
 
     // Cause failures
     statusCode = 500;
@@ -404,15 +404,15 @@ describe('HttpSender', () => {
       instanceName: 'test',
       intervalMs: 15000,
       includeJobData: false,
-      redactFields: [],
-      eventFilter: [],
+      redactFields: [] as string[],
+      eventFilter: [] as string[],
       bufferSize: 10,
       circuitBreakerThreshold: 5,
       circuitBreakerResetMs: 60000,
       useWebSocket: false,
       useHttp: true,
       dataPath: null,
-    } as unknown as CloudConfig);
+    } as CloudConfig); // remoteCommands is omitted: HttpSender never reads it.
 
     await sender.send(makeSnapshot(1));
 
@@ -432,15 +432,15 @@ describe('HttpSender', () => {
       instanceName: 'test',
       intervalMs: 15000,
       includeJobData: false,
-      redactFields: [],
-      eventFilter: [],
+      redactFields: [] as string[],
+      eventFilter: [] as string[],
       bufferSize: 100,
       circuitBreakerThreshold: 2,
       circuitBreakerResetMs: 60000,
       useWebSocket: false,
       useHttp: true,
       dataPath: null,
-    } as unknown as CloudConfig);
+    } as CloudConfig); // remoteCommands is omitted: HttpSender never reads it.
 
     statusCode = 500;
     await sender.send(makeSnapshot(1)); // failure 1

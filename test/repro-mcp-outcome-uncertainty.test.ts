@@ -120,7 +120,8 @@ for (const mode of ['embedded', 'tcp'] as const) {
       for (const call of calls) {
         const tool = tools.find((candidate) => candidate.name === call.name);
         expect(tool).toBeDefined();
-        const schema = tool?.outputSchema as unknown as {
+        const schema = tool?.outputSchema as {
+          type: 'object';
           properties: { data: { anyOf: Array<{ properties?: { success?: { type?: string } } }> } };
         };
         expect(schema.properties.data.anyOf[0].properties?.success?.type).toBe('boolean');

@@ -989,6 +989,7 @@ describe('response.ts', () => {
 
   describe('stats', () => {
     test('should create StatsResponse', () => {
+      // Legacy field names (queued, processing): deliberately not a StatsData shape.
       const s = {
         queued: 50,
         processing: 10,
@@ -1005,6 +1006,7 @@ describe('response.ts', () => {
     });
 
     test('should include reqId', () => {
+      // Legacy field names (queued, processing): deliberately not a StatsData shape.
       const s = {
         queued: 0,
         processing: 0,

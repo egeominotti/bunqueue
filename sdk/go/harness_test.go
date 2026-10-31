@@ -69,13 +69,15 @@ func (s *testServer) start() error {
 		if attempt > 1 {
 			s.port, s.httpPort = freePort(), freePort()
 		}
-		output, err := s.launch()
+		output, exited, err := s.launch()
 		if err == nil {
 			s.started = true
 			return nil
 		}
 		lastErr = err
-		if !isBindCollision(output) {
+		// Relaunch only a server that really exited on a bind collision (as the
+		// TypeScript runServer does), never one that merely timed out.
+		if !exited || !isBindCollision(output) {
 			break
 		}
 	}
@@ -86,10 +88,10 @@ func (s *testServer) start() error {
 // and both of ITS listeners answer: TCP binds before HTTP, so a healthy
 // /healthz plus an open TCP port cannot come from a process that stole either
 // port. A server that exits is reported at once, with its output.
-func (s *testServer) launch() (string, error) {
+func (s *testServer) launch() (output string, exited bool, err error) {
 	root, err := repoRoot()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	cmd := exec.Command("bun", "src/main.ts")
 	cmd.Dir = root
@@ -104,33 +106,38 @@ func (s *testServer) launch() (string, error) {
 	for key, value := range s.extraEnv {
 		cmd.Env = append(cmd.Env, key+"="+value)
 	}
-	output := &boundedOutput{}
-	cmd.Stdout = output
-	cmd.Stderr = output
+	captured := &boundedOutput{}
+	cmd.Stdout = captured
+	cmd.Stderr = captured
+	// Wait must not block on a pipe a grandchild still holds open after the
+	// server itself is gone.
+	cmd.WaitDelay = 2 * time.Second
 	if err := cmd.Start(); err != nil {
-		return "", err
+		return "", false, err
 	}
-	exited := make(chan struct{})
+	done := make(chan struct{})
 	go func() {
 		_ = cmd.Wait()
-		close(exited)
+		close(done)
 	}()
-	s.cmd, s.exited = cmd, exited
+	s.cmd, s.exited = cmd, done
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
-		case <-exited:
+		case <-done:
 			s.cmd, s.exited = nil, nil
-			return output.String(), fmt.Errorf("bunqueue server exited before it was ready: %s", output.String())
+			text := captured.String()
+			return text, true, fmt.Errorf("bunqueue server exited before it was ready: %s", text)
 		default:
 		}
 		if s.ready() {
-			return "", nil
+			return "", false, nil
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	s.crash()
-	return output.String(), fmt.Errorf("bunqueue server did not start within 15s: %s", output.String())
+	text := captured.String()
+	return text, false, fmt.Errorf("bunqueue server did not start within 15s: %s", text)
 }
 
 func (s *testServer) ready() bool {

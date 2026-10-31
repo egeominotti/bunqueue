@@ -103,6 +103,7 @@ describe('job options validator', () => {
   });
 });
 
+// MODES is a readonly tuple; describe.each needs a mutable array (see Modes).
 describe.each(MODES as unknown as Modes)('negative delay runs now [%s]', (mode) => {
   test('Queue.add: waiting, pulled at once, ahead of an earlier delay-0 job', async () => {
     harness = await startHarness('negative-delay-add', mode);
@@ -191,6 +192,7 @@ describe('HTTP job routes accept a negative delay (ready at once)', () => {
   });
 });
 
+// MODES is a readonly tuple; describe.each needs a mutable array (see Modes).
 describe.each(MODES as unknown as Modes)('MCP add tools accept a negative delay [%s]', (mode) => {
   test('add_job, add_jobs_bulk, add_flow and add_cron', async () => {
     const m = await startMcp({ mode });

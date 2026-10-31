@@ -56,6 +56,7 @@ interface Recorder {
  * It records how much history it was given each time it was asked.
  */
 function scriptedModel(rec: Recorder) {
+  // Test double: the mock returns a legacy finish-reason shape (no `unified`).
   return new MockLanguageModelV3({
     doGenerate: async (options: { prompt: unknown[] }) => {
       rec.calls++;

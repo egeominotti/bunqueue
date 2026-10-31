@@ -126,6 +126,7 @@ describe('Fix Verified: Memory Leak in Waiters (eventsManager.ts:56-82)', () => 
 
     // Create waiters for non-existent jobs
     const waitPromises = fakeJobIds.map((jobId) =>
+      // Foreign value: a bigint id, not the branded string JobId.
       qm.waitForJobCompletion(jobId as unknown as JobId, TIMEOUT_MS)
     );
 
@@ -207,6 +208,7 @@ describe('Fix Verified: Memory Leak in Waiters (eventsManager.ts:56-82)', () => 
       const waitPromises = [];
       for (let i = 0; i < WAITERS_PER_ITERATION; i++) {
         const fakeId = BigInt(iter * 1000000 + i);
+        // Foreign value: a bigint id, not the branded string JobId.
         waitPromises.push(qm.waitForJobCompletion(fakeId as unknown as JobId, TIMEOUT_MS));
       }
 
@@ -252,6 +254,7 @@ describe('EventsManager Isolated Tests', () => {
 
     // Wait for non-existent job
     const result = await eventsManager.waitForJobCompletion(
+      // Foreign value: a bigint id, not the branded string JobId.
       fakeJobId as unknown as JobId,
       TIMEOUT_MS
     );

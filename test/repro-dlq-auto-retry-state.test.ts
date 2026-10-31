@@ -42,6 +42,7 @@ function dlqContext(manager: QueueManager): DlqContext {
     storage: SqliteStorage | null;
   };
 
+  // Deliberately partial context: jobResultQueues and jobLogQueues are omitted.
   return {
     shards: manager.getShards(),
     jobIndex: manager.getJobIndex(),

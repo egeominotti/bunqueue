@@ -9,7 +9,8 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --ignore-scripts
 COPY src/ ./src/
 COPY tsconfig.json ./
-RUN bun run typecheck
+# The image holds src/ only: type-check it (bun run typecheck also checks the test tree).
+RUN bun check --no-script
 RUN case "$TARGETARCH" in amd64) arch=x64 ;; arm64) arch=arm64 ;; *) exit 1 ;; esac; \
     case "$VARIANT" in alpine) libc=-musl ;; debian|slim|distroless) libc= ;; *) exit 1 ;; esac; \
     bun build --compile --minify --target="bun-linux-${arch}${libc}" src/main.ts --outfile bunqueue

@@ -88,10 +88,8 @@ there is no JavaScript linter. SDKs in other languages keep their own toolchain
 (`gofmt`, `go vet`, `cargo fmt`, `cargo clippy`, `mix format`, `php -l`).
 
 ```bash
-# Type check. typecheck:prepare builds what the test tree imports (the SDK
-# build, the package build, the docs dependencies): run it on a fresh clone
-# and again after changing src/ or sdk/typescript/, or the check reads stale builds.
-bun run typecheck:prepare
+# Type check. It first rebuilds what the test tree imports (the SDK build,
+# the package build, the docs dependencies), so it never reads a stale build.
 bun run typecheck
 
 # Format code

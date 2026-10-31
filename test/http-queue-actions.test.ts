@@ -76,12 +76,14 @@ describe('HTTP Queue Endpoints', () => {
       const pause = await handleCommand({ cmd: 'Pause', queue: 'q-pr' }, ctx);
       expect(pause.ok).toBe(true);
 
+      // IsPaused replies { paused }, a shape outside the declared Response union.
       const isPaused = await handleCommand({ cmd: 'IsPaused', queue: 'q-pr' }, ctx);
       expect((isPaused as unknown as { paused: boolean }).paused).toBe(true);
 
       const resume = await handleCommand({ cmd: 'Resume', queue: 'q-pr' }, ctx);
       expect(resume.ok).toBe(true);
 
+      // IsPaused replies { paused }, a shape outside the declared Response union.
       const isResumed = await handleCommand({ cmd: 'IsPaused', queue: 'q-pr' }, ctx);
       expect((isResumed as unknown as { paused: boolean }).paused).toBe(false);
     });
@@ -106,6 +108,7 @@ describe('HTTP Queue Endpoints', () => {
 
       const r = await handleCommand({ cmd: 'ListQueues' }, ctx);
       expect(r.ok).toBe(true);
+      // ListQueues replies string names, not the QueueInfo[] that QueuesResponse declares.
       const queues = (r as unknown as { queues: string[] }).queues;
       expect(queues).toContain('alpha');
       expect(queues).toContain('beta');

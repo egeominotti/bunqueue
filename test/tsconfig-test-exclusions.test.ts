@@ -47,3 +47,38 @@ test('bun run typecheck runs the test project, not only src', () => {
   };
   expect(pkg.scripts.typecheck).toContain('bun check --no-script -p tsconfig.test.json');
 });
+
+test('no TypeScript file switches type checking off inline', async () => {
+  // The nocheck directive silences a whole file and the ignore directive a line, without a
+  // trace in tsconfig. The files are read from disk (not with git: the sandbox images and
+  // Machine snapshots have no .git), and the directives are built from fragments so this
+  // test does not match itself.
+  const directives = ['@ts-' + 'nocheck', '@ts-' + 'ignore'];
+  const skip = /(^|\/)(node_modules|dist|dist-test|artifacts|\.claude|\.git)\//;
+  const roots = [
+    'src',
+    'test',
+    'scripts',
+    'bench',
+    'examples',
+    'sdk/conformance',
+    'sdk/typescript/src',
+    'sdk/typescript/tests',
+    'docs/src',
+  ];
+  const glob = new Bun.Glob('**/*.{ts,tsx,mts,cts}');
+  const found: string[] = [];
+  let scanned = 0;
+  for (const root of roots) {
+    for await (const file of glob.scan({ cwd: join(ROOT, root), dot: false })) {
+      if (skip.test(`${root}/${file}`)) continue;
+      scanned++;
+      const text = await Bun.file(join(ROOT, root, file)).text();
+      for (const directive of directives)
+        if (text.includes(directive)) found.push(`${root}/${file}: ${directive}`);
+    }
+  }
+  // A scan that read nothing would pass vacuously.
+  expect(scanned).toBeGreaterThan(1000);
+  expect(found).toEqual([]);
+});

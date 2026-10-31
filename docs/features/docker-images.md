@@ -11,7 +11,8 @@ Alpine 3.22 uses musl. Debian 13, Debian 13 slim, and distroless
 the executable. All bases include CA certificates and required runtime libraries.
 
 The builder uses Bun 1.4.4 on the build host's architecture, installs the frozen
-lockfile with lifecycle scripts disabled, runs typecheck, and cross-compiles for
+lockfile with lifecycle scripts disabled, type-checks `src` (`bun check
+--no-script`; the image holds no test tree), and cross-compiles for
 Docker's target architecture using `--compile --minify`. Only amd64 and arm64
 are accepted. The musl target is selected only for Alpine. The final stage copies
 the compiled executable and an empty owned data directory. It never copies the

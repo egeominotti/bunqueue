@@ -105,6 +105,28 @@ head:
 - The Go SDK e2e harness no longer fails after 15 s when another process takes
   its port between `freePort()` and the server's bind: it binds `127.0.0.1`,
   detects the exit at once and relaunches on fresh ports.
+- `bun run typecheck` now runs `typecheck:prepare` itself (about 4 s; its
+  package build is `tsc --noCheck`, emit only, so type checking stays with
+  `bun check`), so a
+  local run or the pre-commit hook can no longer check the test tree against a
+  stale SDK or package build; the CI Type Check job just runs `typecheck`.
+- CI treats TypeScript and JavaScript under `docs/` as code: a change that
+  touches only `docs/src/lib/*.ts` (which tests import) now runs the type
+  check and the test jobs instead of skipping them as a docs-only change.
+- `test/tsconfig-test-exclusions.test.ts` also fails if any TypeScript file
+  under the type-checked folders contains a nocheck or ignore directive (it
+  reads the files from disk, so it also works where there is no `.git`).
+- The Docker image build type-checks `src` with `bun check --no-script`: since
+  the test tree became type-checked, its `bun run typecheck` step failed,
+  because the image holds `src/` only. The image is built only for releases,
+  so no published image was affected.
+- The Go e2e harness relaunches only a server that exited on a bind collision
+  (not one that timed out), and sets `cmd.WaitDelay` so a child holding the
+  output pipe cannot block a crash or stop.
+- The standalone TypeScript SDK's legacy `Job.updateProgress` (and its
+  progress hook) accept `number | object`, like the main client; the broker
+  already normalized objects the same way (0, with the object's JSON as the
+  message when none is given), and the emitted JavaScript is unchanged.
 
 ### Documentation
 

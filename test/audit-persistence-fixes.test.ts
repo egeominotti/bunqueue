@@ -63,6 +63,7 @@ import { jobId } from '../src/domain/types/job';
 
 function mockJob(id: number, queue = 'q'): Job {
   return {
+    // Foreign value: a bigint id, not the branded string JobId.
     id: BigInt(id) as unknown as JobId,
     queue,
     data: { i: id },

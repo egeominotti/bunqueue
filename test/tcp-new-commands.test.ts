@@ -10,7 +10,13 @@ import { handleGetChildrenValues } from '../src/infrastructure/server/handlers/q
 import { handleStorageStatus } from '../src/infrastructure/server/handlers/management';
 import { handleCommand } from '../src/infrastructure/server/handler';
 import type { Command } from '../src/domain/types/command';
-import type { Response } from '../src/domain/types/response';
+import type {
+  CronResponse,
+  DataResponse,
+  ErrorResponse,
+  Response,
+} from '../src/domain/types/response';
+import type { StorageHealthStatus } from '../src/shared/storageHealth';
 
 function createContext(qm: QueueManager): HandlerContext {
   return {
@@ -52,7 +58,7 @@ describe('CronGet command', () => {
     ) as Response;
 
     expect(res.ok).toBe(true);
-    const cron = (res as unknown as Record<string, unknown>).cron as Record<string, unknown>;
+    const cron = (res as CronResponse).cron;
     expect(cron.name).toBe('daily-cleanup');
     expect(cron.queue).toBe('maintenance');
     expect(cron.schedule).toBe('0 0 * * *');
@@ -66,7 +72,7 @@ describe('CronGet command', () => {
     ) as Response;
 
     expect(res.ok).toBe(false);
-    expect((res as unknown as Record<string, unknown>).error).toBe('Cron job not found');
+    expect((res as ErrorResponse).error).toBe('Cron job not found');
   });
 
   test('should include executions and timezone fields', () => {
@@ -84,7 +90,7 @@ describe('CronGet command', () => {
     ) as Response;
 
     expect(res.ok).toBe(true);
-    const cron = (res as unknown as Record<string, unknown>).cron as Record<string, unknown>;
+    const cron = (res as CronResponse).cron;
     expect(cron.executions).toBe(0);
     expect(cron.timezone).toBe('Europe/Rome');
   });
@@ -100,7 +106,7 @@ describe('CronGet command', () => {
     const res = await handleCommand({ cmd: 'CronGet', name: 'routed-cron' } as Command, ctx);
 
     expect(res.ok).toBe(true);
-    const cron = (res as unknown as Record<string, unknown>).cron as Record<string, unknown>;
+    const cron = (res as CronResponse).cron;
     expect(cron.name).toBe('routed-cron');
   });
 });
@@ -134,7 +140,7 @@ describe('GetChildrenValues command', () => {
     );
 
     expect(res.ok).toBe(true);
-    const data = (res as unknown as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (res as DataResponse<{ values: Record<string, unknown> }>).data;
     expect(data.values).toEqual({});
   });
 
@@ -145,7 +151,7 @@ describe('GetChildrenValues command', () => {
     );
 
     expect(res.ok).toBe(true);
-    const data = (res as unknown as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (res as DataResponse<{ values: Record<string, unknown> }>).data;
     expect(data.values).toEqual({});
   });
 
@@ -185,7 +191,7 @@ describe('StorageStatus command', () => {
     );
 
     expect(res.ok).toBe(true);
-    const data = (res as unknown as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (res as DataResponse<StorageHealthStatus>).data;
     expect(typeof data.diskFull).toBe('boolean');
     expect(data.diskFull).toBe(false); // Normal conditions
     expect(data.error).toBeNull();
@@ -195,7 +201,7 @@ describe('StorageStatus command', () => {
     const res = await handleCommand({ cmd: 'StorageStatus' } as Command, ctx);
 
     expect(res.ok).toBe(true);
-    const data = (res as unknown as Record<string, unknown>).data as Record<string, unknown>;
+    const data = (res as DataResponse<StorageHealthStatus>).data;
     expect(typeof data.diskFull).toBe('boolean');
   });
 });

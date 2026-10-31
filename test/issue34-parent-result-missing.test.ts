@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DEFAULT_CONFIG } from '../src/application/types/config';
 import { Queue, Worker, FlowProducer, shutdownManager } from '../src/client';
+import { getSharedManager } from '../src/client/manager';
 import { BoundedMap } from '../src/shared/boundedMap';
 
 const tempDirs: string[] = [];
@@ -27,6 +28,15 @@ function tempDataPath(): string {
   const dir = mkdtempSync(join(tmpdir(), 'bunqueue-issue34-'));
   tempDirs.push(dir);
   return join(dir, 'queue.db');
+}
+
+/** Poll until `check` holds; fails the test after `timeoutMs`. */
+async function waitUntil(check: () => Promise<boolean>, timeoutMs = 60000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error('waitUntil: condition not met in time');
+    await Bun.sleep(50);
+  }
 }
 
 describe('Issue #34 - Parent result data missing', () => {
@@ -195,92 +205,79 @@ describe('Issue #34 - Parent result data missing', () => {
     queue.close();
   }, 60000);
 
-  test('getChildrenValues returns empty when children results are evicted', async () => {
+  test('getChildrenValues reads evicted children results back from SQLite', async () => {
+    // Issue #34 for getChildrenValues: while the parent is live its children's
+    // results are pinned in memory (the dependency tracker), so the storage
+    // fallback only matters once the parent has completed. Order: children and
+    // parent complete, then more than maxJobResults other jobs complete (the
+    // jobResults LRU evicts the children's results), then the parent's children
+    // values are read. Nothing reads the children's results before the flood.
     const queue = new Queue('issue34-children-evict', { embedded: true, dataPath: tempDataPath() });
     const flow = new FlowProducer({ embedded: true });
     queue.obliterate();
 
-    let parentChildrenValues: Record<string, unknown> = {};
-    let resolve: () => void;
-    const done = new Promise<void>((r) => (resolve = r));
-
     let fillerCompleted = 0;
+    // Must exceed the result cache (maxJobResults) so the flood really evicts.
     const FILLER_COUNT = DEFAULT_CONFIG.maxJobResults + 100;
 
     const worker = new Worker(
       'issue34-children-evict',
       async (job) => {
-        const data = job.data as { role: string; value?: number; filler?: boolean };
-
-        if (data.filler) {
+        const data = job.data as { role: string; value?: number };
+        if (data.role === 'filler') {
           fillerCompleted++;
           return { filler: true };
         }
-
-        if (data.role === 'child') {
-          return { childValue: (data.value ?? 0) * 10 };
-        }
-
-        if (data.role === 'parent') {
-          // Wait for fillers to complete (evict children results)
-          // Push fillers from here to ensure children completed first
-          for (let batch = 0; batch < FILLER_COUNT / 50; batch++) {
-            const jobs = Array.from({ length: 50 }, (_, _i) => ({
-              name: 'filler',
-              data: { filler: true, role: 'filler' },
-            }));
-            await queue.addBulk(jobs);
-          }
-
-          // Wait for fillers to complete
-          while (fillerCompleted < FILLER_COUNT) {
-            await Bun.sleep(100);
-          }
-          await Bun.sleep(500);
-
-          // Now try to get children values - they may have been evicted
-          parentChildrenValues = await queue.getChildrenValues(job.id);
-          resolve!();
-          return { summary: 'done' };
-        }
-
-        return {};
+        if (data.role === 'child') return { childValue: (data.value ?? 0) * 10 };
+        return { summary: 'done' };
       },
       { embedded: true, concurrency: 50 }
     );
 
-    // Create flow: parent waits for 2 children
-    await flow.add({
+    // Step 1: parent waits for 2 children; the whole flow completes.
+    const node = await flow.add({
       name: 'parent',
       queueName: 'issue34-children-evict',
-      data: { role: 'parent', value: 0 },
+      data: { role: 'parent' },
       children: [
-        {
-          name: 'child-a',
-          queueName: 'issue34-children-evict',
-          data: { role: 'child', value: 1 },
-        },
-        {
-          name: 'child-b',
-          queueName: 'issue34-children-evict',
-          data: { role: 'child', value: 2 },
-        },
+        { name: 'child-a', queueName: 'issue34-children-evict', data: { role: 'child', value: 1 } },
+        { name: 'child-b', queueName: 'issue34-children-evict', data: { role: 'child', value: 2 } },
       ],
     });
+    const parentId = node.job.id;
+    const childIds = (node.children ?? []).map((child) => child.job.id);
+    expect(childIds).toHaveLength(2);
+    await waitUntil(async () => (await queue.getJobState(parentId)) === 'completed');
 
-    await done;
-    await Bun.sleep(200);
+    // Step 2: flood with filler jobs; their results push the children's results
+    // out of the in-memory jobResults LRU.
+    for (let batch = 0; batch < FILLER_COUNT / 50; batch++) {
+      const jobs = Array.from({ length: 50 }, () => ({ name: 'filler', data: { role: 'filler' } }));
+      await queue.addBulk(jobs);
+    }
+    await waitUntil(async () => {
+      if (fillerCompleted < FILLER_COUNT) return false;
+      return (await queue.getJobCounts()).completed >= FILLER_COUNT + 3;
+    });
 
-    // BUG: children results were evicted from BoundedMap by filler jobs
-    // Without storage fallback, getChildrenValues returns empty/partial
-    const childrenCount = Object.keys(parentChildrenValues).length;
-    expect(childrenCount).toBe(2);
+    // Precondition: the children's results are gone from memory (has() does not
+    // refresh LRU recency), so the read below can only be served by SQLite.
+    const internals = getSharedManager() as unknown as {
+      jobResults: { has(id: string): boolean };
+      dependencyResults: { has(id: string): boolean };
+    };
+    for (const id of childIds) {
+      expect(internals.jobResults.has(id)).toBe(false);
+      expect(internals.dependencyResults.has(id)).toBe(false);
+    }
 
-    // Verify actual values
-    const values = Object.values(parentChildrenValues)
-      .map((v: any) => v.childValue)
-      .sort();
-    expect(values).toEqual([10, 20]);
+    // Step 3: issue #34: evicted children results used to be lost (empty values);
+    // with persistence they are read back from storage.
+    const childrenValues = await queue.getChildrenValues(parentId);
+    expect(childrenValues).toEqual({
+      [`issue34-children-evict:${childIds[0]}`]: { childValue: 10 },
+      [`issue34-children-evict:${childIds[1]}`]: { childValue: 20 },
+    });
 
     await worker.close();
     flow.close();

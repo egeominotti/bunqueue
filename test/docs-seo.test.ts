@@ -172,6 +172,7 @@ test('reference build integration updates only built current pages and preserves
     const dev = readFileSync(join(files.distRoot, 'reference/dev/index.html'), 'utf8');
     const { integration } = referenceSeo(files.publicRoot, current, SITE);
     const hook = integration.hooks['astro:build:done']!;
+    // Deliberately partial hook context: no pages or assets, and a logger with only info().
     const context = { dir: pathToFileURL(`${files.distRoot}/`), logger: { info: () => {} } };
     await hook(context as unknown as Parameters<typeof hook>[0]);
     const result = readFileSync(join(files.distRoot, 'reference', current, page.file), 'utf8');

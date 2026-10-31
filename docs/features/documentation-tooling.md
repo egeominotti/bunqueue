@@ -83,9 +83,10 @@ no separate linter.
 - **Type checking**: `bun run typecheck` runs `bun check --no-script` on the
   root `tsconfig.json` (all of `src`, including `src/mcp`), then the test tree
   with `bun check --no-script -p tsconfig.test.json` (about 2,000 files with
-  their imports; `bun run typecheck:prepare` first builds the SDK, the package
-  and the docs dependencies those files import: CI runs it, and locally it must
-  be re-run after changing `src/` or `sdk/typescript/`). No test file
+  their imports; `bun run typecheck` first runs `bun run typecheck:prepare`,
+  which rebuilds the SDK, the package (`tsc --noCheck`: emit only, so `tsc`
+  never type-checks) and the docs dependencies those files import, so no run
+  reads a stale build). No test file
   is excluded, and
   `test/tsconfig-test-exclusions.test.ts` fails if one is, or if the project
   weakens the compiler options it inherits (for example `noCheck`).

@@ -28,6 +28,7 @@ describe('enterprise telemetry regressions', () => {
   test('bounds per-queue series and reports omitted queues', async () => {
     const manager = new QueueManager({ maxPrometheusQueues: 2 });
     managers.push(manager);
+    // Deliberately malformed inputs (no data field): the test only needs three queues.
     await manager.push('alpha', { id: 1 } as unknown as JobInput);
     await manager.push('beta', { id: 2 } as unknown as JobInput);
     await manager.push('gamma', { id: 3 } as unknown as JobInput);

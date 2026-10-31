@@ -58,6 +58,7 @@ describe('MCP Server Tools', () => {
 
     test('get job returns null for non-existent ID', async () => {
       const manager = getSharedManager();
+      // Foreign value: a bigint id, not the branded string JobId.
       const job = await manager.getJob(BigInt(999999) as unknown as JobId);
       expect(job).toBeNull();
     });
