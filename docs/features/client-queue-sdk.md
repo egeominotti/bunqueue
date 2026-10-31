@@ -107,7 +107,12 @@ Counts (`queue/runtime/queries.ts`, `queue/operations/counts.ts`):
 `getJobCounts()` / `getJobCountsAsync()`, `getWaitingCount`, `getActiveCount`,
 `getCompletedCount`, `getFailedCount`, `getDelayedCount`, `count()` /
 `countAsync()`, `getCountsPerPriority()` / `getCountsPerPriorityAsync()`. Sync
-`count()` / `getCountsPerPriority()` return `0` / `{}` over TCP.
+`count()` / `getCountsPerPriority()` return `0` / `{}` over TCP. The per-state
+helpers (`getWaitingCount` … `getDelayedCount`) read the matching bucket of
+`getJobCountsAsync()` in both runtimes (TCP: `GetJobCounts`), never the length
+of a `getJobs` page, so they are not capped by its default `end = 100`
+(`test/repro-embedded-delayed-count-cap.test.ts`). Delayed jobs keep their own
+bucket while the queue is paused; only ready jobs move to `paused`.
 
 Group methods (`queue/runtime/queries.ts`, `queue/operations/groups.ts`) are
 asynchronous in both runtimes: `getGroupJobsCount`, `getGroupsJobsCount`,

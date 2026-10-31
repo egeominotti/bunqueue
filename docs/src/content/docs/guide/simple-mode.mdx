@@ -575,6 +575,8 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 
 In TypeScript the signal is a standard `AbortSignal`, so it works with `fetch` too: `await fetch(url, { signal })`. Python's `CancelSignal` exposes the same cooperative `aborted` flag.
 
+In TypeScript, a job `timeout` and `app.worker.cancelJob(id)` also abort `app.getSignal(job.id)`, with the Worker's abort reason, and stop any pending in-process retry.
+
 Cancellation applies once the job is running and its controller has been
 registered. If code adds and immediately cancels a job, wait for the Worker's
 `active` event first; sleeping for a fixed interval races worker polling.

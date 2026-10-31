@@ -58,6 +58,23 @@ head:
   faster; memory mode is unchanged. These are diagnostic host results, not
   publication benchmarks.
 
+### Bugfixes
+
+- `queue.getDelayedCount()` in embedded mode counted the jobs of one default
+  `getJobs` page, so it never reported more than 100: a queue with 250 delayed
+  jobs answered 100 while `getJobCountsAsync().delayed` answered 250. It now reads
+  the same counts as `getJobCounts()`, as over TCP and as the other per-state
+  count helpers do. (`test/repro-embedded-delayed-count-cap.test.ts`)
+- A simple-mode (`Bunqueue`) processor now learns that its job ended elsewhere: a
+  broker-enforced job `timeout`, `app.worker.cancelJob(id)`, `cancelAllJobs()` and
+  a forced worker close abort `app.getSignal(job.id)` with the Worker's reason and
+  stop any pending in-process retry. The wrapper dropped the Worker's signal, so the
+  processor kept running after the broker had already timed the job out. When the
+  processor honours that abort, the rejection counts as a failure for the circuit
+  breaker, as `app.cancel()` already did, so cancelling many running jobs with
+  `cancelAllJobs()` can open the circuit. (`test/repro-bunqueue-worker-signal.test.ts`,
+  `test/bunqueue-cancellation-parent-signal.test.ts`)
+
 ### Documentation
 
 - The `bunqueue-assistant` agent (`agents/bunqueue-assistant.md`) now carries an

@@ -108,7 +108,7 @@ Validated on the client with the broker's validator; an invalid option throws.
 | `getWaitingChildren(start,end)` | Jobs in `waiting-children` (`end` inclusive). | ✓ | ✓ |
 | `getJobCounts()` / `getJobCountsAsync()` | Counts per state (ready jobs count as `paused` while paused). | sync object | sync returns a Promise |
 | `getWaitingCount/getActiveCount/getCompletedCount/getFailedCount/getPrioritizedCount/getWaitingChildrenCount()` | One field of the counts. | ✓ | ✓ |
-| `getDelayedCount()` | Number of delayed jobs. | ✓ capped at 100 | ✓ |
+| `getDelayedCount()` | Number of delayed jobs (same counts as `getJobCounts()`). | ✓ | ✓ |
 | `count()` / `countAsync()` | Total queued jobs. | ✓ | sync `0`, async ✓ |
 | `getCountsPerPriority()` / `…Async()` | `{priority: count}` of queued jobs. | ✓ | sync `{}`, async ✓ |
 | `getMetrics('completed'\|'failed', start, end)` | One-minute count buckets, newest first. | ✓ | ✓ |
@@ -404,12 +404,11 @@ No auth: `OPTIONS`, `/health`, `/healthz`, `/live`, `/ready` (`/prometheus` only
 
 ### Known caveats (verified in code)
 
-- `getDelayedCount()` in embedded mode stops at 100 (it counts one default page).
 - `end` is exclusive for `getJobs`, per-state getters and `getPrioritized`, but inclusive for `getWaitingChildren`, `getGroupJobs`, `getJobSchedulers`, `getDependencies`.
 - `removeOnComplete`/`removeOnFail` accept only booleans; number and `{age, count}` forms are ignored silently.
 - `connection.socketPath` is declared but never read.
 - `QueueGroup` sync methods (`pauseAll`, `drainAll`, …) never reach a TCP server; use the `…Async` forms.
 - Over TCP, `getDeduplicationJobId` / `removeDeduplicationKey` read `response.data` without checking `ok`.
-- A `Bunqueue` processor receives its own cancellation signal, so `worker.cancelJob()` and job-timeout aborts do not reach it.
+- In simple mode, a job `timeout`, `app.worker.cancelJob()` and `cancelAllJobs()` abort `app.getSignal(job.id)`; when the processor honours that abort, the rejection counts as a failure for the circuit breaker, as `app.cancel()` already did.
 - In a `SandboxedWorker`, `UnrecoverableError` and `DelayedError` become ordinary failures.
 - The CLI `rate-limit set` sends no `duration`, so the server default window applies.
