@@ -907,7 +907,8 @@ Command families (each is a `cmd`-tagged interface under `src/domain/types/comma
 `RemoveUnprocessedChildren`), **Monitoring** (`Stats`, `Metrics`, `Prometheus`,
 `StorageStatus`, `CompactMemory`), **Dashboard** (`DashboardOverview/Queues/Queue`),
 **Auth/Negotiation** (`Auth`, `Hello`), and **Events** (`SubscribeEvents`,
-`UnsubscribeEvents`). `SubscribeEvents` carries a validated queue key;
+`UnsubscribeEvents`). `SubscribeEvents` carries a validated queue key and an
+optional `eventTypes` filter (1 to 32 event type names; absent = every type);
 `UnsubscribeEvents` has no payload. Lease durations (`PULL`/`PULLB` `lockTtl`,
 `ExtendLock` `duration`, `ExtendLocks` `durations[i]`, a non-zero `JobHeartbeat`
 `duration`) must be finite numbers (any sign, passed through as on 2.9.10, so a 2.9.10

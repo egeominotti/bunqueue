@@ -1,10 +1,15 @@
-import type { JobEvent } from '../../domain/types/queue';
+import type { EventType, JobEvent } from '../../domain/types/queue';
 import type { ConnectionOptions } from '../types';
 import { resolveToken } from '../resolveToken';
 import { TcpClient } from '../tcpClient';
 
 interface TcpEventSubscriptionOptions {
   connection?: ConnectionOptions;
+  /**
+   * Ask the broker for only these event types. A broker without the filter ignores it
+   * and sends every type, so `onEvent` must still check the type it handles.
+   */
+  eventTypes?: readonly EventType[];
   onError: (error: Error) => void;
   onEvent: (event: JobEvent) => void;
   /** Called each time the stream subscribes again after a lost connection. */
@@ -16,6 +21,7 @@ interface TcpEventSubscriptionOptions {
 export class TcpEventSubscription {
   private readonly client: TcpClient;
   private readonly queue: string;
+  private readonly eventTypes: readonly EventType[] | undefined;
   private readonly onError: (error: Error) => void;
   private readonly onResubscribed: (() => void) | undefined;
   private closed = false;
@@ -27,6 +33,7 @@ export class TcpEventSubscription {
 
   constructor(options: TcpEventSubscriptionOptions) {
     this.queue = options.queue;
+    this.eventTypes = options.eventTypes;
     this.onError = options.onError;
     this.onResubscribed = options.onResubscribed;
     const connection = options.connection ?? {};
@@ -87,7 +94,13 @@ export class TcpEventSubscription {
 
     const generation = this.generation;
     const operation = (this.client.isConnected() ? Promise.resolve() : this.client.connect())
-      .then(() => this.client.send({ cmd: 'SubscribeEvents', queue: this.queue }))
+      .then(() =>
+        this.client.send({
+          cmd: 'SubscribeEvents',
+          queue: this.queue,
+          ...(this.eventTypes ? { eventTypes: this.eventTypes } : {}),
+        })
+      )
       .then((reply) => {
         if (reply.ok !== true) {
           throw new Error(

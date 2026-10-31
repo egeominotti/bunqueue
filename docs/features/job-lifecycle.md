@@ -291,7 +291,7 @@ the job. Lock order shard → processing matches the documented hierarchy.
    wait readers) finds it until the record expires or is dropped (see
    [Core Queue Engine](./core-queue-engine.md#removed-result-retention)); the
    batch ACK and the stall-retried late ACK record it the same way.
-5. Bump counters, broadcast `completed`, call `onJobCompleted` (dependency processing), and re-schedule repeatable jobs via `onRepeat` if under `repeat.limit`.
+5. Bump counters, broadcast `completed`, call `onJobCompleted` (dependency processing), and re-schedule repeatable jobs via `onRepeat` if under `repeat.limit`. `onJobCompleted` also deletes the job's parent-side `flow_failures` rows and checks whether a flow parent now has every child completed (the dashboard `flow:completed` event); that check reads the job just retained in `completedJobsData` and reloads it through `getJob` only when it is not there.
 
 ### FAIL (`failJob`, `src/application/operations/ack/failure.ts:63-175`)
 

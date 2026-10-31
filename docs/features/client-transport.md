@@ -173,8 +173,10 @@ Key shapes defined by this layer:
 
 `TcpEventSubscription` owns one `TcpClient` and one queue key. It resolves the
 same token and connection defaults as the queue/worker transport, connects and
-authenticates first, sends `SubscribeEvents`, and reports ready only after the
-acknowledgement. A disconnect invalidates the current generation; the client's
+authenticates first, sends `SubscribeEvents` (with `eventTypes` when the caller
+passes one: the Worker asks for `stalled` only, `QueueEvents` for every type),
+and reports ready only after the acknowledgement. A broker without the filter
+ignores `eventTypes`, so `onEvent` still checks the event type. A disconnect invalidates the current generation; the client's
 normal reconnect emits `connected`, which starts exactly one fresh subscription
 attempt. Every successful subscription after the first calls the optional
 `onResubscribed` callback: events the broker sent while the connection was down

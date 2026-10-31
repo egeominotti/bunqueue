@@ -241,14 +241,20 @@ Client MUSTs:
 
 #### Queue event stream
 
-| Command             | Request | Response |
-| ------------------- | ------- | -------- |
-| `SubscribeEvents`   | `queue` | `{}`     |
-| `UnsubscribeEvents` | none    | `{}`     |
+| Command             | Request                | Response |
+| ------------------- | ---------------------- | -------- |
+| `SubscribeEvents`   | `queue`, `eventTypes?` | `{}`     |
+| `UnsubscribeEvents` | none                   | `{}`     |
 
 One TCP connection can subscribe to one queue at a time. A new subscription
-replaces the previous queue; unsubscribe leaves the connection usable for
-normal commands. Matching lifecycle events are server-initiated frames:
+replaces the previous queue and filter; unsubscribe leaves the connection usable
+for normal commands. `eventTypes` (optional, 1 to 32 event type names of 1 to
+64 characters, e.g. `["stalled"]`) limits the stream to those types; without it
+(absent or `null`) the connection receives every type. An invalid value is
+refused and leaves the previous subscription in place. Names are not checked against the broker's own types, so a
+type the broker never emits just never arrives. A broker older than the filter
+ignores the field and sends every type, so a client must still check
+`event.eventType`. Matching lifecycle events are server-initiated frames:
 
 ```text
 { type: "event", event: JobEvent }

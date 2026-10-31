@@ -128,7 +128,9 @@ Key methods (real signatures):
 - Flow transactions: `commitFailedJob(jobId, dlqEntry, flowFailure)`,
   `updateFlowLink(child, parent, state)`, `removeFlowLink(child, parent, state)`,
   `updateFlowParentResolution(parent)`, `saveFlowFailure(record)`,
-  `loadFlowFailures()`, `deleteFlowFailure(parentId, childId?)`.
+  `loadFlowFailures()`, `deleteFlowFailure(parentId, childId?)`. The last runs on
+  every single-job completion and failure, so it uses `db.query()` (compiled
+  once per connection) rather than `db.prepare()` (compiled on every call).
 - Removed-completion evidence:
   `commitRemovedCompletion(job, retentionLimit, completedAt?)`,
   `loadDependencyCompletions(retentionLimit)`,

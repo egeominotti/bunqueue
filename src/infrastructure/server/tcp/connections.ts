@@ -12,6 +12,14 @@ import { SocketWriteQueue } from '../socketWriteQueue';
 import type { TcpConnectionData } from '../types/tcpServer';
 import { releaseClientJobsWithRetry } from './clientRelease';
 import { MAX_CONCURRENT_PER_CONNECTION } from './constants';
+import {
+  acceptsEventType,
+  type EncodedEvents,
+  type EventTypeFilter,
+  framesFor,
+  joinFrames,
+  wantedEventTypes,
+} from './eventFanout';
 import { EventSubscriberIndex } from './eventSubscriberIndex';
 
 /** Owns per-client state, slowloris timers, backpressure, and disconnect cleanup. */
@@ -56,6 +64,7 @@ export class TcpConnectionRegistry {
       writeQueue: new SocketWriteQueue(this.maxWriteQueueBytes),
       stallTimer: null,
       eventQueue: null,
+      eventTypes: null,
     };
     this.connections.set(clientId, socket);
     this.eventSubscribers.track(socket);
@@ -143,9 +152,15 @@ export class TcpConnectionRegistry {
     }
   }
 
-  subscribeEvents(socket: Socket<TcpConnectionData>, queue: string): void {
+  subscribeEvents(
+    socket: Socket<TcpConnectionData>,
+    queue: string,
+    eventTypes?: readonly string[] | null
+  ): void {
     const previous = socket.data.eventQueue;
     socket.data.eventQueue = queue;
+    // Each subscription replaces the previous one, filter included.
+    socket.data.eventTypes = eventTypes ? new Set(eventTypes) : null;
     // Only live connections receive events, so a socket closed before its subscribe
     // command ran keeps `eventQueue` but stays out of the index.
     if (previous !== queue && this.connections.get(socket.data.state.clientId) === socket) {
@@ -165,6 +180,7 @@ export class TcpConnectionRegistry {
       this.eventSubscribers.remove(socket, socket.data.eventQueue);
     }
     socket.data.eventQueue = null;
+    socket.data.eventTypes = null;
     this.releaseEventBridgeIfIdle();
   }
 
@@ -173,6 +189,7 @@ export class TcpConnectionRegistry {
     if (!subscribers) return;
     let frame: Uint8Array | null = null;
     for (const socket of subscribers) {
+      if (!acceptsEventType(socket.data.eventTypes, event.eventType)) continue;
       frame ??= FrameParser.frame(encodeMessagePack({ type: 'event', event }));
       socket.data.writeQueue.write(socket, frame);
       this.dropForWriteOverflow(socket);
@@ -187,15 +204,25 @@ export class TcpConnectionRegistry {
    * syscalls, which dominated the server's CPU with several worker processes. A
    * connection subscribes to one queue, so per-queue grouping keeps each socket's
    * frame order, and a socket still drops as soon as its write queue is over budget.
+   * An event no subscriber of its queue accepts (`eventTypes`) is not encoded at all; a
+   * filtered subscriber gets its accepted frames, and no write when there are none.
    */
   private broadcastEvents(events: readonly JobEvent[]): void {
     if (events.length === 1) {
       this.broadcastEvent(events[0]);
       return;
     }
-    const framesByQueue = new Map<string, Uint8Array[]>();
+    const encodedByQueue = new Map<string, EncodedEvents>();
+    const wantedByQueue = new Map<string, EventTypeFilter>();
     for (const event of events) {
-      if (!this.eventSubscribers.subscribers(event.queue)) continue;
+      const subscribers = this.eventSubscribers.subscribers(event.queue);
+      if (!subscribers) continue;
+      let wanted = wantedByQueue.get(event.queue);
+      if (wanted === undefined) {
+        wanted = wantedEventTypes(subscribers);
+        wantedByQueue.set(event.queue, wanted);
+      }
+      if (!acceptsEventType(wanted, event.eventType)) continue;
       // An event that cannot be encoded is skipped alone, as the per-event path does.
       let frame: Uint8Array;
       try {
@@ -203,15 +230,19 @@ export class TcpConnectionRegistry {
       } catch {
         continue;
       }
-      let frames = framesByQueue.get(event.queue);
-      if (!frames) framesByQueue.set(event.queue, (frames = []));
-      frames.push(frame);
+      let encoded = encodedByQueue.get(event.queue);
+      if (!encoded) encodedByQueue.set(event.queue, (encoded = { frames: [], types: [] }));
+      encoded.frames.push(frame);
+      encoded.types.push(event.eventType);
     }
-    for (const [queue, frames] of framesByQueue) {
+    for (const [queue, encoded] of encodedByQueue) {
       const subscribers = this.eventSubscribers.subscribers(queue);
       if (!subscribers) continue;
-      const data = frames.length === 1 ? frames[0] : concatFrames(frames);
+      let all: Uint8Array | null = null;
       for (const socket of subscribers) {
+        const filter = socket.data.eventTypes;
+        const data = filter ? framesFor(encoded, filter) : (all ??= joinFrames(encoded.frames));
+        if (!data) continue;
         socket.data.writeQueue.write(socket, data);
         this.dropForWriteOverflow(socket);
       }
@@ -241,17 +272,4 @@ export class TcpConnectionRegistry {
     }
     this.connections.clear();
   }
-}
-
-/** One buffer holding `frames` back to back. */
-function concatFrames(frames: readonly Uint8Array[]): Uint8Array {
-  let length = 0;
-  for (const frame of frames) length += frame.length;
-  const out = new Uint8Array(length);
-  let offset = 0;
-  for (const frame of frames) {
-    out.set(frame, offset);
-    offset += frame.length;
-  }
-  return out;
 }

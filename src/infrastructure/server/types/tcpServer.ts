@@ -27,4 +27,6 @@ export interface TcpConnectionData {
   stallTimer: SafeTimer | null;
   /** A dedicated event connection may own exactly one queue subscription. */
   eventQueue: string | null;
+  /** That subscription's `eventTypes` filter; null or absent receives every type. */
+  eventTypes?: ReadonlySet<string> | null;
 }

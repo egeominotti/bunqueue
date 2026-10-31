@@ -9,6 +9,16 @@ import { withWriteLock } from '../../shared/lock';
 import type { SetLike } from '../../shared/lru';
 import { QueueManagerDependencyRuntime } from './dependency-runtime';
 
+/** Settles like `queryOps.getJob` for a job it finds without awaiting a lock. */
+async function settledJob(job: Job): Promise<Job> {
+  return job;
+}
+
+/** Same promise shape as `getJob`: an async method that returns an async lookup. */
+async function retainedLookup(job: Job): Promise<Job> {
+  return settledJob(job);
+}
+
 export class QueueManagerFlowFailures extends QueueManagerDependencyRuntime {
   protected onDlqEvicted(entry: DlqEntry): void {
     const location = this.jobIndex.get(entry.job.id);
@@ -65,7 +75,14 @@ export class QueueManagerFlowFailures extends QueueManagerDependencyRuntime {
   }
 
   protected async checkFlowCompleted(completedId: JobId): Promise<void> {
-    const job = await this.getJob(completedId);
+    // The completion that called us just retained this job in memory: read it there
+    // instead of decoding the row it wrote to SQLite. `retainedLookup` settles on the
+    // same microtask as `getJob`, so dashboard events keep their order.
+    const retained =
+      this.jobIndex.get(completedId)?.type === 'completed'
+        ? this.completedJobsData.get(completedId)
+        : undefined;
+    const job = await (retained ? retainedLookup(retained) : this.getJob(completedId));
     if (!job?.parentId) return;
     const parent = await this.getJob(job.parentId);
     if (!parent?.childrenIds || parent.childrenIds.length === 0) return;
