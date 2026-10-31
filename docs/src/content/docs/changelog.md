@@ -18,6 +18,24 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## [Unreleased]
+
+### Documentation
+
+- The [2.9.21 release post](/blog/bunqueue-v2-9-21/) is now a full write-up:
+  - a diagram of the event traffic workers received before and after the
+    `eventTypes` filter;
+  - a byte-level diagram of a corrupted `Float32Array`, and the fact that its
+    stale bytes could carry another job's data;
+  - how a CPU profile found the event traffic, and how a call-count matrix (169
+    functions by 19 scenarios) confirmed both changes;
+  - how the counting `moreTypes` getter keeps ordinary frames on the one-pass
+    path;
+  - why msgpackr 2.1.3 was not adopted.
+
+  The throughput figures are the ones already published, measured on the final
+  2.9.21 code.
+
 ## [2.9.21] - 2026-10-31
 
 ### Performance
