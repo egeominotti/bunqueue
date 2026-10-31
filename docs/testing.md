@@ -45,6 +45,16 @@ serial unless they opt into `test.concurrent`. The explicit worker count keeps
 local, sandbox, and CI behavior consistent instead of scaling unexpectedly with
 the host's CPU count.
 
+`bunfig.toml` sets `[test] pathIgnorePatterns = ["artifacts/**"]`. The ignored
+`artifacts/` directory holds full copies of earlier source trees (benchmark
+baselines, regression candidates), test files included; without the pattern a
+host `bun test` or a path-filtered script such as `bun run test:model` also ran
+those stale copies. The glob is relative to the repository root, so a directory
+named `artifacts` elsewhere is still discovered (`**/artifacts/**` would not be),
+and `./artifacts/**` is not honored by Bun 1.4.4. Bun already skips dot-directories
+such as `.claude/worktrees/`. `test/repro-test-discovery-artifacts.test.ts` runs
+the real `bunfig.toml` against a scratch tree with a failing stale copy.
+
 `bun scripts/test-mcp-all.ts` is a focused wrapper around the maintained MCP
 assertion suites, not a separate response grader. It covers expected negative
 responses as well as applied outcomes and independent state/counter checks.
@@ -452,6 +462,17 @@ because `Bun.listen` and `Bun.serve` report a taken port differently
 propagates only the message. Retries are limited to a broker that actually
 exited, so a readiness timeout still fails with its own diagnostics.
 
+The configuration tests' `runServer` (`test/config-test-support.ts`) applies the
+same rule to the `freePort()` gap. When it picked both ports itself and the child
+exited on a bind collision, it relaunches with fresh ports, up to five launches,
+and returns the last run. A port the caller pinned (`TCP_PORT`/`HTTP_PORT` in
+`env`, or `--tcp-port`, `--http-port`, `--port`/`-p`, with or without `=`, in
+`args`) is never replaced, so a collision on it stays the result under test. The
+`pickPort` option (default `freePort`) lets
+`test/repro-run-server-port-race.test.ts` lose the race deterministically. The
+startup banner is printed before the listeners bind, so a `killWhen` that
+matches it cannot prove a bind succeeded.
+
 ## SDK hardening matrix
 
 The native suites use each public SDK against real disposable brokers. Every
@@ -835,6 +856,15 @@ This prevents queue state, completed-job caches, timers, environment variables,
 or a server shutdown in one file from affecting another file. Authentication is
 enabled only for the authentication suite. `BUNQUEUE_TEST_FILE_TIMEOUT_MS`
 overrides the default three-minute per-file bound.
+
+Both functional runners read per-file assertion counts for their
+`TEST_FILE_RESULT` markers with `parseTestSummary` (`scripts/shared/test-summary.ts`).
+It accepts the `Passed: N` / `Failed: N` block, `Results: X passed, Y failed`
+(with optional `---` delimiters and `, Z total`) and `Results: X/Y tests passed`.
+The labels are matched as whole words, so a `totalFailed: N` metric printed
+earlier is not taken as the failure count. Without a recognized summary a file
+counts 0 passed and 1 failed unless it exited 0; the exit code still decides
+success. `test/repro-integration-runner-summary.test.ts` covers every format.
 
 Every TCP fixture runs against SQLite. `GetJobs` is intentionally eventually
 consistent with non-durable `PUSH` while the roughly 10 ms write buffer drains,

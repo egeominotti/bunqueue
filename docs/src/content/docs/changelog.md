@@ -36,6 +36,23 @@ head:
   The throughput figures are the ones already published, measured on the final
   2.9.21 code.
 
+### Testing
+
+- `bun test` and `bun run test:model` on a developer machine no longer run the
+  stale test copies under `artifacts/`: `bunfig.toml` excludes `artifacts/**`.
+  On one developer machine, `bun run test:model` ran 150 files instead of 6 and
+  reported failures from old benchmark snapshots.
+- Server-startup tests that launch through `runServer`
+  (`test/config-test-support.ts`) no longer fail when a parallel test worker
+  takes a port between `freePort()` and the server's bind. `runServer` now
+  relaunches with fresh ports after a bind collision, unless the test pinned a
+  port itself.
+- The TCP and embedded integration runners now count the assertions of scripts
+  that print `Results: …` summaries, through a shared `parseTestSummary`.
+  `test-websocket.ts` was reported as 0/0 instead of 47 passed. A
+  `totalFailed: N` metric printed before a summary is no longer read as the
+  failure count.
+
 ## [2.9.21] - 2026-10-31
 
 ### Performance

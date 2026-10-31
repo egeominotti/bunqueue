@@ -5,6 +5,7 @@ import { spawn, type Subprocess } from 'bun';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { parseTestSummary } from '../shared/test-summary';
 
 const SCRIPTS_DIR = import.meta.dir;
 const PROJECT_ROOT = `${SCRIPTS_DIR}/../..`;
@@ -184,8 +185,7 @@ async function runTest(testFile: string, server: ServerHandle): Promise<TestResu
   clearTimeout(timeout);
   activeTest = null;
   const output = stdout + (stderr ? `\nSTDERR:\n${stderr}` : '');
-  const passed = Number(output.match(/Passed: (\d+)/)?.[1] ?? 0);
-  const failed = Number(output.match(/Failed: (\d+)/)?.[1] ?? (exitCode === 0 ? 0 : 1));
+  const { passed, failed } = parseTestSummary(output, exitCode);
   return {
     name,
     success: exitCode === 0 && !timedOut,

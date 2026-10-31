@@ -8,6 +8,7 @@ Bun.env.BUNQUEUE_EMBEDDED = '1';
 
 import { spawn } from 'bun';
 import { readdir } from 'fs/promises';
+import { parseTestSummary } from '../shared/test-summary';
 
 const SCRIPTS_DIR = import.meta.dir;
 
@@ -72,11 +73,7 @@ async function main() {
     const result = await runTest(file);
 
     // Extract passed/failed counts from output
-    const passedMatch = result.output.match(/Passed: (\d+)/);
-    const failedMatch = result.output.match(/Failed: (\d+)/);
-
-    const passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
-    const failed = failedMatch ? parseInt(failedMatch[1], 10) : result.success ? 0 : 1;
+    const { passed, failed } = parseTestSummary(result.output, result.success ? 0 : 1);
 
     results.push({
       name: result.name,

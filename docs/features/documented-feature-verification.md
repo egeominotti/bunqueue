@@ -85,7 +85,9 @@ suite and therefore blocks CI and release.
 The paths below are relative to `scripts/tcp/` and `scripts/embedded/`.
 `run-all-tests.ts` discovers every `test-*.ts` file automatically. Shared
 contracts live in `scripts/shared/`; their thin wrappers execute the exact same
-assertions in both modes.
+assertions in both modes. `scripts/shared/test-summary.ts` is not a contract: it is
+the summary parser both runners use for per-file counts (see
+[Testing](../testing.md#tcp-suite-isolation)).
 
 ## Queue
 

@@ -12,6 +12,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { isBindCollision } from './support/bind-collision';
 
 export const REPO = join(import.meta.dir, '..');
 export const MAIN = join(REPO, 'src', 'main.ts');
@@ -123,29 +124,56 @@ export async function runChild(
   return { exitCode: killed ? null : code, output: texts.join('') };
 }
 
-/** Start `src/main.ts` (bare, or with CLI `args`) in the sandbox with free ports. */
-export function runServer(
+/** Launches of `runServer` when another process takes a port it picked. */
+const BIND_ATTEMPTS = 5;
+const PORT_FLAG = /^(--tcp-port|--http-port|--port|-p)(=|$)/;
+
+/** True when the caller chose a port, so a collision on it is the result under test. */
+function pinsPort(options: { env?: Record<string, string>; args?: string[] }): boolean {
+  const env = options.env ?? {};
+  if (Object.hasOwn(env, 'TCP_PORT') || Object.hasOwn(env, 'HTTP_PORT')) return true;
+  return (options.args ?? []).some((arg) => PORT_FLAG.test(arg));
+}
+
+/**
+ * Start `src/main.ts` (bare, or with CLI `args`) in the sandbox with free ports.
+ *
+ * `pickPort` (default `freePort`) releases its port before the child binds it, so a
+ * parallel worker can take it first. When runServer picked both ports itself and the
+ * child exited on a bind collision, it relaunches with fresh ports (up to
+ * `BIND_ATTEMPTS` launches) and returns the last run. Ports pinned by the caller
+ * (`TCP_PORT`/`HTTP_PORT` in `env`, or a port flag in `args`) are never replaced.
+ */
+export async function runServer(
   sandbox: Sandbox,
   options: {
     env?: Record<string, string>;
     args?: string[];
     killAfterMs: number;
     killWhen?: RegExp;
+    pickPort?: () => number;
   }
 ): Promise<ChildRun> {
-  return runChild([MAIN, ...(options.args ?? [])], {
-    cwd: sandbox.dir,
-    killAfterMs: options.killAfterMs,
-    killWhen: options.killWhen,
-    env: {
-      HOST: '127.0.0.1',
-      TCP_PORT: String(freePort()),
-      HTTP_PORT: String(freePort()),
-      BUNQUEUE_DATA_PATH: sandbox.dataPath,
-      LOG_FORMAT: 'json',
-      ...options.env,
-    },
-  });
+  const pickPort = options.pickPort ?? freePort;
+  const attempts = pinsPort(options) ? 1 : BIND_ATTEMPTS;
+  let run: ChildRun | undefined;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    run = await runChild([MAIN, ...(options.args ?? [])], {
+      cwd: sandbox.dir,
+      killAfterMs: options.killAfterMs,
+      killWhen: options.killWhen,
+      env: {
+        HOST: '127.0.0.1',
+        TCP_PORT: String(pickPort()),
+        HTTP_PORT: String(pickPort()),
+        BUNQUEUE_DATA_PATH: sandbox.dataPath,
+        LOG_FORMAT: 'json',
+        ...options.env,
+      },
+    });
+    if (run.exitCode === null || !isBindCollision(run.output)) break;
+  }
+  return run as ChildRun;
 }
 
 /** Lines of the periodic stats log in a server's output. */

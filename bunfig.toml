@@ -1,2 +1,6 @@
 [test]
 preload = ["./test/preload.ts"]
+# artifacts/ (gitignored) holds full copies of older source trees, test files
+# included. The glob is anchored at the repository root, so a directory named
+# artifacts anywhere else is still discovered.
+pathIgnorePatterns = ["artifacts/**"]
