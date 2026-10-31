@@ -54,12 +54,7 @@ export function persistedStallCount(job: Pick<Job, 'stallCount'>): number {
 }
 
 export type PersistedJobState =
-  | 'active'
-  | 'completed'
-  | 'delayed'
-  | 'prioritized'
-  | 'waiting'
-  | 'waiting-children';
+  'active' | 'completed' | 'delayed' | 'prioritized' | 'waiting' | 'waiting-children';
 
 const bufferedJobStates = new WeakMap<Job, PersistedJobState>();
 

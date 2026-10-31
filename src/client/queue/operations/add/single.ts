@@ -82,7 +82,7 @@ export async function add<T>(
         const update = progressUpdate(progress, message);
         await manager.updateProgress(jobId(id), update.progress, update.message);
       },
-      // oxlint-disable-next-line typescript/require-await -- public callback contract is asynchronous
+      // async without await: the public callback contract is asynchronous.
       log: async (id, message) => {
         manager.addLog(jobId(id), message);
       },

@@ -15,11 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Readers receive a `Uint8Array` with those bytes; the element type is not
   carried (`tests/serialization-binary-views.test.ts`).
 
-### Security
+### Tooling
 
-- Development only: `oxfmt` pins `tinypool` 2.1.0, which has two critical
-  advisories, so `tinypool` is overridden to a patched release and the weekly
-  `bun audit` passes again. The published package is unchanged.
+- Development only: type checking uses Bun's built-in `bun check` for both
+  `tsconfig.json` and `tsconfig.legacy.json`, and formatting uses Bun's
+  built-in `bun fmt`, configured in the new `bunfig.toml`. `oxlint`, `oxfmt`
+  and `oxlint-tsgolint` are removed with their configuration files and the
+  `lint`, `lint:fix` and `check:oxc` scripts; linting is dropped. The
+  `tinypool` override, needed only because `oxfmt` pinned a vulnerable
+  `tinypool` 2.1.0, is removed with it. The published package is unchanged.
 
 ### Testing
 

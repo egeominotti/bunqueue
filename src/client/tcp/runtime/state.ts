@@ -20,7 +20,6 @@ export class TcpClientState extends EventEmitter {
     event: 'health',
     listener: (data: { type: string; latency?: number; reason?: string }) => void
   ): this;
-  // oxlint-disable-next-line typescript/no-explicit-any -- EventEmitter's fallback overload requires any[]
   on(event: string, listener: (...args: any[]) => void): this {
     return super.on(event, listener);
   }
@@ -37,7 +36,6 @@ export class TcpClientState extends EventEmitter {
     event: 'health',
     listener: (data: { type: string; latency?: number; reason?: string }) => void
   ): this;
-  // oxlint-disable-next-line typescript/no-explicit-any -- EventEmitter's fallback overload requires any[]
   once(event: string, listener: (...args: any[]) => void): this {
     return super.once(event, listener);
   }

@@ -115,8 +115,7 @@ export function reflectionMeta(options: ExtendedJobOptions): {
       ? undefined
       : clampDuration(effectiveJobDelay(coerceNumericString(options.delay)));
   const priority = coerceNumericString(options.group?.priority ?? options.priority) as
-    | number
-    | undefined;
+    number | undefined;
   return {
     priority,
     delay,

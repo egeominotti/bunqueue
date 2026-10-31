@@ -106,7 +106,6 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     return claims[0]?.job ?? null;
   }
 
-  // oxlint-disable-next-line max-params -- public API includes cancellation and lease policy
   override async pullWithLock(
     queue: string,
     owner: string,
@@ -141,7 +140,6 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     return claims.map((claim) => claim.job);
   }
 
-  // oxlint-disable-next-line max-params -- public API includes cancellation and lease policy
   override async pullBatchWithLock(
     queue: string,
     count: number,
@@ -167,7 +165,6 @@ export class PostgresQueueManagerDelivery extends PostgresQueueManagerTerminalDe
     };
   }
 
-  // oxlint-disable-next-line max-params -- internal bridge mirrors the public pull contract
   private async claimUntil(
     queue: string,
     count: number,

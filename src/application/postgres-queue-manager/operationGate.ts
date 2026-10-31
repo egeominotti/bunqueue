@@ -9,8 +9,7 @@ interface QueuedAdmission {
 }
 
 export type PostgresSyncAdmission<T> =
-  | { readonly accepted: true; readonly value: T }
-  | { readonly accepted: false };
+  { readonly accepted: true; readonly value: T } | { readonly accepted: false };
 
 /** Stop new PostgreSQL operations and drain work admitted before shutdown. */
 export class PostgresOperationGate {

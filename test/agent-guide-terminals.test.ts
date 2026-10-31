@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-implied-eval -- execute the repository's trusted supplementary examples with the installed SDK */
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import {
@@ -72,7 +71,6 @@ for (const example of examples) {
           ],
         } as ModelResponse;
       },
-      // oxlint-disable-next-line require-yield -- the examples call non-streaming run()
       async *getStreamedResponse() {
         throw new Error('Unexpected streaming request');
       },
@@ -109,7 +107,6 @@ for (const example of examples) {
           ],
         } as ModelResponse;
       },
-      // oxlint-disable-next-line require-yield -- the examples call non-streaming run()
       async *getStreamedResponse() {
         throw new Error('Unexpected streaming request');
       },

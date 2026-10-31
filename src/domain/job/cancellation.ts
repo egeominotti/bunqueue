@@ -69,8 +69,7 @@ export interface CancelPort {
 }
 
 export type CancelOutcome =
-  | { readonly removed: true }
-  | { readonly removed: false; readonly state: string };
+  { readonly removed: true } | { readonly removed: false; readonly state: string };
 
 /**
  * Cancel `id`; when nothing was removed, also report the state that explains why. Every

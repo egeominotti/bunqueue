@@ -121,10 +121,4 @@ export interface JobCounts {
 }
 
 export type JobStateName =
-  | 'waiting'
-  | 'prioritized'
-  | 'delayed'
-  | 'active'
-  | 'completed'
-  | 'failed'
-  | 'waiting-children';
+  'waiting' | 'prioritized' | 'delayed' | 'active' | 'completed' | 'failed' | 'waiting-children';

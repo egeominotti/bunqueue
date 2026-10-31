@@ -13,7 +13,6 @@ import { Queue } from '../src/client';
 const PORT = 17631;
 const HTTP = 17632;
 const DB = join(tmpdir(), `bunq-111-tcp-${process.pid}.db`);
-// oxlint-disable-next-line typescript/no-explicit-any -- Bun.Subprocess
 let proc: any;
 
 // 60s: CI runners cold-start the real server binary much slower than a dev machine

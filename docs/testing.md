@@ -8,7 +8,7 @@ state. Performance benchmarks use a different isolation model; see
 ## Validation layers
 
 The normal project typecheck excludes test files. When auditing changed tests,
-also run `bun x --no-install tsc --noEmit -p .changed-audit-tsconfig.json` in the
+also run `bun check --no-script -p .changed-audit-tsconfig.json` in the
 isolated Machine with an explicit configuration including every changed
 TypeScript file and its imports. Keep fixtures faithful to the actual APIs:
 provide cron next-run timestamps, wrap job payloads in `data`, narrow nullable
@@ -233,7 +233,7 @@ run the unit, TCP, and embedded commands above plus:
 
 ```bash
 bun run typecheck
-bun run check:oxc
+bun run format:check
 ```
 
 The Machine gate also supplies a real bounded filesystem for SQLite admission
@@ -304,7 +304,7 @@ failure summary instead of exiting without artifacts. `Dockerfile.sdk-test`
 uses one target per toolchain so SDK dependencies and language versions remain
 isolated; runtime containers have no external network, credentials, home
 mount, repository mount, or Docker socket. The minimal build context retains
-the root `.gitignore` so Oxfmt uses the same ignore boundary as the worktree.
+the root `.gitignore` so `bun fmt` uses the same ignore boundary as the worktree.
 Cloudflare's local runtime receives
 `CLOUDFLARE_CF_FETCH_ENABLED=false`, preventing its optional `Request.cf`
 metadata fetch from weakening the no-network guarantee or delaying the gate.

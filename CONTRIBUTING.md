@@ -26,10 +26,13 @@ git clone https://github.com/egeominotti/bunqueue.git
 cd bunqueue
 bun install --frozen-lockfile
 bun run typecheck
-bun run check:oxc
+bun run format:check
 ```
 
-The pre-commit hook runs `typecheck` and `check:oxc` (Oxlint + Oxfmt).
+`typecheck` runs Bun's built-in type checker (`bun check`) and `format:check`
+runs Bun's built-in formatter (`bun fmt --check`, configured in the `[fmt]`
+section of `bunfig.toml`). The pre-commit hook runs both. There is no separate
+linter.
 
 ## Code guidelines
 
@@ -37,7 +40,7 @@ The pre-commit hook runs `typecheck` and `check:oxc` (Oxlint + Oxfmt).
   (`domain` → `application` → `infrastructure`, `client`, `cli`, `mcp`).
 - At most 300 lines per file and one concern per file; export only what is needed.
 - All repository content is in English: code, comments, tests and documentation.
-- Match the style of the surrounding code; run `bun run lint:fix && bun run format`.
+- Match the style of the surrounding code; run `bun run format`.
 
 ## Tests
 

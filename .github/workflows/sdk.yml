@@ -73,7 +73,7 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run build
-      - name: Oxlint and Oxfmt check
+      - name: Format and type check (bun fmt, bun check)
         working-directory: sdk/typescript
         run: bun run check
       - name: Canonical API and shared behavior parity

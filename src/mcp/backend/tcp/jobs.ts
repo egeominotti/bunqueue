@@ -120,9 +120,7 @@ export class TcpJobBackend extends TcpBackendBase {
       if (!isNegativeOutcome(error)) throw error;
     }
     const job = (await this.sendLookup({ cmd: 'GetJob', id }))?.job as
-      | Record<string, unknown>
-      | null
-      | undefined;
+      Record<string, unknown> | null | undefined;
     if (!job || typeof job !== 'object') return null;
     return {
       progress: numberField(job, 'progress'),

@@ -35,7 +35,6 @@ export class WaitForSignalError extends Error {
 export type UnwindOutcome = 'ran' | LostCompensationClaim;
 
 /** Run compensation handlers in reverse start order for every eligible step. */
-// oxlint-disable-next-line max-params -- registry and operator retry are independent inputs
 export async function runCompensation(
   exec: Execution,
   wf: Workflow,

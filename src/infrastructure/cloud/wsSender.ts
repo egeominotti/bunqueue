@@ -139,7 +139,10 @@ export class WsSender {
 
   /** Encode and send as zstd(msgpack) binary frame */
   private async sendBinary(ws: WebSocket, data: unknown): Promise<void> {
-    ws.send(await Bun.zstdCompress(encodeMessagePack(data)));
+    const frame = await Bun.zstdCompress(encodeMessagePack(data));
+    // Type-only narrowing, no copy: zstdCompress returns a Buffer over a regular
+    // ArrayBuffer, never a SharedArrayBuffer, which is what WebSocket.send requires.
+    ws.send(frame as Uint8Array<ArrayBuffer>);
   }
 
   /** Decode incoming message — supports zstd+msgpack, plain msgpack, and JSON (text) */

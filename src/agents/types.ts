@@ -31,11 +31,7 @@ export class AgentTurnError extends Error {
 
   constructor(
     public readonly code:
-      | 'interrupted'
-      | 'failure'
-      | 'cancelled'
-      | 'needs_input'
-      | 'invalid_output',
+      'interrupted' | 'failure' | 'cancelled' | 'needs_input' | 'invalid_output',
     options?: ErrorOptions
   ) {
     super(`Agent turn ${code}`, options);

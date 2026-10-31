@@ -68,7 +68,6 @@ export async function runWorkflowContract(mode: CoreE2eMode): Promise<CoverageTr
       )
     );
     tracker.call('Workflow', 'forEach', () =>
-      // oxlint-disable-next-line array-callback-return -- the Workflow DSL extractor must return items
       workflow.forEach(
         (ctx) => ctx.input.items,
         'each',

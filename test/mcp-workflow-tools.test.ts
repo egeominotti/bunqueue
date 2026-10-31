@@ -60,7 +60,6 @@ function startBroker(dir: string): number {
 }
 
 type Wrap = (backend: McpBackend) => McpBackend;
-// oxlint-disable-next-line typescript/no-explicit-any -- tool replies are free-form JSON
 type Reply = Record<string, any>;
 
 async function connectMcp(port: number, env: Record<string, string>, wrap?: Wrap) {

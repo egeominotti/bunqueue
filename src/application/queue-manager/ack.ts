@@ -141,7 +141,6 @@ export class QueueManagerAck extends QueueManagerDelivery {
     }
   }
 
-  // oxlint-disable-next-line max-params -- public compatibility signature carries removal policy
   async fail(
     jobId: JobId,
     error?: string,

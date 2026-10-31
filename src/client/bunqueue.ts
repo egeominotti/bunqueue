@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-explicit-any -- implementation signatures forward typed overloads */
 import { assertDuration } from '../shared/durations';
 import { coerceNumericString } from './tcp/numeric';
 import type { SchedulerInfo } from './queue/scheduler';

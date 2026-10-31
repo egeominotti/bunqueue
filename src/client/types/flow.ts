@@ -26,10 +26,4 @@ export type Processor<T = unknown, R = unknown> = (
 ) => Promise<R> | ObservableLike<R> | R;
 
 export type QueueEventType =
-  | 'waiting'
-  | 'active'
-  | 'completed'
-  | 'failed'
-  | 'progress'
-  | 'removed'
-  | 'drained';
+  'waiting' | 'active' | 'completed' | 'failed' | 'progress' | 'removed' | 'drained';

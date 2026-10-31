@@ -53,7 +53,6 @@ export class QueueManagerDelivery extends QueueManagerState {
     return job;
   }
 
-  // oxlint-disable-next-line max-params -- public API includes cancellation and lock policy
   async pullWithLock(
     queue: string,
     owner: string,
@@ -93,7 +92,6 @@ export class QueueManagerDelivery extends QueueManagerState {
     return jobs;
   }
 
-  // oxlint-disable-next-line max-params -- public API includes cancellation and lock policy
   async pullBatchWithLock(
     queue: string,
     count: number,

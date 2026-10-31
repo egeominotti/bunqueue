@@ -22,11 +22,8 @@ export class CoreE2eHarness {
   readonly dataPath: string;
   readonly mode: CoreE2eMode;
   private readonly cleanups: Cleanup[] = [];
-  // oxlint-disable-next-line typescript/prefer-readonly -- initialized by the async start factory
   private manager: QueueManager | null = null;
-  // oxlint-disable-next-line typescript/prefer-readonly -- initialized by the async start factory
   private server: TcpServer | null = null;
-  // oxlint-disable-next-line typescript/prefer-readonly -- initialized by the async start factory
   private tcpPort: number | null = null;
   private sequence = 0;
 

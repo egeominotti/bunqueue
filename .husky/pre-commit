@@ -10,11 +10,11 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Lint and format verification (Oxlint + Oxfmt)
-echo "🔎 Oxlint and Oxfmt check..."
-bun run check:oxc
+# Format verification (bun fmt)
+echo "🔎 Format check..."
+bun run format:check
 if [ $? -ne 0 ]; then
-  echo "❌ Lint or format errors found. Run 'bun run lint:fix && bun run format' to fix."
+  echo "❌ Format errors found. Run 'bun run format' to fix."
   exit 1
 fi
 

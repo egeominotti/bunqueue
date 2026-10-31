@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-implied-eval -- execute trusted documented/live wrappers without a provider */
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { consumeAgentTurn, mapClaudeMessages } from '../src/agents';

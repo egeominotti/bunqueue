@@ -20,6 +20,25 @@ head:
 
 ## [Unreleased]
 
+### Tooling
+
+- Type checking uses Bun's built-in `bun check` (`bun run typecheck`), and
+  formatting uses Bun's built-in `bun fmt` (`bun fmt`, `bun run format`,
+  `bun run format:check`), configured in the `[fmt]` section of `bunfig.toml`.
+  A `fmt` script keeps a bare `bun fmt` inside the formatted scope.
+  This applies to the root project and the TypeScript SDK (`sdk/typescript`).
+- `oxlint`, `oxfmt` and `oxlint-tsgolint` are removed from both projects,
+  together with `.oxlintrc.json`, `.oxfmtrc.json`, the `lint`, `lint:fix` and
+  `check:oxc` scripts, the `oxlint-disable` comments, and the `tinypool`
+  override that only `oxfmt` needed. Linting is dropped; `typescript` stays
+  for `build:lib` declaration output, typedoc and the compiler-API tests.
+- `bun fmt` reformatted 13 root and 1 SDK source files (union types that fit
+  on one line, multi-line SQL template arguments); no code changed meaning.
+- `src/infrastructure/cloud/wsSender.ts` narrows the `Bun.zstdCompress` frame
+  to `Uint8Array<ArrayBuffer>` before `WebSocket.send`, a type-only fix for an
+  error that `bun check` reports and `tsc` 5.9 did not. There is no copy and no
+  runtime change.
+
 ### Documentation
 
 - The [2.9.21 release post](/blog/bunqueue-v2-9-21/) is now a full write-up:

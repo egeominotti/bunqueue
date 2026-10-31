@@ -40,7 +40,7 @@ clients may run in other runtimes through the network protocol.
 - Use `rg`/`rg --files` for repository searches and `apply_patch` for manual
   source edits.
 - Runtime source is TypeScript ESM. Follow the existing 2-space, single-quote,
-  semicolon style; Oxlint and Oxfmt are authoritative.
+  semicolon style; `bun fmt` (configured in `bunfig.toml`) is authoritative.
 - Keep hot queue paths synchronous while a shard lock is held. Do not introduce
   an `await` inside a synchronous critical section.
 - Maintain queue invariants together: heap membership, `jobIndex`, processing
@@ -83,8 +83,7 @@ narrowest relevant tests while iterating:
 BUNQUEUE_EMBEDDED=1 bun test test/path-to-test.test.ts
 bun run test:model
 bun run typecheck
-bunx oxlint src test/path-to-test.test.ts
-bunx oxfmt --check src test/path-to-test.test.ts
+bun fmt --check --no-script src test/path-to-test.test.ts
 git diff --check
 ```
 
@@ -138,7 +137,7 @@ bun test --parallel=4
 bun scripts/tcp/run-all-tests.ts
 bun scripts/embedded/run-all-tests.ts
 bun run typecheck
-bun run check:oxc
+bun run format:check
 ```
 
 Use a unique Machine name for every final candidate and delete it after its

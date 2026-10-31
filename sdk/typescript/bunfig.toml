@@ -1,0 +1,14 @@
+[fmt]
+# Formatting options for `bun fmt`, applied on top of Prettier's defaults.
+useTabs = false
+tabWidth = 2
+printWidth = 100
+singleQuote = true
+jsxSingleQuote = false
+quoteProps = "as-needed"
+trailingComma = "es5"
+semi = true
+arrowParens = "always"
+bracketSameLine = false
+bracketSpacing = true
+ignorePatterns = ["dist/**", "node_modules/**"]

@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-implied-eval -- execute the repository's trusted wrapper, substituting only provider transport */
 import { expect, test } from 'bun:test';
 import type { query } from '@anthropic-ai/claude-agent-sdk';
 import type { NonStreamRunOptions } from '@openai/agents';

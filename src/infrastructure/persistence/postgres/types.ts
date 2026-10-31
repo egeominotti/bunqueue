@@ -3,13 +3,7 @@ import type { Job, JobId } from '../../../domain/types/job';
 import type { StallConfig } from '../../../domain/types/stall';
 
 export type PostgresJobState =
-  | 'waiting'
-  | 'prioritized'
-  | 'delayed'
-  | 'waiting-children'
-  | 'active'
-  | 'completed'
-  | 'failed';
+  'waiting' | 'prioritized' | 'delayed' | 'waiting-children' | 'active' | 'completed' | 'failed';
 
 export interface PostgresStorageConfig {
   readonly url: string;

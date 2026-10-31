@@ -98,7 +98,6 @@ export class QueueEvents<R = unknown, P = unknown> extends EventEmitter {
   on(event: 'drained', listener: (data: DrainedEvent) => void): this;
   on(event: 'paused' | 'resumed', listener: (data: Record<string, never>) => void): this;
   on(event: 'error', listener: (error: Error, event?: JobEvent) => void): this;
-  // oxlint-disable-next-line typescript/no-explicit-any -- EventEmitter's fallback overload requires any[]
   on(event: string, listener: (...args: any[]) => void): this {
     return super.on(event, listener);
   }
@@ -117,7 +116,6 @@ export class QueueEvents<R = unknown, P = unknown> extends EventEmitter {
   once(event: 'drained', listener: (data: DrainedEvent) => void): this;
   once(event: 'paused' | 'resumed', listener: (data: Record<string, never>) => void): this;
   once(event: 'error', listener: (error: Error, event?: JobEvent) => void): this;
-  // oxlint-disable-next-line typescript/no-explicit-any -- EventEmitter's fallback overload requires any[]
   once(event: string, listener: (...args: any[]) => void): this {
     return super.once(event, listener);
   }

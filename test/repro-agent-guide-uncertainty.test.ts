@@ -36,7 +36,6 @@ function documentedFlow(AgentClass: unknown, ledger: unknown, agentJournal: Agen
   const code = new Bun.Transpiler({ loader: 'ts' }).transformSync(
     source.replace(/^import .*;\n/gm, '')
   );
-  // oxlint-disable-next-line typescript/no-implied-eval -- execute the repository's trusted documented example
   return new Function(
     'Agent',
     'run',
@@ -102,7 +101,6 @@ test('documented OpenAI turn cannot succeed after an uncertain remote tool effec
               ],
       } as ModelResponse;
     },
-    // oxlint-disable-next-line require-yield -- the documented example uses non-streaming run()
     async *getStreamedResponse() {
       throw new Error('Unexpected streaming request');
     },
@@ -169,7 +167,6 @@ test('documented OpenAI tool propagation preserves the operator idempotency key 
             ],
       } as ModelResponse;
     },
-    // oxlint-disable-next-line require-yield -- the guide uses non-streaming run()
     async *getStreamedResponse() {
       throw new Error('Unexpected streaming request');
     },

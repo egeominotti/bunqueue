@@ -84,8 +84,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Oxlint and Oxfmt check
-        run: bun run check:oxc
+      - name: Format check (bun fmt)
+        run: bun run format:check
 
       - name: Validate GitHub Actions workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12

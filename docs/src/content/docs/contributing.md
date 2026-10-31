@@ -79,19 +79,19 @@ before fixing it. The model run is required in addition to the final isolated
 
 ### Code Style
 
-We use [Oxlint](https://oxc.rs/docs/guide/usage/linter/quickstart.html) for
-type-aware linting and
-[Oxfmt](https://oxc.rs/docs/guide/usage/formatter/quickstart.html) for formatting:
+We use Bun's built-in tools only: [`bun check`](https://bun.com/docs/runtime/check)
+for type checking and [`bun fmt`](https://bun.com/docs/format) for formatting,
+configured in the `[fmt]` section of `bunfig.toml`. There is no separate linter.
 
 ```bash
-# Lint
-bun run lint
+# Type check
+bun run typecheck
 
 # Format code
 bun run format
 
-# Lint + format verification (what CI / the pre-commit hook run)
-bun run check:oxc
+# Format verification (what CI / the pre-commit hook run, with typecheck)
+bun run format:check
 ```
 
 ## Making Changes
@@ -123,7 +123,7 @@ test: add DLQ filtering tests
 3. Add/update tests
 4. Update documentation
 5. Run `bun run test:model` for core queue changes, then the authoritative
-   `bun run test:sandbox` gate and `bun run check:oxc`
+   `bun run test:sandbox` gate, `bun run typecheck` and `bun run format:check`
 6. Push and create a PR
 
 ### PR Template

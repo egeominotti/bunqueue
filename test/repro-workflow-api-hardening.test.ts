@@ -204,7 +204,6 @@ describe('workflow production API hardening', () => {
     ).toThrow(/maxIterations/);
     expect(() =>
       new Workflow('fractional-loop')
-        // oxlint-disable-next-line array-callback-return -- Workflow.forEach extracts items
         .forEach(
           () => [],
           'work',

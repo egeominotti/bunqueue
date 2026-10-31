@@ -119,12 +119,12 @@ export interface FlowNodeResult {
 }
 
 /** A legacy undefined result means applied; retired executions are explicitly ignored. */
-// oxlint-disable-next-line typescript/no-invalid-void-type -- Keep existing Promise<void> adapter implementations assignable.
+// void keeps existing Promise<void> adapter implementations assignable.
 export type McpAckOutcome = void | {
   readonly applied: false;
   readonly reason: 'already-finalized';
 };
-// oxlint-disable-next-line typescript/no-invalid-void-type -- Keep existing Promise<void> adapter implementations assignable.
+// void keeps existing Promise<void> adapter implementations assignable.
 export type McpAckBatchOutcome = void | {
   readonly ignoredIds: string[];
   readonly ignoredIndices: number[];

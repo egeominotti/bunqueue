@@ -24,11 +24,7 @@ import { DEFAULT_CONNECTION, type ConnectionOptions } from './types';
 import { ceilAtLeast, coerceNumericString, isFiniteNumber } from './numeric';
 
 type DurationKey =
-  | 'connectTimeout'
-  | 'commandTimeout'
-  | 'pingInterval'
-  | 'reconnectDelay'
-  | 'maxReconnectDelay';
+  'connectTimeout' | 'commandTimeout' | 'pingInterval' | 'reconnectDelay' | 'maxReconnectDelay';
 type CountKey = 'maxReconnectAttempts' | 'maxPingFailures' | 'maxCommandTimeouts' | 'maxInFlight';
 type PoolLikeOptions = Partial<ConnectionOptions> & { poolSize?: number };
 

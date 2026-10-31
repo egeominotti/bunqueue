@@ -27,7 +27,6 @@ export class PostgresQueueManagerTerminalDelivery extends PostgresQueueManagerQu
     return await this.runPostgresOperation(() => this.completeBatch(items));
   }
 
-  // oxlint-disable-next-line max-params -- public compatibility signature carries failure policy
   override async fail(
     id: JobId,
     error?: string,

@@ -73,32 +73,44 @@ bun generate-og.ts
 It writes generated PNGs below `docs/scripts/out/`. Generated output is copied
 to `docs/public/` only when the corresponding public asset is intentionally
 being refreshed. Both source modules must remain below the repository's
-300-line limit and pass Oxlint and Oxfmt together.
+300-line limit and pass `bun fmt --check` and `bun check`.
 
-## Static analysis and formatting
+## Type checking and formatting
 
-The root project and TypeScript SDK use pinned Oxlint and Oxfmt releases.
-Oxlint reads `.oxlintrc.json`, enables type-aware rules through the pinned
-`oxlint-tsgolint` companion, and keeps intentional queue-specific exceptions in
-scoped overrides or `oxlint-disable-next-line` directives. Oxfmt reads
-`.oxfmtrc.json` and preserves the existing two-space, single-quote, semicolon,
-100-column style.
+The root project and the TypeScript SDK use only Bun's built-in tools; there is
+no separate linter.
 
-The migration keeps the former prototype-call, switch-fallthrough, and array
-constructor checks through Oxlint's `no-prototype-builtins`, `no-fallthrough`,
-and `no-array-constructor` rules. Oxc has no exact equivalents for Biome's
-`noArguments`, `useIterableCallbackReturn`, `noGlobalIsNan`, or
-`useConsistentEnumValueType`; the nearest applicable checks remain enabled as
-`prefer-rest-params`, `array-callback-return`, `use-isnan` through the
-correctness category, and `typescript/no-mixed-enums`. These are intentional
-semantic approximations rather than a claim that the two rule sets are
-identical. The SDK similarly uses `typescript/no-empty-object-type` as the
-supported replacement for Biome's broader `noBannedTypes` rule.
+- **Type checking**: `bun run typecheck` runs `bun check --no-script` on the
+  nearest `tsconfig.json`. Its checker follows TypeScript 7, so it can report
+  errors `tsc` 5.9 accepts (for example the `Uint8Array<ArrayBuffer>` cast in
+  `src/infrastructure/cloud/wsSender.ts`); `build:lib` still compiles with
+  `tsc`, so both must stay clean.
+  The SDK checks both `tsconfig.json` and `tsconfig.legacy.json` with
+  `bun check --no-script -p <project>`. `bun check` never writes files, so
+  `build:lib` still emits declarations with `tsc -p tsconfig.build.json`, and
+  the `typescript` package stays for that, for typedoc and for the
+  compiler-API tests.
+- **Formatting**: `bun fmt`, `bun run fmt`, `bun run format` and
+  `bun run format:check` run
+  `bun fmt --no-script` (with `--check` for the latter) over `src` at the root
+  and over `src tests` in the SDK. The options live in the `[fmt]` section of
+  each project's `bunfig.toml`: two spaces, single quotes, semicolons,
+  100 columns, `es5` trailing commas, `as-needed` property quotes and
+  `always` arrow parentheses, on top of Prettier's defaults. `bun fmt` also
+  skips files ignored by `.gitignore`.
 
-Run `bun run check:oxc` at the repository root. The TypeScript SDK exposes the
-same check as `bun run check` from `sdk/typescript/` and owns nested Oxc configs
-so it also works as a standalone checkout. CI, the pre-commit hook, and both
-isolated validation images invoke these same scripts.
+Inside scripts, hooks and CI, both commands always pass `--no-script`: without
+it, `bun check` runs the package.json `check` script and `bun fmt` runs the
+`fmt` script instead of the built-in tool (Bun 1.4.4 ignores a `format`
+script). Each project defines `fmt` so that a bare `bun fmt` stays inside the
+formatted scope; without it, `bun fmt` would rewrite the whole tree, docs and
+generated files included.
+
+Run `bun run check` at the repository root (type check, format check and the
+docs-data guard). The TypeScript SDK exposes `bun run check` (format check and
+type check) from `sdk/typescript/` and owns its own `bunfig.toml`, so it also
+works as a standalone checkout. CI, the pre-commit hook, and both isolated
+validation images invoke these same scripts.
 
 ## Generated API reference
 

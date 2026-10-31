@@ -78,7 +78,6 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
   on(event: 'error', listener: (error: Error) => void): this;
   on(event: 'cancelled', listener: (data: { jobId: string; reason: string }) => void): this;
   on(event: 'log', listener: (job: Job<T>, message: string) => void): this;
-  // oxlint-disable-next-line typescript/no-explicit-any -- EventEmitter's fallback listener is intentionally untyped
   on(event: string, listener: (...args: any[]) => void): this {
     return super.on(event, listener);
   }
@@ -92,7 +91,6 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
   once(event: 'error', listener: (error: Error) => void): this;
   once(event: 'cancelled', listener: (data: { jobId: string; reason: string }) => void): this;
   once(event: 'log', listener: (job: Job<T>, message: string) => void): this;
-  // oxlint-disable-next-line typescript/no-explicit-any -- EventEmitter's fallback listener is intentionally untyped
   once(event: string, listener: (...args: any[]) => void): this {
     return super.once(event, listener);
   }
@@ -106,7 +104,6 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
   off(event: 'error', listener: (error: Error) => void): this;
   off(event: 'cancelled', listener: (data: { jobId: string; reason: string }) => void): this;
   off(event: 'log', listener: (job: Job<T>, message: string) => void): this;
-  // oxlint-disable-next-line typescript/no-explicit-any -- EventEmitter's fallback listener is intentionally untyped
   off(event: string, listener: (...args: any[]) => void): this {
     return super.off(event, listener);
   }

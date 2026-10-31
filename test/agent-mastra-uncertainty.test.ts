@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-implied-eval -- execute the repository's trusted guide with the installed SDK */
 import { expect, test } from 'bun:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -187,7 +187,6 @@ describe('queue.forward() failure handling', () => {
         port: 18879,
         commandTimeout: 300,
         // Don't retry the dead link forever during the test
-        // oxlint-disable-next-line typescript/no-explicit-any -- exercise a deliberately incomplete connection
       } as any,
     });
     open.push(fwd);

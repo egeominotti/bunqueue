@@ -28,7 +28,6 @@ interface Closable {
   close(): void;
 }
 
-// oxlint-disable-next-line typescript/no-explicit-any -- listeners of every socket-data type
 const servers: Array<TCPSocketListener<any>> = [];
 const closables: Closable[] = [];
 const realTimers = {
@@ -57,7 +56,6 @@ export function track<T extends Closable>(closable: T): T {
 }
 
 /** Stop `server` in `cleanup()`. */
-// oxlint-disable-next-line typescript/no-explicit-any -- listeners of every socket-data type
 export function trackServer<T extends TCPSocketListener<any>>(server: T): T {
   servers.push(server);
   return server;

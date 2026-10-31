@@ -1,5 +1,5 @@
 function postgresCharacterLength(value: string): number {
-  // oxlint-disable-next-line typescript/no-misused-spread -- PostgreSQL length(text) counts code points.
+  // PostgreSQL length(text) counts code points.
   return [...value].length;
 }
 

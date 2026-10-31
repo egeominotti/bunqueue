@@ -31,8 +31,10 @@ export class AgentJournal {
   checkpointSession(executionId: string, stepId: string, sessionId: string): void {
     progressPayload({ type: 'session', sessionId }, this.maxBytes);
     this.db
-      .query(`INSERT INTO sessions VALUES (?, ?, ?)
-      ON CONFLICT(execution_id,step_id) DO UPDATE SET session_id=excluded.session_id`)
+      .query(
+        `INSERT INTO sessions VALUES (?, ?, ?)
+      ON CONFLICT(execution_id,step_id) DO UPDATE SET session_id=excluded.session_id`
+      )
       .run(identity(executionId), identity(stepId), identity(sessionId));
   }
 
@@ -54,13 +56,17 @@ export class AgentJournal {
           .query('INSERT INTO events(execution_id,step_id,payload) VALUES (?,?,?)')
           .run(executionId, stepId, payload);
         const overflow = this.db
-          .query(`SELECT cursor FROM events WHERE execution_id=?
-        ORDER BY cursor DESC LIMIT 1 OFFSET ?`)
+          .query(
+            `SELECT cursor FROM events WHERE execution_id=?
+        ORDER BY cursor DESC LIMIT 1 OFFSET ?`
+          )
           .get(executionId, this.maxEvents) as { cursor: number } | null;
         if (overflow) {
           this.db
-            .query(`INSERT INTO retention VALUES (?,?) ON CONFLICT(execution_id)
-          DO UPDATE SET dropped_through=MAX(dropped_through, excluded.dropped_through)`)
+            .query(
+              `INSERT INTO retention VALUES (?,?) ON CONFLICT(execution_id)
+          DO UPDATE SET dropped_through=MAX(dropped_through, excluded.dropped_through)`
+            )
             .run(executionId, overflow.cursor);
           this.db
             .query('DELETE FROM events WHERE execution_id=? AND cursor<=?')
@@ -81,8 +87,10 @@ export class AgentJournal {
         .query('SELECT dropped_through FROM retention WHERE execution_id=?')
         .get(executionId) as { dropped_through: number } | null;
       const rows = this.db
-        .query(`SELECT cursor, step_id, payload FROM events
-        WHERE execution_id=? AND cursor>? ORDER BY cursor ASC LIMIT ?`)
+        .query(
+          `SELECT cursor, step_id, payload FROM events
+        WHERE execution_id=? AND cursor>? ORDER BY cursor ASC LIMIT ?`
+        )
         .all(executionId, after, limit) as { cursor: number; step_id: string; payload: string }[];
       const events = rows.map((row) => ({
         executionId,
@@ -105,16 +113,20 @@ export class AgentJournal {
   claimEffect(run: AgentRunIdentity, callId: string, token: string): boolean {
     return (
       this.db
-        .query(`INSERT INTO effects VALUES (?,?,?,?, 'pending', NULL)
-      ON CONFLICT(execution_id,step_id,call_id) DO NOTHING`)
+        .query(
+          `INSERT INTO effects VALUES (?,?,?,?, 'pending', NULL)
+      ON CONFLICT(execution_id,step_id,call_id) DO NOTHING`
+        )
         .run(identity(run.executionId), identity(run.stepId), identity(callId), token).changes === 1
     );
   }
 
   getEffect(run: AgentRunIdentity, callId: string): EffectRecord | null {
     return this.db
-      .query(`SELECT token,status,result FROM effects
-      WHERE execution_id=? AND step_id=? AND call_id=?`)
+      .query(
+        `SELECT token,status,result FROM effects
+      WHERE execution_id=? AND step_id=? AND call_id=?`
+      )
       .get(
         identity(run.executionId),
         identity(run.stepId),
@@ -130,8 +142,10 @@ export class AgentJournal {
   ): boolean {
     return (
       this.db
-        .query(`UPDATE effects SET token=? WHERE execution_id=? AND step_id=? AND call_id=?
-      AND status='pending' AND token=?`)
+        .query(
+          `UPDATE effects SET token=? WHERE execution_id=? AND step_id=? AND call_id=?
+      AND status='pending' AND token=?`
+        )
         .run(nextToken, run.executionId, run.stepId, callId, priorToken).changes === 1
     );
   }
@@ -142,8 +156,10 @@ export class AgentJournal {
       throw new Error('Agent effect result exceeds maximum bytes');
     return (
       this.db
-        .query(`UPDATE effects SET status='completed',result=? WHERE execution_id=?
-      AND step_id=? AND call_id=? AND token=? AND status='pending'`)
+        .query(
+          `UPDATE effects SET status='completed',result=? WHERE execution_id=?
+      AND step_id=? AND call_id=? AND token=? AND status='pending'`
+        )
         .run(encoded, run.executionId, run.stepId, callId, token).changes === 1
     );
   }

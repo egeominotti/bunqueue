@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-implied-eval -- execute the repository's trusted guide with real SDK/helpers */
 import { expect, test } from 'bun:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -67,7 +66,6 @@ test('documented OpenAI tool effects belong to their own concurrent workflow run
         ],
       } as ModelResponse;
     },
-    // oxlint-disable-next-line require-yield -- this guide example uses non-streaming run()
     async *getStreamedResponse() {
       throw new Error('Unexpected streaming request');
     },

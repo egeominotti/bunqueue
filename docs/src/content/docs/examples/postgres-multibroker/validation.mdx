@@ -54,9 +54,8 @@ own client container, prints the fleet state, and tears the project down.
 Static checks run before the Docker gate:
 
 ```bash
-bunx oxfmt --check examples/postgres-multibroker/*.ts
-bunx oxlint examples/postgres-multibroker/*.ts
-bunx tsc --noEmit --strict --target ESNext --module ESNext \
+bun fmt --check --no-script examples/postgres-multibroker/*.ts
+bun check --no-script --strict --target ESNext --module ESNext \
   --moduleResolution bundler --types bun-types --skipLibCheck \
   examples/postgres-multibroker/*.ts
 docker compose -f examples/postgres-multibroker/compose.yaml config --quiet

@@ -5,8 +5,7 @@
 
 /** Retry backoff: a base delay in ms (exponential growth) or an explicit strategy. */
 export type McpBackoff =
-  | number
-  | { type: 'fixed' | 'exponential'; delay: number; maxDelay?: number };
+  number | { type: 'fixed' | 'exponential'; delay: number; maxDelay?: number };
 
 /** Unique-key deduplication within a queue. */
 export interface McpDeduplication {

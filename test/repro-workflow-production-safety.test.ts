@@ -48,7 +48,6 @@ describe('workflow production safety invariants', () => {
         (loop) => loop.step('__loop-step', () => true)
       ),
       // Workflow.forEach is a DSL builder whose extractor intentionally returns items.
-      // oxlint-disable-next-line array-callback-return -- not Array.prototype.forEach
       new Workflow('reserved-for-each').forEach(
         () => [1],
         'sub:for-each-step',
@@ -101,7 +100,6 @@ describe('workflow production safety invariants', () => {
   test('forEach keeps the final result under the declared bare name', async () => {
     let observed: unknown;
     const workflow = new Workflow('foreach-result')
-      // oxlint-disable-next-line array-callback-return -- Workflow DSL item extractor
       .forEach(
         () => [1, 2],
         'double',
@@ -131,7 +129,6 @@ describe('workflow production safety invariants', () => {
   test('forEach compensates indexed iterations once and never its bare mirror', async () => {
     const compensated: number[] = [];
     const workflow = new Workflow('foreach-single-unwind')
-      // oxlint-disable-next-line array-callback-return -- Workflow DSL item extractor
       .forEach(
         () => ['first', 'second'],
         'reserve',

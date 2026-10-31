@@ -1,7 +1,5 @@
 export type PendingTransitionSettlement =
-  | { status: 'applied' }
-  | { status: 'ignored' }
-  | { status: 'failed'; error: Error };
+  { status: 'applied' } | { status: 'ignored' } | { status: 'failed'; error: Error };
 
 export interface ManualMove {
   result:

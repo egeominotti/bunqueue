@@ -4,9 +4,7 @@ import { identity } from './progress';
 import { AgentEffectUncertainError, type AgentRunIdentity } from './types';
 
 export type EffectReconciliation<T> =
-  | { status: 'completed'; result: T }
-  | { status: 'not_applied' }
-  | { status: 'unknown' };
+  { status: 'completed'; result: T } | { status: 'not_applied' } | { status: 'unknown' };
 
 export interface AgentEffectOptions<T> extends AgentRunIdentity {
   journal: AgentJournal;

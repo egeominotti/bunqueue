@@ -22,8 +22,9 @@ serialization, Queue, Worker, FlowProducer, query, or admin code.
 4. **Max 250 lines per file** — split into modules, don't compress.
 5. **Relative imports with explicit `.js` extension** (NodeNext): without it,
    Node ESM cannot resolve.
-6. **Oxlint, Oxfmt and tsc**: `bun run check` (lint, format, `bun run
-   typecheck`) must be clean before any change is considered done.
+6. **Format and types**: `bun run check` (`bun fmt --check` and `bun run
+   typecheck`, which runs `bun check`) must be clean before any change is
+   considered done.
 7. **Protocol source of truth**: `../../src/domain/types/command.ts`
    (commands), `../../src/domain/types/response.ts` (responses),
    `../../src/infrastructure/server/handlers/` (actual shapes). When in
@@ -87,8 +88,8 @@ serialization, Queue, Worker, FlowProducer, query, or admin code.
 ```bash
 bun install && bun run build      # bundles dist/ from ../../scripts/build-portable-client.ts (tests import from dist/)
 bun run test:property             # deterministic planner/commit tests + legacy option/timer unit tests
-bun run check                     # Oxlint + Oxfmt + typecheck
-bun run typecheck                 # tsconfig.json (build options, all sources) + tsconfig.legacy.json (NodeNext, Node types only)
+bun run check                     # bun fmt --check + typecheck
+bun run typecheck                 # bun check: tsconfig.json (build options, all sources) + tsconfig.legacy.json (NodeNext, Node types only)
 bun tests/integration.ts          # smoke
 bun tests/e2e.ts                  # full e2e
 node --experimental-strip-types tests/e2e.ts

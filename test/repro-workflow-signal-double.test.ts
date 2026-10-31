@@ -20,7 +20,6 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { Engine, Workflow } from '../src/client/workflow';
 
 describe('REPRO: engine.signal() must not double-execute post-waitFor steps', () => {
-  // oxlint-disable-next-line typescript/no-explicit-any -- test-local engine handle
   let engine: any;
   afterEach(async () => {
     await engine?.close?.();

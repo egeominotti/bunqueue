@@ -38,13 +38,11 @@
     "test:property": "bun test tests/flow-plan.property.test.ts tests/flow-identity.property.test.ts tests/flow-plan.validation.test.ts tests/flow-plan.limits.test.ts tests/flow-plan.contract.test.ts tests/flow-commit.test.ts tests/serialization-binary-views.test.ts tests/worker-slot-signal.test.ts tests/legacy-connection-durations.test.ts tests/legacy-worker-durations.test.ts tests/legacy-simple-mode-durations.test.ts tests/legacy-simple-mode-validation.test.ts tests/legacy-simple-mode-sync-throw.test.ts tests/legacy-compat-options.test.ts tests/legacy-compat-simple-mode.test.ts",
     "test:integration": "bun tests/integration.ts",
     "test:soak": "bun tests/soak.ts",
-    "lint": "oxlint src tests",
-    "lint:fix": "oxlint --fix src tests",
-    "format": "oxfmt --write src tests",
-    "format:check": "oxfmt --check src tests",
-    "check:oxc": "bun run lint && bun run format:check",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.legacy.json",
-    "check": "bun run check:oxc && bun run typecheck",
+    "fmt": "bun fmt --no-script src tests",
+    "format": "bun fmt --no-script src tests",
+    "format:check": "bun fmt --check --no-script src tests",
+    "typecheck": "bun check --no-script -p tsconfig.json && bun check --no-script -p tsconfig.legacy.json",
+    "check": "bun run format:check && bun run typecheck",
     "test:workers": "cd tests/workers && bun install --frozen-lockfile && cd ../.. && bun pm pack --destination tests/workers && cd tests/workers && mv bunqueue-client-*.tgz bunqueue-client.tgz && rm -rf node_modules/bunqueue-client && mkdir -p node_modules/bunqueue-client && tar -xzf bunqueue-client.tgz -C node_modules/bunqueue-client --strip-components=1 && node run.mjs"
   },
   "keywords": [
@@ -66,13 +64,7 @@
     "@types/node-20": "npm:@types/node@20.19.43",
     "@types/node-22": "npm:@types/node@22.20.4",
     "fast-check": "4.9.0",
-    "oxfmt": "0.64.0",
-    "oxlint": "1.79.0",
-    "oxlint-tsgolint": "7.0.2001",
     "typescript": "^5.7.0"
-  },
-  "overrides": {
-    "tinypool": "^2.1.2"
   },
   "author": "Egeo Minotti",
   "homepage": "https://bunqueue.dev/guide/sdks/",

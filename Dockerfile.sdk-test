@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /workspace
 COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile --ignore-scripts
-COPY tsconfig.json tsconfig.test.json tsconfig.build.json .oxlintrc.json .oxfmtrc.json .gitignore ./
+COPY tsconfig.json tsconfig.test.json tsconfig.build.json .gitignore ./
 COPY src ./src
 COPY sdk ./sdk
 COPY scripts ./scripts

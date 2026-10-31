@@ -12,7 +12,6 @@ import type { DlqFilter, DlqStats } from './dlq-rate-limit.js';
 import type { CircuitState, TriggerRule } from './types.js';
 
 type Raw = Record<string, unknown>;
-// oxlint-disable-next-line typescript/no-explicit-any -- mixin context needs the erased generic instance
 type Ctx = Bunqueue<any, any>;
 
 export const bunqueueApi = {
