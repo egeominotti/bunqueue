@@ -1980,7 +1980,10 @@ and SQLite serialization. The common path uses msgpackr directly. A frame/blob
 containing `__proto__` is decoded as maps and materialized with
 `Object.defineProperty`, preserving `__proto__` and `__proto_` as distinct own
 data properties without invoking prototype setters. The TCP transport frames
-the same msgpack-encoded `Command`/`Response` objects.
+the same msgpack-encoded `Command`/`Response` objects. Encoding writes a
+non-byte TypedArray or a `DataView` as a msgpack `bin` of exactly its own bytes
+(`src/shared/msgpackByteViews.ts`), decoded as a `Uint8Array`; every other
+value encodes exactly as with msgpackr's default `pack`.
 
 - `pack(data)` → `Uint8Array`; written into BLOB columns. The single-row and
   batch insert binders only pack non-empty arrays

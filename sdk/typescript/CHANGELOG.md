@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A non-byte TypedArray (`Float32Array`, `Uint16Array`, `BigInt64Array`, ...) or a
+  `DataView` in job data is now sent as a msgpack `bin` of exactly its own bytes,
+  as the broker writes it, instead of being refused with `SerializationError`.
+  Readers receive a `Uint8Array` with those bytes; the element type is not
+  carried (`tests/serialization-binary-views.test.ts`).
+
 ### Security
 
 - Development only: `oxfmt` pins `tinypool` 2.1.0, which has two critical

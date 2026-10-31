@@ -74,6 +74,34 @@ head:
   breaker, as `app.cancel()` already did, so cancelling many running jobs with
   `cancelAllJobs()` can open the circuit. (`test/repro-bunqueue-worker-signal.test.ts`,
   `test/bunqueue-cancellation-parent-signal.test.ts`)
+- **Typed arrays in job data no longer arrive corrupted.** A `Float32Array`,
+  `Uint16Array`, `Float64Array` or any other non-byte TypedArray (and a
+  `DataView`) in job data, results, progress or events reached workers over TCP,
+  and SQLite readers after a restart, as a Uint8Array of the wrong bytes, and a
+  `BigInt64Array` made a TCP or durable add throw (an embedded buffered add
+  succeeded, then its write-buffer flush failed). msgpackr writes such a view as a msgpack
+  `bin` of its byte length but copies it element by element, leaving stale bytes
+  of its shared output buffer in the frame (the bytes changed from run to run).
+  `encodeMessagePack` now writes such a view as a `bin` of exactly its own
+  bytes wherever it sits in plain objects (including `Object.create(...)`
+  objects), arrays, Maps, Sets and Errors, so readers get exactly those bytes (a
+  `Uint8Array` in JavaScript). Class instances (with or without a `toJSON`) and
+  subclasses of those built-ins are left to msgpackr exactly as before, and so is
+  a built-in type an app encodes with its own `addExtension`, detected with an
+  empty sample of that type (an extension that writes the built-in bytes for an
+  empty value is not detected); a view inside one keeps the previous encoding.
+  The rewrite visits each value once, so deeply nested Sets and Maps a client
+  sends cost linear time. Frames without a view are byte-identical to before
+  (53,547 compared values); frames with no Set, Error, RegExp, ArrayBuffer or
+  non-Buffer binary value are encoded in one pass at unchanged cost, a frame
+  that carries a plain `Uint8Array` pays one extra scan (about 9%), and one with
+  a Set or Error also packs an empty sample of that type to check for an app
+  extension. A frame that needs the rewrite is encoded twice, so a `toJSON` inside
+  it runs twice. Rows already stored with corrupt bytes are not repaired. The
+  TypeScript SDK (`bunqueue-client`) used to refuse these views with
+  `SerializationError` and now sends them the same way.
+  (`test/repro-typed-array-payload-bytes.test.ts`,
+  `test/msgpack-byte-views.test.ts`)
 
 ### Documentation
 

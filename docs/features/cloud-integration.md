@@ -42,7 +42,7 @@ Internal:
 
 External / runtime:
 
-- `msgpackr` (`pack`/`unpack`) — the only third-party import in the module; payloads are MessagePack-encoded.
+- `msgpackr`, through the canonical `shared/msgpack` codec (`encodeMessagePack`/`decodeMessagePack`) for both the HTTP snapshot upload and the WebSocket channel — the only third-party dependency of the module; payloads are MessagePack-encoded, and a non-byte TypedArray or `DataView` in job data is sent as a `bin` of its own bytes.
 - Bun built-ins: `Bun.zstdCompress` / `Bun.zstdDecompress` (compression), `fetch` + `AbortSignal.timeout` (HTTP), global `WebSocket` with Bun's header-bearing constructor, `crypto.subtle` (HMAC-SHA256), `Bun.env`, `Bun.sleep`, `os` (`hostname`/`arch`/`platform`/`cpus`), `process.memoryUsage`.
 
 ## Public Interface

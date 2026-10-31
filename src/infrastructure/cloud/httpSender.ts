@@ -4,7 +4,7 @@
  * Uses msgpack + zstd encoding (same as WebSocket channel)
  */
 
-import { pack } from 'msgpackr';
+import { encodeMessagePack } from '../../shared/msgpack';
 import type { CloudConfig, CloudSnapshot } from './types';
 import { CircuitBreaker } from './circuitBreaker';
 import { SnapshotBuffer } from './buffer';
@@ -76,7 +76,7 @@ export class HttpSender {
   /** HTTP POST with auth headers and optional HMAC — sends zstd(msgpack) */
   private async post(url: string, body: unknown): Promise<void> {
     const tPack = performance.now();
-    const msgpackBuf = pack(body);
+    const msgpackBuf = encodeMessagePack(body);
     const packMs = Math.round((performance.now() - tPack) * 100) / 100;
     const tZstd = performance.now();
     const compressed = new Uint8Array(await Bun.zstdCompress(msgpackBuf, { level: 6 }));
