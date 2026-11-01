@@ -21,12 +21,6 @@ export function postgresLeaseRecoveryMs(config: Pick<CadenceConfig, 'leaseDurati
   return half < POSTGRES_MAX_RECOVERY_SCAN_MS ? half : POSTGRES_MAX_RECOVERY_SCAN_MS;
 }
 
-/**
- * The cadence of the legacy flow-parent repair pass: one slice (at most 1,000
- * dependency edges) every 250 ms, about 4,000 edges/s per broker until the pass ends.
- */
-export const POSTGRES_FLOW_FAILURE_REPAIR_SLICE_MS = 250;
-
 /** The fixed cadence of the DLQ, worker/broker purge and retention sweeps. */
 const POSTGRES_PERIODIC_SWEEP_MS = 60_000;
 
@@ -51,8 +45,6 @@ export interface PostgresMaintenanceTasks {
   readonly sweeps: () => void;
   /** Every `pollIntervalMs`. */
   readonly cron: () => void;
-  /** Every `POSTGRES_FLOW_FAILURE_REPAIR_SLICE_MS` when given; a no-op once its pass is done. */
-  readonly flowFailureRepair?: () => void;
 }
 
 /**
@@ -73,9 +65,6 @@ export class PostgresMaintenanceSchedule {
       [POSTGRES_PERIODIC_SWEEP_MS, tasks.sweeps],
       [config.pollIntervalMs, tasks.cron],
     ];
-    if (tasks.flowFailureRepair) {
-      periods.push([POSTGRES_FLOW_FAILURE_REPAIR_SLICE_MS, tasks.flowFailureRepair]);
-    }
     for (const [periodMs, run] of periods) this.timers.push(safeInterval(run, periodMs));
   }
 

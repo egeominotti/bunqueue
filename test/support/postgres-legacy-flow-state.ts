@@ -101,6 +101,8 @@ export async function chain(fixture: Fixture, policies: Array<Policy | null>): P
     await updatePostgresJobParent(fixture.ctx, job.id, ids[ids.length - 1]);
     ids.push(job.id);
   }
+  // A heartbeat in the same millisecond as the child's failure counts as "after" it.
+  await Bun.sleep(2);
   return ids;
 }
 

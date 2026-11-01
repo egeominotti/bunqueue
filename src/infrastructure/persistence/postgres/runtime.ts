@@ -1,5 +1,5 @@
 import { recoverExpiredPostgresLeases } from './recovery';
-import { recoverPostgresFlowFailures } from './flowFailureRepair';
+import { PostgresFlowFailureMaintenance } from './flowFailureMaintenance';
 import { releasePostgresBrokerLeases } from './leaseRelease';
 import { PostgresEventStream } from './events';
 import { prunePostgresEventCommits } from './eventJournal';
@@ -51,6 +51,7 @@ export class PostgresQueueStoreRuntime {
   private readonly postCommitMaintenance: PostgresPostCommitMaintenance;
   private readonly maintenanceFlights: PostgresMaintenanceFlights;
   private readonly eventCommitGc: PostgresEventCommitGc;
+  private readonly flowFailures: PostgresFlowFailureMaintenance;
 
   constructor(config: PostgresStorageConfig) {
     const resolved = resolvePostgresRuntimeConfig(config);
@@ -72,6 +73,9 @@ export class PostgresQueueStoreRuntime {
     this.eventCommitGc = new PostgresEventCommitGc(
       (batchSize, maxBatches) => prunePostgresEventCommits(this.context, batchSize, maxBatches),
       (subsystem, error) => this.reportMaintenance(subsystem, error)
+    );
+    this.flowFailures = new PostgresFlowFailureMaintenance(this.context, (operation, subsystem) =>
+      this.runMaintenance(operation, subsystem)
     );
     this.events = new PostgresEventStream(this.context);
     this.unsubscribeEventStatus = this.events.subscribeDrainStatus((error) => {
@@ -106,6 +110,7 @@ export class PostgresQueueStoreRuntime {
     this.maintenanceFlights.close();
     this.eventCommitGc.close();
     this.maintenanceSchedule.stop();
+    this.flowFailures.stop();
   }
 
   private async closeOnce(): Promise<void> {
@@ -230,7 +235,7 @@ export class PostgresQueueStoreRuntime {
       await reconcilePostgresCronsOnStartup(this.context);
       await recoverExpiredPostgresLeases(this.context);
       // Reported, not fatal: one bad record must not keep the broker from starting.
-      await this.recoverFlowFailures(true);
+      await this.flowFailures.recover(true);
       await repairPostgresDlq(this.context);
       await prunePostgresCompletionTombstones(this.context);
       await prunePostgresGroupStates(this.context);
@@ -245,20 +250,18 @@ export class PostgresQueueStoreRuntime {
     }
   }
 
-  private readonly repairFlows = () => recoverPostgresFlowFailures(this.context, 'repair');
-
   private startMaintenance(): void {
     this.eventCommitGc.start();
     this.maintenanceSchedule.start(this.config, {
       heartbeat: () => void this.runMaintenance(() => this.heartbeatBroker(), 'heartbeat'),
       recovery: () => {
         void this.runMaintenance(() => recoverExpiredPostgresLeases(this.context), 'recovery');
-        void this.recoverFlowFailures();
+        void this.flowFailures.recover(false);
       },
       sweeps: () => this.runPeriodicSweeps(),
       cron: () => void this.runMaintenance(() => processPostgresCrons(this.context), 'cron'),
-      flowFailureRepair: () => void this.runMaintenance(this.repairFlows, 'flow-failure-repair'),
     });
+    this.flowFailures.start();
   }
 
   private runPeriodicSweeps(): void {
@@ -274,12 +277,6 @@ export class PostgresQueueStoreRuntime {
     void this.postCommitMaintenance.run('group-state-retention', () =>
       prunePostgresGroupStates(this.context)
     );
-  }
-
-  /** Finish pending levels; at startup, first run a slice of the legacy repair pass. */
-  private recoverFlowFailures(startup = false): Promise<void> {
-    const recover = () => recoverPostgresFlowFailures(this.context, startup ? 'startup' : 'tick');
-    return this.runMaintenance(recover, 'flow-failure-recovery');
   }
 
   private async runMaintenance(

@@ -113,21 +113,38 @@ export async function repairEdge(tx: TransactionSQL, ctx: PostgresContext, edge:
   return inserted.length > 0;
 }
 
-/** Candidate edges whose current rows still call for a repair (checked without locks). */
+/** An edge whose check or repair threw, collected so the others still run. */
+export interface EdgeFailure {
+  readonly edge: EdgeKey;
+  readonly error: unknown;
+}
+
+/**
+ * Candidate edges whose current rows still call for a repair (checked without locks).
+ * A row that cannot be decoded fails only its own edge, so the pass moves past it.
+ */
 export async function prefilter(
   ctx: PostgresContext,
   edges: readonly EdgeKey[]
-): Promise<EdgeKey[]> {
-  if (edges.length === 0) return [];
+): Promise<{ edges: EdgeKey[]; failures: EdgeFailure[] }> {
+  if (edges.length === 0) return { edges: [], failures: [] };
   const ids = [...new Set(edges.flatMap((edge) => [edge.parent_id, edge.child_id]))];
   const rows = await ctx.sql<PostgresJobRow[]>`
     SELECT * FROM bunqueue_jobs
     WHERE namespace = ${ctx.config.namespace} AND id = ANY(${ctx.sql.array(ids, 'TEXT')})
   `;
   const byId = new Map(rows.map((row) => [row.id, row]));
-  return edges.filter((edge) => {
+  const failures: EdgeFailure[] = [];
+  const matches = edges.filter((edge) => {
     const parentRow = byId.get(edge.parent_id);
     const childRow = byId.get(edge.child_id);
-    return parentRow && childRow ? repairFor(parentRow, childRow) !== null : false;
+    if (!parentRow || !childRow) return false;
+    try {
+      return repairFor(parentRow, childRow) !== null;
+    } catch (error: unknown) {
+      failures.push({ edge, error });
+      return false;
+    }
   });
+  return { edges: matches, failures };
 }

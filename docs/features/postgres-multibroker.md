@@ -750,9 +750,13 @@ policy and no `bunqueue_flow_failures` record. It makes one full pass over
 `bunqueue_dependencies` in primary-key order `(job_id, dependency_id)`, from the
 first edge to the last, in slices of at most 10 pages of 100 edges: one slice at
 startup before the recovery sweep (so a small table is repaired before the broker
-is ready), then one slice every `POSTGRES_FLOW_FAILURE_REPAIR_SLICE_MS` (250 ms) on
-the `flow-failure-repair` maintenance flight. The work per slice is bounded by
-edges read, not by matches found:
+is ready), then the rest on the `flow-failure-repair` maintenance flight, driven by
+`PostgresFlowFailureMaintenance`
+([`flowFailureMaintenance.ts`](../../src/infrastructure/persistence/postgres/flowFailureMaintenance.ts)).
+That loop arms one timer at a time: each slice starts
+`POSTGRES_FLOW_FAILURE_REPAIR_SLICE_MS` (250 ms) after the previous one finished,
+or when a retry is due. The work per slice is bounded by edges read, not by
+matches found:
 
 ```sql
 WITH edge AS MATERIALIZED (
@@ -785,20 +789,37 @@ Brokers that find the same edge serialize on those keys; the second sees the
 record (or the applied result) and writes nothing. The record is then pending
 (its edge exists) and the same broker applies it through the regular applier
 after commit, exactly once across brokers; a crash before that leaves it to the
-recovery sweep. Edge failures are collected per edge, logged once and reported as
-one `AggregateError` (to `flow-failure-recovery` for the startup slice, to
-`flow-failure-repair` afterwards), and a failed startup slice never skips the sweep.
+recovery sweep. Edge failures (a failed repair transaction, or a candidate row whose
+payload cannot be decoded, so a bad row never stalls the pass on its page) are
+collected per edge, logged once and reported as one `AggregateError` (to
+`flow-failure-recovery` for the startup slice, to `flow-failure-repair`
+afterwards), and a failed startup slice never skips the sweep. The error stays
+recorded until a pass completes cleanly: every later slice of the failed pass,
+the wait for the retry and every slice of the retry pass rethrow it, so the
+`maintenance:flow-failure-repair` health entry is not cleared by a slice that
+merely read no failing edge. A database error that interrupts a slice is kept the
+same way and marks the pass as not clean. After a pass with errors the next pass
+starts 60 s later, and the wait doubles after each further failed pass up to one
+hour (`postgresFlowFailureRepairRetryMs`), so an edge that keeps failing costs at
+most one full pass an hour per broker; a clean pass resets the backoff.
 
 Coverage and cost. The pass keeps its position in memory and every broker process
 starts a new pass at the first edge, so coverage does not depend on how long
 earlier processes lived: any broker that stays up for one pass reads every edge.
-One pass takes about ⌈edges / 1,000⌉ × 250 ms (about 4,000 edges/s per broker:
-100,000 edges in about 25 s, 1,000,000 in about 4 minutes); every slice is ten
-primary-key range reads of 100 edges with two primary-key joins each, plus one
-read by primary key of the candidate rows. Brokers starting together scan the same
-edges, which costs duplicate reads but never a duplicate repair. A pass that ends
-without an error stops the repair for that process: later slices return at once
-without a query, so the steady-state cost is zero. That is safe because a stuck
+About 4,000 edges/s per broker is a ceiling, reached only when slices take no
+time: a pass takes ⌈edges / 1,000⌉ × (250 ms + slice duration), so at least
+about 25 s for 100,000 edges and 4 minutes for 1,000,000. Slices never overlap
+and never run back to back: a slice holds one pool connection while it runs (ten
+primary-key range reads of 100 edges with two primary-key joins each, one read by
+primary key of the candidate rows, and a short transaction per match), and the
+next one waits 250 ms after it finished, however long it took. Every broker makes
+its own pass: brokers starting together scan the same edges, which costs duplicate
+reads but never a duplicate repair, so ten brokers restarting on a 1,000,000-edge
+table each spend at least about 4 minutes of reads. A pass that ends without an
+error stops the repair for that process: no timer stays armed, so the
+steady-state cost is zero. Shutdown and a fenced broker session stop the loop
+with the rest of the maintenance (`stopMaintenance`), and a slice that is running
+then does not re-arm. That is safe because a stuck
 parent comes only from an older version: in a rolling upgrade, a parent that an
 older broker strands after a newer broker finished its pass is repaired by the
 startup pass of the newer broker that replaces that older one. A pass with errors
@@ -1187,9 +1208,9 @@ retain their existing host-clock behavior.
   re-arming on every local and remote claim and renewal (remote ones are visible
   only through the journal), adding hot-path work for the same bound.
   `maintenanceSchedule.ts` arms these two periods, cron polling
-  (`pollIntervalMs`), the 60-second DLQ/worker/broker/retention sweeps and, when
-  the runtime passes it, the 250 ms legacy flow-parent repair slice (a no-op once
-  its pass is done) with `safeInterval`, and the durable journal poll uses `safeInterval` too. A lease or
+  (`pollIntervalMs`), and the 60-second DLQ/worker/broker/retention sweeps with
+  `safeInterval` (the legacy flow-parent repair is not a period: its loop arms one
+  `safeTimeout` after each slice and none once its pass is done), and the durable journal poll uses `safeInterval` too. A lease or
   poll interval beyond the native timer limit (2^31 - 1 ms) is therefore honoured
   instead of ticking every millisecond.
 - `bunqueue_workers` makes worker registration and heartbeat state visible to

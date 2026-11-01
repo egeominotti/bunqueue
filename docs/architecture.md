@@ -159,7 +159,7 @@ do not re-poll in a tight loop.
   ([`flowFailureRepair.ts`](../src/application/flowFailureRepair.ts), rule in
   [`domain/job/flowFailureRepair.ts`](../src/domain/job/flowFailureRepair.ts), PostgreSQL in
   [`postgres/flowFailureRepair.ts`](../src/infrastructure/persistence/postgres/flowFailureRepair.ts), a one-pass background
-  scan per broker process). Houses DLQ, Events, Worker,
+  scan per broker process driven by [`postgres/flowFailureMaintenance.ts`](../src/infrastructure/persistence/postgres/flowFailureMaintenance.ts)). Houses DLQ, Events, Worker,
   JobLogs, Stats managers, and the batch `QueueStatsAggregator`. DLQ reads/purge
   live in `dlqManager.ts`; manual and automatic DLQ retry transitions live in
   `dlqRetry.ts`, while cold completed retry lives in

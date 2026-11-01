@@ -12,7 +12,8 @@
 > `src/application/flowFailureRepair.ts`,
 > `src/domain/job/flowFailureRepair.ts`,
 > `src/infrastructure/persistence/postgres/flowFailureRepair.ts`,
-> `src/infrastructure/persistence/postgres/flowFailureRepairEdges.ts`
+> `src/infrastructure/persistence/postgres/flowFailureRepairEdges.ts`,
+> `src/infrastructure/persistence/postgres/flowFailureMaintenance.ts`
 
 ## Purpose and contract
 
@@ -440,7 +441,8 @@ parent promoted, active or in the DLQ is not in `waitingDeps`.
 
 PostgreSQL (`postgres/flowFailureRepair.ts`, `postgres/flowFailureRepairEdges.ts`)
 applies the same rule in one full pass per broker process: a slice at startup
-before the recovery sweep, then a slice on its own cadence until the pass ends,
+before the recovery sweep, then one slice at a time (`flowFailureMaintenance.ts`)
+until the pass ends,
 as described in [PostgreSQL multi-broker](./postgres-multibroker.md). A child
 removed on failure (`removeOnFail`) or purged from the DLQ leaves nothing to
 repair from.

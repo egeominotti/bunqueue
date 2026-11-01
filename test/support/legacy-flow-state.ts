@@ -87,6 +87,9 @@ export async function writeChain(
     });
   }
   close(manager);
+  // The repair counts a heartbeat or transition in the same millisecond as the child's
+  // failure as "after" it (and skips the parent), so the failure must come later.
+  await Bun.sleep(2);
   return ids;
 }
 

@@ -158,15 +158,24 @@ head:
   count, and a write error stops startup as the replay's own writes do. On
   PostgreSQL every broker process makes one full pass over
   `bunqueue_dependencies` in primary-key order: one slice of at most 1,000
-  edges at startup, then one slice every 250 ms (about 4,000 edges/s, so
-  100,000 edges take about 25 s) until the last edge, and a restart starts a
-  new pass. Every match is re-checked under the locks of a terminal failure of
-  that child and gets its record with `ON CONFLICT DO NOTHING`, so it applies
-  exactly once across brokers; the existing applier then applies it, and the
-  recovery sweep finishes it after a crash. After a clean pass the broker
-  stops scanning (a pass with errors starts over after 60 s); a parent that an
-  older broker strands later in a rolling upgrade is repaired by the startup
-  pass of the newer broker that replaces it. No schema change; a child removed
+  edges at startup, then one slice 250 ms after the previous one finished
+  until the last edge, and a restart starts a new pass. About 4,000 edges/s per
+  broker is a ceiling (100,000 edges take at least about 25 s); a slice holds
+  one pool connection while it runs, slices never overlap, and every broker
+  makes its own pass, so ten brokers restarting on a 1,000,000-edge table each
+  spend at least about 4 minutes of reads. Every match is re-checked under the
+  locks of a terminal failure of that child and gets its record with
+  `ON CONFLICT DO NOTHING`, so it applies exactly once across brokers; the
+  existing applier then applies it, and the recovery sweep finishes it after a
+  crash. After a clean pass the broker stops scanning and no repair timer stays
+  armed; a pass with errors starts over after 60 s, doubling after each further
+  failed pass up to one hour, and its error (including a database error that
+  interrupts a slice) stays in the
+  `maintenance:flow-failure-repair` health entry until a pass completes
+  cleanly. A candidate row that cannot be decoded fails only its own edge
+  instead of stalling the pass. A parent that an older broker strands later in
+  a rolling upgrade is repaired by the startup pass of the newer broker that
+  replaces it. No schema change; a child removed
   on failure (`removeOnFail`) or purged from the DLQ leaves no trace to repair
   from.
   (`test/repro-flow-legacy-stuck-parent-repair.test.ts`,
@@ -174,7 +183,8 @@ head:
   `test/repro-flow-legacy-repair-retried-parent.test.ts`,
   `test/postgres-flow-legacy-stuck-parent-repair.test.ts`,
   `test/postgres-flow-legacy-stuck-parent-controls.test.ts`,
-  `test/postgres-flow-legacy-repair-coverage.test.ts`)
+  `test/postgres-flow-legacy-repair-coverage.test.ts`,
+  `test/postgres-flow-legacy-repair-maintenance.test.ts`)
 - **A parent failed by several siblings at once reports its failure once.** When
   two or more children with `failParentOnFailure` failed at the same moment
   under the same parent, the parent went to the DLQ once (and its own parent was
