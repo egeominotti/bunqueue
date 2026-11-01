@@ -167,7 +167,7 @@ SQLite `dlq` table (`src/infrastructure/persistence/schema.ts:73`): `id INTEGER 
 4. **Stall (runtime)** — `moveStalliedJobToDlq` (`src/application/stallDetection.ts`) when `stallCount >= maxStalls`. Reason `Stalled`. Cron `preventOverlap` jobs are dropped instead.
 5. **Lock expiry** — `handleRecoveryBoundExceeded` (`src/application/lockManager.ts`). Reason `MaxAttemptsExceeded` (`Lock expired at max attempts (N)`) or `Stalled`.
 6. **Startup recovery** — `recover` (`src/application/background/recovery/`) classifies interrupted active work and quarantines corrupt dependency metadata.
-7. **Flow parent failure** — `moveParentToFailed` (`src/application/queue-manager/flow-failures.ts`) routes a parent whose child failed; reason `Unknown` with a `Child job <id> failed: …` message.
+7. **Flow parent failure** — `moveParentToFailed` (`src/application/queue-manager/flow-failures.ts`) routes a parent whose child failed; reason `Unknown` with a `Child job <id> failed: …` message. That parent has failed terminally, so its own flow policy (if it has a parent) commits with this DLQ move and applies to its parent in turn, up the tree; a parent without a policy keeps the plain `saveDlqEntry` + `deleteJob` writes.
 
 Entry paths 4–6 apply a flow child's failure policy as path 1 does: the `flow_failures` outbox record commits with the DLQ move and the parent is failed, promoted or detached (see [Flow Producer](./flow-producer.md#failure-policies-and-recovery)). They still skip path 1's `dlq:added` event, `totalFailed` counter and completion bookkeeping, as before, and emit `flow:failed` only for a child with a policy.
 
@@ -269,7 +269,7 @@ memory-only, persisted embedded, and TCP deployments.
 `DlqShard` itself is single-threaded data (Bun is single-threaded per process); its methods take no locks. Locking is the caller's job and follows the documented hierarchy (`jobIndex` → `completedJobs` → `shards[N]` → `processingShards[N]`):
 
 - `moveFailedJobToDlq` runs inside `failJob`'s `withWriteLock(shardLocks[idx])` after the processing-shard lock released the job (`src/application/operations/ack/failure.ts:71-75`, `:99-138`).
-- `moveParentToFailed` (`queue-manager/flow-failures.ts`) acquires the shard write lock and **re-checks `jobIndex.get(parentId)?.type === 'queue'` inside the lock** — a TOCTOU guard preventing two concurrent child-failure callbacks from creating duplicate DLQ entries for the same parent.
+- `moveParentToFailed` (`queue-manager/flow-failures.ts`) acquires the shard write lock and **re-checks `jobIndex.get(parentId)?.type === 'queue'` inside the lock** — a TOCTOU guard preventing two concurrent child-failure callbacks from creating duplicate DLQ entries for the same parent. Each level of the upward propagation (`failParentForChild`) takes and releases one shard lock; the next level's policy runs only after that lock is released, so no two shard locks are held at once.
 - `discardJob` takes the queue or processing lock to extract the job, then a
   separate shard write lock to add and synchronously persist the DLQ entry,
   delete the live row, and release terminal dependency/custom-ID ownership.

@@ -22,18 +22,29 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 ## When a Child Fails
 
-By default a parent just keeps waiting for its remaining children. Four child options change what happens when a child fails terminally (no retries left):
+By default a parent just keeps waiting for its remaining children. Four child options change what happens when a child fails terminally: its last attempt fails, it throws `UnrecoverableError`, or stall detection, lock expiry or startup recovery after a crash uses up its attempts. The policy applies the same way on every path:
 
 | Option | Behavior |
 |--------|----------|
-| `failParentOnFailure` | Parent immediately moves to `failed`, even if other children are still running |
+| `failParentOnFailure` | Parent immediately moves to `failed` (into the DLQ, error `Child job <id> failed: <error>`), even if other children are still running. Siblings are not cancelled and the parent's own attempts are not used |
 | `removeDependencyOnFailure` | The failed child is silently dropped from the parent's dependencies; the parent proceeds as if it never existed |
 | `ignoreDependencyOnFailure` | Like the above, but the failure is recorded; the parent can read it via `job.getIgnoredChildrenFailures()` |
-| `continueParentOnFailure` | Parent is promoted to run **immediately**; it can inspect failures via `job.getFailedChildrenValues()` and cancel leftover children |
+| `continueParentOnFailure` | Parent is promoted to run **immediately**; `job.getFailedChildrenValues()` lists the failures recorded before it started, and it can cancel leftover children |
 
-Choose at most one policy per child. The selected policy and any unresolved
-failure record are durable: a broker restart cannot reset the child to default
-behavior or put an already-released parent back into `waiting-children`.
+Choose at most one policy per child. A parent that `failParentOnFailure` moves to
+`failed` has failed terminally too, so its own policy then applies to its parent:
+`failParentOnFailure` on every level fails the whole branch up to the root. In
+PostgreSQL mode this currently applies one level only: the parent fails, and its
+own parent keeps waiting.
+
+Policies are accepted only on a job that has a parent: `flow.add()` / `addBulk()`
+children and `addBulkThen` parallel jobs. A root node, an `addChain` step or an
+`addTree` child carrying one is rejected with `a flow failure policy requires a
+parent`; in a chain, a step that fails terminally leaves the steps after it waiting.
+
+With a persistent backend (SQLite or PostgreSQL), the selected policy and any
+unresolved failure record are durable: a broker restart cannot reset the child to
+default behavior or put an already-released parent back into `waiting-children`.
 
 A worked example with `continueParentOnFailure`, useful when the parent should decide how to handle partial failure:
 
@@ -41,6 +52,10 @@ A worked example with `continueParentOnFailure`, useful when the parent should d
 <TabItem label="Bun">
 
 ```typescript
+import { FlowProducer, Worker } from 'bunqueue/client';
+
+const flow = new FlowProducer({ embedded: true });
+
 await flow.add({
   name: 'pipeline',
   queueName: 'main',
@@ -57,7 +72,7 @@ const worker = new Worker('main', async (job) => {
   // { 'workers:job-abc': 'step-a failed', ... }
 
   if (Object.keys(failed).length > 0) {
-    await job.removeUnprocessedChildren();  // cancel children still waiting
+    await job.removeUnprocessedChildren();  // cancel direct children still queued
     return { status: 'partial', failedSteps: failed };
   }
   return { status: 'complete' };
@@ -68,10 +83,9 @@ const worker = new Worker('main', async (job) => {
 <TabItem label="Node.js / Deno">
 
 ```typescript
-import { FlowProducer, Queue, Worker } from 'bunqueue-client';
+import { FlowProducer, Worker } from 'bunqueue-client';
 
 const flow = new FlowProducer();
-const queue = new Queue('main');
 
 await flow.add({
   name: 'pipeline',
@@ -85,11 +99,11 @@ await flow.add({
 });
 
 const worker = new Worker('main', async (job) => {
-  const failed = await queue.getFailedChildrenValues(job.id);
+  const failed = await job.getFailedChildrenValues();
   // { 'workers:job-abc': 'step-a failed', ... }
 
   if (Object.keys(failed).length > 0) {
-    await queue.removeUnprocessedChildren(job.id);  // cancel children still waiting
+    await job.removeUnprocessedChildren();  // cancel direct children still queued
     return { status: 'partial', failedSteps: failed };
   }
   return { status: 'complete' };
@@ -123,7 +137,7 @@ def process(job):
     # {"workers:job-abc": "step-a failed", ...}
 
     if failed:
-        queue.remove_unprocessed_children(job.id)  # cancel children still waiting
+        queue.remove_unprocessed_children(job.id)  # cancel direct children still queued
         return {"status": "partial", "failed_steps": failed}
     return {"status": "complete"}
 
@@ -133,22 +147,22 @@ Worker("main", process).run()
 </TabItem>
 <TabItem label="PHP">
 
-The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are available in the Bun package and the TypeScript and Python SDKs. The failure options themselves work from PHP like anywhere else; read child outcomes by looking the child IDs up with `getJob($childId)` / `getResult($childId)` on the queue.
+The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK. The failure options themselves work from PHP like anywhere else; read child outcomes by looking the child IDs up with `getJob($childId)` / `getResult($childId)` on the queue.
 
 </TabItem>
 <TabItem label="Go">
 
-The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are available in the Bun package and the TypeScript and Python SDKs. The failure options themselves work from Go like anywhere else; read child outcomes by looking the child IDs up with `GetJob(childID)` / `GetResult(childID)` on the queue.
+The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK. The failure options themselves work from Go like anywhere else; read child outcomes by looking the child IDs up with `GetJob(childID)` / `GetResult(childID)` on the queue.
 
 </TabItem>
 <TabItem label="Rust">
 
-The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are available in the Bun package and the TypeScript and Python SDKs. The failure options themselves work from Rust like anywhere else; read child outcomes by looking the child IDs up with `get_job(child_id)` / `get_result(child_id)` on the queue.
+The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK. The failure options themselves work from Rust like anywhere else; read child outcomes by looking the child IDs up with `get_job(child_id)` / `get_result(child_id)` on the queue.
 
 </TabItem>
 <TabItem label="Elixir">
 
-The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are available in the Bun package and the TypeScript and Python SDKs. The failure options themselves work from Elixir like anywhere else; read child outcomes by looking the child IDs up with `get_job(child_id)` / `get_result(child_id)` on the queue.
+The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK. The failure options themselves work from Elixir like anywhere else; read child outcomes by looking the child IDs up with `get_job(child_id)` / `get_result(child_id)` on the queue.
 
 </TabItem>
 </Tabs>
@@ -159,6 +173,8 @@ And with `ignoreDependencyOnFailure`, when the parent should continue with parti
 <TabItem label="Bun">
 
 ```typescript
+import { Worker } from 'bunqueue/client';
+
 const worker = new Worker('reports', async (job) => {
   const ignored = await job.getIgnoredChildrenFailures();
   // { 'workers:job-abc': 'enrichment API timeout' }
@@ -170,10 +186,10 @@ const worker = new Worker('reports', async (job) => {
 <TabItem label="Node.js / Deno">
 
 ```typescript
-const queue = new Queue('reports');
+import { Worker } from 'bunqueue-client';
 
 const worker = new Worker('reports', async (job) => {
-  const ignored = await queue.getIgnoredChildrenFailures(job.id);
+  const ignored = await job.getIgnoredChildrenFailures();
   // { 'workers:job-abc': 'enrichment API timeout' }
   return { partial: Object.keys(ignored).length > 0 };
 });
@@ -196,27 +212,27 @@ Worker("reports", process).run()
 </TabItem>
 <TabItem label="PHP">
 
-The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are available in the Bun package and the TypeScript and Python SDKs. The failure options themselves work from PHP like anywhere else; read child outcomes by looking the child IDs up with `getJob($childId)` / `getResult($childId)` on the queue.
+The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK. The failure options themselves work from PHP like anywhere else; read child outcomes by looking the child IDs up with `getJob($childId)` / `getResult($childId)` on the queue.
 
 </TabItem>
 <TabItem label="Go">
 
-The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are available in the Bun package and the TypeScript and Python SDKs. The failure options themselves work from Go like anywhere else; read child outcomes by looking the child IDs up with `GetJob(childID)` / `GetResult(childID)` on the queue.
+The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK. The failure options themselves work from Go like anywhere else; read child outcomes by looking the child IDs up with `GetJob(childID)` / `GetResult(childID)` on the queue.
 
 </TabItem>
 <TabItem label="Rust">
 
-The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are available in the Bun package and the TypeScript and Python SDKs. The failure options themselves work from Rust like anywhere else; read child outcomes by looking the child IDs up with `get_job(child_id)` / `get_result(child_id)` on the queue.
+The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK. The failure options themselves work from Rust like anywhere else; read child outcomes by looking the child IDs up with `get_job(child_id)` / `get_result(child_id)` on the queue.
 
 </TabItem>
 <TabItem label="Elixir">
 
-The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are available in the Bun package and the TypeScript and Python SDKs. The failure options themselves work from Elixir like anywhere else; read child outcomes by looking the child IDs up with `get_job(child_id)` / `get_result(child_id)` on the queue.
+The child-failure queries (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK. The failure options themselves work from Elixir like anywhere else; read child outcomes by looking the child IDs up with `get_job(child_id)` / `get_result(child_id)` on the queue.
 
 </TabItem>
 </Tabs>
 
-*All four failure-propagation options are ordinary job options and reach the wire in every SDK. The reading helpers (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are currently available in the Bun package, the TypeScript SDK and the Python SDK (on `Queue`, taking the job id).*
+*All four failure-propagation options are ordinary job options and reach the wire in every SDK. The reading helpers (`getFailedChildrenValues`, `getIgnoredChildrenFailures`, `removeUnprocessedChildren`) are job methods in the Bun package and the TypeScript SDK, and `Queue` methods taking the job id in the Python SDK.*
 
 ## Where to go next
 

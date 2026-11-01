@@ -37,7 +37,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 | `close()` / `disconnect()` | Close the connection pool |
 | `waitUntilReady()` | Wait until the FlowProducer is connected |
 
-The table describes the Bun package. SDK availability: `add` and `addChain` exist in all six SDKs; `getFlow` in TypeScript, Python, PHP and Go; `addBulk` and `addBulkThen` in TypeScript and Python; `addTree`, `getParentResult` and `getParentResults` in the Bun package only.
+The table describes the Bun package. The TypeScript SDK (`bunqueue-client`) exports the same `FlowProducer` class, so every method above, `closing` included, works there too. In the other SDKs: `add` and `addChain` exist in all of them; `getFlow` in Python, PHP and Go (as `getFlow(jobId, depth)`, without `queueName`/`maxChildren`); `addBulk` and `addBulkThen` in Python; `addTree`, `getParentResult` and `getParentResults` in none.
 
 FlowProducer extends Node.js `EventEmitter` (BullMQ v5 compatible). Its
 `closing` property is `null` while live, then becomes the stable Promise returned
@@ -49,10 +49,11 @@ return Promises in TCP mode. Always `await` them in portable code. They preserve
 `0`, `false`, an empty string, and persisted `null`; an ID with no stored result
 is omitted from the map (or resolves to `undefined` for the single read).
 
-The Bun snippets in this guide are exercised in
-`test/flow-docs-examples.test.ts`, including the complete Quick Start, chain,
-fan-in, parent-first tree, per-queue defaults, bounded traversal, and both
-failure-value APIs.
+The behavior described in this guide is exercised against a real broker, in both
+embedded and TCP mode, by `test/docs-flow-guide/` (one suite per page) and
+`test/flow-docs-examples.test.ts` (the Quick Start, chain, fan-in, parent-first
+tree, per-queue defaults, bounded traversal, and both failure-value APIs). The
+external-SDK tabs are not executed by these suites.
 
 ### Job methods inside a worker processor
 
@@ -62,9 +63,9 @@ failure-value APIs.
 | `job.getFailedChildrenValues()` | Errors from children that failed with `continueParentOnFailure` |
 | `job.getIgnoredChildrenFailures()` | Errors from children that failed with `ignoreDependencyOnFailure` |
 | `job.removeChildDependency()` | Atomically detach this job from its parent; promotes the parent if it was the last pending child |
-| `job.removeUnprocessedChildren()` | Cancel all waiting/delayed children; active and finished children are unaffected |
+| `job.removeUnprocessedChildren()` | Cancel every direct child that is still queued (waiting, delayed, prioritized, or waiting for its own children); active and finished children, and grandchildren, are unaffected |
 
-In the external SDKs, `getChildrenValues` is available on the job in TypeScript and Python and on `Queue` (taking the job id) in TypeScript, Python, PHP and Go; the other four methods live on `Queue` in TypeScript and Python.
+In the TypeScript SDK all five are job methods, exactly as in the Bun package (`Queue.getChildrenValues(id)` also exists). In Python, `get_children_values` is on the job and on `Queue`; the other four are on `Queue`, taking the job id. PHP and Go have only `getChildrenValues` on `Queue`; Rust and Elixir have none of them yet.
 
 ### Step shape
 
@@ -78,7 +79,7 @@ interface FlowStep<T = unknown> {
   queueName: string;      // Target queue
   data: T;                // Job data
   opts?: JobOptions;      // Optional job options
-  children?: FlowStep[];  // Child steps (addTree)
+  children?: FlowStep<T>[];  // Child steps (addTree)
 }
 
 // flow.add / flow.addBulk (children run BEFORE the parent)
@@ -87,7 +88,7 @@ interface FlowJob<T = unknown> {
   queueName: string;
   data?: T;
   opts?: JobOptions;
-  children?: FlowJob[];
+  children?: FlowJob<T>[];
 }
 ```
 
@@ -95,12 +96,13 @@ interface FlowJob<T = unknown> {
 <TabItem label="Node.js / Deno">
 
 ```typescript
-// addChain / addBulkThen
+// addChain / addBulkThen / addTree
 interface FlowStep<T = unknown> {
-  name: string;
-  queueName: string;
-  data?: T;
-  opts?: JobOptions;
+  name: string;           // Job name
+  queueName: string;      // Target queue
+  data: T;                // Job data
+  opts?: JobOptions;      // Optional job options
+  children?: FlowStep<T>[];  // Child steps (addTree)
 }
 
 // flow.add / flow.addBulk (children run BEFORE the parent)

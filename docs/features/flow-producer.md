@@ -321,6 +321,29 @@ after releasing their shard and processing locks, and emit the child-level
 durable record. Startup recovery writes the record before the replay below
 runs, so the replay applies it. Children without a parent or without a policy
 keep the plain `saveDlqEntry` + `deleteJob` writes and emit no flow event.
+
+A parent that `failParentOnFailure` moves to the DLQ (`moveParentToFailed` in
+`queue-manager/flow-failures.ts`, message `Child job <id> failed: <error>`)
+has failed terminally itself, so its own policy toward its parent applies in
+turn, up the tree (BullMQ semantics). Each step (`failParentForChild`) builds
+the parent's `flowFailureRecord` with that message and commits it with the
+parent's DLQ move (`persistRecoveryDlqMove`); after the shard lock is
+released, a `fail` record fails the next parent and the other modes run
+`onChildDependencyOption` on it. The climb is an iterative loop with a visited
+set, and it stops at a parent that is no longer queued, so a cycle or a deep
+chain cannot recurse. A failed parent without a policy or without a parent
+keeps the previous writes (`saveDlqEntry` + `deleteJob`) and events, and its
+own parent keeps waiting. A failed parent that carries a policy also emits the
+child-level `flow:failed` event toward its own parent, as a worker FAIL does,
+so a `fail` chain reports each pair once at child level and once when the next
+parent is failed. The same rule holds for a child linked to a parent
+after it already failed (`updateJobParent`). The startup replay
+(`flowFailureRecovery.ts`) is a worklist: a parent it fails appends its own
+committed record, which the same pass applies to the next parent, so a crash
+between two levels leaves a durable record that the next start finishes.
+PostgreSQL mode (`postgres/flowFailures.ts` `applyPostgresFlowFailure`)
+applies only the first level today.
+
 Startup calls `recoverFlowFailures` before workers start, then idempotently
 fails, promotes, or detaches the parent. `ignore` and `continue` records remain
 available while the parent is live and are removed when that parent completes,

@@ -1,13 +1,26 @@
 import type { Shard } from '../../domain/queue/shard';
 import type { DlqEntry } from '../../domain/types/dlq';
 import { FailureReason } from '../../domain/types/dlq';
+import type { FlowFailureRecord } from '../../domain/types/flow';
 import type { Job, JobId } from '../../domain/types/job';
 import type { JobLocation } from '../../domain/types/queue';
 import { EventType } from '../../domain/types/queue';
 import { shardIndex } from '../../shared/hash';
 import { withWriteLock } from '../../shared/lock';
 import type { SetLike } from '../../shared/lru';
+import {
+  emitFlowChildFailed,
+  flowFailureRecord,
+  persistRecoveryDlqMove,
+} from '../flowChildFailure';
 import { QueueManagerDependencyRuntime } from './dependency-runtime';
+
+/** A parent moved to the DLQ by its child, with its own policy record (if any). */
+interface FailedFlowParent {
+  readonly parent: Job;
+  readonly error: string;
+  readonly flowFailure: FlowFailureRecord | null;
+}
 
 /** Settles like `queryOps.getJob` for a job it finds without awaiting a lock. */
 async function settledJob(job: Job): Promise<Job> {
@@ -102,16 +115,50 @@ export class QueueManagerFlowFailures extends QueueManagerDependencyRuntime {
     if (childJob.parentId) await this.moveParentToFailed(childJob.parentId, childJob, error);
   }
 
+  /**
+   * Fail a flow parent because of a child's `failParentOnFailure`. The parent has then
+   * failed terminally itself, so its own flow policy applies to its parent in turn, up
+   * the tree. Iterative with a visited set: a cycle or a deep chain cannot recurse.
+   */
   protected override async moveParentToFailed(
     parentId: JobId,
     childJob: Job,
     error: string | undefined
   ): Promise<void> {
+    const visited = new Set<JobId>();
+    let next: { parentId: JobId; child: Job; error: string | undefined } | null = {
+      parentId,
+      child: childJob,
+      error,
+    };
+    while (next && !visited.has(next.parentId)) {
+      visited.add(next.parentId);
+      const failed = await this.failParentForChild(next.parentId, next.child, next.error);
+      next = null;
+      if (!failed?.flowFailure) break;
+      // Every lock is released here, as after a worker FAIL.
+      const { parent, error: parentError } = failed;
+      if (failed.flowFailure.mode === 'fail') {
+        next = { parentId: failed.flowFailure.parentId, child: parent, error: parentError };
+      } else {
+        await this.onChildDependencyOption(parent, parentError);
+      }
+    }
+  }
+
+  /** Move one parent to the DLQ; returns it with its own policy record, or null. */
+  private async failParentForChild(
+    parentId: JobId,
+    childJob: Job,
+    error: string | undefined
+  ): Promise<FailedFlowParent | null> {
     const parentJob = await this.getJob(parentId);
-    if (!parentJob || this.jobIndex.get(parentId)?.type !== 'queue') return;
+    if (!parentJob || this.jobIndex.get(parentId)?.type !== 'queue') return null;
 
     const index = shardIndex(parentJob.queue);
+    const failError = `Child job ${childJob.id} failed: ${error ?? 'unknown error'}`;
     let releasedDependencies: JobId[] = [];
+    let failed: FailedFlowParent | null = null;
     await withWriteLock(this.shardLocks[index], () => {
       if (this.jobIndex.get(parentId)?.type !== 'queue') return;
       const shard = this.shards[index];
@@ -126,18 +173,18 @@ export class QueueManagerFlowFailures extends QueueManagerDependencyRuntime {
         queue.remove(parentId);
         shard.decrementQueued(parentId);
       }
-      const failError = `Child job ${childJob.id} failed: ${error ?? 'unknown error'}`;
       const entry = shard.addToDlq(parentJob, FailureReason.Unknown, failError);
       this.jobIndex.set(parentId, { type: 'dlq', queueName: parentJob.queue });
-      this.storage?.saveDlqEntry(entry);
-      this.storage?.deleteJob(parentId);
+      // A parent with its own policy commits that outbox record with its DLQ move.
+      const flowFailure = flowFailureRecord(parentJob, failError);
+      persistRecoveryDlqMove(this.storage, parentId, entry, flowFailure);
       this.storage?.deleteFlowFailure(parentId, childJob.id);
+      failed = { parent: parentJob, error: failError, flowFailure };
     });
     this.releaseCompletionPins(releasedDependencies);
     this.failedChildrenValues.delete(parentId);
     this.ignoredChildrenFailures.delete(parentId);
     this.dependencyResults.releaseConsumer(parentId);
-    const failError = `Child job ${childJob.id} failed: ${error ?? 'unknown error'}`;
     this.eventsManager.broadcast({
       eventType: EventType.Failed,
       queue: parentJob.queue,
@@ -152,5 +199,9 @@ export class QueueManagerFlowFailures extends QueueManagerDependencyRuntime {
       queue: parentJob.queue,
       error: error ?? 'Child job failed',
     });
+    const result = failed as FailedFlowParent | null;
+    if (result?.flowFailure)
+      emitFlowChildFailed(this.dashboardEmit ?? undefined, parentJob, failError);
+    return result;
   }
 }

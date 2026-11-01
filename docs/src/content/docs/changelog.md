@@ -62,7 +62,27 @@ head:
   in `waiting-children`; PostgreSQL mode was not affected, because its lease
   expiry already applies the policy in the same transaction.
   (`test/repro-flow-policy-on-recovery-exhaustion.test.ts`,
-  `test/flow-policy-recovery-durability.test.ts`)
+  `test/flow-policy-recovery-durability.test.ts`,
+  `test/flow-policy-recovery-edges.test.ts`)
+- **`failParentOnFailure` now propagates up a nested flow.** A parent that a
+  child's `failParentOnFailure` moves to `failed` ("Child job <id> failed: …")
+  has failed terminally itself, but its own policy toward its parent never ran:
+  with `grandparent <- mid(failParentOnFailure) <- leaf(failParentOnFailure)`,
+  a failing `leaf` failed `mid` and left `grandparent` in `waiting-children`
+  forever, and the same happened when `mid` carried
+  `ignoreDependencyOnFailure`, `removeDependencyOnFailure` or
+  `continueParentOnFailure`. The failed parent's own policy now applies to its
+  parent, level by level up the tree, as BullMQ does: its `flow_failures`
+  record commits in the same SQLite transaction as its DLQ move, the effect
+  runs after the shard lock is released, and the startup outbox replay
+  propagates the same way, so a crash between "mid failed" and "grandparent
+  updated" cannot strand the grandparent. A failed parent without a policy or
+  without a parent keeps exactly the previous writes and events (its own
+  parent keeps waiting); siblings are not cancelled, the parent's attempts are
+  not consumed, and DLQ reasons and messages are unchanged. PostgreSQL mode
+  still applies only one level; that is tracked separately.
+  (`test/repro-flow-fail-parent-propagation.test.ts`,
+  `test/flow-fail-parent-propagation-durability.test.ts`)
 
 ### Tooling
 

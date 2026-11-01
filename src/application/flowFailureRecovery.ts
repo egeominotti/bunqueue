@@ -1,3 +1,4 @@
+import type { FlowFailureRecord } from '../domain/types/flow';
 import type { Job, JobId } from '../domain/types/job';
 import { FailureReason } from '../domain/types/dlq';
 import type { JobLocation } from '../domain/types/queue';
@@ -6,6 +7,7 @@ import type { SqliteStorage } from '../infrastructure/persistence/sqlite';
 import { shardIndex } from '../shared/hash';
 import type { SetLike } from '../shared/lru';
 import type { DependencyResultTracker } from './dependencyResultTracker';
+import { flowFailureRecord } from './flowChildFailure';
 import {
   type DependencyCompletionTracker,
   reconcileDependencyCompletionPins,
@@ -52,12 +54,16 @@ function promote(parent: Job, ctx: FlowFailureRecoveryContext): void {
   ctx.storage.updateFlowParentResolution(parent);
 }
 
+/**
+ * The parent has failed terminally itself: its own policy record toward its parent
+ * commits with its DLQ move and is returned so the replay applies it in turn.
+ */
 function failParent(
   parent: Job,
   childId: JobId,
   error: string,
   ctx: FlowFailureRecoveryContext
-): void {
+): FlowFailureRecord | null {
   const shard = ctx.shards[shardIndex(parent.queue)];
   if (shard.waitingDeps.delete(parent.id)) {
     shard.unregisterDependencies(parent.id, parent.dependsOn);
@@ -67,14 +73,20 @@ function failParent(
   if (queued) shard.decrementQueued(parent.id);
   const message = `Child job ${String(childId)} failed: ${error}`;
   const entry = shard.addToDlq(parent, FailureReason.Unknown, message);
-  ctx.storage.commitFailedJob(parent.id, entry, null);
+  const flowFailure = flowFailureRecord(parent, message);
+  ctx.storage.commitFailedJob(parent.id, entry, flowFailure);
   ctx.jobIndex.set(parent.id, { type: 'dlq', queueName: parent.queue });
   ctx.dependencyResults.releaseConsumer(parent.id);
+  return flowFailure;
 }
 
 /** Replay the durable flow-failure outbox before workers can observe recovered jobs. */
 export function recoverFlowFailures(ctx: FlowFailureRecoveryContext): void {
-  for (const record of ctx.storage.loadFlowFailures()) {
+  // A worklist: a parent failed here appends its own record, so the policy climbs the
+  // tree. A failed parent is no longer queued, so each job appends at most one record.
+  const records = ctx.storage.loadFlowFailures();
+  for (let position = 0; position < records.length; position++) {
+    const record = records[position];
     const parent = findQueuedJob(ctx, record.parentId);
     if (!parent) {
       if (ctx.jobIndex.get(record.parentId)?.type !== 'queue') {
@@ -85,8 +97,9 @@ export function recoverFlowFailures(ctx: FlowFailureRecoveryContext): void {
 
     const childKey = `${record.childQueue}:${String(record.childId)}`;
     if (record.mode === 'fail') {
-      failParent(parent, record.childId, record.error, ctx);
+      const propagated = failParent(parent, record.childId, record.error, ctx);
       ctx.storage.deleteFlowFailure(record.parentId, record.childId);
+      if (propagated) records.push(propagated);
       continue;
     }
 

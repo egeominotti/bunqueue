@@ -233,32 +233,32 @@ const { jobIds } = await flow.addTree({
 </TabItem>
 <TabItem label="Python">
 
-`addTree` (parent-first hierarchies) is available in the Bun `bunqueue` package only. In Python, `add` builds the inverse tree, where children complete before their parent.
+`addTree` (parent-first hierarchies) is available in the Bun package and the TypeScript SDK only. In Python, `add` builds the inverse tree, where children complete before their parent.
 
 </TabItem>
 <TabItem label="PHP">
 
-`addTree` (parent-first hierarchies) is available in the Bun `bunqueue` package only. In PHP, `add` builds the inverse tree, where children complete before their parent.
+`addTree` (parent-first hierarchies) is available in the Bun package and the TypeScript SDK only. In PHP, `add` builds the inverse tree, where children complete before their parent.
 
 </TabItem>
 <TabItem label="Go">
 
-`addTree` (parent-first hierarchies) is available in the Bun `bunqueue` package only. In Go, `add` builds the inverse tree, where children complete before their parent.
+`addTree` (parent-first hierarchies) is available in the Bun package and the TypeScript SDK only. In Go, `add` builds the inverse tree, where children complete before their parent.
 
 </TabItem>
 <TabItem label="Rust">
 
-`addTree` (parent-first hierarchies) is available in the Bun `bunqueue` package only. In Rust, `add` builds the inverse tree, where children complete before their parent.
+`addTree` (parent-first hierarchies) is available in the Bun package and the TypeScript SDK only. In Rust, `add` builds the inverse tree, where children complete before their parent.
 
 </TabItem>
 <TabItem label="Elixir">
 
-`addTree` (parent-first hierarchies) is available in the Bun `bunqueue` package only. In Elixir, `add` builds the inverse tree, where children complete before their parent.
+`addTree` (parent-first hierarchies) is available in the Bun package and the TypeScript SDK only. In Elixir, `add` builds the inverse tree, where children complete before their parent.
 
 </TabItem>
 </Tabs>
 
-*`addTree` (parent-first hierarchies) is available in the Bun package only for now. Every SDK's `add` builds the inverse tree, where children complete before their parent ([Quick Start](/guide/flow/#quick-start)).*
+*`addTree` (parent-first hierarchies) is available in the Bun package and the TypeScript SDK only for now. Every SDK's `add` builds the inverse tree, where children complete before their parent ([Quick Start](/guide/flow/#quick-start)).*
 
 ### Read results from earlier jobs
 
@@ -287,41 +287,42 @@ const worker = new Worker('pipeline', async (job) => {
 </TabItem>
 <TabItem label="Node.js / Deno">
 
-`getParentResult` / `getParentResults` are Bun-package helpers. In Node.js / Deno, read a parent with `getResult(parentId)` on the queue.
+`getParentResult` / `getParentResults` work the same in `bunqueue-client`: run the Bun example with `FlowProducer` and `Worker` imported from `bunqueue-client` and a TCP connection.
 
 </TabItem>
 <TabItem label="Python">
 
-`getParentResult` / `getParentResults` are Bun-package helpers. In Python, read a parent with `get_result(parent_id)` on the queue.
+`getParentResult` / `getParentResults` are available in the Bun package and the TypeScript SDK. In Python, read a parent with `get_result(parent_id)` on the queue.
 
 </TabItem>
 <TabItem label="PHP">
 
-`getParentResult` / `getParentResults` are Bun-package helpers. In PHP, read a parent with `getResult($parentId)` on the queue.
+`getParentResult` / `getParentResults` are available in the Bun package and the TypeScript SDK. In PHP, read a parent with `getResult($parentId)` on the queue.
 
 </TabItem>
 <TabItem label="Go">
 
-`getParentResult` / `getParentResults` are Bun-package helpers. In Go, read a parent with `GetResult(parentID)` on the queue.
+`getParentResult` / `getParentResults` are available in the Bun package and the TypeScript SDK. In Go, read a parent with `GetResult(parentID)` on the queue.
 
 </TabItem>
 <TabItem label="Rust">
 
-`getParentResult` / `getParentResults` are Bun-package helpers. In Rust, read a parent with `get_result(parent_id)` on the queue.
+`getParentResult` / `getParentResults` are available in the Bun package and the TypeScript SDK. In Rust, read a parent with `get_result(parent_id)` on the queue.
 
 </TabItem>
 <TabItem label="Elixir">
 
-`getParentResult` / `getParentResults` are Bun-package helpers. In Elixir, read a parent with `get_result(parent_id)` on the queue.
+`getParentResult` / `getParentResults` are available in the Bun package and the TypeScript SDK. In Elixir, read a parent with `get_result(parent_id)` on the queue.
 
 </TabItem>
 </Tabs>
 
-*`getParentResult` / `getParentResults` are Bun-package helpers for both
-embedded and TCP runtimes. Await them in transport-neutral code: embedded keeps
-the historical synchronous return, while TCP performs `GetResult` round trips.
-The external SDKs can read a parent with `getResult(parentId)` (`get_result` in
-Python).*
+*`getParentResult` / `getParentResults` are helpers of the Bun package and the
+TypeScript SDK, for both embedded and TCP runtimes. Await them in
+transport-neutral code: embedded keeps the historical synchronous return, while
+TCP performs `GetResult` round trips. The other SDKs read a parent with
+`getResult` on the queue (`get_result` in Python, Rust and Elixir, `GetResult` in
+Go).*
 
 Injected fields: `__flowParentId`, `__flowParentIds`, plus the BullMQ-compatible
 `__parentId`, `__parentQueue`, and `__childrenIds`. A non-root `addChain` or
@@ -368,6 +369,8 @@ await flow.add(
 
 ```typescript
 import { FlowProducer } from 'bunqueue-client';
+
+const flow = new FlowProducer();
 
 await flow.add(
   {
@@ -466,6 +469,11 @@ mismatch returns `null`. A missing descendant, malformed topology, cycle, or
 real TCP/server error throws instead of returning a misleading partial tree.
 Each returned descendant must also point back to the parent being traversed;
 corrupt or cross-linked ownership is rejected.
+A child that no longer exists, such as a completed `removeOnComplete` child or one
+cancelled by `removeUnprocessedChildren`, counts as a missing descendant:
+`getFlow` throws `Flow child job <id> not found`, so bound `depth` above it. The
+Python, PHP and Go SDKs expose `getFlow(jobId, depth)` without `queueName` or
+`maxChildren`.
 Dependency keys returned by `getDependencies()` use each child's actual queue,
 so cross-queue keys are `childQueue:childId`.
 

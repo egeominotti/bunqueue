@@ -167,14 +167,16 @@ $worker->run();
 flow := bunqueue.NewFlowProducer(bunqueue.Options{})
 defer flow.Close()
 
-node, err := flow.Add(bunqueue.FlowJob{
+if _, err := flow.Add(bunqueue.FlowJob{
     Name: "build-report", QueueName: "reports",
     Data: map[string]any{"month": "2026-01"},
     Children: []bunqueue.FlowJob{
         {Name: "fetch-sales", QueueName: "reports", Data: map[string]any{"source": "sales"}},
         {Name: "fetch-costs", QueueName: "reports", Data: map[string]any{"source": "costs"}},
     },
-})
+}); err != nil {
+    log.Fatal(err)
+}
 
 queue := bunqueue.NewQueue("reports", bunqueue.Options{})
 worker := bunqueue.NewWorker("reports", func(job *bunqueue.Job) (any, error) {
@@ -186,7 +188,7 @@ worker := bunqueue.NewWorker("reports", func(job *bunqueue.Job) (any, error) {
         }
         return map[string]any{"report": values}, nil
     }
-    return fetchData(any(job.Data()).(map[string]any)["source"].(string))
+    return fetchData(job.Data().(map[string]any)["source"].(string))
 }, bunqueue.WorkerOptions{})
 worker.Run()
 ```
@@ -240,19 +242,23 @@ _Reading children results (`GetChildrenValues`) has no typed helper in the Elixi
 </Tabs>
 
 Flow creation is one broker-side transaction in the Bun package and all six
-current external SDKs: `addBulk` commits every tree or none, and workers cannot
-see a leaf before the full graph exists. Previously published SDK versions that
+current external SDKs: workers cannot see a leaf before the full graph exists,
+and where `FlowProducer.addBulk` exists (Bun, TypeScript, Python) it commits every tree or
+none. Previously published SDK versions that
 compose `PUSH` and `UpdateParent` remain compatible with the server, but their
 already-sent requests cannot gain `PUSHF` all-or-nothing visibility.
 
 :::tip
-In the Bun package, FlowProducer works in TCP mode too: pass `connection: { port: 6789 }` instead of `embedded: true`.
+In the Bun package, FlowProducer works in TCP mode too: pass `connection: { port: 6789 }` instead of `{ embedded: true }` on both the FlowProducer and the Worker.
 :::
 
 ### Creation guarantees and limits
 
 The Bun producer validates the complete graph before sending it and the broker
-validates it again. With a SQLite `dataPath`, one immediate transaction commits
+validates it again. An embedded FlowProducer has no `dataPath` option of its own:
+it uses the process-wide embedded engine, so set `BUNQUEUE_DATA_PATH` or create a
+`Queue` or `Worker` with `dataPath` before the first flow call. With a SQLite
+database, one immediate transaction commits
 the graph before it is published to workers, even when individual nodes omit
 `durable: true`. PostgreSQL likewise admits the complete graph, dependency
 edges, queue registry changes, and durable events in one database transaction
@@ -267,6 +273,7 @@ visible to workers, but a process crash cannot recover it.
   or retained flow ID—including durable job/DLQ rows, completion or timeout
   tombstones, retained results, and IDs still referenced by a waiting
   parent—rejects the whole request in either persistent backend.
+- A node's `data`, when given, must be an object (not an array, `null` or a primitive).
 - `name` inside user data is preserved independently from the job's own name.
   Keys beginning with `__` are reserved for engine-owned flow metadata.
 - `repeat`, `deduplication`, `debounce`, and `opts.parent` are rejected inside

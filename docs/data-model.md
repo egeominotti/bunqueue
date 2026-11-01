@@ -1169,8 +1169,12 @@ CREATE INDEX idx_flow_failures_parent ON flow_failures(parent_id);
 This table is both a durable propagation outbox and the live value store for
 child failures. A terminal child and its outbox row commit together, whichever
 path makes it terminal: worker FAIL, lock expiry, stall detection, or startup
-recovery of a job active at a crash. Startup
-replays rows before workers can observe recovered parents. `fail` and `remove`
+recovery of a job active at a crash. A parent that a `fail` row moves to the
+DLQ is itself a terminal child: when it has a parent and a policy, its own row
+commits with its DLQ move, so the policy climbs the tree one durable row per
+level. Startup
+replays rows before workers can observe recovered parents, appending the rows
+of the parents it fails to the same pass. `fail` and `remove`
 rows are deleted after application; `ignore` and `continue` remain readable
 while the parent is live and are deleted when it reaches a terminal state or is
 removed. Queue obliteration also matches `child_queue` directly and parent/child
