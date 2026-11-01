@@ -2,6 +2,7 @@ import { createDlqEntry, FailureReason, recordJobFailureAttempt } from '../../..
 import { calculateBackoff, type JobId } from '../../../domain/types/job';
 import { isCorruptDependsOn } from '../../../infrastructure/persistence/sqliteSerializer';
 import { shardIndex } from '../../../shared/hash';
+import { flowFailureRecord, persistRecoveryDlqMove } from '../../flowChildFailure';
 import type { BackgroundContext } from '../../types';
 import { quarantineCorruptDependsOn, RECOVERY_BATCH_SIZE } from './shared';
 
@@ -85,8 +86,9 @@ export function recoverActiveJobs(
           : `Job stalled ${job.stallCount} times (recovered at startup)`;
         const entry = createDlqEntry(job, reason, error, shard.getDlqConfig(job.queue));
         job.startedAt = null;
-        ctx.storage.saveDlqEntry(entry);
-        ctx.storage.deleteJob(job.id);
+        // A flow child's policy record commits with the DLQ move; the flow-failure
+        // outbox replay that runs after recovery applies it to the parent.
+        persistRecoveryDlqMove(ctx.storage, job.id, entry, flowFailureRecord(job, error));
       } else {
         recordJobFailureAttempt(job, FailureReason.Stalled, 'Interrupted during recovery', now);
         job.startedAt = null;

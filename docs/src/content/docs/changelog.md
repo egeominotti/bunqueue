@@ -38,6 +38,32 @@ head:
   push and bulk push were unchanged. These are native host diagnostics, not
   publication benchmarks.
 
+### Bug fixes
+
+- **A flow parent no longer waits forever when a child is exhausted by a
+  crash, an expired lock or a stall.** A child with `failParentOnFailure`,
+  `ignoreDependencyOnFailure`, `removeDependencyOnFailure` or
+  `continueParentOnFailure` that used up its attempts (or `maxStalls`) outside
+  a worker FAIL — during startup recovery after a broker crash ("Job reached
+  max attempts (N) during startup recovery"), on lock expiry ("Lock expired at
+  max attempts (N)") or through stall detection — went to the DLQ, but its
+  policy never ran: no `flow_failures` record was written and the parent stayed
+  in `waiting-children`. These paths now apply the policy as a terminal
+  worker FAIL does: the outbox record commits in the same SQLite transaction as the
+  DLQ move, so a crash right after it cannot lose the policy, and the parent is
+  failed, promoted or detached in memory (or by the startup outbox replay), with
+  the same child `flow:failed` dashboard event (the other worker-FAIL
+  bookkeeping, such as `dlq:added` and `totalFailed`, is unchanged on these
+  paths). Jobs without a parent or without a
+  policy are unchanged, as are retry, backoff, stall counting, DLQ reasons and
+  messages, and the `cron:` discard. Parents already stuck by this bug before
+  the upgrade are not repaired automatically. Found by a production-style
+  FlowProducer campaign (50,100 jobs with broker SIGKILLs) that left 21 parents
+  in `waiting-children`; PostgreSQL mode was not affected, because its lease
+  expiry already applies the policy in the same transaction.
+  (`test/repro-flow-policy-on-recovery-exhaustion.test.ts`,
+  `test/flow-policy-recovery-durability.test.ts`)
+
 ### Tooling
 
 - Type checking uses Bun's built-in `bun check` (`bun run typecheck`), and

@@ -24,6 +24,8 @@ function getLockContext(ctx: BackgroundContext): LockContext {
     dashboardEmit: ctx.dashboardEmit,
     storage: ctx.storage,
     timeoutScheduler: ctx.timeoutScheduler,
+    onChildTerminalFailure: ctx.onChildTerminalFailure,
+    onChildDependencyOption: ctx.onChildDependencyOption,
   };
 }
 

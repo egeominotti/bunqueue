@@ -192,7 +192,10 @@ phase-progress, and completion diagnostics at debug level on stderr:
    `RECOVERY_BATCH_SIZE = 10000` rows. Every handled row leaves the active result
    set, so incrementing `OFFSET` over the shrinking set would skip rows. Each
    `active` row is treated as interrupted work and charged one attempt and one
-   stall (DLQ when either bound is exhausted). Only genuinely abandoned work must
+   stall (DLQ when either bound is exhausted). A flow child with a failure
+   policy commits its `flow_failures` outbox record in the same transaction as
+   that DLQ move, so the flow-outbox replay after these phases applies the
+   policy to its parent. Only genuinely abandoned work must
    reach this phase: a job the live broker returned to its queue without a charge
    (worker disconnect release, `requeueJob`, `MoveToWait`, `MoveToDelayed`) is
    persisted in its queued state at that moment, and a graceful shutdown lets

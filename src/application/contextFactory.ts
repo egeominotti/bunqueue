@@ -37,6 +37,8 @@ export class ContextFactory {
       eventsManager: this.deps.eventsManager,
       storage: this.deps.storage,
       timeoutScheduler: this.deps.timeoutScheduler,
+      onChildTerminalFailure: this.callbacks.onChildTerminalFailure,
+      onChildDependencyOption: this.callbacks.onChildDependencyOption,
     };
   }
 
@@ -79,6 +81,8 @@ export class ContextFactory {
       registerQueueName: this.callbacks.registerQueueName,
       unregisterQueueName: this.callbacks.unregisterQueueName,
       dashboardEmit: this.callbacks.emitDashboardEvent,
+      onChildTerminalFailure: this.callbacks.onChildTerminalFailure,
+      onChildDependencyOption: this.callbacks.onChildDependencyOption,
       workerManager: this.deps.workerManager,
       monitoringState: this.deps.monitoringState,
       completedJobsData: this.deps.completedJobsData,

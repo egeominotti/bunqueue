@@ -1,16 +1,15 @@
 import { FailureReason, recordJobFailureAttempt } from '../../../domain/types/dlq';
-import type { FlowFailureMode, FlowFailureRecord } from '../../../domain/types/flow';
 import {
   calculateBackoff,
   canRetry,
   MAX_TIMELINE_ENTRIES,
   normalizeStacktrace,
-  type Job,
   type JobId,
 } from '../../../domain/types/job';
 import { EventType } from '../../../domain/types/queue';
 import { processingShardIndex, shardIndex } from '../../../shared/hash';
 import { withWriteLock } from '../../../shared/lock';
+import { applyChildFailurePolicy, flowFailureRecord } from '../../flowChildFailure';
 import { throughputTracker } from '../../throughputTracker';
 import type { AckContext, FailJobOptions, TerminalFailureInput } from '../../types/ack';
 
@@ -40,24 +39,6 @@ function moveFailedJobToDlq(input: TerminalFailureInput): void {
       error: error ?? 'Max attempts exceeded',
     });
   }
-}
-
-function flowFailureRecord(job: Job, error: string | undefined): FlowFailureRecord | null {
-  if (!job.parentId) return null;
-  let mode: FlowFailureMode | null = null;
-  if (job.failParentOnFailure) mode = 'fail';
-  else if (job.continueParentOnFailure) mode = 'continue';
-  else if (job.ignoreDependencyOnFailure) mode = 'ignore';
-  else if (job.removeDependencyOnFailure) mode = 'remove';
-  if (!mode) return null;
-  return {
-    parentId: job.parentId,
-    childId: job.id,
-    childQueue: job.queue,
-    mode,
-    error: error ?? 'unknown error',
-    createdAt: Date.now(),
-  };
 }
 
 export async function failJob(
@@ -168,16 +149,5 @@ export async function failJob(
     ctx.onJobFailed?.(jobId);
   }
 
-  if (!wasRetried && job.failParentOnFailure && job.parentId && ctx.onChildTerminalFailure) {
-    await ctx.onChildTerminalFailure(job, error);
-  }
-
-  if (
-    !wasRetried &&
-    job.parentId &&
-    ctx.onChildDependencyOption &&
-    (job.removeDependencyOnFailure || job.ignoreDependencyOnFailure || job.continueParentOnFailure)
-  ) {
-    await ctx.onChildDependencyOption(job, error);
-  }
+  if (!wasRetried) await applyChildFailurePolicy(job, error, ctx);
 }

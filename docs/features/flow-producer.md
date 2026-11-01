@@ -7,7 +7,8 @@
 > `src/application/operations/flowTopologyValidation.ts`,
 > `src/client/flowReader.ts`,
 > `src/client/flowResults.ts`,
-> `src/application/flowFailureRecovery.ts`
+> `src/application/flowFailureRecovery.ts`,
+> `src/application/flowChildFailure.ts`
 
 ## Purpose and contract
 
@@ -306,6 +307,20 @@ Exactly one of these child options may be enabled:
 
 All four flags are columns in `jobs` and survive active-job recovery. A terminal
 child failure and its `flow_failures` outbox record are committed together.
+The policy applies to every terminal child failure, not only a worker FAIL: a
+child that exhausts its attempts (or `maxStalls`) through an expired lock
+(`lockManager.ts`), stall detection or cleanup's orphan recovery
+(`stallDetection.ts`), or startup recovery of work active at a crash
+(`background/recovery/active.ts`) builds the same record
+(`flowChildFailure.ts` `flowFailureRecord`) and commits it with its DLQ move
+(`persistRecoveryDlqMove` → `commitFailedJob`). The runtime sweeps then apply
+the policy to the parent in memory (`applyRecoveredChildFailurePolicy`, the
+same `onChildTerminalFailure`/`onChildDependencyOption` callbacks as FAIL)
+after releasing their shard and processing locks, and emit the child-level
+`flow:failed` dashboard event; a policy that throws is logged and left to the
+durable record. Startup recovery writes the record before the replay below
+runs, so the replay applies it. Children without a parent or without a policy
+keep the plain `saveDlqEntry` + `deleteJob` writes and emit no flow event.
 Startup calls `recoverFlowFailures` before workers start, then idempotently
 fails, promotes, or detaches the parent. `ignore` and `continue` records remain
 available while the parent is live and are removed when that parent completes,
@@ -406,7 +421,11 @@ Coverage is deliberately layered:
   ACK/ACKB crash, retention, custom-ID generation, stall-late-ACK, and
   transaction-fault coverage lives in
   `repro-model-flow-batch-parent-persistence.test.ts` and
-  `repro-dependency-completion-retention.test.ts`;
+  `repro-dependency-completion-retention.test.ts`; failure policies of a child
+  exhausted by startup recovery, lock expiry or stall detection (including a
+  crash between the DLQ move and the parent effect) live in
+  `repro-flow-policy-on-recovery-exhaustion.test.ts` and
+  `flow-policy-recovery-durability.test.ts`;
 - `flow-docs-examples.test.ts` executes the Bun Quick Start, chain, fan-in,
   parent-first tree, option/traversal, and failure-policy examples;
 - generated trees in `model-based/flow-producer-model.test.ts` check graph

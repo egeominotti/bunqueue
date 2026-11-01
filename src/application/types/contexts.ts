@@ -9,6 +9,7 @@ import type { RWLock } from '../../shared/lock';
 import type { BoundedMap, BoundedSet, LRUMap, MapLike, SetLike } from '../../shared/lru';
 import type { DependencyCompletionTracker } from '../dependencyCompletions';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
+import type { FlowChildFailureCallbacks } from '../flowChildFailure';
 import type { RemovedResults } from '../removedResults';
 import type { EventsManager } from '../eventsManager';
 import type { MonitoringState } from '../monitoringChecks';
@@ -58,7 +59,8 @@ export interface QueueManagerMetrics {
   totalFailed: { value: bigint };
 }
 
-export interface LockContext {
+/** Lock expiry applies a flow child's failure policy through the callbacks. */
+export interface LockContext extends FlowChildFailureCallbacks {
   jobIndex: Map<JobId, JobLocation>;
   jobLocks: Map<JobId, JobLock>;
   retiredCronLeaseTokens: MapLike<JobId, string>;
@@ -74,7 +76,8 @@ export interface LockContext {
   timeoutScheduler: JobTimeoutScheduler;
 }
 
-export interface BackgroundContext extends QueueManagerState {
+/** Stall detection applies a flow child's failure policy through the callbacks. */
+export interface BackgroundContext extends QueueManagerState, FlowChildFailureCallbacks {
   fail: (jobId: JobId, error?: string, failureReason?: FailureReason) => Promise<void>;
   registerQueueName: (queue: string) => void;
   unregisterQueueName: (queue: string) => void;

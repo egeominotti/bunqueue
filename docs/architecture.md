@@ -151,7 +151,10 @@ do not re-poll in a tight loop.
   `clientTracking.ts` releases on disconnect only deliveries the connection
   still owns, and persists each release (`markReleased`) so restart recovery
   sees the queued job the live broker sees, with no attempt charged. Cleanup's orphan recovery, a backstop for the stall checker that
-  follows the per-queue stall configuration, lives in `orphanRecovery.ts`. Houses DLQ, Events, Worker,
+  follows the per-queue stall configuration, lives in `orphanRecovery.ts`. A flow
+  child's terminal-failure policy (outbox record, DLQ-move persistence and parent
+  callbacks) is shared by worker FAIL, lock expiry, stall detection and startup
+  recovery through [`flowChildFailure.ts`](../src/application/flowChildFailure.ts). Houses DLQ, Events, Worker,
   JobLogs, Stats managers, and the batch `QueueStatsAggregator`. DLQ reads/purge
   live in `dlqManager.ts`; manual and automatic DLQ retry transitions live in
   `dlqRetry.ts`, while cold completed retry lives in

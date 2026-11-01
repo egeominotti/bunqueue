@@ -12,6 +12,12 @@ import type { IndexedPriorityQueue } from '../domain/queue/priorityQueue';
 import { shardIndex, processingShardIndex } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
 import { detachClientJob } from './clientOwnership';
+import {
+  applyRecoveredChildFailurePolicy,
+  emitFlowChildFailed,
+  flowFailureRecord,
+  persistRecoveryDlqMove,
+} from './flowChildFailure';
 import type { LockContext } from './types';
 
 // Re-export lock operations
@@ -89,29 +95,45 @@ export async function checkExpiredLocks(ctx: LockContext): Promise<void> {
   }
 
   // Phase 3: Process with correct lock hierarchy: shardLock -> processingLock
-  for (const [shardIdx, procMap] of byShard) {
-    await withWriteLock(ctx.shardLocks[shardIdx], async () => {
-      for (const [procIdx, items] of procMap) {
-        await withWriteLock(ctx.processingLocks[procIdx], async () => {
-          for (const { jobId, lock, job } of items) {
-            const currentJob = ctx.processingShards[procIdx].get(jobId);
-            const currentLock = ctx.jobLocks.get(jobId);
-            // The same job object is reused by its next delivery, so the
-            // lease must also still belong to the delivery in processing.
-            if (
-              currentJob !== job ||
-              currentLock !== lock ||
-              !isLockExpired(currentLock, Date.now()) ||
-              isLeaseFromEarlierGeneration(currentJob, currentLock)
-            ) {
-              continue;
+  const failedFlowChildren: FailedFlowChild[] = [];
+  try {
+    for (const [shardIdx, procMap] of byShard) {
+      await withWriteLock(ctx.shardLocks[shardIdx], async () => {
+        for (const [procIdx, items] of procMap) {
+          await withWriteLock(ctx.processingLocks[procIdx], async () => {
+            for (const { jobId, lock, job } of items) {
+              const currentJob = ctx.processingShards[procIdx].get(jobId);
+              const currentLock = ctx.jobLocks.get(jobId);
+              // The same job object is reused by its next delivery, so the
+              // lease must also still belong to the delivery in processing.
+              if (
+                currentJob !== job ||
+                currentLock !== lock ||
+                !isLockExpired(currentLock, Date.now()) ||
+                isLeaseFromEarlierGeneration(currentJob, currentLock)
+              ) {
+                continue;
+              }
+              const failed = processExpiredLockInner(jobId, lock, job, shardIdx, procIdx, ctx, now);
+              if (failed) failedFlowChildren.push(failed);
             }
-            processExpiredLockInner(jobId, lock, job, shardIdx, procIdx, ctx, now);
-          }
-        });
-      }
-    });
+          });
+        }
+      });
+    }
+  } finally {
+    // Flow policies take the parent's shard lock, so they run once every lock is
+    // released, and still run for children already moved when a later write threw.
+    for (const { job, error } of failedFlowChildren) {
+      await applyRecoveredChildFailurePolicy(job, error, ctx);
+    }
   }
+}
+
+/** A flow child the sweep failed terminally, whose policy still has to reach its parent. */
+interface FailedFlowChild {
+  job: Job;
+  error: string;
 }
 
 /**
@@ -126,7 +148,7 @@ function processExpiredLockInner(
   procIdx: number,
   ctx: LockContext,
   now: number
-): void {
+): FailedFlowChild | null {
   const shard = ctx.shards[shardIdx];
   const queue = shard.getQueue(job.queue);
 
@@ -145,7 +167,7 @@ function processExpiredLockInner(
     ctx.jobIndex.delete(jobId);
     ctx.storage?.deleteJob(jobId);
     ctx.jobLocks.delete(jobId);
-    return;
+    return null;
   }
 
   // Increment attempts and reset state
@@ -157,8 +179,9 @@ function processExpiredLockInner(
   const stallConfig = shard.getStallConfig(job.queue);
   const attemptsExhausted = job.attempts >= job.maxAttempts;
   const stallsExhausted = stallConfig.maxStalls > 0 && job.stallCount >= stallConfig.maxStalls;
+  let failedFlowChild: FailedFlowChild | null = null;
   if (attemptsExhausted || stallsExhausted) {
-    handleRecoveryBoundExceeded({
+    failedFlowChild = handleRecoveryBoundExceeded({
       jobId,
       job,
       lock,
@@ -179,6 +202,7 @@ function processExpiredLockInner(
     queue: job.queue,
     renewalCount: lock.renewalCount,
   });
+  return failedFlowChild;
 }
 
 /** Options for handling max stalls exceeded */
@@ -193,28 +217,31 @@ interface RecoveryBoundOptions {
 }
 
 /** Move job to DLQ when either crash-recovery budget is exhausted. */
-function handleRecoveryBoundExceeded(opts: RecoveryBoundOptions): void {
+function handleRecoveryBoundExceeded(opts: RecoveryBoundOptions): FailedFlowChild | null {
   const { jobId, job, lock, shard, ctx, now, attemptsExhausted } = opts;
   // Release the concurrency slot (+group+uniqueKey) acquired at pull before
   // moving to DLQ — otherwise the slot leaks (mirrors
   // stallDetection.moveStalliedJobToDlq).
   shard.releaseJobResources(job.queue, job.uniqueKey, job.groupId, job.id);
+  const error = attemptsExhausted
+    ? `Lock expired at max attempts (${job.maxAttempts})`
+    : `Lock expired after ${lock.renewalCount} renewals`;
   const entry = shard.addToDlq(
     job,
     attemptsExhausted ? FailureReason.MaxAttemptsExceeded : FailureReason.Stalled,
-    attemptsExhausted
-      ? `Lock expired at max attempts (${job.maxAttempts})`
-      : `Lock expired after ${lock.renewalCount} renewals`
+    error
   );
   job.startedAt = null;
   ctx.jobIndex.set(jobId, { type: 'dlq', queueName: job.queue });
   // Persist the DLQ move like the sibling paths (ack.moveFailedJobToDlq,
   // stallDetection.moveStalliedJobToDlq, backgroundTasks startup-recovery).
-  // Without these two writes the jobs row survives in SQLite as an orphan and
-  // the DLQ entry lives only in memory — a later retry then re-INSERTs the
-  // surviving row and throws `UNIQUE constraint failed: jobs.id` (#97).
-  ctx.storage?.saveDlqEntry(entry);
-  ctx.storage?.deleteJob(jobId);
+  // Without it the jobs row survives in SQLite as an orphan and the DLQ entry
+  // lives only in memory — a later retry then re-INSERTs the surviving row and
+  // throws `UNIQUE constraint failed: jobs.id` (#97). A flow child's policy
+  // record commits in the same transaction.
+  const flowFailure = flowFailureRecord(job, error);
+  persistRecoveryDlqMove(ctx.storage, jobId, entry, flowFailure);
+  if (flowFailure) emitFlowChildFailed(ctx.dashboardEmit, job, error);
 
   ctx.eventsManager.broadcast({
     eventType: EventType.Stalled,
@@ -232,6 +259,7 @@ function handleRecoveryBoundExceeded(opts: RecoveryBoundOptions): void {
       ? 'Lock expired (max attempts reached)'
       : 'Lock expired (max stalls reached)',
   });
+  return flowFailure ? { job, error } : null;
 }
 
 /** Options for requeuing expired job */

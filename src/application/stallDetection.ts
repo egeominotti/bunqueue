@@ -13,6 +13,12 @@ import { queueLog } from '../shared/logger';
 import { shardIndex, processingShardIndex, SHARD_COUNT } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
 import { detachClientJob } from './clientOwnership';
+import {
+  applyRecoveredChildFailurePolicy,
+  emitFlowChildFailed,
+  flowFailureRecord,
+  persistRecoveryDlqMove,
+} from './flowChildFailure';
 import type { BackgroundContext } from './types';
 
 /**
@@ -106,6 +112,7 @@ export async function handleStalledJob(
   // Broadcast events AFTER verifying job is still stalled to avoid false positives
   let handled = false;
   let handledAction = action;
+  let flowChildError: string | null = null;
 
   await withWriteLock(ctx.shardLocks[idx], async () => {
     await withWriteLock(ctx.processingLocks[procIdx], () => {
@@ -121,7 +128,7 @@ export async function handleStalledJob(
 
       if (action === StallAction.MoveToDlq || attemptsExhausted) {
         handledAction = StallAction.MoveToDlq;
-        moveStalliedJobToDlq(job, ctx, shard, procIdx, attemptsExhausted);
+        flowChildError = moveStalliedJobToDlq(job, ctx, shard, procIdx, attemptsExhausted);
       } else {
         retryStalliedJob(job, ctx, shard, procIdx, idx);
       }
@@ -152,17 +159,22 @@ export async function handleStalledJob(
       data: { stallCount: job.stallCount, action: handledAction },
     });
   }
+  // The flow policy takes the parent's shard lock, so it runs after both are released.
+  if (flowChildError !== null) await applyRecoveredChildFailurePolicy(job, flowChildError, ctx);
   return handled;
 }
 
-/** Move stalled job to DLQ */
+/**
+ * Move stalled job to DLQ.
+ * @returns the DLQ error of a flow child whose failure policy must still be applied.
+ */
 function moveStalliedJobToDlq(
   job: Job,
   ctx: BackgroundContext,
   shard: BackgroundContext['shards'][number],
   procIdx: number,
   attemptsExhausted: boolean
-): void {
+): string | null {
   ctx.processingShards[procIdx].delete(job.id);
   ctx.timeoutScheduler.cancel(job.id);
   shard.releaseJobResources(job.queue, job.uniqueKey, job.groupId, job.id);
@@ -171,23 +183,28 @@ function moveStalliedJobToDlq(
   if (job.uniqueKey?.startsWith('cron:')) {
     ctx.jobIndex.delete(job.id);
     ctx.storage?.deleteJob(job.id);
-    return;
+    return null;
   }
 
   incrementStallCount(job);
   job.attempts++;
   job.startedAt = null;
   job.lastHeartbeat = Date.now();
+  const error = attemptsExhausted
+    ? `Job stalled at max attempts (${job.maxAttempts})`
+    : `Job stalled ${job.stallCount} times`;
   const entry = shard.addToDlq(
     job,
     attemptsExhausted ? FailureReason.MaxAttemptsExceeded : FailureReason.Stalled,
-    attemptsExhausted
-      ? `Job stalled at max attempts (${job.maxAttempts})`
-      : `Job stalled ${job.stallCount} times`
+    error
   );
   ctx.jobIndex.set(job.id, { type: 'dlq', queueName: job.queue });
-  ctx.storage?.saveDlqEntry(entry);
-  ctx.storage?.deleteJob(job.id);
+  // A flow child's policy record commits with the DLQ move, as on a worker FAIL.
+  const flowFailure = flowFailureRecord(job, error);
+  persistRecoveryDlqMove(ctx.storage, job.id, entry, flowFailure);
+  if (!flowFailure) return null;
+  emitFlowChildFailed(ctx.dashboardEmit, job, error);
+  return error;
 }
 
 /** Retry stalled job */

@@ -1167,7 +1167,9 @@ CREATE INDEX idx_flow_failures_parent ON flow_failures(parent_id);
 ```
 
 This table is both a durable propagation outbox and the live value store for
-child failures. A terminal child and its outbox row commit together. Startup
+child failures. A terminal child and its outbox row commit together, whichever
+path makes it terminal: worker FAIL, lock expiry, stall detection, or startup
+recovery of a job active at a crash. Startup
 replays rows before workers can observe recovered parents. `fail` and `remove`
 rows are deleted after application; `ignore` and `continue` remain readable
 while the parent is live and are deleted when it reaches a terminal state or is
