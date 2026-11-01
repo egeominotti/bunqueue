@@ -160,7 +160,7 @@
     "@langchain/langgraph": "^1.4.8",
     "@mastra/core": "^1.53.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "@openai/agents": "^0.13.5",
+    "@openai/agents": "^0.21.0",
     "@types/bun": "^1.4.0",
     "ai": "^7.0.38",
     "bullmq": "^5.79.3",
