@@ -12,9 +12,11 @@ import {
   applyPostgresFlowFailure,
   clearPostgresParentFlowFailures,
   lockPostgresFlowParents,
+  type PostgresDlqLimitRequest,
 } from './flowFailures';
 import { getPostgresQueuePolicies } from './policies';
 import { enforcePostgresDlqLimit } from './dlqLifecycle';
+import { propagatePostgresFlowFailures } from './flowFailurePropagation';
 import { discardPostgresProtectedCronLease } from './leaseRelease';
 import type { PostgresJobRow } from './types';
 import { lockPostgresDependencyCompletions } from './dependencyPromotion';
@@ -117,6 +119,7 @@ export async function recoverExpiredPostgresLeases(
   limit = 100
 ): Promise<number> {
   const result = await ctx.sql.begin(async (tx) => {
+    const propagations: PostgresDlqLimitRequest['propagation'][] = [];
     const now = await databaseNow(tx);
     const initialCandidates = await tx<Array<{ id: string }>>`
       SELECT id FROM bunqueue_jobs
@@ -127,7 +130,7 @@ export async function recoverExpiredPostgresLeases(
       LIMIT ${Math.max(1, limit)}
     `;
     if (initialCandidates.length === 0) {
-      return { count: 0, dlqLimits: new Map<string, number>() };
+      return { count: 0, dlqLimits: new Map<string, number>(), propagations };
     }
     await lockPostgresDependencyCompletions(
       tx,
@@ -154,7 +157,7 @@ export async function recoverExpiredPostgresLeases(
       parentIds.map((id) => id as Job['id'])
     );
     if (candidates.length === 0) {
-      return { count: 0, dlqLimits: new Map<string, number>() };
+      return { count: 0, dlqLimits: new Map<string, number>(), propagations };
     }
     const rows = await tx<PostgresJobRow[]>`
       SELECT * FROM bunqueue_jobs
@@ -203,14 +206,16 @@ export async function recoverExpiredPostgresLeases(
         const request = await applyPostgresFlowFailure(tx, ctx, job, error, now);
         if (maxEntries !== null) dlqLimits.set(job.queue, maxEntries);
         if (request) dlqLimits.set(request.queue, request.maxEntries);
+        propagations.push(request?.propagation);
       }
     }
-    return { count: rows.length, dlqLimits };
+    return { count: rows.length, dlqLimits, propagations };
   });
   for (const [queue, maxEntries] of [...result.dlqLimits].sort(([left], [right]) =>
     left.localeCompare(right)
   )) {
     await enforcePostgresDlqLimit(ctx, queue, maxEntries);
   }
+  await propagatePostgresFlowFailures(ctx, result.propagations);
   return result.count;
 }

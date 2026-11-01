@@ -25,8 +25,10 @@ import {
   applyPostgresFlowFailure,
   clearPostgresParentFlowFailures,
   lockPostgresJobFlowParent,
+  type PostgresDlqLimitRequest,
 } from './flowFailures';
 import { enforcePostgresDlqLimit } from './dlqLifecycle';
+import { propagatePostgresFlowFailures } from './flowFailurePropagation';
 import { getPostgresQueuePolicies } from './policies';
 import type { PostgresFailureInput, PostgresJobRow, PostgresTransitionResult } from './types';
 import { partitionPostgresDestructionCandidates } from './dependencyDestruction';
@@ -221,10 +223,12 @@ export async function failPostgresJob(
       dlqRetryState: willRetry ? getDlqRetryState(job) : null,
     });
     const dlqLimits = new Map<string, number>();
+    let propagation: PostgresDlqLimitRequest['propagation'] = null;
     if (!willRetry) {
       await clearPostgresParentFlowFailures(tx, ctx, job.id);
       const request = await applyPostgresFlowFailure(tx, ctx, job, input.error, now);
       if (request) dlqLimits.set(request.queue, request.maxEntries);
+      propagation = request?.propagation;
     }
     if (dlqMaxEntries !== null) {
       dlqLimits.set(job.queue, dlqMaxEntries);
@@ -237,6 +241,7 @@ export async function failPostgresJob(
         state: nextState,
       } satisfies PostgresTransitionResult,
       dlqLimits,
+      propagation,
     };
   });
   for (const [queue, maxEntries] of [...result.dlqLimits].sort(([left], [right]) =>
@@ -246,5 +251,6 @@ export async function failPostgresJob(
       enforcePostgresDlqLimit(ctx, queue, maxEntries)
     );
   }
+  await propagatePostgresFlowFailures(ctx, [result.propagation]);
   return result.transition;
 }

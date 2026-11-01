@@ -33,9 +33,8 @@ By default a parent just keeps waiting for its remaining children. Four child op
 
 Choose at most one policy per child. A parent that `failParentOnFailure` moves to
 `failed` has failed terminally too, so its own policy then applies to its parent:
-`failParentOnFailure` on every level fails the whole branch up to the root. In
-PostgreSQL mode this currently applies one level only: the parent fails, and its
-own parent keeps waiting.
+`failParentOnFailure` on every level fails the whole branch up to the root. This
+holds in every mode (in-memory, SQLite and PostgreSQL).
 
 Policies are accepted only on a job that has a parent: `flow.add()` / `addBulk()`
 children and `addBulkThen` parallel jobs. A root node, an `addChain` step or an

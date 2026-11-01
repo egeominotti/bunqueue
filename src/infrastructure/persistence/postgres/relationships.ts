@@ -3,6 +3,7 @@ import type { Job, JobId } from '../../../domain/types/job';
 import { decodePostgresJob, encodePostgresValue } from './codec';
 import { databaseNow, recordPostgresEvent, type PostgresContext } from './context';
 import { enforcePostgresDlqLimit } from './dlqLifecycle';
+import { propagatePostgresFlowFailures } from './flowFailurePropagation';
 import {
   applyPostgresFlowFailure,
   lockPostgresFlowParent,
@@ -182,6 +183,7 @@ export async function updatePostgresJobParent(
     updatePostgresJobParentInTransaction(tx, ctx, childId, parentId)
   );
   if (request) await enforcePostgresDlqLimit(ctx, request.queue, request.maxEntries);
+  await propagatePostgresFlowFailures(ctx, [request?.propagation]);
 }
 
 /** Detach a child and promote the parent when no unresolved edge remains. */

@@ -16,7 +16,7 @@ const LINKABLE_STATES: readonly PostgresJobState[] = [
   'waiting-children',
 ];
 
-function failureMode(job: Job): FlowFailureMode | null {
+export function postgresFlowFailureMode(job: Job): FlowFailureMode | null {
   if (!job.parentId) return null;
   if (job.failParentOnFailure) return 'fail';
   if (job.continueParentOnFailure) return 'continue';
@@ -39,9 +39,16 @@ interface FlowFailureMutation {
   readonly now: number;
 }
 
+/** A failed flow parent's own policy record toward its parent, pending application. */
+export interface PostgresFlowFailurePropagation {
+  readonly parentId: JobId;
+  readonly childId: JobId;
+}
+
 export interface PostgresDlqLimitRequest {
   readonly queue: string;
   readonly maxEntries: number;
+  readonly propagation?: PostgresFlowFailurePropagation | null;
 }
 
 async function storeFailureValue(
@@ -82,6 +89,32 @@ async function unresolvedCount(
   return Number(row.count);
 }
 
+/** A failed parent's own policy record, written only while its edge exists (pending). */
+async function recordPropagation(
+  input: FlowFailureMutation,
+  message: string
+): Promise<PostgresFlowFailurePropagation | null> {
+  const { tx, ctx, parent, now } = input;
+  const mode = postgresFlowFailureMode(parent);
+  if (!mode || !parent.parentId) return null;
+  const ns = ctx.config.namespace;
+  const inserted = await tx`
+    INSERT INTO bunqueue_flow_failures
+      (namespace, parent_id, child_id, child_queue, mode, error, created_at)
+    SELECT ${ns}, ${String(parent.parentId)}, ${String(parent.id)}, ${parent.queue},
+           ${mode}, ${message}, ${now}
+    WHERE EXISTS (
+      SELECT 1 FROM bunqueue_dependencies WHERE namespace = ${ns}
+        AND job_id = ${String(parent.parentId)} AND dependency_id = ${String(parent.id)}
+    )
+    ON CONFLICT (namespace, parent_id, child_id) DO UPDATE SET
+      child_queue = excluded.child_queue, mode = excluded.mode,
+      error = excluded.error, created_at = excluded.created_at
+    RETURNING child_id
+  `;
+  return inserted.length > 0 ? { parentId: parent.parentId, childId: parent.id } : null;
+}
+
 async function failParent(input: FlowFailureMutation): Promise<PostgresDlqLimitRequest> {
   const { tx, ctx, parent, child, error, now } = input;
   const message = `Child job ${String(child.id)} failed: ${error}`;
@@ -107,6 +140,7 @@ async function failParent(input: FlowFailureMutation): Promise<PostgresDlqLimitR
         version = version + 1
     WHERE namespace = ${ctx.config.namespace} AND id = ${String(parent.id)}
   `;
+  const propagation = await recordPropagation(input, message);
   await recordPostgresEvent(tx, ctx, {
     queue: parent.queue,
     type: 'failed',
@@ -118,7 +152,7 @@ async function failParent(input: FlowFailureMutation): Promise<PostgresDlqLimitR
     dlqEntry: entry,
     dlqRetryState: null,
   });
-  return { queue: parent.queue, maxEntries: dlq.maxEntries };
+  return { queue: parent.queue, maxEntries: dlq.maxEntries, propagation };
 }
 
 async function releaseDependencies(
@@ -212,7 +246,7 @@ export async function applyPostgresFlowFailure(
   errorValue: string | undefined,
   now: number
 ): Promise<PostgresDlqLimitRequest | null> {
-  const mode = failureMode(child);
+  const mode = postgresFlowFailureMode(child);
   if (!mode || !child.parentId) return null;
   const rows = await tx<PostgresJobRow[]>`
     SELECT * FROM bunqueue_jobs
@@ -250,6 +284,13 @@ export async function getPostgresFlowFailureValues(
     FROM bunqueue_flow_failures
     WHERE namespace = ${ctx.config.namespace}
       AND parent_id = ${String(parentId)} AND mode = ${mode}
+      AND NOT EXISTS (
+        -- A record whose edge is still present is pending, not yet applied.
+        SELECT 1 FROM bunqueue_dependencies AS dependency
+        WHERE dependency.namespace = bunqueue_flow_failures.namespace
+          AND dependency.job_id = bunqueue_flow_failures.parent_id
+          AND dependency.dependency_id = bunqueue_flow_failures.child_id
+      )
     ORDER BY created_at, child_id
   `;
   return Object.fromEntries(rows.map((row) => [`${row.child_queue}:${row.child_id}`, row.error]));

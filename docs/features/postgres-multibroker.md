@@ -690,6 +690,54 @@ canonical order, and only then locks job rows. Attachment either commits before
 that parent read and is included in failure propagation, or waits until the
 terminal transition finishes; there is no unlocked child-to-parent TOCTOU path.
 
+Flow failure policies climb a nested flow one level per transaction
+([`flowFailurePropagation.ts`](../../src/infrastructure/persistence/postgres/flowFailurePropagation.ts)).
+When a child's `failParentOnFailure` fails a parent that carries its own policy
+and has a parent, the terminal transaction also commits that parent's record in
+`bunqueue_flow_failures` toward the next parent; the record is pending while the
+next parent's dependency edge on it exists. After commit, the same broker applies
+it in a new transaction that takes the locks of a terminal child failure (the
+failed parent's dependency-completion key, the next parent's flow key, then the
+two rows), so no transaction acquires a higher level's keys while it holds a
+lower level's keys and rows. Applying the record removes the edge or fails the
+next parent, which may commit the record of the level above, and so on. Every
+applier (the committing broker, a retry of its post-commit work, or the recovery
+sweep of any broker at startup and on each lease-recovery tick) serializes on the
+dependency-completion key and revalidates the record, the edge, the failed row and
+the parent state, so a level is applied exactly once and a crash between two
+levels is finished by the next sweep. A parent without a policy or without a
+parent writes no record and keeps the previous writes and events.
+
+The record is written only while that edge exists (one `INSERT ... SELECT ...
+WHERE EXISTS` in the same transaction, no extra lock), so a parent that a
+sibling already failed gets no record. A sibling that fails or releases the next
+parent concurrently (its own transaction holds the next parent's flow key, which
+the lower level does not) can still win the race: a record whose edge is gone and
+whose parent is `failed` or missing is dropped by the applier or by the sweep,
+because a parent's own failure removes every value really applied to it. This
+ordering differs from SQLite, which applies the levels under one in-process flow:
+in PostgreSQL a sibling's `failParentOnFailure` or `continueParentOnFailure` that
+commits between "mid failed" and the next-level apply wins, and mid's `fail`
+record is then dropped (the next parent is already failed or running); an
+`ignore`/`continue` record that loses to a sibling's `continueParentOnFailure`
+stays as a recorded failure value of the released parent, as a direct
+application to a still-linkable parent would store it.
+
+The sweep pages through every candidate (pending or orphaned) with a keyset on
+`(created_at, parent_id, child_id)`, 100 per page, and applies each record on its
+own, so records that keep failing cannot starve newer ones. Failures are logged
+once and reported to the `flow-failure-recovery` maintenance health entry as one
+`AggregateError` that names the first failing parent/child pair and its cause; a
+startup sweep failure is reported, not fatal.
+
+Mixed versions during a rolling upgrade: an older broker neither applies the next
+level after commit nor runs the sweep, so a chain it fails stops at one level as
+before. A mid-level parent that an older broker fails writes no record, so newer
+brokers cannot finish that chain either. An older broker's
+`getIgnoredChildrenFailures()` / `getFailedChildrenValues()` read has no edge
+filter and can briefly report a pending `ignore`/`continue` record that a newer
+broker committed. There is no schema change and no version bump.
+
 A unique-ID `ACKB` locks rows in deterministic ID order, validates every lease
 before the first write, and then persists completions, retained/deleted rows,
 events, and queue metric additions with set-based statements. One invalid token

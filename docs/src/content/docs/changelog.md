@@ -80,9 +80,33 @@ head:
   without a parent keeps exactly the previous writes and events (its own
   parent keeps waiting); siblings are not cancelled, the parent's attempts are
   not consumed, and DLQ reasons and messages are unchanged. PostgreSQL mode
-  still applies only one level; that is tracked separately.
+  propagates the same way: the failed parent's own record commits in
+  `bunqueue_flow_failures` with its failure (pending while the next parent's
+  dependency edge exists), and each next level runs in its own transaction
+  after the commit, with the locks of a terminal child failure, so the lock
+  order stays deadlock-free. Brokers serialize on the failed parent's
+  dependency-completion lock, so each level applies exactly once, and the
+  recovery sweep of any broker (at startup and on every lease-recovery tick)
+  finishes a chain that a crash interrupted between two levels. A pending
+  `ignore`/`continue` record is not reported by `getIgnoredChildrenFailures()`
+  or `getFailedChildrenValues()` until it is applied. The record is written
+  only while that edge exists, and one whose parent a sibling failed first is
+  dropped, so a failed parent never reports a phantom ignored or continued
+  failure. Unlike SQLite, a sibling's failure or `continueParentOnFailure` that
+  commits between two levels wins, and the lower level's `fail` record is then
+  dropped. The sweep pages through every pending record, so records that keep
+  failing cannot starve the others, and its error names the failing
+  parent/child pair. No schema change. During a rolling upgrade, older brokers
+  do not apply the next level or run the sweep (their chains stop at one level,
+  and a mid-level parent they fail writes no record), and their reads can
+  briefly report a pending `ignore`/`continue` record.
   (`test/repro-flow-fail-parent-propagation.test.ts`,
-  `test/flow-fail-parent-propagation-durability.test.ts`)
+  `test/flow-fail-parent-propagation-durability.test.ts`,
+  `test/postgres-flow-fail-parent-propagation.test.ts`,
+  `test/postgres-flow-fail-parent-propagation-durability.test.ts`,
+  `test/postgres-flow-fail-parent-propagation-multibroker.test.ts`,
+  `test/postgres-flow-fail-parent-propagation-edges.test.ts`,
+  `test/postgres-flow-propagation-stale-record.test.ts`)
 
 ### Tooling
 

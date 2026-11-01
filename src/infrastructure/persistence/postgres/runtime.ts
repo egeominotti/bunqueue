@@ -1,4 +1,5 @@
 import { recoverExpiredPostgresLeases } from './recovery';
+import { recoverPostgresFlowFailurePropagations } from './flowFailurePropagation';
 import { releasePostgresBrokerLeases } from './leaseRelease';
 import { PostgresEventStream } from './events';
 import { prunePostgresEventCommits } from './eventJournal';
@@ -228,6 +229,8 @@ export class PostgresQueueStoreRuntime {
       this.brokerRegistrationStarted = true;
       await reconcilePostgresCronsOnStartup(this.context);
       await recoverExpiredPostgresLeases(this.context);
+      // Reported, not fatal: one bad record must not keep the broker from starting.
+      await this.recoverFlowFailures();
       await repairPostgresDlq(this.context);
       await prunePostgresCompletionTombstones(this.context);
       await prunePostgresGroupStates(this.context);
@@ -246,8 +249,10 @@ export class PostgresQueueStoreRuntime {
     this.eventCommitGc.start();
     this.maintenanceSchedule.start(this.config, {
       heartbeat: () => void this.runMaintenance(() => this.heartbeatBroker(), 'heartbeat'),
-      recovery: () =>
-        void this.runMaintenance(() => recoverExpiredPostgresLeases(this.context), 'recovery'),
+      recovery: () => {
+        void this.runMaintenance(() => recoverExpiredPostgresLeases(this.context), 'recovery');
+        void this.recoverFlowFailures();
+      },
       sweeps: () => this.runPeriodicSweeps(),
       cron: () => void this.runMaintenance(() => processPostgresCrons(this.context), 'cron'),
     });
@@ -265,6 +270,14 @@ export class PostgresQueueStoreRuntime {
     );
     void this.postCommitMaintenance.run('group-state-retention', () =>
       prunePostgresGroupStates(this.context)
+    );
+  }
+
+  /** Finish flow-failure levels that a crashed or interrupted broker left pending. */
+  private recoverFlowFailures(): Promise<void> {
+    return this.runMaintenance(
+      () => recoverPostgresFlowFailurePropagations(this.context),
+      'flow-failure-recovery'
     );
   }
 

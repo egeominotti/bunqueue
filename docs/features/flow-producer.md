@@ -341,8 +341,31 @@ after it already failed (`updateJobParent`). The startup replay
 (`flowFailureRecovery.ts`) is a worklist: a parent it fails appends its own
 committed record, which the same pass applies to the next parent, so a crash
 between two levels leaves a durable record that the next start finishes.
-PostgreSQL mode (`postgres/flowFailures.ts` `applyPostgresFlowFailure`)
-applies only the first level today.
+PostgreSQL mode applies the same rule across brokers. `applyPostgresFlowFailure`
+(`postgres/flowFailures.ts`) still applies the first level in the terminal
+transaction (worker FAIL, lease expiry, late link). When it fails a parent that
+carries a policy and has a parent, it also commits that parent's own record in
+`bunqueue_flow_failures` (parent = the next parent, child = the failed parent,
+mode = its policy, error = `Child job <id> failed: <error>`). A record is
+pending while the next parent's dependency edge on that child exists.
+`postgres/flowFailurePropagation.ts` applies each next level after the commit,
+in its own transaction and in the order of a terminal child failure (child's
+dependency-completion lock, next parent's flow lock, child row, parent row), so
+no transaction takes a higher level's lock while it holds a lower level's
+locks. Applying a record removes the edge (or fails the parent), so every
+replay is a no-op: two brokers applying the same record serialize on the
+child's dependency-completion lock and the second finds nothing to do. A crash
+between two levels leaves the pending record, which the recovery sweep of any
+broker (at startup and every lease-recovery tick) finishes.
+`getIgnoredChildrenFailures()` / `getFailedChildrenValues()` skip a record
+whose edge still exists, so a pending `ignore`/`continue` record is reported
+only after it is applied.
+The record is written only while that edge exists; a record that loses a race
+to a sibling that failed the next parent first (edge gone, parent `failed` or
+missing) is dropped, so a failed parent never reports a phantom ignored or
+continued failure. A sibling that commits between two levels wins, unlike the
+in-process SQLite loop; the ordering, sweep paging and mixed-version behavior
+are described in [PostgreSQL multi-broker](./postgres-multibroker.md).
 
 Startup calls `recoverFlowFailures` before workers start, then idempotently
 fails, promotes, or detaches the parent. `ignore` and `continue` records remain
