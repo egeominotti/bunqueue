@@ -12,6 +12,14 @@ export interface CompletedJobWrite {
   timeline?: JobTimelineEntry[];
 }
 
+/** One write of a scalar ACK loop: what `storeResult` or `markCompleted` would run. */
+export type CompletionWrite =
+  | { kind: 'result'; jobId: JobId; result: unknown }
+  | { kind: 'complete'; jobId: JobId; completedAt: number; timeline: JobTimelineEntry[] };
+
+/** Outcome of a committed completion write sequence: the failed write, if any. */
+export type CompletionWriteOutcome = { failedAt: number; error: unknown } | null;
+
 export type SqliteCriticalLossCallback = (jobs: Job[], lastError: Error, attempts: number) => void;
 
 export interface SqliteCriticalLoss {

@@ -565,8 +565,12 @@ mutates both sides of the topology.
 4. The job is removed from `processingShards`, added to `completedJobs`, its result
    stored in the `jobResults` LRU. A retained `ACKB` with no defined results
    flushes pending inserts and commits all completed states through one
-   `markCompletedBatch` transaction. Result-bearing or `removeOnComplete`
-   entries retain their ordered scalar/combined completion paths; a
+   `markCompletedBatch` transaction. A result-bearing retained `ACKB` runs the
+   scalar `storeResult`/`markCompleted` statements, in their exact order, inside
+   one transaction (`ackResultWrites.ts`, `commitCompletionWrites`), commits the
+   prefix that succeeded and replays each outcome through `safeWrite`, so it ends
+   exactly as the per-job autocommits did. `removeOnComplete` entries retain their
+   ordered scalar/combined completion paths; a
    `removeOnComplete` completion records its result in the memory-only
    `removedResults` (60 s) for a WaitJob or wait read that arrives later. A failed
    state batch rolls back before scalar retry. Dependents are queued for

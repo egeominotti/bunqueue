@@ -20,6 +20,24 @@ head:
 
 ## [Unreleased]
 
+### Performance
+
+- A batch `ACKB` that carries results (what a TCP `Worker` sends whenever its
+  processor returns a value) now commits once per batch instead of twice per
+  job. It runs the same `storeResult` and `markCompleted` statements, with the
+  same arguments and in the same order, inside one SQLite transaction, stops at
+  the first failure exactly where the per-job loop stopped, commits the writes
+  that succeeded and replays each outcome through the same disk-full
+  bookkeeping, so every outcome, including the 2.9.11 fault matrix and
+  lock-contention behavior, is unchanged. A job still in the write buffer or a
+  failed `BEGIN`/`COMMIT` keeps the per-job writes. Before, those two
+  autocommits per job took about 60% of the broker's CPU while processing. On
+  native macOS arm64 with Bun 1.4.4 (fresh broker and SQLite database per run,
+  50,000 jobs, worker concurrency 50 and batch size 50, three alternating
+  runs), TCP processing went from 6,825–6,892 to 13,176–13,266 jobs/s (1.93x);
+  push and bulk push were unchanged. These are native host diagnostics, not
+  publication benchmarks.
+
 ### Tooling
 
 - Type checking uses Bun's built-in `bun check` (`bun run typecheck`), and

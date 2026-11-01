@@ -1,6 +1,6 @@
 # Job Lifecycle (push / pull / ack / fail)
 
-> **Category:** Jobs · **Source:** `src/application/operations/push.ts`, `src/application/operations/pushBatch.ts`, `src/application/operations/pushAdmission.ts`, `src/application/operations/pull.ts`, `src/application/operations/pullStateTransition.ts`, `src/application/operations/pullFinalization.ts`, `src/application/operations/ack.ts`, `src/application/operations/ack/`, `src/application/operations/ackHelpers.ts`, `src/application/operations/jobStateTransitions.ts`, `src/application/dependencyCompletions.ts`, `src/domain/types/jobs/model.ts`, `src/domain/job/`, `src/domain/queue/waiterManager.ts`
+> **Category:** Jobs · **Source:** `src/application/operations/push.ts`, `src/application/operations/pushBatch.ts`, `src/application/operations/pushAdmission.ts`, `src/application/operations/pull.ts`, `src/application/operations/pullStateTransition.ts`, `src/application/operations/pullFinalization.ts`, `src/application/operations/ack.ts`, `src/application/operations/ack/`, `src/application/operations/ackHelpers.ts`, `src/application/operations/ackResultWrites.ts`, `src/application/operations/jobStateTransitions.ts`, `src/application/dependencyCompletions.ts`, `src/domain/types/jobs/model.ts`, `src/domain/job/`, `src/domain/queue/waiterManager.ts`
 
 ## Purpose
 
@@ -311,7 +311,7 @@ dependency-result, result/log, and parent flow-failure ownership. 4. Broadcast `
 
 `calculateBackoff` (`src/domain/job/state.ts`): fixed = `delay * (0.8 + rand*0.4)` (±20% jitter); exponential / default = `base * 2^attempts * (0.5 + rand)` (±50% jitter), capped at `backoffConfig.maxDelay ?? DEFAULT_MAX_BACKOFF` (1 h). It always returns a finite delay >= 0: a zero base is `0` for any attempt count (no `0 * 2^1024 = NaN`), the exponent is capped at 1023, a NaN, negative or missing base uses the 1000 ms default, and an invalid stored `maxDelay` falls back to the 1-hour cap. The same cap governs stall retries. The processor `DelayedError` re-delay (`calculateDelayedErrorDelay`, same file) uses the base delay without growth or jitter (a non-positive or `NaN` base falls back to `1000`), capped at a positive finite `maxDelay`, else `DEFAULT_MAX_BACKOFF`: a `maxDelay` of `0` does not apply there, so a job that keeps throwing `DelayedError` never re-runs without a wait. `maxDelay` is carried into repeat successors (`buildRepeatSuccessor` copies `backoffConfig`) and cron-spawned jobs (`CronJobOptions.backoff`).
 
-### Batch ack (`ackHelpers.ts`)
+### Batch ack (`ackHelpers.ts`, `ackResultWrites.ts`)
 
 `ackJobBatch`/`ackJobBatchWithResults` short-circuit to parallel per-job
 `ackJob` for ≤4 ids. Larger batches: `groupByProcShard` → `extractJobs` (one
@@ -329,8 +329,21 @@ live dependent never observes completion before its in-memory result. When every
 retained and no defined result must be stored, `finalizeBatchAck` precomputes
 the capped completion timelines and commits all rows through one
 `markCompletedBatch` transaction. A failed batch rolls back before the original
-scalar loop runs. Batches containing a defined result or any removal keep the
-existing per-job ordering and transaction boundaries.
+scalar loop runs. A retained batch with a defined result keeps the per-job write
+order but not the per-job commits: `batchedCompletionWriter`
+(`src/application/operations/ackResultWrites.ts`) first runs, through
+`SqliteStorage.commitCompletionWrites`, the same `insertResult` and `completeJob`
+statements with the same arguments and in the same order inside one transaction,
+stops at the first throw as the scalar loop would and commits the writes that
+succeeded (what their autocommits kept). The unchanged loop then settles each
+`storeResult`/`markCompleted` call through `settleCompletionWrite`, the scalar
+`safeWrite` with the recorded success or error, so the job index, memory sets,
+disk-full state and logs end exactly as with scalar writes (pinned by
+`test/repro-write-path-faults.test.ts` and its 2.9.11 fixture). A job still in the
+write buffer, a closed database, an open transaction, a failed `BEGIN`/`COMMIT` or a transaction
+SQLite rolled back itself makes it write nothing and run the scalar writes.
+Batches with any removal keep the existing per-job ordering and transaction
+boundaries.
 
 ### Manual transitions (`jobStateTransitions.ts`)
 

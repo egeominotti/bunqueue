@@ -7,6 +7,7 @@ import { withWriteLock } from '../../shared/lock';
 import { shardIndex, processingShardIndex } from '../../shared/hash';
 import { throughputTracker } from '../throughputTracker';
 import { commitRemovedCompletion } from '../dependencyCompletions';
+import { batchedCompletionWriter } from './ackResultWrites';
 import type { BatchContext, ExtractedJob, FinalizeContext } from '../types/ack';
 
 export type { BatchContext, ExtractedJob, FinalizeContext } from '../types/ack';
@@ -181,12 +182,15 @@ export function finalizeBatchAck<T>(
 ): void {
   const now = Date.now();
   const storage = ctx.storage;
-  const hasStorage = storage !== null;
   const jobCount = extractedJobs.length;
 
   const needsBroadcast = ctx.needsBroadcast?.() ?? true;
   const hasPendingDeps = ctx.hasPendingDeps?.() ?? true;
   const completionBatchPersisted = persistCompletedBatch(extractedJobs, ctx, includeResults, now);
+  const writer =
+    storage && !completionBatchPersisted
+      ? (batchedCompletionWriter(extractedJobs, storage, includeResults, now) ?? storage)
+      : storage;
 
   // Batch counter update
   ctx.totalCompleted.value += BigInt(jobCount);
@@ -230,14 +234,12 @@ export function finalizeBatchAck<T>(
       if (includeResults && result !== undefined) {
         ctx.jobResults.set(jobId, result);
         ctx.jobResultQueues.set(jobId, job.queue);
-        if (hasStorage) storage.storeResult(jobId, result);
+        if (writer) writer.storeResult(jobId, result);
       }
       // 2. Update job index and store job data for completed listing
       ctx.jobIndex.set(jobId, { type: 'completed' as const, queueName: job.queue });
       ctx.completedJobsData.set(jobId, job);
-      if (hasStorage && !completionBatchPersisted) {
-        storage.markCompleted(jobId, now, job.timeline);
-      }
+      if (writer && !completionBatchPersisted) writer.markCompleted(jobId, now, job.timeline);
       // 3. Mark as completed LAST - this is the signal other threads wait for
       ctx.completedJobs.add(jobId);
     } else {

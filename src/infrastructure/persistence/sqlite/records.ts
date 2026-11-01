@@ -3,6 +3,7 @@ import { assertWellFormedJobId, type Job, type JobId } from '../../../domain/typ
 import type { DependencyCompletionRecord } from '../dependencyCompletionStore';
 import { pack, reconstructDlqEntry, rowToJob, unpack } from '../sqliteSerializer';
 import type { DbJob } from '../statements';
+import type { CompletionWrite, CompletionWriteOutcome } from '../types/sqlite';
 import { SqliteFlows } from './flows';
 
 /** Direct job/result lookup and payload-free dependency completion records. */
@@ -15,6 +16,68 @@ export abstract class SqliteRecords extends SqliteFlows {
   storeResult(jobId: JobId, result: unknown): void {
     this.safeWrite(() => {
       this.statements.get('insertResult')!.run(jobId, pack(result), Date.now());
+    });
+  }
+
+  /**
+   * Run the statements of a scalar storeResult()/markCompleted() sequence in one
+   * transaction: same statements, arguments and order, stopping at the first throw as
+   * the scalar loop does, then commit the writes that succeeded, which is exactly what
+   * their autocommits kept. Returns `undefined`, with nothing written, when that cannot
+   * be reproduced (a job still buffered, an open transaction, a failed BEGIN or COMMIT,
+   * or SQLite rolling the transaction back itself): the caller then runs the scalar
+   * writes. The caller settles each write through settleCompletionWrite().
+   */
+  commitCompletionWrites(writes: readonly CompletionWrite[]): CompletionWriteOutcome | undefined {
+    try {
+      // A closed database throws here although its prepared statements still run.
+      if (this.db.inTransaction) return undefined;
+    } catch {
+      return undefined;
+    }
+    for (const write of writes) {
+      if (this.writeBuffer.hasPending(String(write.jobId))) return undefined;
+    }
+    try {
+      this.db.run('BEGIN');
+    } catch {
+      return undefined;
+    }
+    let outcome: CompletionWriteOutcome = null;
+    for (let index = 0; index < writes.length; index++) {
+      const write = writes[index];
+      try {
+        if (write.kind === 'result') {
+          this.statements.get('insertResult')!.run(write.jobId, pack(write.result), Date.now());
+        } else {
+          const timeline = write.timeline.length > 0 ? pack(write.timeline) : null;
+          this.statements
+            .get('completeJob')!
+            .run('completed', write.completedAt, timeline, write.jobId);
+        }
+      } catch (error) {
+        outcome = { failedAt: index, error };
+        break;
+      }
+    }
+    try {
+      if (!this.db.inTransaction) return undefined;
+      this.db.run('COMMIT');
+    } catch {
+      try {
+        this.db.run('ROLLBACK');
+      } catch {
+        // The transaction is already gone.
+      }
+      return undefined;
+    }
+    return outcome;
+  }
+
+  /** Account one committed write exactly as its scalar safeWrite() call would have. */
+  settleCompletionWrite(error: { error: unknown } | null): void {
+    this.safeWrite(() => {
+      if (error) throw error.error;
     });
   }
 

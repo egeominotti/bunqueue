@@ -116,6 +116,9 @@ Key methods (real signatures):
   `markWaitingChildren(jobId, timeline?)`,
   `markCompleted(jobId, completedAt, timeline?)`,
   `markCompletedBatch(updates: readonly CompletedJobWrite[])`,
+  `commitCompletionWrites(writes: readonly CompletionWrite[])` (the statements of
+  a scalar result-bearing ACK loop in one transaction; see below),
+  `settleCompletionWrite(error)`,
   `markFailed(job, error)`, `updateForRetry(job)`, `updateJobData(jobId, data)`,
   `updateRunAt(jobId, runAt)` (persists moveToDelayed/changeDelay, re-deriving
   `state` from `run_at`), `updateJobChildrenIds(jobId, childrenIds)`,
@@ -366,6 +369,18 @@ the scalar completion side effects (`progress=100` and
 pull and retained/result-free ACK application paths then retry scalar writes;
 pull keeps individual failures non-fatal, while ACK retains its historical
 scalar error behavior. Empty batches are no-ops.
+
+`commitCompletionWrites` serves the result-bearing batch ACK. It takes the
+ordered `CompletionWrite` list the scalar loop would issue (`result` →
+`insertResult` with `pack(result)` and `Date.now()`, `complete` → `completeJob`),
+opens one deferred transaction, runs each prepared statement looked up from
+`statements` per call, stops at the first throw and commits the writes before it,
+returning `{ failedAt, error }` or `null`. It returns `undefined` without writing
+when a listed job still has a write-buffer insert, the database is closed, a
+transaction is already open, `BEGIN` or `COMMIT` fails (`COMMIT` failures roll back), or SQLite ended
+the transaction itself; the caller then runs the scalar writes.
+`settleCompletionWrite(error)` runs `safeWrite` around the recorded outcome, so
+disk-full detection and its log lines follow the scalar calls one for one.
 
 Lifecycle telemetry batching is separate from job-state durability. Batch
 operations build an ordered `JobEvent` array and `EventsManager.broadcastBatch`
