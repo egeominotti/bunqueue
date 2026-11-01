@@ -741,10 +741,74 @@ once and reported to the `flow-failure-recovery` maintenance health entry as one
 `AggregateError` that names the first failing parent/child pair and its cause; a
 startup sweep failure is reported, not fatal.
 
+Each broker process also repairs parents that older versions left stuck
+([`flowFailureRepair.ts`](../../src/infrastructure/persistence/postgres/flowFailureRepair.ts),
+[`flowFailureRepairEdges.ts`](../../src/infrastructure/persistence/postgres/flowFailureRepairEdges.ts),
+rule in [Flow Producer](./flow-producer.md#startup-repair-of-parents-stuck-by-older-versions)):
+a `waiting-children` parent with an edge on a `failed` child linked to it, with a
+policy and no `bunqueue_flow_failures` record. It makes one full pass over
+`bunqueue_dependencies` in primary-key order `(job_id, dependency_id)`, from the
+first edge to the last, in slices of at most 10 pages of 100 edges: one slice at
+startup before the recovery sweep (so a small table is repaired before the broker
+is ready), then one slice every `POSTGRES_FLOW_FAILURE_REPAIR_SLICE_MS` (250 ms) on
+the `flow-failure-repair` maintenance flight. The work per slice is bounded by
+edges read, not by matches found:
+
+```sql
+WITH edge AS MATERIALIZED (
+  SELECT job_id, dependency_id FROM bunqueue_dependencies
+  WHERE namespace = $ns AND (job_id, dependency_id) > ($after_parent, $after_child)
+  ORDER BY job_id, dependency_id LIMIT 100
+)
+SELECT edge.job_id AS parent_id, edge.dependency_id AS child_id,
+  (parent.id IS NOT NULL AND child.id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM bunqueue_flow_failures f
+    WHERE f.namespace = $ns AND f.parent_id = edge.job_id
+      AND f.child_id = edge.dependency_id)) AS candidate
+FROM edge
+LEFT JOIN bunqueue_jobs parent ON parent.namespace = $ns AND parent.id = edge.job_id
+  AND parent.state = 'waiting-children'
+LEFT JOIN bunqueue_jobs child ON child.namespace = $ns AND child.id = edge.dependency_id
+  AND child.state = 'failed' AND child.parent_id = edge.job_id
+  AND child.failure_reason IS NOT NULL
+  AND (child.failure_reason <> 'unknown' OR child.error LIKE 'Child job %')
+ORDER BY edge.job_id, edge.dependency_id
+```
+
+Candidates are read by primary key and filtered with the shared rule without
+locks (the policy lives in the payload), so a child without a policy costs no
+transaction. Each remaining match runs one transaction with the locks of a
+terminal failure of that child (its dependency-completion key, its parent's flow
+key, the child row, the parent row `FOR UPDATE`), re-checks the rule, the edge and
+the absence of a record, and inserts the record with `ON CONFLICT DO NOTHING`.
+Brokers that find the same edge serialize on those keys; the second sees the
+record (or the applied result) and writes nothing. The record is then pending
+(its edge exists) and the same broker applies it through the regular applier
+after commit, exactly once across brokers; a crash before that leaves it to the
+recovery sweep. Edge failures are collected per edge, logged once and reported as
+one `AggregateError` (to `flow-failure-recovery` for the startup slice, to
+`flow-failure-repair` afterwards), and a failed startup slice never skips the sweep.
+
+Coverage and cost. The pass keeps its position in memory and every broker process
+starts a new pass at the first edge, so coverage does not depend on how long
+earlier processes lived: any broker that stays up for one pass reads every edge.
+One pass takes about ⌈edges / 1,000⌉ × 250 ms (about 4,000 edges/s per broker:
+100,000 edges in about 25 s, 1,000,000 in about 4 minutes); every slice is ten
+primary-key range reads of 100 edges with two primary-key joins each, plus one
+read by primary key of the candidate rows. Brokers starting together scan the same
+edges, which costs duplicate reads but never a duplicate repair. A pass that ends
+without an error stops the repair for that process: later slices return at once
+without a query, so the steady-state cost is zero. That is safe because a stuck
+parent comes only from an older version: in a rolling upgrade, a parent that an
+older broker strands after a newer broker finished its pass is repaired by the
+startup pass of the newer broker that replaces that older one. A pass with errors
+starts over from the first edge after `POSTGRES_FLOW_FAILURE_REPAIR_RETRY_MS`
+(60 s). The lease-recovery tick runs only the recovery sweep.
+
 Mixed versions during a rolling upgrade: an older broker neither applies the next
 level after commit nor runs the sweep, so a chain it fails stops at one level as
-before. A mid-level parent that an older broker fails writes no record, so newer
-brokers cannot finish that chain either. An older broker's
+before. A mid-level parent that an older broker fails writes no record; the
+repair pass of the newer broker that next starts writes it and finishes the chain. An older broker's
 `getIgnoredChildrenFailures()` / `getFailedChildrenValues()` read has no edge
 filter and can briefly report a pending `ignore`/`continue` record that a newer
 broker committed. There is no schema change and no version bump.
@@ -1123,8 +1187,9 @@ retain their existing host-clock behavior.
   re-arming on every local and remote claim and renewal (remote ones are visible
   only through the journal), adding hot-path work for the same bound.
   `maintenanceSchedule.ts` arms these two periods, cron polling
-  (`pollIntervalMs`), and the 60-second DLQ/worker/broker/retention sweeps with
-  `safeInterval`, and the durable journal poll uses `safeInterval` too. A lease or
+  (`pollIntervalMs`), the 60-second DLQ/worker/broker/retention sweeps and, when
+  the runtime passes it, the 250 ms legacy flow-parent repair slice (a no-op once
+  its pass is done) with `safeInterval`, and the durable journal poll uses `safeInterval` too. A lease or
   poll interval beyond the native timer limit (2^31 - 1 ms) is therefore honoured
   instead of ticking every millisecond.
 - `bunqueue_workers` makes worker registration and heartbeat state visible to

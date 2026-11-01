@@ -40,7 +40,7 @@ const emails = new Queue<EmailJob>('emails', storage);
 
 new Worker<EmailJob>('emails', async (job) => {
   console.log('sending to', job.data.to);
-  // await sendEmail(job.data);
+  // await sendEmail(job.data); // sendEmail: your own delivery function
   return { sent: true };
 }, { ...storage, concurrency: 3 }); // 3 jobs in parallel
 
@@ -76,7 +76,7 @@ Every example uses `embedded: true`. Without it, bunqueue tries to connect to a 
   if (!job) return { error: 'Job not found' };
   return {
     id: job.id,
-    progress: job.progress,          // 0-100, set by the worker
+    progress: job.progress,          // last updateProgress() value: 0-100 by convention, or an object
     result: job.returnvalue ?? null, // what the worker returned
     error: job.failedReason ?? null, // last error message
   };

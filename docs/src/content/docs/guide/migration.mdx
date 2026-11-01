@@ -177,7 +177,7 @@ Then, in your code:
   row before publishing local state, while PostgreSQL commits the complete graph
   in one database transaction; both provide all-or-nothing creation without
   client-side rollback.
-- **Per-worker rate limiting**: `limiter: { max, duration }` on `WorkerOptions`, unchanged.
+- **Worker `limiter` option**: `limiter: { max, duration }` on `WorkerOptions` keeps its shape, but bunqueue enforces it per worker (see [Queue-level rate limiting](#queue-level-rate-limiting)).
 
 ### BullMQ Pro-oriented APIs in the Bun package
 
@@ -233,7 +233,7 @@ backoff: { type: 'fixed', delay: 5000 }       // same as BullMQ
 backoff: 1000                                  // shorthand: exponential with 1000ms base
 ```
 
-Exponential retries wait roughly 2s, 4s, 8s with a 1000ms base (`delay * 2^attempts`). bunqueue adds automatic jitter (a small random spread) so thousands of failed jobs do not retry at the same instant, and caps delays at 1 hour by default. Set `maxDelay` on the object form to choose a different cap per job, for example `{ type: 'exponential', delay: 1000, maxDelay: 30000 }` (0 to 86,400,000 ms).
+Exponential retries are centred on 2s, 4s, 8s with a 1000ms base (`delay * 2^attempts`). bunqueue adds automatic jitter so thousands of failed jobs do not retry at the same instant: each exponential wait is multiplied by a random factor between 0.5 and 1.5, and a fixed wait by one between 0.8 and 1.2, so fixed backoff does not grow. Delays are capped at 1 hour by default. Set `maxDelay` on the object form to choose a different cap per job, for example `{ type: 'exponential', delay: 1000, maxDelay: 30000 }` (0 to 86,400,000 ms).
 
 ### Repeatable jobs
 
@@ -263,11 +263,11 @@ const worker = new Worker(
 );
 ```
 
-An experimental `SandboxedWorker` (built on Bun Workers) exists if you need process isolation. See [Worker vs SandboxedWorker](/guide/worker/sandboxed/#worker-vs-sandboxedworker).
+An experimental `SandboxedWorker` (built on Bun Workers) exists if you need the processor isolated in a worker thread; unlike BullMQ's sandboxed processors, it does not spawn a child process. See [Worker vs SandboxedWorker](/guide/worker/sandboxed/#worker-vs-sandboxedworker).
 
 ### Queue-level rate limiting
 
-The per-worker `limiter` works as in BullMQ. bunqueue also offers a queue-level limit:
+BullMQ's `limiter` is global: it caps the whole queue across all of its workers. bunqueue's `limiter` keeps the same shape but caps each worker on its own, so N workers can start up to N times the limit. For one cap shared by all workers, use the queue-level limit:
 
 ```typescript
 queue.setGlobalRateLimit(100); // max 100 jobs per second across all workers

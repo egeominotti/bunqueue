@@ -318,7 +318,7 @@ const info = await queue.getJobScheduler('health-check');
 :::tip[Related]
 
 - [Architecture Overview](/architecture/) - Full component map
-- [Data Structures](/architecture/data-structures/) - Skip list behind time-ordered scheduling
+- [Data Structures](/architecture/data-structures/) - The 4-ary MinHeap behind time-ordered scheduling
 - [Persistence](/architecture/persistence/) - Where schedulers survive restarts
 - [Storage Backends](/guide/databases/) - PostgreSQL cron coordination and failover boundaries
 - [Cron Jobs Guide](/guide/cron/) - Using schedulers from the client

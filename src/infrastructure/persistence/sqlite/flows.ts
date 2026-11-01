@@ -204,6 +204,23 @@ export abstract class SqliteFlows extends SqliteMutations {
     });
   }
 
+  /** Insert outbox records in one transaction; an existing record is kept as written. */
+  insertMissingFlowFailures(records: readonly FlowFailureRecord[]): void {
+    if (records.length === 0) return;
+    this.safeWrite(() => {
+      const insert = this.db.prepare(
+        `INSERT INTO flow_failures (parent_id, child_id, child_queue, mode, error, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(parent_id, child_id) DO NOTHING`
+      );
+      this.db.transaction(() => {
+        for (const r of records) {
+          insert.run(r.parentId, r.childId, r.childQueue, r.mode, r.error, r.createdAt);
+        }
+      })();
+    });
+  }
+
   loadFlowFailures(): FlowFailureRecord[] {
     const rows = this.db
       .query<

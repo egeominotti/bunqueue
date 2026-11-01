@@ -108,6 +108,9 @@ curl 'http://localhost:6790/queues/emails/dlq?limit=100&offset=0'
 </TabItem>
 </Tabs>
 
+With `AUTH_TOKENS` set on the server, the HTTP calls on this page need
+`-H 'Authorization: Bearer <token>'`.
+
 The Bun async API applies `reason`, time, due-retry, expiry, limit, and offset
 filters server-side in both embedded and TCP modes. The HTTP endpoint currently
 supports only `limit` and `offset`; external clients must filter that page

@@ -289,7 +289,7 @@ Check whether a queue is currently paused.
 
 ### Drain
 
-Remove all waiting and delayed jobs from a queue. Active jobs are not affected.
+Remove all waiting, prioritized and delayed jobs from a queue. Active jobs are not affected.
 
 **Request:**
 
@@ -498,6 +498,7 @@ jobs. Every response below is wrapped in `data`:
 
 { cmd: 'GetGroupsJobsCount', queue, maxCount? }
 // -> { ok: true, data: { count: number } }
+// maxCount is accepted by the command type but ignored: the count is never capped
 
 { cmd: 'GetGroupActiveCount', queue, groupId }
 // -> { ok: true, data: { count: number } }

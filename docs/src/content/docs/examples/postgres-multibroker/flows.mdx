@@ -47,6 +47,9 @@ the transformed ledger and forecast child are complete.
   The example uses the default dependency policy: a parent waits for successful children. For
   partial-success graphs, select `failParentOnFailure`, `removeDependencyOnFailure`,
   `continueParentOnFailure`, or `ignoreDependencyOnFailure` per child and test the intended outcome.
+  A policy applies whether the child fails in a worker or exhausts its attempts through lease
+  recovery. A parent failed this way applies its own policy to its parent in turn, so
+  `failParentOnFailure` on every level fails the branch up to the root.
 </Aside>
 
 ## Design guidance

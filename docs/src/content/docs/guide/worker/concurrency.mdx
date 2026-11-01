@@ -232,7 +232,7 @@ worker := bunqueue.NewWorker("queue", processor, bunqueue.WorkerOptions{
 
 ```rust
 let worker = Worker::new("queue", processor, WorkerOptions {
-    batch_size: 100,        // Request up to 100; free slots cap the pull
+    batch_size: 100,        // Request up to 100; concurrency (default 4) and free slots cap the pull
     poll_timeout_ms: 5_000, // Wait up to 5s for jobs (long polling)
     ..Default::default()
 });
@@ -244,7 +244,7 @@ let worker = Worker::new("queue", processor, WorkerOptions {
 ```elixir
 worker =
   Bunqueue.Worker.new("queue", handler,
-    batch_size: 100,     # Request up to 100; free slots cap the pull
+    batch_size: 100,     # Request up to 100; concurrency (default 1) and free slots cap the pull
     poll_timeout: 5_000  # Wait up to 5s for jobs (long polling)
   )
 ```

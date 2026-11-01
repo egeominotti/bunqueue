@@ -476,7 +476,22 @@ sudo systemctl enable --now bunqueue
 sudo journalctl -u bunqueue -f
 ```
 
-To upgrade: stop the service, `bun install -g bunqueue@latest`, start it again, then confirm with `curl http://localhost:6790/health | jq .version`. Updating the package does not restart the service.
+The unit runs the [single binary](/guide/installation/#single-binary-no-bun-required) at
+`/usr/local/bin/bunqueue`. To upgrade, stop the service, replace that file with the new
+release's binary, start it again, then confirm with
+`curl http://localhost:6790/health | jq .version`:
+
+```bash
+sudo systemctl stop bunqueue
+curl -fsSLO https://github.com/egeominotti/bunqueue/releases/latest/download/bunqueue-linux-x64.tar.gz
+tar -xzf bunqueue-linux-x64.tar.gz
+sudo mv bunqueue-linux-x64 /usr/local/bin/bunqueue
+sudo systemctl start bunqueue
+```
+
+Pick the archive for your platform. `bun install -g bunqueue@latest` installs into
+`~/.bun/bin`, not `/usr/local/bin`, so it does not change what this unit runs. Replacing the
+binary does not restart the service.
 
 ## PM2
 

@@ -36,7 +36,7 @@ new Worker(
   'emails',
   async (job) => {
     console.log('sending to', job.data.to);
-    // await sendEmail(job.data);
+    // await sendEmail(job.data); // sendEmail: your own delivery function
     return { sent: true };
   },
   { ...storage, concurrency: 3 }
@@ -71,7 +71,7 @@ Every example uses `embedded: true`. Without it, bunqueue tries to connect to a 
 
 ### Let clients check job status
 
-Return the job id from the enqueue route, then expose a status endpoint. `job.progress` is a 0-100 number your worker sets, `returnvalue` is what your worker returned, `failedReason` is the last error message:
+Return the job id from the enqueue route, then expose a status endpoint. `job.progress` is the value your worker last passed to `updateProgress()` (by convention a 0-100 number, but an object is accepted too), `returnvalue` is what your worker returned, `failedReason` is the last error message:
 
 ```typescript
 app.get('/api/jobs/:id', async (c) => {
@@ -91,6 +91,7 @@ app.get('/api/jobs/:id', async (c) => {
 ### Report progress from the worker
 
 ```typescript
+// fetchData and renderPdf stand for your own functions
 new Worker(
   'reports',
   async (job) => {
@@ -106,7 +107,7 @@ new Worker(
 
 ### Expose queue stats
 
-`getJobCounts()` is synchronous in embedded mode and returns counts per state (`waiting`, `active`, `completed`, `failed`, `delayed`):
+`getJobCounts()` is synchronous in embedded mode and returns counts per state (`waiting`, `prioritized`, `active`, `completed`, `failed`, `delayed`, `paused`, `waiting-children`):
 
 ```typescript
 app.get('/api/queues/emails/stats', (c) => c.json(emails.getJobCounts()));
@@ -115,6 +116,7 @@ app.get('/api/queues/emails/stats', (c) => c.json(emails.getJobCounts()));
 ### React to job results
 
 ```typescript
+// processor: your job handler, e.g. async (job) => ({ sent: true })
 const worker = new Worker('emails', processor, {
   embedded: true,
   dataPath: './data/bunq.db',
@@ -211,6 +213,7 @@ Close workers first (each `close()` waits for its active jobs), then release the
 ```typescript
 import { shutdownManager } from 'bunqueue/client';
 
+// workers: every Worker this process created
 async function shutdown() {
   await Promise.all(workers.map((w) => w.close()));
   shutdownManager();

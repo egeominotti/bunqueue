@@ -316,7 +316,8 @@ Batch acknowledge multiple jobs.
   cmd: 'ACKB',
   ids: string[],          // Job IDs
   results?: any[],        // Optional results (same order as ids; if provided, length must match ids)
-  tokens?: string[]       // Lock tokens (same order/length as ids; required for leased jobs)
+  tokens?: string[],      // Lock tokens (same order/length as ids; required for leased jobs)
+  removeOnCompletes?: Array<boolean | null> // Per-item removeOnComplete (same length as ids; applied only with results)
 }
 ```
 
@@ -408,6 +409,8 @@ Add a log entry to a job.
 ```typescript
 { ok: true, data: { added: true } }
 ```
+
+An id the server does not know returns `{ ok: false, error: 'Job not found' }`.
 
 ---
 

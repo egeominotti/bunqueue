@@ -417,17 +417,17 @@ The agent discovers the tools on its own; this table shows what is available. Ev
 
 | Group | Tools | Examples |
 |-------|-------|----------|
-| `jobs` | 12 | `add_job`, `add_jobs_bulk`, `get_job`, `get_job_result`, `wait_for_job`, `get_job_logs` |
+| `jobs` | 13 | `add_job`, `add_jobs_bulk`, `get_job`, `get_job_result`, `wait_for_job`, `get_job_logs` |
 | `job-control` | 7 | `cancel_job`, `promote_job`, `change_job_priority`, `move_to_delayed`, `discard_job` |
 | `processing` | 8 | `pull_job`, `ack_job`, `fail_job`, `job_heartbeat`, `extend_lock` |
-| `queues` | 11 | `list_queues`, `get_job_counts`, `pause_queue`, `drain_queue`, `clean_queue` |
+| `queues` | 12 | `list_queues`, `get_job_counts`, `pause_queue`, `drain_queue`, `clean_queue` |
 | `dlq` | 5 | `get_dlq`, `get_dlq_stats`, `retry_dlq`, `purge_dlq`, `retry_completed` |
 | `cron` | 4 | `add_cron`, `list_crons`, `get_cron`, `delete_cron` |
 | `limits` | 5 | `set_rate_limit`, `set_concurrency`, `get_queue_limits`, `clear_rate_limit` |
 | `flows` | 5 | `add_flow`, `add_flow_chain`, `add_flow_bulk_then`, `get_flow`, `get_children_values` |
 | `workers` | 7 | `register_worker`, `list_workers`, `register_handler`, `list_handlers` |
 | `webhooks` | 4 | `add_webhook`, `list_webhooks`, `set_webhook_enabled`, `remove_webhook` |
-| `monitoring` | 7 | `get_stats`, `get_queue_stats`, `get_memory_stats`, `get_prometheus_metrics` |
+| `monitoring` | 9 | `get_stats`, `get_queue_stats`, `get_memory_stats`, `get_prometheus_metrics` |
 | `workflows` (optional) | 3 | `list_workflow_executions`, `get_workflow_execution`, `signal_workflow` |
 
 Errors come back as plain messages, never stack traces. Inputs are checked by each tool's schema before anything reaches the queue (for example: names cannot be empty, priorities are whole numbers within ±1,000,000, attempts go from 1 to 1000; these tool limits are stricter than the broker, which accepts any finite priority), and a rejected call changes nothing.

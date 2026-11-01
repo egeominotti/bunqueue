@@ -190,11 +190,11 @@ describe('AI SDK on the workflow engine: turn-per-step (doUntil)', () => {
       provisioned: provisionedBefore,
     });
 
-    // NOTE what this does NOT prove. A crash in the MIDDLE of the loop still restarts
-    // it from iteration 0, because loop bodies are not memoised: the whole loop is a
-    // single job, and re-entering the node re-runs every turn. The per-iteration
-    // records added for the transcript are what make memoisation possible, but it is
-    // not implemented — an agent killed at turn 7 still re-pays for turns 1-6.
+    // NOTE what this does NOT prove. It only re-enters after the loop finished; it does
+    // not kill the engine in the MIDDLE of the loop. Loop iterations are memoised
+    // (runIteration in loops.ts skips an iteration whose `name:iteration` record is
+    // already completed), so a mid-loop crash resumes at the first unfinished turn,
+    // but that path is not exercised here.
   }, 60_000);
 });
 

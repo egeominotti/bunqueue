@@ -94,7 +94,7 @@ These numbers come from `scripts/ai-sdk/saga-live-e2e.ts`, which runs against th
 
 **Tokens are paid once, not twice.** The child process calls the model, the plan is journaled, then the process is killed before it can act on it. A second process calls `recover()`. The external call log shows the model was called **one time**.
 
-**An agent killed at turn 7 resumes at turn 7.** Loop iterations are memoised: completed turns are skipped, and only the turn that was actually interrupted runs again. Before this existed, a four turn loop interrupted once executed seven turns in total. Now it executes five, and the two extra are the genuinely unfinished turn plus the one that finishes the job.
+**An agent killed at turn 7 resumes at turn 7.** Loop iterations are memoised: completed turns are skipped, and only the turn that was actually interrupted runs again.
 
 **Whatever the model chose gets undone in reverse.** In the live run, Claude picked three tools on its own, with its own arguments. A later step failed. The engine destroyed all three, in the exact reverse of the order it had picked them, without knowing the plan in advance.
 
@@ -117,7 +117,7 @@ These numbers come from `scripts/ai-sdk/saga-live-e2e.ts`, which runs against th
 
 ### A real run, not a diagram
 
-This is the unedited output of `bun scripts/ai-sdk/saga-live-e2e.ts` against the live API. Claude chose the tools, including `shards: 3`, which nothing in the prompt asked for.
+This is output from `bun scripts/ai-sdk/saga-live.ts` against the live API, trimmed to the relevant lines. Claude chose the tools, including `shards: 3`, which nothing in the prompt asked for.
 
 <div class="hp-code-window">
   <div class="hp-code-titlebar">
@@ -126,7 +126,7 @@ This is the unedited output of `bun scripts/ai-sdk/saga-live-e2e.ts` against the
       <span class="hp-dot hp-dot-yellow"></span>
       <span class="hp-dot hp-dot-green"></span>
     </div>
-    <span class="hp-code-filename">bun scripts/ai-sdk/saga-live-e2e.ts</span>
+    <span class="hp-code-filename">bun scripts/ai-sdk/saga-live.ts</span>
   </div>
 
 ```text
@@ -165,7 +165,7 @@ PASS: provisioned 3, rolled back 3
 The trick is one line: define your tools **without** `execute`. The SDK then hands back the model's intent instead of running it, and you turn each intended call into a workflow step that has an inverse.
 
 ```bash
-bun add bunqueue ai @ai-sdk/anthropic
+bun add bunqueue ai @ai-sdk/anthropic zod
 ```
 
 ```typescript
@@ -221,7 +221,7 @@ const agentSaga = new Workflow<{ tenant: string }>('provision-tenant')
 
 The agent decides **what** to do. The workflow owns **the effects**. That separation is the whole idea, and it is what makes a non deterministic planner safe to run against production systems.
 
-Read the last two lines carefully. `.pivot()` marks the point of no return: once the welcome email goes out, a later failure must not release the subdomain the customer has already been told about.
+Read the last two lines carefully. `.pivot()` marks the point of no return: once the welcome email goes out, a later failure must not undo what the customer has already been told about. The diagram below shows the same rule in a signup saga that reserves a subdomain and charges a setup fee before its pivot.
 
 <div class="bq-sim">
   <div class="bq-sim-head">

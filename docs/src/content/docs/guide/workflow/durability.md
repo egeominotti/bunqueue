@@ -77,6 +77,7 @@ console.log(`Recovered ${recovered.total} executions`);
 | `running` | Re-enqueues the current node so the run continues |
 | `waiting` | Re-arms the signal timeout for its **remaining** time; if the signal was already recorded before recovery, resumes immediately |
 | `compensating` | Re-enters the unwind. A reversal recorded as succeeded is skipped, and one recorded `compensation-failed` still blocks the chain, so the run parks again rather than reporting a clean rollback |
+| `failed` with no `rollbackStatus` | The failure was persisted but the process died before the unwind recorded an outcome, so rollback is still owed. Recovery re-drives it exactly like `compensating` and counts it under `compensating` |
 
 A timeout is re-armed on the time that is left, not from zero. A 24-hour approval window on a process restarted after 23 hours fires in one hour.
 
@@ -102,7 +103,7 @@ is graceful and does not abort the generation: it waits for active control flow
 to finish and checkpoint normally.
 
 :::caution[Recovery is a manual call]
-Nothing resumes on its own. If you never call `recover()`, an interrupted run sits in the database untouched.
+Do not rely on anything resuming on its own. A node job that already reached the queue's SQLite file can be redelivered when the engine starts again, but a timed `waitFor`, an interrupted unwind, or a run whose node job never reached the queue is driven again only by `recover()`.
 :::
 
 ## What resumes, and what replays

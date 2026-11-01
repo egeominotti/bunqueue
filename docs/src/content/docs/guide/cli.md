@@ -164,10 +164,12 @@ bunqueue queue resume emails
 bunqueue queue paused emails              # prints "Queue is paused" or "Queue is active"
 
 bunqueue queue jobs emails --state waiting --limit 10   # list jobs by state
-# states: waiting, delayed, active, completed, failed (--offset for pagination)
+# states: waiting, delayed, active, completed, failed, prioritized, paused,
+# waiting-children (--offset for pagination)
 
 bunqueue queue clean emails --grace 3600000 --state completed  # remove old jobs
 # default state when omitted: waiting/delayed; --limit caps per call (default 1000)
+# --state active is accepted but removes nothing: the server never cleans in-flight jobs
 
 bunqueue queue drain emails         # remove all waiting jobs (active ones keep running)
 bunqueue queue obliterate emails    # remove EVERYTHING for this queue

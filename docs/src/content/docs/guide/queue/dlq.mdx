@@ -155,8 +155,8 @@ queue.purge_dlq()?;                      // Clear all
 </TabItem>
 </Tabs>
 
-_DLQ configuration (`setDlqConfig`) is available in Bun, TypeScript, and
-Python; PHP, Go, Rust, and Elixir can set the same server policy through
+_DLQ configuration (`setDlqConfig`) is available in the Bun package, the
+TypeScript SDK and Python; PHP, Go, Rust, and Elixir can set the same server policy through
 `PUT /queues/:queue/dlq-config`. Full metadata, stats, and server-side reason
 filters exist in both TypeScript packages; every SDK can use the HTTP metadata and
 stats endpoints. Automatic retries preserve their bounded retry chain and

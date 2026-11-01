@@ -1174,7 +1174,16 @@ DLQ is itself a terminal child: when it has a parent and a policy, its own row
 commits with its DLQ move, so the policy climbs the tree one durable row per
 level. Startup
 replays rows before workers can observe recovered parents, appending the rows
-of the parents it fails to the same pass. `fail` and `remove`
+of the parents it fails to the same pass. Before the replay, startup inserts
+(`ON CONFLICT DO NOTHING`, one transaction) the row that older versions never
+wrote for a recovered `waiting-children` parent whose dependency is in the DLQ
+with a failure policy and no row for the pair, with the DLQ entry's error and
+the child's last failed attempt as `created_at`; discarded children (reason
+`unknown` without a `Child job ` error), children without a policy, parents
+running when the child failed and parents acted on after it (a DLQ retry, a run,
+a promotion: a non-`waiting-children` timeline entry or a `lastHeartbeat` at or
+after the failure) get none
+([Flow Producer](./features/flow-producer.md#startup-repair-of-parents-stuck-by-older-versions)). `fail` and `remove`
 rows are deleted after application; `ignore` and `continue` remain readable
 while the parent is live and are deleted when it reaches a terminal state or is
 removed. Queue obliteration also matches `child_queue` directly and parent/child
@@ -1558,7 +1567,7 @@ then `id`; round-robin `last_served` chooses among lane heads. All paths use
 | ------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bunqueue_dependencies`  | `(namespace, job_id, dependency_id)` | Durable unresolved/completed dependency edges; reverse index `(namespace, dependency_id, job_id)`.                                                                                          |
 | `bunqueue_completions`   | `(namespace, job_id)`                | Generation-scoped completion proof and optional result, including removed jobs; a `NULL` `result` marks a completed job removed by `Cancel` (its result is gone and reads as `undefined`); queue index `(namespace, queue, job_id)` and retention index `(namespace, completed_at DESC, job_id DESC)`. |
-| `bunqueue_flow_failures` | `(namespace, parent_id, child_id)`   | Durable child failure policy (`fail`, `remove`, `ignore`, `continue`), error and timestamp; indexed by parent/mode. A row whose `(parent_id, child_id)` dependency edge still exists is a pending propagation record (a parent failed by `failParentOnFailure`, toward its own parent), written only while that edge exists; `ignore`/`continue` rows without the edge are the failure values recorded for a live parent, and a row without the edge whose parent is `failed`, `completed` or missing is an orphan of a lost race (that transition already cleared the values applied to the parent), deleted by the applier or by the recovery sweep.                                                                         |
+| `bunqueue_flow_failures` | `(namespace, parent_id, child_id)`   | Durable child failure policy (`fail`, `remove`, `ignore`, `continue`), error and timestamp; indexed by parent/mode. A row whose `(parent_id, child_id)` dependency edge still exists is a pending propagation record (a parent failed by `failParentOnFailure`, toward its own parent), written only while that edge exists; `ignore`/`continue` rows without the edge are the failure values recorded for a live parent, and a row without the edge whose parent is `failed`, `completed` or missing is an orphan of a lost race (that transition already cleared the values applied to the parent), deleted by the applier or by the recovery sweep. A missing row for a `waiting-children` parent's edge on a `failed` child with a policy (left by older versions) is inserted by the legacy repair pass (one full primary-key pass over `bunqueue_dependencies` per broker process, a slice at startup and then every 250 ms until a clean pass ends), which re-checks under the terminal-failure locks before inserting.                                                                         |
 | `bunqueue_repeat_links`  | `(namespace, original_id)`           | Exactly one successor generation per completed repeat job; successor reverse index.                                                                                                         |
 
 Dependency evidence has its own namespace/ID advisory-lock domain. Names are

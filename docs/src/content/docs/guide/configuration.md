@@ -55,7 +55,7 @@ Use the config file as your baseline and override per environment with env vars 
 
 ## Picking a config file
 
-bunqueue looks in your project root for `bunqueue.config.ts`, then `bunqueue.config.js`, then `bunqueue.config.mjs`. To use a specific file:
+bunqueue looks in the current working directory (normally your project root) for `bunqueue.config.ts`, then `bunqueue.config.js`, then `bunqueue.config.mjs`. To use a specific file:
 
 ```bash
 bunqueue start --config ./config/production.config.ts

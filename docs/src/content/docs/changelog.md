@@ -57,7 +57,8 @@ head:
   paths). Jobs without a parent or without a
   policy are unchanged, as are retry, backoff, stall counting, DLQ reasons and
   messages, and the `cron:` discard. Parents already stuck by this bug before
-  the upgrade are not repaired automatically. Found by a production-style
+  the upgrade are repaired at the next startup (see the startup repair below).
+  Found by a production-style
   FlowProducer campaign (50,100 jobs with broker SIGKILLs) that left 21 parents
   in `waiting-children`; PostgreSQL mode was not affected, because its lease
   expiry already applies the policy in the same transaction.
@@ -98,8 +99,11 @@ head:
   failing cannot starve the others, and its error names the failing
   parent/child pair. No schema change. During a rolling upgrade, older brokers
   do not apply the next level or run the sweep (their chains stop at one level,
-  and a mid-level parent they fail writes no record), and their reads can
-  briefly report a pending `ignore`/`continue` record.
+  and a mid-level parent they fail writes no record; the startup repair below
+  writes it on the next start of a newer broker), and
+  their reads can briefly report a pending `ignore`/`continue` record. Parents
+  left waiting this way before the upgrade, on SQLite or PostgreSQL, are
+  repaired by that startup repair.
   (`test/repro-flow-fail-parent-propagation.test.ts`,
   `test/flow-fail-parent-propagation-durability.test.ts`,
   `test/postgres-flow-fail-parent-propagation.test.ts`,
@@ -125,6 +129,67 @@ head:
   30 s lease) on each live broker.
   (`test/postgres-flow-propagation-completed-parent.test.ts`,
   `test/postgres-flow-propagation-sweep-budget.test.ts`)
+- **Flow parents stuck by the two bugs above are repaired at startup.** Older
+  versions could leave a parent in `waiting-children` forever with a dependency
+  edge on a child that had failed terminally (in the DLQ) carrying a failure
+  policy, and no `flow_failures` outbox record: a child exhausted by startup
+  recovery, lock expiry or stall detection, or a mid-level parent failed by its
+  child's `failParentOnFailure` ("Child job <id> failed: …"). Startup now
+  writes the missing record, in the shape a terminal failure writes, with the
+  DLQ entry's error and the time of the child's last failed attempt, and the
+  existing outbox replay applies it: the parent is failed, released (with the
+  entry in `getIgnoredChildrenFailures()`) or promoted (with the entry in
+  `getFailedChildrenValues()`), and a repaired `fail` keeps climbing the tree.
+  The repair is idempotent (an applied record removes the edge or fails the
+  parent, and an existing record is never replaced) and it only touches a
+  parent still in `waiting-children` that stayed there since the child failed.
+  It never touches a child without a policy (the parent keeps waiting, the
+  documented default), a child still retrying or queued, a discarded or
+  quarantined child (DLQ reason `unknown` without a "Child job" error: those
+  paths never applied a policy), a parent that was running when the child
+  failed (no version applies a policy to a running parent), or a parent that
+  someone acted on after the failure: any timeline transition at or after the
+  failure other than `waiting-children` (a DLQ retry, a run, a promotion), or a
+  `lastHeartbeat` at or after it (a DLQ retry and a pull both stamp it, so a
+  parent retried from the DLQ and given a new child before it ran keeps
+  waiting for that child even when its 20-entry timeline is full). On SQLite
+  the scan runs once in memory over the recovered waiting parents, before the
+  outbox replay; the log names the repaired pairs (the first 20) and their
+  count, and a write error stops startup as the replay's own writes do. On
+  PostgreSQL every broker process makes one full pass over
+  `bunqueue_dependencies` in primary-key order: one slice of at most 1,000
+  edges at startup, then one slice every 250 ms (about 4,000 edges/s, so
+  100,000 edges take about 25 s) until the last edge, and a restart starts a
+  new pass. Every match is re-checked under the locks of a terminal failure of
+  that child and gets its record with `ON CONFLICT DO NOTHING`, so it applies
+  exactly once across brokers; the existing applier then applies it, and the
+  recovery sweep finishes it after a crash. After a clean pass the broker
+  stops scanning (a pass with errors starts over after 60 s); a parent that an
+  older broker strands later in a rolling upgrade is repaired by the startup
+  pass of the newer broker that replaces it. No schema change; a child removed
+  on failure (`removeOnFail`) or purged from the DLQ leaves no trace to repair
+  from.
+  (`test/repro-flow-legacy-stuck-parent-repair.test.ts`,
+  `test/flow-legacy-stuck-parent-repair-controls.test.ts`,
+  `test/repro-flow-legacy-repair-retried-parent.test.ts`,
+  `test/postgres-flow-legacy-stuck-parent-repair.test.ts`,
+  `test/postgres-flow-legacy-stuck-parent-controls.test.ts`,
+  `test/postgres-flow-legacy-repair-coverage.test.ts`)
+- **A parent failed by several siblings at once reports its failure once.** When
+  two or more children with `failParentOnFailure` failed at the same moment
+  under the same parent, the parent went to the DLQ once (and its own parent was
+  handled once), but its `failed` event and the parent-level `flow:failed`
+  dashboard event were emitted once per sibling, each with a different reason
+  ("Child job <leaf1> failed: …", "Child job <leaf2> failed: …"), so webhooks,
+  event subscribers and `waitUntilFinished` callers saw it fail more than once.
+  The sibling whose call finds the parent already moved (the re-check inside the
+  shard lock) now emits nothing and leaves the parent's in-memory bookkeeping
+  alone; only the call that moved the parent reports it, with that child's
+  reason. A plain two-level parent with two failing children had the same
+  duplicate, before and after the propagation fix above. The startup outbox
+  replay emits no events and was not affected; PostgreSQL mode was not
+  affected. (`test/flow-coverage-concurrent-siblings-engine.test.ts`,
+  `test/flow-coverage-concurrent-siblings.test.ts`)
 
 ### Tooling
 

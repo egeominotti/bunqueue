@@ -55,7 +55,7 @@ receive attempt-only keys or a cancellation signal.
 
 Backoff is `min(500ms × 2^(attempt-1), 30s)` plus up to 50% jitter. When attempts run out the step fails and the rollback begins.
 
-Set `retry: 1` on steps that throw deliberately, such as validation or guard clauses, so a rejection is not retried five times before being believed.
+Set `retry: 1` on steps that throw deliberately, such as validation or guard clauses, so a rejection is believed the first time instead of being retried until the default three attempts are spent.
 
 The persisted attempt count is cumulative. If a process stops after attempt two,
 recovery starts at attempt three rather than granting a new retry budget.

@@ -8,7 +8,11 @@
 > `src/client/flowReader.ts`,
 > `src/client/flowResults.ts`,
 > `src/application/flowFailureRecovery.ts`,
-> `src/application/flowChildFailure.ts`
+> `src/application/flowChildFailure.ts`,
+> `src/application/flowFailureRepair.ts`,
+> `src/domain/job/flowFailureRepair.ts`,
+> `src/infrastructure/persistence/postgres/flowFailureRepair.ts`,
+> `src/infrastructure/persistence/postgres/flowFailureRepairEdges.ts`
 
 ## Purpose and contract
 
@@ -336,7 +340,13 @@ keeps the previous writes (`saveDlqEntry` + `deleteJob`) and events, and its
 own parent keeps waiting. A failed parent that carries a policy also emits the
 child-level `flow:failed` event toward its own parent, as a worker FAIL does,
 so a `fail` chain reports each pair once at child level and once when the next
-parent is failed. The same rule holds for a child linked to a parent
+parent is failed. Only the call that actually moves a parent reports it:
+when several siblings fail it at once, each step re-checks inside the shard
+lock that the parent is still queued, and a step that finds it already moved
+returns without the parent's `failed` event, its parent-level `flow:failed`
+event, its in-memory cleanup or any further propagation, so subscribers,
+webhooks and completion waiters see one failure with the winning child's
+reason. The same rule holds for a child linked to a parent
 after it already failed (`updateJobParent`). The startup replay
 (`flowFailureRecovery.ts`) is a worklist: a parent it fails appends its own
 committed record, which the same pass applies to the next parent, so a crash
@@ -371,6 +381,69 @@ Startup calls `recoverFlowFailures` before workers start, then idempotently
 fails, promotes, or detaches the parent. `ignore` and `continue` records remain
 available while the parent is live and are removed when that parent completes,
 fails, is removed, or is obliterated.
+
+### Startup repair of parents stuck by older versions
+
+Before the two fixes above, a child exhausted by startup recovery, lock expiry
+or stall detection, and a parent failed by its child's `failParentOnFailure`,
+reached the DLQ without its outbox record, so the parent kept its edge on a
+terminally failed child and waited forever. The repair rule is pure
+(`domain/job/flowFailureRepair.ts` `missingFlowFailureRecord`, shared by both
+backends): for a parent in `waiting-children` whose edge points at a child that
+is in the DLQ, still linked to that parent (`parentId`), with no record for the
+pair, it returns the record a terminal failure writes (mode by the same
+precedence as `flowFailureRecord`, error = the DLQ entry's error or
+`unknown error`, `createdAt` = the child's last failed attempt), or null when:
+
+- the child carries no policy (the parent keeps waiting, the documented default);
+- the DLQ reason is missing, or is `unknown` without a `Child job ` error: a
+  discard (`discardJob`, `discardPostgresJob`) and the corrupt-`depends_on`
+  quarantine never apply a policy, while a parent failed by a child is `unknown`
+  with that message (`domain/job/flowFailureMessage.ts` `failedByChildMessage`
+  builds it on both backends and the rule matches `FAILED_BY_CHILD_PREFIX`);
+- the parent did not stay waiting since the child's failure
+  (`stayedWaitingSince`), because someone acted on it or the failure was never
+  eligible:
+  - its last timeline transition before the failure is `active`: it was running,
+    and no version applies a policy to a running parent;
+  - a timeline transition at or after the failure is anything but
+    `waiting-children` (linking a new child to a waiting parent records only
+    that): a DLQ retry records `waiting`, a run `active`, a promotion its state;
+  - its `lastHeartbeat` is at or after the failure: a DLQ retry (`prepareRetry`,
+    the PostgreSQL retry plan) and a pull both stamp it, and the SQLite
+    `requeueDlqJob` and the PostgreSQL payload persist it.
+
+  A genuinely stranded parent has none of these: its last transition before the
+  failure is its creation or `waiting-children`, nothing but new-child links
+  follow, and its `lastHeartbeat` dates from its creation or an earlier run.
+  Equal timestamps count as "after", so a same-millisecond tie is never
+  repaired. Known limit: `MAX_TIMELINE_ENTRIES` is 20, and a full timeline
+  records neither a DLQ retry nor a run. The `lastHeartbeat` check still
+  recognizes the retry, but a parent that ran after the failure and ended in
+  `moveToWaitingChildren` without a persisted heartbeat after the failure looks
+  stranded and is repaired; a full timeline can also hide the `active` entry
+  of a parent that was running at the failure.
+
+SQLite (`application/flowFailureRepair.ts`, called at the start of
+`recoverFlowFailures`) scans the recovered `waitingDeps` parents in memory,
+resolves each dependency through `jobIndex` (`dlq` only) and the newest DLQ
+entry of that job (one map per queue that needs it), inserts the missing
+records in one transaction with `ON CONFLICT DO NOTHING`
+(`insertMissingFlowFailures`), and reloads the outbox, so the regular
+worklist replay applies them, a repaired `fail` included. It logs the count and
+the first 20 repaired pairs with their mode. A write error stops startup, as the
+replay's own writes do (constructor unwinding, then the error is rethrown). A
+crash before the replay finishes leaves the durable records; an applied record
+removed the edge or failed the parent, so a second start repairs nothing. A
+child still queued or retrying is not in the DLQ and is never a candidate; a
+parent promoted, active or in the DLQ is not in `waitingDeps`.
+
+PostgreSQL (`postgres/flowFailureRepair.ts`, `postgres/flowFailureRepairEdges.ts`)
+applies the same rule in one full pass per broker process: a slice at startup
+before the recovery sweep, then a slice on its own cadence until the pass ends,
+as described in [PostgreSQL multi-broker](./postgres-multibroker.md). A child
+removed on failure (`removeOnFail`) or purged from the DLQ leaves nothing to
+repair from.
 
 `removeChildDependency()` removes a live edge on both sides. Parent dependencies,
 children IDs, child `parentId`, internal metadata, reverse indexes, protected

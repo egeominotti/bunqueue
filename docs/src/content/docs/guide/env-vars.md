@@ -249,7 +249,7 @@ Protects the server itself from misbehaving clients (per TCP connection or HTTP 
 | `RATE_LIMIT_WINDOW_MS`    | non-negative integer | `60000` | Window duration in ms; `0` disables rate limiting                                                                            |
 | `RATE_LIMIT_CLEANUP_MS`   | positive integer     | `60000` | Interval in ms for evicting idle clients' tracking data; `0` or no number keeps the default, with a warning                  |
 
-An invalid value (for example `0`, `1e4` or `1m`) fails server startup with `Invalid NAME: "value" (expected ...)`, printed as one `Fatal error:` line before the startup banner. `0` is rejected for all three: no limit, a window that never counts, or a sweep that never runs.
+An invalid value (for example `RATE_LIMIT_MAX_REQUESTS=0`, `1e4` or `1m`) fails server startup with `Invalid NAME: "value" (expected ...)`, printed as one `Fatal error:` line before the startup banner. `0` is an error only for `RATE_LIMIT_MAX_REQUESTS` (it would refuse every request); `RATE_LIMIT_WINDOW_MS=0` disables rate limiting and `RATE_LIMIT_CLEANUP_MS=0` keeps the default sweep, with a warning.
 
 ## Monitoring thresholds
 

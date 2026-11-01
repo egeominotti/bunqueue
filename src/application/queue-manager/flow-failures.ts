@@ -8,6 +8,7 @@ import { EventType } from '../../domain/types/queue';
 import { shardIndex } from '../../shared/hash';
 import { withWriteLock } from '../../shared/lock';
 import type { SetLike } from '../../shared/lru';
+import { failedByChildMessage } from '../../domain/job/flowFailureMessage';
 import {
   emitFlowChildFailed,
   flowFailureRecord,
@@ -156,7 +157,7 @@ export class QueueManagerFlowFailures extends QueueManagerDependencyRuntime {
     if (!parentJob || this.jobIndex.get(parentId)?.type !== 'queue') return null;
 
     const index = shardIndex(parentJob.queue);
-    const failError = `Child job ${childJob.id} failed: ${error ?? 'unknown error'}`;
+    const failError = failedByChildMessage(String(childJob.id), error ?? 'unknown error');
     let releasedDependencies: JobId[] = [];
     let failed: FailedFlowParent | null = null;
     await withWriteLock(this.shardLocks[index], () => {
@@ -181,6 +182,10 @@ export class QueueManagerFlowFailures extends QueueManagerDependencyRuntime {
       this.storage?.deleteFlowFailure(parentId, childJob.id);
       failed = { parent: parentJob, error: failError, flowFailure };
     });
+    const result = failed as FailedFlowParent | null;
+    // A sibling (or any other transition) moved the parent first: that call owns its
+    // terminal failure, so this one emits nothing and leaves its bookkeeping alone.
+    if (!result) return null;
     this.releaseCompletionPins(releasedDependencies);
     this.failedChildrenValues.delete(parentId);
     this.ignoredChildrenFailures.delete(parentId);
@@ -199,9 +204,9 @@ export class QueueManagerFlowFailures extends QueueManagerDependencyRuntime {
       queue: parentJob.queue,
       error: error ?? 'Child job failed',
     });
-    const result = failed as FailedFlowParent | null;
-    if (result?.flowFailure)
+    if (result.flowFailure) {
       emitFlowChildFailed(this.dashboardEmit ?? undefined, parentJob, failError);
+    }
     return result;
   }
 }

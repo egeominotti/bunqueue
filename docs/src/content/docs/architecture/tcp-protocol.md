@@ -99,7 +99,7 @@ const queue = new Queue('my-queue', {
 | -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pipelining`         | `true`  | Enable TCP pipelining                                                                                                                             |
 | `maxInFlight`        | `100`   | Max commands in flight per connection (a whole number `>= 1`, or `Infinity`)                                                                      |
-| `poolSize`           | `4`     | Number of TCP connections (a whole number up to 65535; below 1 means one)                                                                         |
+| `poolSize`           | `4`     | Number of TCP connections (a whole number up to 65535; below 1 means one); a Worker defaults to `min(concurrency, 8)`                             |
 | `commandTimeout`     | `30000` | Command timeout (ms, `>= 1`; `Infinity` = no client-side timeout)                                                                                 |
 | `pingInterval`       | `30000` | Health-check ping interval (ms; `0` or `Infinity` disables, otherwise `>= 1`)                                                                     |
 | `maxCommandTimeouts` | `3`     | Consecutive command timeouts (no intervening success) before the link is concluded dead and reconnect is forced (a whole number; `0` disables) |
@@ -115,7 +115,8 @@ fractional count throws a `RangeError` naming the option, for example
 
 ## Protocol Version Negotiation
 
-On connect, client and server negotiate protocol version:
+A client can negotiate the protocol version explicitly with `Hello` (the Bun
+client exposes it as `hello()`; it is not sent automatically on connect):
 
 ```typescript
 // Client → Server
@@ -142,10 +143,9 @@ inbound protocol boundary.
 **Connect sequence:**
 
 1. TCP socket connect
-2. Send `Hello` (protocol negotiation)
-3. Send `Auth` (if token configured)
-4. Start ping timer
-5. Ready for commands
+2. Send `Auth` (if token configured)
+3. Start ping timer
+4. Ready for commands
 
 **Reconnect strategy:**
 
@@ -203,6 +203,7 @@ Token comparison uses constant-time algorithm to prevent timing attacks.
 | ------- | -------------- | ----------------------------------------- | ----------------------------------------------- |
 | `PUSH`  | Add single job | `{ cmd, queue, data, priority?, delay? }` | `{ ok, id }`                                    |
 | `PUSHB` | Add batch      | `{ cmd, queue, jobs }`                    | `{ ok, ids }`                                   |
+| `PUSHF` | Add a whole flow atomically | `{ cmd, jobs }` (validated graph) | `{ ok, data: { jobs } }`                       |
 | `PULL`  | Get single job | `{ cmd, queue, timeout?, group? }`        | `{ ok, job, token? }`                           |
 | `PULLB` | Get batch      | `{ cmd, queue, count, timeout?, group? }` | `{ ok, jobs, tokens? }`                         |
 | `ACK`   | Complete job   | `{ cmd, id, result?, token? }`            | `{ ok, data?: { applied, reason } }`            |
@@ -303,8 +304,8 @@ health settings, validated like the options above:
 | ---------------------- | ---------- | --------------------------------------------------------------------------- |
 | `connectTimeout`       | `5000`     | Connection attempt timeout (ms, finite, `>= 1`)                             |
 | `autoReconnect`        | `true`     | Reconnect after a lost connection                                           |
-| `reconnectDelay`       | `100`      | First reconnect delay, doubled per attempt (ms, finite, `>= 1`)             |
-| `maxReconnectDelay`    | `30000`    | Reconnect delay ceiling, plus up to 30% jitter (ms, finite, `>= 1`)         |
+| `reconnectDelay`       | `100`      | First reconnect delay, doubled per attempt (ms, above 0, or `Infinity`)     |
+| `maxReconnectDelay`    | `30000`    | Reconnect delay ceiling, plus up to 30% jitter (ms, `>= 1`, or `Infinity`)  |
 | `maxReconnectAttempts` | `Infinity` | Attempts before giving up (a whole number; `0` gives up at once)            |
 | `maxPingFailures`      | `3`        | Consecutive failed pings before a reconnect (a whole number `>= 1`, or `Infinity`) |
 

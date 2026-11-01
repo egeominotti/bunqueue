@@ -199,7 +199,7 @@ await emailQueue.add(
   {
     priority: 10, // Higher = processed first
     delay: 5000, // Wait 5 seconds before processing
-    attempts: 3, // Retry up to 3 times if the processor throws
+    attempts: 3, // At most 3 attempts (2 retries) if the processor throws
     backoff: 1000, // Wait 1 second between retries (grows on each attempt)
   }
 );
@@ -229,7 +229,7 @@ await emailQueue.add(
   {
     priority: 10, // Higher = processed first
     delay: 5000, // Wait 5 seconds before processing
-    attempts: 3, // Retry up to 3 times if the processor throws
+    attempts: 3, // At most 3 attempts (2 retries) if the processor throws
     backoff: 1000, // Wait 1 second between retries (grows on each attempt)
   }
 );
@@ -249,7 +249,7 @@ await emailQueue.addBulk([
 queue.add("send-email", {"to": "a@test.com", "subject": "Hi"},
     priority=10,   # Higher = processed first
     delay=5000,    # Wait 5 seconds before processing
-    attempts=3,    # Retry up to 3 times if the processor raises
+    attempts=3,    # At most 3 attempts (2 retries) if the processor raises
     backoff=1000)  # Wait 1 second between retries (grows on each attempt)
 
 # Many jobs at once (one optimized batch)
@@ -267,7 +267,7 @@ queue.add_bulk([
 $queue->add('send-email', ['to' => 'a@test.com', 'subject' => 'Hi'], [
     'priority' => 10,   // Higher = processed first
     'delay' => 5000,    // Wait 5 seconds before processing
-    'attempts' => 3,    // Retry up to 3 times if the processor throws
+    'attempts' => 3,    // At most 3 attempts (2 retries) if the processor throws
     'backoff' => 1000,  // Wait 1 second between retries (grows on each attempt)
 ]);
 
@@ -287,7 +287,7 @@ queue.Add("send-email", map[string]any{"to": "a@test.com", "subject": "Hi"},
     bunqueue.JobOptions{
         "priority": 10,   // Higher = processed first
         "delay":    5000, // Wait 5 seconds before processing
-        "attempts": 3,    // Retry up to 3 times if the processor errors
+        "attempts": 3,    // At most 3 attempts (2 retries) if the processor errors
         "backoff":  1000, // Wait 1 second between retries (grows on each attempt)
     })
 
@@ -313,7 +313,7 @@ let data = Value::Map(vec![
 queue.add("send-email", data.clone(), JobOptions {
     priority: Some(10),                         // Higher = processed first
     delay: Some(5000),                          // Wait 5 seconds before processing
-    attempts: Some(3),                          // Retry up to 3 times on failure
+    attempts: Some(3),                          // At most 3 attempts (2 retries)
     backoff: Some(Backoff::Milliseconds(1000)), // Wait 1 second between retries
     ..Default::default()
 })?;
@@ -332,7 +332,7 @@ queue.add_bulk(vec![
 # Priority, delay, retries
 {:ok, _job} =
   Bunqueue.Queue.add(queue, "send-email", %{to: "a@test.com", subject: "Hi"},
-    # Higher = processed first; wait 5s; retry 3 times; 1s between retries
+    # Higher = processed first; wait 5s; at most 3 attempts; 1s between retries
     priority: 10,
     delay: 5000,
     attempts: 3,
@@ -637,8 +637,6 @@ process.on('SIGINT', async () => {
 <TabItem label="Node.js / Deno">
 
 ```typescript
-import { shutdownManager } from 'bunqueue-client';
-
 process.on('SIGINT', async () => {
   await worker.close(); // Finish active jobs
   process.exit(0);
@@ -809,7 +807,7 @@ bunx bunqueue-dashboard
 
 Try the [live demo](https://egeominotti.github.io/bunqueue-dashboard/) without installing anything, or read the [dashboard guide](/guide/dashboard/) for deployment and security.
 
-**Connect AI agents.** bunqueue ships an MCP server with 75 tools, so agents like Claude can add jobs, manage crons, and monitor queues via natural language:
+**Connect AI agents.** bunqueue ships an MCP server with 79 tools, so agents like Claude can add jobs, manage crons, and monitor queues via natural language:
 
 ```bash
 bun add -g bunqueue                     # provides the bunqueue-mcp binary

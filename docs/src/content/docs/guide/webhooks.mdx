@@ -50,7 +50,7 @@ That is enough to see events flowing. In production, always verify the signature
 
 ### Manage webhooks from an SDK
 
-The TypeScript, Python, PHP, and Go SDKs expose the same webhook surface programmatically:
+The TypeScript (legacy entry), Python, PHP, and Go SDKs expose the same webhook surface programmatically:
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">
@@ -61,17 +61,21 @@ the HTTP API, or the raw `AddWebhook` / `ListWebhooks` / `RemoveWebhook` TCP com
 </TabItem>
 <TabItem label="Node.js / Deno">
 
+The default `bunqueue-client` entry mirrors the Bun package and has no webhook helpers;
+they are on the legacy entry, `bunqueue-client/legacy`:
+
 ```typescript
-import { Queue } from 'bunqueue-client';
+import { Queue } from 'bunqueue-client/legacy';
 
 const queue = new Queue('emails');
 
 // Registered webhooks are scoped to this queue unless you pass `queue`
-const { webhookId } = await queue.addWebhook({
+const webhook = await queue.addWebhook({
   url: 'https://api.example.com/hooks/bunqueue',
   events: ['job.completed', 'job.failed'],
   secret: 'my-webhook-secret', // optional
 });
+const webhookId = String(webhook.webhookId);
 
 const hooks = await queue.listWebhooks();
 await queue.setWebhookEnabled(webhookId, false); // pause delivery
@@ -128,6 +132,7 @@ webhookID, _ := queue.AddWebhook(
 )
 
 hooks, _ := queue.ListWebhooks()
+fmt.Println(len(hooks), "webhook(s) registered")
 _ = queue.SetWebhookEnabled(webhookID, false) // pause delivery
 _ = queue.RemoveWebhook(webhookID)
 ```

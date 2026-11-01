@@ -137,13 +137,14 @@ Lease renewal / heartbeat flow through the TCP handlers (`src/infrastructure/ser
 - `JobHeartbeat` / `JobHeartbeatBatch` → `renewJobLock` when a `token` is present, else updates `job.lastHeartbeat` (`queue-manager/locks.ts`).
 - `ExtendLock` / `ExtendLocks` → `extendLock` → `renewJobLock`.
 - Lease durations (`PULL`/`PULLB` `lockTtl`, `ExtendLock` `duration`, `ExtendLocks`
-  `durations[i]`, a non-zero `JobHeartbeat` `duration`) must be finite numbers of at
-  least 1 ms (`validateLockDuration`, see
-  [Job Options Validation](./job-options-validation.md)). The handlers reply with a
-  protocol error before claiming a job or touching a lease; the embedded
-  `QueueManager.pullWithLock`/`pullBatchWithLock`/`createLock`/`extendLock`/
-  `renewJobLock(Batch)` throw the same message. A NaN or infinite TTL used to give a
-  lease that never expires, and a negative one revoked it.
+  `durations[i]`, `JobHeartbeat` `duration`) must be finite numbers of any sign, passed
+  through as on 2.9.10; omitted or `null` means the default TTL, and a `JobHeartbeat`
+  `duration` of `0` leaves the TTL unchanged (`validateLockDuration`, see
+  [Job Options Validation](./job-options-validation.md)). Only NaN, an infinity or a
+  non-number (a string included) is refused, because such a lease would never expire.
+  The handlers reply with a protocol error before claiming a job or touching a lease;
+  the embedded `QueueManager.pullWithLock`/`pullBatchWithLock`/`createLock`/`extendLock`/
+  `renewJobLock(Batch)` throw the same message.
 - `Heartbeat` → worker-level liveness (worker registry, not job leases).
 
 Leases are created implicitly by `PULL`/`PULLB` via `pullWithLock`/`pullBatchWithLock` (`queue-manager/delivery.ts`) and released by `ACK`/`FAIL` (`queue-manager/ack.ts`). See [TCP Server Command Handlers](./tcp-server-handlers.md).

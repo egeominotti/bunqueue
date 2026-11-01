@@ -55,11 +55,11 @@ The `Bunqueue` class, a Queue and a Worker bundled into one object, with named r
 
 ### Retry
 
-Running a failed job again. bunqueue retries up to `attempts` times (default 3) before giving up. See the [Worker API](/guide/worker/).
+Running a failed job again. bunqueue runs a job up to `attempts` times in total (default 3, so up to two retries) before giving up. See the [Worker API](/guide/worker/).
 
 ### Backoff
 
-The waiting time between retries. Each retry waits longer than the last, which stops a struggling service from being hammered. See the [Dead Letter Queue guide](/guide/dlq/).
+The waiting time between retries. With exponential backoff (the default) each retry waits about twice as long as the last, which stops a struggling service from being hammered; fixed backoff waits about the same time before every retry. Both add a random spread (jitter). See the [Dead Letter Queue guide](/guide/dlq/).
 
 ### DLQ (Dead Letter Queue)
 

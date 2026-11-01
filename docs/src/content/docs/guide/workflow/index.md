@@ -117,6 +117,7 @@ with the same provider idempotency key.
 | [Durability](/guide/workflow/durability/) | Idempotency keys, crash recovery, what resumes |
 | [Human Approval](/guide/workflow/approval/) | Pausing a run until a person decides |
 | [AI Agents](/guide/workflow/ai-agents/) | Durable agent loops with the Vercel AI SDK |
+| [Agent SDKs](/guide/workflow/agent-sdks/) | Claude Agent SDK, OpenAI Agents SDK, Mastra and LangGraph inside a workflow step |
 | [API Reference](/guide/workflow/api/) | Engine methods, events, execution shape, limits |
 
 ## When *not* to use it

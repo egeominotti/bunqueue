@@ -195,6 +195,7 @@ and the user-facing [storage guide](/guide/databases/).
   </div>
   <div class="bq-diag-arrow">↓</div>
   <div class="bq-diag-layer">5. Add to pendingDepChecks <i>wake dependents</i>, 6. broadcast 'completed' event, 7. trigger webhooks</div>
+  <p class="bq-diag-note">A batch ACK (<code>ACKB</code>) of retained jobs on SQLite commits its completions together: a result-free batch through one <code>markCompletedBatch</code> transaction, and a result-bearing batch runs its per-job result and completion writes inside one transaction, falling back to per-job writes when a transaction cannot be used. <code>removeOnComplete</code> entries keep their per-job path.</p>
 </div>
 
 ## Background Tasks
@@ -225,7 +226,7 @@ and the user-facing [storage guide](/guide/databases/).
     <div class="bq-diag-layer">Take the shard then processing lock, re-check the stall <i>a heartbeat that landed meanwhile keeps the job</i>, detach the silent connection</div>
     <div class="bq-diag-row">
       <div class="bq-diag-cell">stallCount &lt; maxStalls <i>increment + retry</i></div>
-      <div class="bq-diag-cell bq-diag-accent">stallCount &gt;= maxStalls <i>move to DLQ</i></div>
+      <div class="bq-diag-cell bq-diag-accent">stallCount &gt;= maxStalls <i>move to DLQ; a flow child also applies its failure policy to the parent</i></div>
     </div>
   </div>
   <div class="bq-diag-group">
@@ -258,7 +259,7 @@ and the user-facing [storage guide](/guide/databases/).
   <div class="bq-diag-head"><b>Cleanup</b><span>every 10s</span></div>
   <div class="bq-diag-layer">1. Refresh delayed counts in each shard</div>
   <div class="bq-diag-layer bq-diag-accent">2. Compact priority queues <i>if stale ratio &gt; 20%, rebuild heap</i></div>
-  <div class="bq-diag-layer">3. Recover orphaned processing entries <i>only on queues with stall detection enabled and past gracePeriod: active jobs with no pull, heartbeat, progress update or lock renewal for longer than max(30min, stallTimeout or stallInterval), and no unexpired lease of the current delivery. Each one takes the stall path: rule re-checked under the shard and processing locks, slot released, owning connection detached, attempt counted, then retried with backoff or moved to the DLQ</i></div>
+  <div class="bq-diag-layer">3. Recover orphaned processing entries <i>only on queues with stall detection enabled and past gracePeriod: active jobs with no pull, heartbeat, progress update or lock renewal for longer than max(30min, stallTimeout or stallInterval), and no unexpired lease of the current delivery. Each one takes the stall path: rule re-checked under the shard and processing locks, slot released, owning connection detached, attempt counted, then retried with backoff or moved to the DLQ (applying a flow child's failure policy)</i></div>
   <div class="bq-diag-layer">4. Clean stale waiting dependencies <i>waiting &gt; 1 hour</i></div>
   <div class="bq-diag-layer">5. Clean expired unique keys</div>
   <div class="bq-diag-layer">6. Clean orphaned job index entries and leases</div>

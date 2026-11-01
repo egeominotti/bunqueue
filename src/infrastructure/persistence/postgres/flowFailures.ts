@@ -1,5 +1,6 @@
 import type { TransactionSQL } from 'bun';
 import { createDlqEntry, FailureReason } from '../../../domain/types/dlq';
+import { failedByChildMessage } from '../../../domain/job/flowFailureMessage';
 import type { FlowFailureMode } from '../../../domain/types/flow';
 import { MAX_TIMELINE_ENTRIES, type Job, type JobId } from '../../../domain/types/job';
 import { postgresAdvisoryLockName } from './advisoryLocks';
@@ -117,7 +118,7 @@ async function recordPropagation(
 
 async function failParent(input: FlowFailureMutation): Promise<PostgresDlqLimitRequest> {
   const { tx, ctx, parent, child, error, now } = input;
-  const message = `Child job ${String(child.id)} failed: ${error}`;
+  const message = failedByChildMessage(String(child.id), error);
   parent.completedAt = now;
   if (parent.timeline.length < MAX_TIMELINE_ENTRIES) {
     parent.timeline.push({ state: 'failed', timestamp: now, error: message });

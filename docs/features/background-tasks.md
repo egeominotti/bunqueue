@@ -213,6 +213,20 @@ phase-progress, and completion diagnostics at debug level on stderr:
    the stale `queue_state` row instead of registering an empty queue forever.
 5. **Phase 3 — completed hot cache** (`background/recovery/restore.ts`): loads up to `maxCompletedJobs` rows into `completedJobs`/`completedJobsData` for low-latency lookups. SQLite cleanup and completed statistics remain database-authoritative beyond this window. `customIdMap` is intentionally NOT populated here to avoid LRU-evicting pending-job mappings.
 
+After these phases the flow-outbox replay (`flowFailureRecovery.ts`) runs. It
+first repairs parents that older versions left in `waiting-children`
+(`flowFailureRepair.ts`): for each recovered `waitingDeps` parent whose
+dependency is in the DLQ with a failure policy and has no `flow_failures` row,
+and that stayed waiting since that child failed (not running then, no DLQ retry,
+run or promotion after it), it inserts the row a terminal failure writes, then
+the replay applies it like any other row
+([Flow Producer](./flow-producer.md#startup-repair-of-parents-stuck-by-older-versions)).
+The scan is in memory over the recovered parents, with one DLQ map per queue
+that holds a candidate child; it logs the count and the first 20 repaired pairs.
+A write error during the repair stops startup like the replay's own writes
+(below). PostgreSQL brokers run the equivalent repair as a background pass over
+`bunqueue_dependencies` ([PostgreSQL multi-broker](./postgres-multibroker.md)).
+
 If any recovery phase, flow-outbox replay, or cron restore throws, constructor
 unwinding closes the SQLite write-buffer timer and stops the partially-created
 cron, worker, event, and telemetry services before rethrowing. The process can

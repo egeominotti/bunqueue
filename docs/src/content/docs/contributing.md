@@ -126,9 +126,13 @@ test: add DLQ filtering tests
 1. Create a feature branch
 2. Make your changes
 3. Add/update tests
-4. Update documentation
+4. Update documentation: the internal reference under `docs/` (`docs/README.md`,
+   `docs/architecture.md`, `docs/data-model.md`, `docs/features/*.md`) in the
+   same change as the code, and the changelog
+   (`docs/src/content/docs/changelog.md`) in every commit
 5. Run `bun run test:model` for core queue changes, then the authoritative
-   `bun run test:sandbox` gate, `bun run typecheck` and `bun run format:check`
+   `bun run test:sandbox` gate (plus `bun run test:sandbox:sdk` after any change
+   under `sdk/`), `bun run typecheck` and `bun run format:check`
 6. Push and create a PR
 
 ### PR Template
@@ -243,9 +247,10 @@ Update README.md for:
 
 Releases are handled by the maintainer. Every release:
 
-1. Bumps the patch version in `package.json`
+1. Bumps the version in `package.json`
 2. Updates the changelog (`docs/src/content/docs/changelog.md`)
-3. Publishes to npm with `bun publish`
+3. Publishes to npm from GitHub Actions through npm trusted publishing, with a
+   provenance attestation; packages are never published from a local machine
 
 ## Getting Help
 
@@ -256,7 +261,7 @@ Releases are handled by the maintainer. Every release:
 
 Contributors are listed in:
 - GitHub contributors page
-- README.md acknowledgments
+- The "Thanks to N contributors!" section of each release blog post
 
 Thank you for contributing!
 

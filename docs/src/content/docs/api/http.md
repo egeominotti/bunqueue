@@ -44,7 +44,7 @@ AUTH_TOKENS=secret-token-1,secret-token-2
 curl -H "Authorization: Bearer secret-token-1" http://localhost:6790/stats
 ```
 
-Token comparison uses **constant-time equality** (`crypto.timingSafeEqual` equivalent) to prevent timing attacks. Each token is compared against all configured tokens, ensuring no information leaks about token length or prefix.
+The presented token is compared with each configured token using a constant-time comparison, so a mismatch does not return at the first differing character. The check stops at the first configured token that matches, and each comparison runs over the shorter of the two lengths.
 
 **Endpoints that skip authentication:**
 
@@ -64,13 +64,17 @@ The `GET /prometheus` endpoint optionally requires auth when `requireAuthForMetr
 { "ok": false, "error": "Unauthorized" }
 ```
 
+A `401` carries no `Access-Control-Allow-Origin` header, even when CORS is configured, so a
+cross-origin browser client sees a CORS failure rather than this body. The same holds for
+the `429` rate-limit response.
+
 ---
 
 ## CORS
 
 Cross-Origin Resource Sharing is configured via the `CORS_ALLOW_ORIGIN` environment variable. By default it is unset, meaning no cross-origin access is granted. Set it explicitly, and only to the origins that need browser access (e.g., `CORS_ALLOW_ORIGIN=https://dashboard.example.com`). See the [Security guide](/security/) for hardening recommendations.
 
-When CORS is configured, all JSON responses include the `Access-Control-Allow-Origin` header. Preflight (`OPTIONS`) requests return:
+When CORS is configured, JSON responses from the API routes include the `Access-Control-Allow-Origin` header (not `401` and `429`; see [Authentication](#authentication)). Preflight (`OPTIONS`) requests return:
 
 ```
 HTTP/1.1 204 No Content
@@ -106,10 +110,10 @@ Some endpoints, such as `DELETE /jobs/:id`, queue control, DLQ, rate-limit/concu
 { "ok": false, "error": "Queue name contains invalid characters" }
 ```
 
-**Validation rules applied to all endpoints:**
+**Validation rules for the endpoints that admit jobs** (single and bulk push; the delay and lock arguments of other job routes are noted where they differ):
 
 - **Queue names**: 1-256 characters, alphanumeric + `-_.:`
-- **Numeric fields**: Validated by the same validator as the TCP commands, embedded `Queue.add` and flows, which rejects only what no job can run with: a non-number, `NaN` or an infinity, a negative `timeout`, `ttl` or `backoff.delay` (a missing `backoff.delay` is the 1000 ms default). A negative `delay` makes the job ready at once with a past run time (as in 2.9.10), a move-to-delayed/delay `delay` is required, and a lock `duration` must be a finite number. Every value 2.9.10 accepted keeps its 2.9.10 result.
+- **Numeric fields**: Validated by the same validator as the TCP commands, embedded `Queue.add` and flows, which rejects only what no job can run with: a non-number, `NaN`, an infinity in any field except `maxAttempts` (where an infinity means the maximum attempt count), a negative `timeout`, `ttl`, `backoff` or `backoff.delay` (a missing `backoff.delay` is the 1000 ms default), and, with `groupId`, a `priority` that is not an integer from 0 to 2,097,151. A negative `delay` makes the job ready at once with a past run time (as in 2.9.10), a move-to-delayed/delay `delay` is required, and a lock `duration` must be a finite number. Every value 2.9.10 accepted keeps its 2.9.10 result.
 - **Job data**: Max 10MB per pushed job payload (updating an existing job's data has no size limit, as in 2.9.10)
 - **Job IDs**: UUID v7 format (auto-generated) or custom string (via `jobId` field)
 
@@ -222,19 +226,19 @@ curl -X POST http://localhost:6790/queues/emails/jobs \
   }'
 ```
 
-**Request body**, only `data` is required:
+**Request body**, every field is optional:
 
 | Field              | Type                 | Default      | Description                                                                                                                                                                                                                                        |
 | ------------------ | -------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data`             | `any`                | _(required)_ | Job payload. Any JSON-serializable value. Max 10MB.                                                                                                                                                                                                |
+| `data`             | `any`                | -            | Job payload. Any JSON-serializable value. Max 10MB. A push without `data` is accepted and creates a job with no payload.                                                                                                                         |
 | `name`             | `string`             | `"default"`  | Job name, stored as the top-level `job.name`.                                                                                                                                                                                                      |
-| `priority`         | `number`             | `0`          | Higher value = processed sooner. Any finite number.                                                                                                                                                                                                |
+| `priority`         | `number`             | `0`          | Higher value = processed sooner. Any finite number; with `groupId` it is the group priority and must be an integer from 0 to 2,097,151.                                                                                                          |
 | `delay`            | `number`             | `0`          | Milliseconds before the job becomes available for processing. A negative delay makes it ready at once (past run time).                                                                                                                      |
 | `maxAttempts`      | `number`             | `3`          | Maximum attempts before the job moves to the DLQ. `1` or less runs once, a fraction rounds up, at most 2,147,483,647. `attempts` is accepted as an alias.                                                                                         |
 | `backoff`          | `number` or `object` | `1000`       | Base retry delay in milliseconds (exponential: `backoff * 2^attempt`). Also accepts `{ "type": "fixed" \| "exponential", "delay": ms, "maxDelay": ms }` (any other type runs as exponential); the optional `maxDelay` (0 to 1 day) caps each retry delay (default: 1 hour). |
 | `ttl`              | `number`             | -            | Time-to-live from creation in milliseconds (0 or more). Job is discarded if not processed within this window.                                                                                                                                      |
 | `timeout`          | `number`             | -            | Processing timeout in milliseconds (0 or more; 0 means none). The broker fails the active attempt at its absolute deadline; a later outcome from that lease generation is ignored.                                                                 |
-| `uniqueKey`        | `string`             | -            | Deduplication key. If a job with the same `uniqueKey` already exists in the queue, the push is silently ignored.                                                                                                                                   |
+| `uniqueKey`        | `string`             | -            | Deduplication key. If a job with the same `uniqueKey` already exists in the queue, no new job is created: the response is `200` with the existing job's `id`.                                                                                     |
 | `jobId`            | `string`             | -            | Broker-wide custom job ID. If a live job with this ID already exists in any queue, the push is idempotent and returns the existing ID.                                                                                                             |
 | `tags`             | `string[]`           | `[]`         | Metadata tags for filtering and querying.                                                                                                                                                                                                          |
 | `groupId`          | `string`             | -            | Job-group identifier. Claims use ascending group priority with FIFO ties and round-robin across groups; execution is concurrent unless a Worker supplies a group concurrency cap.                                                                  |
@@ -267,11 +271,11 @@ the existing job's ID is returned (idempotent).
 | Status | Error                                    | Cause                                        |
 | ------ | ---------------------------------------- | -------------------------------------------- |
 | `400`  | `Invalid JSON body`                      | Request body is not valid JSON               |
-| `400`  | `Queue name is required`                 | Empty queue name                             |
+| `404`  | `Not found`                              | Empty queue name (no route matches)          |
 | `400`  | `Queue name contains invalid characters` | Queue name has chars outside `a-zA-Z0-9_-.:` |
 | `400`  | `Job data too large (max 10MB)`          | Serialized data exceeds 10MB                 |
 | `400`  | `priority must be a number`              | Non-numeric priority (`"high"`)              |
-| `400`  | `delay must be a number`                 | Non-numeric delay (a negative delay is 0)    |
+| `400`  | `delay must be a number`                 | Non-numeric delay (a negative one runs at once) |
 | `400`  | `timeout must be at least 0`             | Negative processing timeout                  |
 | `400`  | `backoff.delay must be at least 0`       | Negative object-form `backoff.delay` (a missing one is 1000) |
 
@@ -407,6 +411,9 @@ curl -X POST http://localhost:6790/queues/emails/jobs/pull-batch \
 ```
 
 Returns fewer jobs than `count` if the queue doesn't have enough available jobs.
+
+With `owner`, the response also carries `tokens`: the lock token of each job, in the same
+order as `jobs`. Send each token back with its job's ack, fail and heartbeat requests.
 
 ---
 
@@ -636,7 +643,7 @@ With a numeric `backoff` (default `1000`, `maxAttempts` `3`), the retry delay is
 
 ### Update Job Data
 
-Edit the JSON payload of a job in-place. Works on jobs in `waiting`, `delayed`, or `active` state. Useful for modifying job parameters before processing or while a job is being retried.
+Edit the JSON payload of a job in-place. Works on jobs that are `waiting`, `prioritized`, `delayed`, `paused`, `waiting-children` (or waiting on `dependsOn`) or `active`. On a completed repeatable job it updates the next repetition, if that one is still queued. Useful for modifying job parameters before processing or while a job is being retried.
 
 ```
 PUT /jobs/:id/data
@@ -663,10 +670,11 @@ PUT /jobs/:id/priority
 ```
 
 ```json
-{ "priority": 100 }
+{ "priority": 100, "lifo": true }
 ```
 
-The job is repositioned in the priority queue immediately. Does not work on `active` jobs (they're already being processed).
+`lifo` is optional; it sets the tie-break order among jobs of the same priority, as on the
+TCP [`ChangePriority`](/api/tcp/control/#changepriority) command. The job is repositioned in the priority queue immediately. Does not work on `active` jobs (they're already being processed).
 
 **Broadcasts:** `job:priority-changed` event with `{ jobId, newPriority }`.
 
@@ -715,16 +723,17 @@ POST /jobs/:id/move-to-delayed
 ```
 
 ```json
-{ "delay": 60000 }
+{ "delay": 60000, "token": "lock-token" }
 ```
 
-The job will become `waiting` again after `delay` milliseconds.
+`token` is optional; it is required only for an active job that holds a lock. The job
+will become `waiting` again after `delay` milliseconds.
 
 ---
 
 ### Change Delay
 
-Update the delay of a `delayed` job. The job's `runAt` time is recalculated.
+Update the delay of a job. For a job still in the queue (`waiting`, `prioritized`, `delayed` or `paused`) the `runAt` time is recalculated as now + `delay`; an `active` job moves to `delayed`, as with [Move to Delayed](#move-to-delayed). This route forwards no lock token, so an active job that holds a lock is refused; use Move to Delayed with its `token`.
 
 ```
 PUT /jobs/:id/delay
@@ -1427,6 +1436,7 @@ PUT /queues/:queue/stall-config
 
 | Field           | Default | Description                                                   |
 | --------------- | ------- | ------------------------------------------------------------- |
+| `enabled`       | `true`  | Turn stall detection on or off for this queue                 |
 | `stallInterval` | `30000` | A job is stalled after this many ms without a heartbeat       |
 | `maxStalls`     | `3`     | Max times a job can stall before moving to DLQ                |
 | `gracePeriod`   | `5000`  | Grace period after job starts before stall detection kicks in |
@@ -1460,7 +1470,9 @@ PUT /queues/:queue/dlq-config
 | Field        | Default     | Description                                                                |
 | ------------ | ----------- | -------------------------------------------------------------------------- |
 | `autoRetry`  | `false`     | Automatically retry DLQ entries after a delay                              |
-| `maxAge`     | `604800000` | Max age of DLQ entries in ms (default: 7 days). Older entries are removed. |
+| `autoRetryInterval` | `3600000` | Delay between automatic retries of an entry, in ms (default: 1 hour) |
+| `maxAutoRetries` | `3`     | Automatic retries of an entry before auto-retry gives up on it             |
+| `maxAge`     | `604800000` | Max age of DLQ entries in ms (default: 7 days; `null` = never). Older entries are removed. |
 | `maxEntries` | `10000`     | Max DLQ entries per queue. Oldest are evicted when full.                   |
 
 **Broadcasts:** `config:dlq-changed` event.
@@ -1529,12 +1541,15 @@ curl -X POST http://localhost:6790/crons \
 | `immediately`    | `boolean` | No       | Fire once on creation, then continue on schedule (default `false`).                                                                               |
 | `skipIfNoWorker` | `boolean` | No       | Skip a tick when no worker is registered for the queue (default `false`).                                                                         |
 | `preventOverlap` | `boolean` | No       | Deduplicate overlapping runs, a tick is skipped while the previous generated job is still pending/active (default `true`).                        |
+| `uniqueKey`      | `string`  | No       | Deduplication key for the generated jobs.                                                                                                         |
+| `dedup`          | `object`  | No       | Deduplication options for the generated jobs: `{ ttl?, extend?, replace? }` (`ttl` finite).                                                       |
+| `skipMissedOnRestart` | `boolean` | No  | Skip ticks missed while the server was down instead of running them on restart (default `true`).                                                  |
 | `jobOptions`     | `object`  | No       | Per-job options applied to every generated job: `maxAttempts`, `backoff`, `timeout`, `delay`, `stallTimeout`, `removeOnComplete`, `removeOnFail`. |
 
 \* At least one of `schedule` or `repeatEvery` is required. When both are valid,
 `schedule` takes precedence for backward compatibility.
 
-**Broadcasts:** `cron:created` event.
+**Broadcasts:** `cron:created` event (`cron:updated` when the name already existed).
 
 ---
 
@@ -1558,7 +1573,7 @@ DELETE /crons/:name
 
 ## Webhooks
 
-Register HTTP endpoints to be called when specific job events occur. Webhooks are delivered with exponential backoff on failure (3 retries, 1s base delay).
+Register HTTP endpoints to be called when specific job events occur. A failed delivery is retried with linear backoff: up to 3 attempts in total, first try included (`WEBHOOK_MAX_RETRIES`), waiting 1s, then 2s (`WEBHOOK_RETRY_DELAY_MS` times the attempt number).
 
 ### List All Webhooks
 
@@ -1674,6 +1689,10 @@ POST /workers
 ```json
 { "name": "email-worker-1", "queues": ["emails", "notifications"] }
 ```
+
+Optional fields, as on the TCP [`RegisterWorker`](/api/tcp/workers/#registerworker)
+command: `concurrency` (number), `workerId` (reuse a stable worker ID across
+re-registrations), `hostname`, `pid` and `startedAt` (ms timestamp).
 
 **Broadcasts:** `worker:connected` event with `{ workerId, name, queues }`.
 
@@ -1876,7 +1895,7 @@ Aggregated read-only snapshots designed for dashboards (fewer round-trips than c
 GET /dashboard
 ```
 
-Single call returning `stats` (global counts + totals + uptime), `throughput` (per-second rates), `latency` (averages + percentiles, nested per operation: `push`, `pull`, `ack`), `memory`, `collections`, `workers` (stats + list, capped at 100 with a `truncated` flag), `crons` (total + list, capped at 100), `storage`, and `timestamp`.
+Single call returning `stats` (global counts + totals + uptime), `throughput` (per-second rates), `latency` (`averages` is flat, `{ pushMs, pullMs, ackMs }`; `percentiles` is nested per operation, `push`/`pull`/`ack` each with `p50`, `p95`, `p99`), `memory`, `collections`, `workers` (stats + list, capped at 100 with a `truncated` flag), `crons` (total + list, capped at 100 with a `truncated` flag), `storage`, and `timestamp`.
 
 ### Queues (paginated)
 
@@ -1908,7 +1927,7 @@ GET /dashboard/queues[?limit=100&offset=0]
 GET /dashboard/queues/:queue[?includeJobs=true]
 ```
 
-Returns `counts` (all 8 states, paused-aware), `paused`, `priorityCounts`, a `dlqPreview` (up to 10 entries), and, with `includeJobs=true`, up to 10 job summaries per state (`waiting`, `active`, `delayed`, `paused`).
+Returns `counts` (all 8 states, paused-aware, plus the queue's lifetime `totalCompleted` and `totalFailed`), `paused`, `priorityCounts`, a `dlqPreview` (up to 10 entries), and, with `includeJobs=true`, up to 10 job summaries per state (`waiting`, `active`, `delayed`, `paused`).
 
 ---
 
@@ -2207,7 +2226,7 @@ that information; the outer event envelope always supplies `event`, `ts`, and
 | `cron:created` | `name, queue, pattern?, every?, nextRun` | Cron added                                                            |
 | `cron:deleted` | `name`                                   | Cron removed                                                          |
 | `cron:fired`   | `name, queue`                            | Cron triggered, job pushed                                            |
-| `cron:updated` | `name, queue, nextRun`                   | Cron modified                                                         |
+| `cron:updated` | `name, queue, pattern?, every?, nextRun` | Cron modified                                                         |
 | `cron:missed`  | `name, queue, error`                     | Cron missed execution window                                          |
 | `cron:skipped` | `name, queue, reason`                    | Cron skipped due to overlap (previous instance still within interval) |
 
@@ -2262,7 +2281,7 @@ that information; the outer event envelope always supplies `event`, `ts`, and
 
 | Event                      | Payload                                                                                                                                | Description                                                                              |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `stats:snapshot`           | `waiting, active, completed, dlq, totalPushed, totalCompleted, totalFailed, pushPerSec, pullPerSec, uptime, queues, workers, cronJobs` | Every 5s                                                                                 |
+| `stats:snapshot`           | `waiting, active, delayed, completed, dlq, totalPushed, totalCompleted, totalFailed, pushPerSec, pullPerSec, uptime, queues, workers, cronJobs` | Every 5s                                                                                 |
 | `health:status`            | `ok, uptime, memory: { rss, heapUsed }, connections`                                                                                   | Every 10s                                                                                |
 | `storage:status`           | `collections, diskFull`                                                                                                                | Every 30s                                                                                |
 | `storage:backup-started`   | `bucket`                                                                                                                               | S3 backup started                                                                        |

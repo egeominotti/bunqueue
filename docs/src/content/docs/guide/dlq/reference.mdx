@@ -25,7 +25,7 @@ head:
 | Reason | Description |
 |--------|-------------|
 | `explicit_fail` | A retryable processor failure in the attempt history |
-| `max_attempts_exceeded` | A normal processor failure exhausted the job's attempts |
+| `max_attempts_exceeded` | A failure that will not be retried: the job's attempts are exhausted (by a processor failure, a stall, an expired lock or startup recovery), or the processor threw `UnrecoverableError` |
 | `timeout` | A processing timeout; retained on retry attempts and terminal timeout entries |
 | `stalled` | Job stopped sending heartbeats (worker likely crashed) |
 | `ttl_expired` | Reserved category; current waiting-job TTL expiry removes the job instead of creating a DLQ entry |

@@ -209,7 +209,7 @@ worker.Run()
 <TabItem label="Rust">
 
 ```rust
-// `ctrlc` is the signal-hook crate used by this application.
+// `ctrlc` is a third-party signal-handling crate added by this application.
 let shutdown_worker = worker.clone();
 ctrlc::set_handler(move || shutdown_worker.stop())?;
 

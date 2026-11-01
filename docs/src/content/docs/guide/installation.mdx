@@ -232,7 +232,7 @@ Bunqueue.Worker.run(worker)
 </TabItem>
 </Tabs>
 
-You should see `Processing: { message: "bunqueue is working!" }`. Next: the [Quick Start](/guide/quickstart/) builds on this.
+In the Bun and Node.js / Deno tabs you should see `Processing: { message: "bunqueue is working!" }`; the other SDKs print the same job data in their language's own format. Next: the [Quick Start](/guide/quickstart/) builds on this.
 
 To check the server and CLI:
 
@@ -292,7 +292,7 @@ A `SHA256SUMS` file is attached to every release for checksum verification.
 Download it from the same release as your archive. On Windows, extract the ZIP
 and run `bunqueue-windows-x64.exe` or `bunqueue-windows-arm64.exe`.
 
-The binary is the full server + CLI. For the client SDK in your app code you still install the package (`bun add bunqueue`).
+The binary is the full server + CLI. For the client in your app code you still install `bunqueue` or your language's [client SDK](/guide/sdks/).
 
 ## Install from source
 

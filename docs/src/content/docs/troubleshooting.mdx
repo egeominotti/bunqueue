@@ -209,11 +209,11 @@ console.log(counts);
 <TabItem label="Node.js / Deno">
 
 ```typescript
-// Check if paused
-const isPaused = await queue.isPaused();
+// Check if paused (the synchronous isPaused() is embedded-only)
+const isPaused = await queue.isPausedAsync();
 
 // Check counts
-const counts = await queue.getJobCounts();
+const counts = await queue.getJobCountsAsync();
 console.log(counts);
 ```
 
@@ -326,7 +326,7 @@ worker.on('failed', (job, error) => {
 worker.on('failed', (job, error) => {
   console.error('Job failed:', error);
   console.error('Job data:', job.data);
-  console.error('Attempts:', job.attempts);
+  console.error('Attempts:', job.attemptsMade);
 });
 ```
 

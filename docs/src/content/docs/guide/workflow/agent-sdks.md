@@ -15,7 +15,7 @@ head:
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · workflow engine</span>
   <h1 class="bq-hero-h1 bq-bench-h1">Your agent SDK, <em>inside a durable workflow.</em></h1>
-  <p class="bq-hero-sub">Keep session checkpoints and business effects durable, validate terminal outcomes, and declare compensation for completed workflow steps.</p>
+  <p class="bq-hero-sub">Keep session checkpoints and business effects durable, validate terminal outcomes, and declare compensation for completed workflow steps and the step that failed.</p>
 </div>
 
 ## Who owns what
@@ -37,7 +37,7 @@ This page covers the Claude Agent SDK, the OpenAI Agents SDK, Mastra and LangGra
 | The loop | Model calls, tool dispatch, context | Nothing, it stays out of the way |
 | Conversation | Session, transcript and provider-local files | Explicit session checkpoints in a separate journal |
 | Effects | Runs your tool functions | Caller-defined effect identity, reconciliation and compensation |
-| Failure | Surfaces the error | Compensation for completed workflow steps with declared handlers |
+| Failure | Surfaces the error | Compensation, with declared handlers, for completed workflow steps and the step that failed |
 | A person in the middle | No | A gate that parks the run for days |
 
 The seam is small. An agent turn becomes one `.step()`, and that step declares what to do if a later step fails.
@@ -222,7 +222,7 @@ stored session to `resume`; the journal does not automatically resume a provider
 ## OpenAI Agents SDK
 
 ```bash
-bun add @openai/agents
+bun add @openai/agents zod
 ```
 
 The shape is the same, with one extra wrinkle worth being careful about: here the side effects happen inside the agent's tools, not in your step body. The step needs to know what its tools did so its compensate handler can undo it.
@@ -287,8 +287,9 @@ before issuing an operation and completed afterward; it cannot make a remote
 service exactly-once. Callback errors, process death or a lost completion write
 leave uncertainty. A retry refuses to issue that operation again until your
 reconciliation proves completion or proves the original invocation has stopped
-and nothing was applied. A failed agent step is not automatically compensated by
-the workflow engine: use the journal to recover its effects explicitly.
+and nothing was applied. When the agent step itself fails, the engine still calls
+its compensate handler, but no `effects` were returned for it to read: use the
+journal to recover those effects explicitly.
 
 Keep tool errors fatal to this workflow turn. OpenAI's default tool error handler
 turns exceptions into text for the model; `errorFunction: null` disables that
@@ -334,7 +335,7 @@ cursor = page.nextCursor;
 ```
 
 Cursors increase globally, but gaps track actual evictions for the requested run.
-Limits are capped at 1000 events per replay. This is a polling journal, not a live
+`limit` defaults to 100 and must be 1 to 1000 events per replay; a larger value throws a `RangeError`. This is a polling journal, not a live
 provider stream or an automatic workflow recovery mechanism.
 
 ### The transcript survives the step boundary
@@ -395,7 +396,7 @@ const flow = new Workflow('purge-with-approval')
 ## Mastra
 
 ```bash
-bun add @mastra/core @ai-sdk/anthropic
+bun add @mastra/core @ai-sdk/anthropic zod
 ```
 
 Mastra agents take a Vercel AI SDK model, so the model side is whatever you already use. Tools are declared with `createTool`, and the effect collection pattern is the same as the OpenAI SDK.

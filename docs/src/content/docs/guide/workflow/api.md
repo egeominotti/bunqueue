@@ -42,6 +42,9 @@ structural graph change.
 
 `register()` refuses a definition that could not behave as written:
 
+- a workflow name that is already registered on this engine
+- a workflow with no steps
+- a definition whose graph hash differs from a run of the same name that is still active in the store (`WorkflowDefinitionMismatchError`; `compensation-stuck` runs do not count)
 - duplicate step names
 - declaring one branch path name twice (thrown earlier, by `path()` while building)
 - a step name colliding with a loop's `name:index` namespace
@@ -54,12 +57,17 @@ structural graph change.
 ```typescript
 const engine = new Engine({
   embedded: true,              // in-process (or connection: { port: 6789 } for TCP)
-  dataPath: './data/wf.db',    // SQLite path, omit and nothing persists
+  dataPath: './data/wf.db',    // SQLite path; omit it and the workflow store is in memory
   concurrency: 10,             // concurrent workflow-node jobs (default: 5)
   queueName: '__wf:steps',     // internal queue name (default)
   onEvent: (event) => {},      // global listener
 });
 ```
+
+Without `dataPath` only the workflow store (executions, signals, archive) is in memory. In
+embedded mode the internal step queue still uses the process's embedded manager, which
+reads `BUNQUEUE_DATA_PATH` (then `BQ_DATA_PATH`, `DATA_PATH`, `SQLITE_PATH`) when no path is
+given, so its jobs can still be written to that file.
 
 | Method | Returns | Description |
 |---|---|---|
@@ -130,6 +138,7 @@ Independent of `failureReason`: `completed`, `not-applicable`, `stuck`. The fiel
   startedAt?: number;
   completedAt?: number;
   attempts?: number;
+  compensatable?: boolean;       // declared a compensate handler when it ran
   idempotencyKey?: string;       // run:step#occurrence:direction
   occurrence?: number;           // loop iteration index
   loopItem?: unknown;            // forEach __item, for compensation
@@ -175,7 +184,7 @@ delivery because dispatch isolates each callback.
 }
 ```
 
-`forEach` and loop bodies additionally see `ctx.steps.__item` and `ctx.steps.__index`.
+`forEach` handlers, and their compensate handlers, additionally see `ctx.steps.__item` and `ctx.steps.__index`. `doUntil`/`doWhile` bodies do not.
 
 ## How it works
 

@@ -112,7 +112,7 @@ Three knobs, in order of impact: raise worker `concurrency` (parallel jobs per w
 
 ### How does deduplication work?
 
-Pass a `jobId`. Adding the same `jobId` twice returns the existing job instead of creating a duplicate, same behavior as BullMQ. This makes webhook handlers and restart-recovery code safe to re-run:
+Pass a `jobId`. Adding the same `jobId` while the earlier job is still unfinished (waiting, delayed, waiting for children, or active) returns the existing job instead of creating a duplicate. Once that job has completed or moved to the DLQ, the same `jobId` creates a fresh job. This makes webhook handlers and restart-recovery code safe to re-run while the work is pending:
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">

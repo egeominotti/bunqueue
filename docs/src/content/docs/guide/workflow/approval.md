@@ -106,7 +106,7 @@ deadline, so a 90-day gate does not wrap around and fire immediately.
 ```typescript
 const exec = engine.getExecution(run.id);
 exec?.state;                              // 'waiting'
-exec?.steps['__waitFor:manager-approval']; // when the wait started
+exec?.steps['__waitFor:manager-approval']; // when the wait started (timed gates only)
 
 // Everything parked, across every workflow:
 engine.listExecutions(undefined, 'waiting');

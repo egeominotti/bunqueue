@@ -1,6 +1,6 @@
 ---
 title: "Simple Mode: Queue + Worker in One Object"
-description: "bunqueue Simple Mode combines Queue and Worker in one object: named routes, onion middleware, cron, events, and 12 built-in features with zero boilerplate."
+description: "bunqueue Simple Mode combines Queue and Worker in one object: named routes, onion middleware, cron, events, and built-in retry, circuit breaker, TTL, deduplication, rate limiting and DLQ with zero boilerplate."
 head:
   - tag: meta
     attrs:
@@ -1602,10 +1602,22 @@ Simple Mode ships in the TypeScript and Python SDKs only. In Elixir, compose `Qu
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `concurrency` | `1` | Parallel jobs |
+| `concurrency` | `1` (Python: `4`) | Parallel jobs |
 | `embedded` | `false` | Use embedded SQLite (`BUNQUEUE_EMBEDDED=1` makes it the default; an explicit `embedded: false` still wins) |
 | `connection` | localhost:6789 | TCP server connection |
+| `dataPath` | environment data path | Embedded SQLite file, passed to both the queue and the worker |
 | `autorun` | `true` | Start worker immediately |
+| `heartbeatInterval`, `batchSize`, `pollTimeout` | Worker defaults | Forwarded to the internal [Worker](/guide/worker/options/) |
+| `limiter` | none | Worker rate limiter; ignored when `rateLimit` is also set |
+| `removeOnComplete`, `removeOnFail` | Worker defaults | Forwarded to the internal Worker |
+
+**Queue:**
+
+| Option | Description |
+|--------|-------------|
+| `defaultJobOptions` | Default `JobOptions` for every `add()` |
+| `autoBatch` | TCP auto-batching of concurrent `add()` calls, as on [Queue](/guide/queue/options/) |
+| `prefixKey` | Namespace prefix prepended to the queue name on the server, for both the queue and the worker |
 
 **Features:**
 

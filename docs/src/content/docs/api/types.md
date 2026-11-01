@@ -265,7 +265,7 @@ interface Job<T = unknown> {
 
   /**
    * Discard this job. Marks it to not be processed further.
-   * The job will be moved to failed state with a "discarded" reason.
+   * The job will be moved to failed state (the DLQ) with reason `unknown` and no error message.
    */
   discard(): void;
 
@@ -484,7 +484,8 @@ interface JobOptions {
   /**
    * Delay in milliseconds before job becomes available (default: 0). A negative delay
    * makes the job ready at once with a run time in the past, so it runs ahead of later
-   * ready jobs, as in 2.9.10.
+   * ready jobs, as in 2.9.10. The maximum is `MAX_JOB_DURATION_MS` (4,320,000,000,000,000
+   * ms, about 136,900 years); a longer finite delay is clamped to it.
    */
   delay?: number;
 
@@ -547,10 +548,10 @@ interface JobOptions {
   /** Maximum stack trace lines to store on failure (default: 10) */
   stackTraceLimit?: number;
 
-  /** Maximum number of log entries to keep per job */
+  /** Log entries to keep per job: stored in `job.opts` for BullMQ compatibility, not applied when logs are added */
   keepLogs?: number;
 
-  /** Maximum job data size in bytes. Jobs exceeding this are rejected. */
+  /** Maximum job data size in bytes: stored in `job.opts` for BullMQ compatibility, not enforced (larger data is accepted) */
   sizeLimit?: number;
 
   /** Fail parent job if this child job fails (default: false) */
@@ -662,7 +663,7 @@ interface RepeatOptions {
   /** Repeat every N milliseconds (alternative to pattern) */
   every?: number;
 
-  /** Maximum repetitions (omit or null for infinite) */
+  /** Maximum repetitions (omit for infinite) */
   limit?: number;
 
   /** Cron pattern (alternative to every) */
@@ -1441,10 +1442,10 @@ Returned by `sandboxedWorker.getStats()`.
 
 ```typescript
 {
-  total: number; // Total worker processes
+  total: number; // Worker threads in the pool, recycled ones included (busy + idle + recycled)
   busy: number; // Currently processing
   idle: number; // Alive and available for work
-  recycled: number; // Workers recycled after idling
+  recycled: number; // Threads currently terminated by idle recycling
   restarts: number; // Total restarts across all workers
 }
 ```
@@ -1500,14 +1501,15 @@ type FailureReason =
   | 'max_attempts_exceeded' // Exceeded all retry attempts
   | 'timeout' // Job processing timed out (exceeded timeout option)
   | 'stalled' // Job stalled (no heartbeat within stallInterval)
-  | 'ttl_expired' // Time-to-live expired before processing
-  | 'worker_lost' // Worker disconnected while processing (TCP mode)
+  | 'ttl_expired' // Reserved: declared but never produced
+  | 'worker_lost' // Reserved: declared but never produced
   | 'unknown'; // Catch-all for edge cases
 ```
 
 :::note[When is 'unknown' used?]
 The `unknown` reason is a catch-all for rare edge cases:
 
+- Jobs moved to the DLQ with `job.discard()` (or the `Discard` command), which records no error message
 - Job data corruption during serialization
 - Internal queue manager errors
 - Jobs recovered from database without failure metadata

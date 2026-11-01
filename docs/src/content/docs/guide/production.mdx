@@ -24,7 +24,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 | Failure                                        | What happens to the job                                                                                                                                          |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worker crashes mid-job                         | The job is redelivered to another worker after its lease expires. It may run twice, never zero times.                                                            |
+| Worker crashes mid-job                         | If its TCP connection closes, the server puts the jobs it held back in the queue at once. A worker that hangs with its connection open loses the job when its lease expires. Either way it may run twice, never zero times. |
 | Server killed hard (`kill -9`)                 | Jobs written to disk survive and recover on restart. Jobs accepted in the last ~10 ms may be lost, unless they were added with `durable: true`.                  |
 | Server restarted gracefully (SIGTERM, deploys) | After shutdown completes successfully, buffered SQLite writes are flushed before exit. A flush error or forced termination follows the hard-kill row instead.   |
 | Job fails repeatedly                           | After its retry attempts are exhausted it moves to the DLQ (dead letter queue, a parking lot for failed jobs you can inspect and retry). See [DLQ](/guide/dlq/). |

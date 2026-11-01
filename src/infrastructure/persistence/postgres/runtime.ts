@@ -1,5 +1,5 @@
 import { recoverExpiredPostgresLeases } from './recovery';
-import { recoverPostgresFlowFailurePropagations } from './flowFailurePropagation';
+import { recoverPostgresFlowFailures } from './flowFailureRepair';
 import { releasePostgresBrokerLeases } from './leaseRelease';
 import { PostgresEventStream } from './events';
 import { prunePostgresEventCommits } from './eventJournal';
@@ -230,7 +230,7 @@ export class PostgresQueueStoreRuntime {
       await reconcilePostgresCronsOnStartup(this.context);
       await recoverExpiredPostgresLeases(this.context);
       // Reported, not fatal: one bad record must not keep the broker from starting.
-      await this.recoverFlowFailures();
+      await this.recoverFlowFailures(true);
       await repairPostgresDlq(this.context);
       await prunePostgresCompletionTombstones(this.context);
       await prunePostgresGroupStates(this.context);
@@ -245,6 +245,8 @@ export class PostgresQueueStoreRuntime {
     }
   }
 
+  private readonly repairFlows = () => recoverPostgresFlowFailures(this.context, 'repair');
+
   private startMaintenance(): void {
     this.eventCommitGc.start();
     this.maintenanceSchedule.start(this.config, {
@@ -255,6 +257,7 @@ export class PostgresQueueStoreRuntime {
       },
       sweeps: () => this.runPeriodicSweeps(),
       cron: () => void this.runMaintenance(() => processPostgresCrons(this.context), 'cron'),
+      flowFailureRepair: () => void this.runMaintenance(this.repairFlows, 'flow-failure-repair'),
     });
   }
 
@@ -273,12 +276,10 @@ export class PostgresQueueStoreRuntime {
     );
   }
 
-  /** Finish flow-failure levels that a crashed or interrupted broker left pending. */
-  private recoverFlowFailures(): Promise<void> {
-    return this.runMaintenance(
-      () => recoverPostgresFlowFailurePropagations(this.context),
-      'flow-failure-recovery'
-    );
+  /** Finish pending levels; at startup, first run a slice of the legacy repair pass. */
+  private recoverFlowFailures(startup = false): Promise<void> {
+    const recover = () => recoverPostgresFlowFailures(this.context, startup ? 'startup' : 'tick');
+    return this.runMaintenance(recover, 'flow-failure-recovery');
   }
 
   private async runMaintenance(

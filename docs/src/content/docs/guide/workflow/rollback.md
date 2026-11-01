@@ -125,7 +125,7 @@ exec?.rollbackStatus;                    // 'stuck'
 exec?.steps.charge?.compensation;        // compensation-failed, timed out after 1000ms
 ```
 
-Without that bound the run would sit in `compensating` instead, which is worse than a parked one: it is not `compensation-stuck`, so there is nothing to `resumeCompensation` or `abandonCompensation`. A concurrent local `engine.recover()` waits for the exact claim owner and reloads the durable row before deciding whether it must retry, but it cannot make a permanently hung handler finish. The timeout is what guarantees that ownership settles and the run reaches an operator-visible state.
+Without that bound the run would sit in `compensating` instead, which is worse than a parked one: it is not `compensation-stuck`, so there is nothing to `resumeCompensation` or `abandonCompensation`. A concurrent `engine.recover()` on the same Engine skips an unwind that Engine already owns; a replacement Engine in the same process waits for the exact claim owner and reloads the durable row before deciding whether it must retry. Neither can make a permanently hung handler finish. The timeout is what guarantees that ownership settles and the run reaches an operator-visible state.
 
 ### A failure that was never resolved keeps the chain stopped
 
@@ -250,7 +250,7 @@ The parent parks in `compensation-stuck` instead. The two fields say different t
 
 | Field | What it holds here |
 |---|---|
-| `failureReason` | why the parent's step failed, `Sub-workflow "<name>" (<id>) timed out` |
+| `failureReason` | why the parent's step failed, `Sub-workflow "<name>" (<id>) timed out after <timeout>ms` |
 | `steps['sub:<name>'].compensation.error` | why the rollback stopped, the child is still running and cannot be rolled back until it stops |
 
 Once the child stops on its own, whether it completes or fails, `resumeCompensation()` on the parent picks the unwind up and reaches it. There is no API to stop a running execution, so for a child that is genuinely wedged the exit is `abandonCompensation()` on the parent, which records the remaining reversals as skipped and makes the parent terminal.

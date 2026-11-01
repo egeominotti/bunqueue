@@ -105,6 +105,8 @@ Delete a cron job schedule by name.
 }
 ```
 
+A name with no registered cron returns `{ ok: false, error: 'Cron job not found' }`.
+
 ---
 
 ### CronList

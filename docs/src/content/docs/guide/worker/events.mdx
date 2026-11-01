@@ -124,6 +124,8 @@ Elixir exposes connection telemetry; record per-job outcomes in the handler's
 normal return path:
 
 ```elixir
+require Logger
+
 telemetry = fn event -> Logger.info("bunqueue", bunqueue: event) end
 
 worker =

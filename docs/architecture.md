@@ -154,7 +154,12 @@ do not re-poll in a tight loop.
   follows the per-queue stall configuration, lives in `orphanRecovery.ts`. A flow
   child's terminal-failure policy (outbox record, DLQ-move persistence and parent
   callbacks) is shared by worker FAIL, lock expiry, stall detection and startup
-  recovery through [`flowChildFailure.ts`](../src/application/flowChildFailure.ts). Houses DLQ, Events, Worker,
+  recovery through [`flowChildFailure.ts`](../src/application/flowChildFailure.ts). The startup outbox replay
+  first writes the records older versions never wrote for parents stuck in `waiting-children`
+  ([`flowFailureRepair.ts`](../src/application/flowFailureRepair.ts), rule in
+  [`domain/job/flowFailureRepair.ts`](../src/domain/job/flowFailureRepair.ts), PostgreSQL in
+  [`postgres/flowFailureRepair.ts`](../src/infrastructure/persistence/postgres/flowFailureRepair.ts), a one-pass background
+  scan per broker process). Houses DLQ, Events, Worker,
   JobLogs, Stats managers, and the batch `QueueStatsAggregator`. DLQ reads/purge
   live in `dlqManager.ts`; manual and automatic DLQ retry transitions live in
   `dlqRetry.ts`, while cold completed retry lives in

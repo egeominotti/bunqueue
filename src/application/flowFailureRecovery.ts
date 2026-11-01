@@ -1,6 +1,7 @@
 import type { FlowFailureRecord } from '../domain/types/flow';
 import type { Job, JobId } from '../domain/types/job';
 import { FailureReason } from '../domain/types/dlq';
+import { failedByChildMessage } from '../domain/job/flowFailureMessage';
 import type { JobLocation } from '../domain/types/queue';
 import type { Shard } from '../domain/queue/shard';
 import type { SqliteStorage } from '../infrastructure/persistence/sqlite';
@@ -8,6 +9,7 @@ import { shardIndex } from '../shared/hash';
 import type { SetLike } from '../shared/lru';
 import type { DependencyResultTracker } from './dependencyResultTracker';
 import { flowFailureRecord } from './flowChildFailure';
+import { repairMissingFlowFailures } from './flowFailureRepair';
 import {
   type DependencyCompletionTracker,
   reconcileDependencyCompletionPins,
@@ -71,7 +73,7 @@ function failParent(
   shard.waitingChildren.delete(parent.id);
   const queued = shard.getQueue(parent.queue).remove(parent.id);
   if (queued) shard.decrementQueued(parent.id);
-  const message = `Child job ${String(childId)} failed: ${error}`;
+  const message = failedByChildMessage(String(childId), error);
   const entry = shard.addToDlq(parent, FailureReason.Unknown, message);
   const flowFailure = flowFailureRecord(parent, message);
   ctx.storage.commitFailedJob(parent.id, entry, flowFailure);
@@ -84,7 +86,9 @@ function failParent(
 export function recoverFlowFailures(ctx: FlowFailureRecoveryContext): void {
   // A worklist: a parent failed here appends its own record, so the policy climbs the
   // tree. A failed parent is no longer queued, so each job appends at most one record.
-  const records = ctx.storage.loadFlowFailures();
+  let records = ctx.storage.loadFlowFailures();
+  // Records an older version never wrote are added first, then replayed in order.
+  if (repairMissingFlowFailures(ctx, records) > 0) records = ctx.storage.loadFlowFailures();
   for (let position = 0; position < records.length; position++) {
     const record = records[position];
     const parent = findQueuedJob(ctx, record.parentId);

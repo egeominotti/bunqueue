@@ -85,6 +85,11 @@ Retry jobs from the dead-letter queue (move them back to waiting).
 { ok: true, count: number }  // Number of jobs retried
 ```
 
+With `filter`, the memory and SQLite engines retry every entry the filter selects
+(honouring the filter's own `limit`/`offset`) and ignore `jobId` and `count`. Only the
+PostgreSQL backend combines them: it narrows to `jobId` when given, applies the filter,
+and caps the result at `count` (falling back to `filter.limit`).
+
 ---
 
 ### PurgeDlq

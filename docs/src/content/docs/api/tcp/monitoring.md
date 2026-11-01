@@ -125,11 +125,14 @@ legacy broker-wide response shown below.
     avgLatencyMs: number,
     avgProcessingMs: number,
     memoryUsageMb: number,
-    sqliteSizeMb: number,
-    activeConnections: number
+    sqliteSizeMb: number,      // always 0: not measured by this response
+    activeConnections: number  // always 0: not measured by this response
   }
 }
 ```
+
+`sqliteSizeMb` and `activeConnections` are kept for wire compatibility and are always
+`0`; `memoryUsageMb` is the server process's JavaScript heap in use.
 
 For durable queue-scoped minute metrics, send:
 
@@ -255,8 +258,9 @@ Send a heartbeat for an active job (prevents stall detection from marking it as 
 }
 ```
 
-A `duration` other than `0` (no TTL change) must be a finite number of at least
-1 ms; otherwise the command fails with `duration must be ...`.
+A `duration` other than `0` (no TTL change) must be a finite number, applied as
+given (as with `ExtendLock`); NaN, an infinity or a non-number fails with
+`duration must be ...`.
 
 **Response:**
 

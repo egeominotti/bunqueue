@@ -68,7 +68,7 @@ queue.set_dlq_config({
 </TabItem>
 <TabItem label="PHP">
 
-The PHP SDK has no config helper yet. Set the server-side policy through HTTP:
+The PHP SDK has no config helper yet. Set the server-side policy through HTTP, or send `SetDlqConfig` over the SDK connection as shown in [DLQ Configuration](/guide/dlq/configuration/):
 
 ```bash
 curl -X PUT http://localhost:6790/queues/emails/dlq-config \
@@ -79,7 +79,7 @@ curl -X PUT http://localhost:6790/queues/emails/dlq-config \
 </TabItem>
 <TabItem label="Go">
 
-The Go SDK has no config helper yet. Set the server-side policy through HTTP:
+The Go SDK has no config helper yet. Set the server-side policy through HTTP, or send `SetDlqConfig` over the SDK connection as shown in [DLQ Configuration](/guide/dlq/configuration/):
 
 ```bash
 curl -X PUT http://localhost:6790/queues/emails/dlq-config \
@@ -90,7 +90,7 @@ curl -X PUT http://localhost:6790/queues/emails/dlq-config \
 </TabItem>
 <TabItem label="Rust">
 
-The Rust SDK has no config helper yet. Set the server-side policy through HTTP:
+The Rust SDK has no config helper yet. Set the server-side policy through HTTP, or send `SetDlqConfig` over the SDK connection as shown in [DLQ Configuration](/guide/dlq/configuration/):
 
 ```bash
 curl -X PUT http://localhost:6790/queues/emails/dlq-config \
@@ -101,7 +101,7 @@ curl -X PUT http://localhost:6790/queues/emails/dlq-config \
 </TabItem>
 <TabItem label="Elixir">
 
-The Elixir SDK has no config helper yet. Set the server-side policy through HTTP:
+The Elixir SDK has no config helper yet. Set the server-side policy through HTTP, or send `SetDlqConfig` over the SDK connection as shown in [DLQ Configuration](/guide/dlq/configuration/):
 
 ```bash
 curl -X PUT http://localhost:6790/queues/emails/dlq-config \
@@ -113,13 +113,15 @@ curl -X PUT http://localhost:6790/queues/emails/dlq-config \
 </Tabs>
 
 The config lives server-side per queue, so setting it from any client applies
-to jobs produced and consumed in every language. The policy, retry counter,
+to jobs produced and consumed in every language. When the server runs with `AUTH_TOKENS`, add
+`-H 'Authorization: Bearer <token>'` to these HTTP calls. The policy, retry counter,
 complete failure history, original entry/expiry times, and next retry time all
 survive a SQLite or PostgreSQL broker restart.
 
 The first retry becomes due after the base interval. Each dispatch increments
-`retryCount`; if the redelivered job fails again, its next delay follows
-`autoRetryInterval * 2^(retryCount - 1)`. Once `retryCount` reaches
+`retryCount` and, at that moment, schedules the next retry at
+`now + autoRetryInterval * 2^(retryCount - 1)`; if the redelivered job fails
+again, its entry keeps that already-scheduled time. Once `retryCount` reaches
 `maxAutoRetries`, `nextRetryAt` becomes `null` and automatic redelivery stops.
 
 :::note[Maintenance cadence and manual retries]

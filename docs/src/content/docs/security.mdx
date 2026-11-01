@@ -22,12 +22,13 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 Report privately through either channel:
 
-- Email: **security@bunqueue.dev**
+- Email: **founder@bunqueue.dev**, with the subject
+  `[SECURITY] bunqueue: <short summary>`
 - GitHub private vulnerability reporting: open the
   [Security tab](https://github.com/egeominotti/bunqueue/security) and select
   "Report a vulnerability"
 
-You will receive an acknowledgement within 48 hours. Fixes ship as patch
+You will receive an acknowledgement within 3 business days. Fixes ship as patch
 releases and are announced through GitHub Security Advisories and the npm
 advisory database.
 
@@ -288,10 +289,13 @@ bunqueue start
 
 ## Supported versions
 
-Security fixes are released as patch versions on the current 2.x line.
-There are no long term support branches: keep the server and the client
-SDKs (`bunqueue`, `bunqueue-client`) on the latest release. Updates are
-announced through GitHub Security Advisories and npm advisories.
+Security fixes are released as patch versions of the latest minor release.
+The previous minor receives Critical and High fixes for 3 months after the
+next minor ships; older releases are not supported. Keep the server and the
+client SDKs (`bunqueue`, `bunqueue-client`) on the latest release. Updates are
+announced through GitHub Security Advisories and npm advisories. The full
+policy is in the repository's
+[`SECURITY.md`](https://github.com/egeominotti/bunqueue/blob/main/SECURITY.md).
 
 :::tip[Related]
 

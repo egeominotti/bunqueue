@@ -138,7 +138,7 @@ names shown in the table.
 | `removeOnComplete` | `boolean`                   | `false` | Auto-delete after completion                                         |
 | `removeOnFail`     | `boolean`                   | `false` | Auto-delete after failure                                            |
 | `stallTimeout`     | `number`                    | -       | Per-job stall timeout override                                       |
-| `repeat`           | `object`                    | -       | Repeating job config (`every`, `pattern`, `limit`)                   |
+| `repeat`           | `object`                    | -       | Repeating job config (`every`, `pattern`, `limit`, `tz`, `immediately`, `startDate`, `endDate`, …) |
 | `durable`          | `boolean`                   | `false` | SQLite: bypass its write buffer; PostgreSQL is already transactional |
 | `lifo`             | `boolean`                   | `false` | Process newest first                                                 |
 | `group`            | `{ id, priority?, maxSize? }` | -       | Assign a [fair job group](/guide/queue/job-groups/), optional 0-first intra-group priority, and atomic pending-depth cap |

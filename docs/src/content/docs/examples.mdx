@@ -479,7 +479,7 @@ Timezones and schedule management in the [cron guide](/guide/cron/).
 
 ## Deduplicate jobs with jobId
 
-Adding a job with a `jobId` that already exists returns the existing job instead of creating a duplicate. Useful for "exactly one welcome email per user" and safe re-runs after a restart.
+Adding a job with the `jobId` of an unfinished job (waiting, delayed, waiting for children, or active) returns the existing job instead of creating a duplicate, so re-runs after a restart do not queue the same work twice. Once that job has completed or moved to the DLQ, the same `jobId` creates a fresh job, so it does not by itself guarantee "exactly one welcome email per user".
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">

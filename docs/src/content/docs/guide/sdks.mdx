@@ -394,8 +394,8 @@ mix run app.exs                           # Elixir
 Producer and worker are usually separate services, often in different
 languages: a Next.js API adds jobs, a Python service processes them,
 against the same queue and the same protocol. Constructors default to
-`host: 'localhost'` and `port: 6789`, so no options are needed for a local
-setup.
+`host: 'localhost'` (Elixir: `127.0.0.1`) and `port: 6789`, so no options are
+needed for a local setup.
 
 ## Protocol and architecture
 
@@ -517,8 +517,9 @@ queue =
 </Tabs>
 
 The command timeout governs how long each in-flight command waits for a
-response. TypeScript and Python keep the TCP connect timeout internal; PHP, Go,
-and Rust expose it separately. Elixir applies its timeout to connect and
+response. TypeScript keeps the TCP connect timeout internal. Python's `Queue` does
+not take it, but a `Connection(connect_timeout=5.0)` (seconds, the default) passed as
+`connection=` sets it; PHP, Go, and Rust expose it separately. Elixir applies its timeout to connect and
 command exchange.
 
 ### Connection resilience
@@ -715,17 +716,19 @@ The table below describes the other SDKs and the historical TypeScript
 
 | Option               | Default                                         | Notes                                                                                   |
 | -------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `concurrency`        | 4 in legacy TypeScript/Python/Go/Rust; 1 in Elixir/PHP | Jobs processed in parallel except PHP, which is sequential by design                    |
+| `concurrency`        | 4 in legacy TypeScript/Python/Go/Rust; 1 in Elixir; PHP has no option | Jobs processed in parallel; PHP is sequential by design and has no `concurrency` option |
 | `batchSize`          | usually 10; Elixir defaults to concurrency      | Jobs fetched per `PULLB`, capped by free slots and the server max (1000)                |
-| `pollTimeoutMs`      | usually 5000; Elixir 1000                       | Server-side long-poll; max 30 000                                                       |
-| `lockTtlMs`          | 30 000                                          | Job lease TTL                                                                           |
-| `heartbeatIntervalS` | 10; Go defaults to disabled                     | Worker + per-job lock heartbeats; 0 disables (Go: zero or negative, or `DisableHeartbeat: true`) |
+| `pollTimeoutMs`      | usually 5000; Elixir `poll_timeout` 1000        | Server-side long-poll; max 30 000                                                       |
+| `lockTtlMs`          | 30 000; Elixir `lock_ttl`                       | Job lease TTL                                                                           |
+| `heartbeatIntervalS` | 10; Go defaults to disabled; Elixir `heartbeat_interval` 10 000 ms | Worker + per-job lock heartbeats; 0 disables (Go: zero or negative, or `DisableHeartbeat: true`) |
 | `ackBatch`           | off                                             | Opt-in ACK batching (below; legacy TypeScript and Python)                                      |
 | `autorun`            | true where exposed                              | Legacy TypeScript/Python can start at construction; PHP, Go, Rust, and Elixir start explicitly |
 
-Names follow each language: Python, Rust, and Elixir use snake_case; PHP uses
-camelCase array keys; Go uses a `WorkerOptions` struct
-(`PollTimeoutMs`, `LockTtlMs`, ...).
+Names follow each language: Python and Rust use snake_case (`poll_timeout_ms`,
+`lock_ttl_ms`; Python `heartbeat_interval_s`, Rust `heartbeat_interval` as an
+`Option<Duration>`); Elixir drops the unit suffix (`poll_timeout`, `lock_ttl`,
+`heartbeat_interval`, all in milliseconds); PHP uses camelCase array keys; Go uses
+a `WorkerOptions` struct (`PollTimeoutMs`, `LockTtlMs`, ...).
 
 ### Lease model
 

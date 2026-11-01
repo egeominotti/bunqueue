@@ -108,7 +108,7 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
     <div class="bq-diag-cell">job_results <i>job_id TEXT PRIMARY KEY, result BLOB MessagePack, completed_at INTEGER</i></div>
     <div class="bq-diag-cell">dlq <i>id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT, queue TEXT, entry BLOB full DlqEntry MessagePack, entered_at INTEGER</i></div>
     <div class="bq-diag-cell">cron_jobs <i>name TEXT PRIMARY KEY, queue TEXT, job_name TEXT, data BLOB, schedule TEXT, repeat_every INTEGER, priority INTEGER, next_run INTEGER, executions INTEGER, max_limit INTEGER, timezone TEXT, unique_key TEXT, dedup BLOB, skip_missed_on_restart INTEGER, skip_if_no_worker INTEGER, prevent_overlap INTEGER, job_options BLOB</i></div>
-    <div class="bq-diag-cell">queue_state <i>name TEXT PRIMARY KEY, paused/rate/concurrency fields plus stall_enabled, stall_interval, max_stalls, stall_grace_period; persists queue controls and custom stall policy across restarts</i></div>
+    <div class="bq-diag-cell">queue_state <i>name TEXT PRIMARY KEY, paused/rate/concurrency fields plus stall_enabled, stall_interval, max_stalls, stall_grace_period and dlq_config; persists queue controls, custom stall policy and DLQ policy across restarts</i></div>
   </div>
 </div>
 
@@ -116,7 +116,7 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
 
 <div class="bq-diag">
   <div class="bq-diag-head"><b>Startup recovery</b><span>crash recovery on boot, batches of 10,000 rows</span></div>
-  <div class="bq-diag-layer bq-diag-accent">1. Recover active jobs <i>restore custom stall policy first, then read repeated 10k batches from offset zero; each interrupted job persists stallCount++ and attempts++. Below both maxStalls and maxAttempts it is requeued with backoff; reaching either bound persists exactly one DLQ entry. Cron-spawned preventOverlap jobs are dropped, the scheduler recreates them</i></div>
+  <div class="bq-diag-layer bq-diag-accent">1. Recover active jobs <i>restore custom stall policy first, then read repeated 10k batches from offset zero; each interrupted job persists stallCount++ and attempts++. Below both maxStalls and maxAttempts it is requeued with backoff; reaching either bound persists exactly one DLQ entry, together with the flow-failure outbox record when the job is a flow child with a failure policy. Cron-spawned preventOverlap jobs are dropped, the scheduler recreates them</i></div>
   <div class="bq-diag-arrow">↓</div>
   <div class="bq-diag-layer">2. Load pending jobs <i>state waiting/delayed: jobs with unmet dependencies go to waitingDeps, the rest to their shard queue; jobIndex, customId and uniqueKey mappings restored</i></div>
   <div class="bq-diag-arrow">↓</div>
@@ -126,7 +126,9 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
   <div class="bq-diag-arrow">↓</div>
   <div class="bq-diag-layer">5. Load completed jobs <i>up to the 50k in-memory cap, for clean() and stats</i></div>
   <div class="bq-diag-arrow">↓</div>
-  <div class="bq-diag-layer">6. Load cron jobs <i>populate cron scheduler heap; past next_run is recalculated forward when skipMissedOnRestart or skipIfNoWorker is set</i></div>
+  <div class="bq-diag-layer">6. Replay the flow-failure outbox <i>apply each failed child's policy to its parent; a parent failed this way applies its own policy in turn, so failParentOnFailure on every level fails the branch up to the root</i></div>
+  <div class="bq-diag-arrow">↓</div>
+  <div class="bq-diag-layer">7. Load cron jobs <i>populate cron scheduler heap; past next_run is recalculated forward when skipMissedOnRestart or skipIfNoWorker is set</i></div>
 </div>
 
 ## S3 Backup Flow
@@ -164,7 +166,7 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
 
 <div class="bq-diag">
   <div class="bq-diag-head"><b>Error recovery</b><span>flush() fails</span></div>
-  <div class="bq-diag-layer bq-diag-accent">Re-buffer failed jobs <i>double-buffered swap: the failed flush buffer is merged back, nothing is dropped</i></div>
+  <div class="bq-diag-layer bq-diag-accent">Re-buffer failed jobs <i>double-buffered swap: transiently failed jobs are merged back; only rows rejected by a constraint violation are logged and dropped</i></div>
   <div class="bq-diag-arrow">↓</div>
   <div class="bq-diag-layer">Retry with exponential backoff <i>100ms initial, 30s max, up to 10 retries; regular flushing pauses during backoff</i></div>
   <div class="bq-diag-arrow">↓</div>

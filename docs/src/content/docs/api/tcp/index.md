@@ -286,7 +286,7 @@ Job data payloads are limited to **10 MB** when serialized.
 |                | [`Pause`](/api/tcp/control/#pause)                                           | Pause a queue                                |
 |                | [`Resume`](/api/tcp/control/#resume)                                         | Resume a queue                               |
 |                | [`IsPaused`](/api/tcp/control/#ispaused)                                     | Check if queue is paused                     |
-|                | [`Drain`](/api/tcp/control/#drain)                                           | Remove all waiting/delayed jobs              |
+|                | [`Drain`](/api/tcp/control/#drain)                                           | Remove waiting/prioritized/delayed jobs      |
 |                | [`Obliterate`](/api/tcp/control/#obliterate)                                 | Remove all queue data                        |
 |                | [`Clean`](/api/tcp/control/#clean)                                           | Remove old jobs                              |
 |                | [`ListQueues`](/api/tcp/control/#listqueues)                                 | List all queues                              |

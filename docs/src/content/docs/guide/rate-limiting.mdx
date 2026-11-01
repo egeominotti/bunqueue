@@ -54,10 +54,6 @@ await queue.removeGlobalRateLimitAsync();
 await queue.setGlobalRateLimitAsync(100);          // 100 jobs per second
 await queue.setGlobalRateLimitAsync(100, 60_000);  // 100 jobs per minute
 await queue.removeGlobalRateLimitAsync();
-
-// Awaitable variants: resolve after the server applied the change
-await queue.setGlobalRateLimitAsync(100, 60_000);
-await queue.removeGlobalRateLimitAsync();
 ```
 
 </TabItem>

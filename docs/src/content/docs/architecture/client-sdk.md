@@ -101,10 +101,12 @@ throughput.
 
 **Key Features:**
 
-- 4 connections per pool (default)
-- Load-aware client selection
+- 4 connections per Queue pool by default; each Worker owns a dedicated pool of
+  `min(concurrency, 8)` connections
+- Round-robin selection that skips disconnected clients
 - Automatic reconnection with exponential backoff
-- Shared pools across Queue/Worker instances
+- Reference-counted shared pools across Queue instances that keep the default
+  `poolSize` and no token
 
 ## Heartbeat & Stall Detection
 
@@ -115,7 +117,7 @@ throughput.
     <div class="bq-diag-layer">heartbeatTimer <i>every 10s sends JobHeartbeatB { ids, tokens } to the server</i></div>
     <div class="bq-diag-row">
       <div class="bq-diag-cell">pulledJobIds <i>all pulled jobs get heartbeat</i></div>
-      <div class="bq-diag-cell">activeJobIds <i>jobs being processed</i></div>
+      <div class="bq-diag-cell">activeJobs <i>count of jobs being processed</i></div>
       <div class="bq-diag-cell">jobTokens <i>lock tokens for verification</i></div>
     </div>
   </div>

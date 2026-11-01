@@ -33,7 +33,14 @@ Retrieve a job by its internal ID.
 **Response:**
 
 ```typescript
-{ ok: true, job: Job }
+{
+  ok: true,
+  job: Job & {
+    state: string,          // same value GetState returns
+    returnvalue?: unknown,  // stored result, as GetResult returns it
+    failedReason?: string   // last failure message in the job's timeline
+  }
+}
 ```
 
 Returns an error if the job is not found.
@@ -100,8 +107,12 @@ List jobs with filtering and pagination.
 **Response:**
 
 ```typescript
-{ ok: true, jobs: Job[] }
+{ ok: true, jobs: Array<Job & { state: string, returnvalue?: unknown, failedReason?: string }> }
 ```
+
+Each job carries the same `state`, `returnvalue` and `failedReason` fields as
+[GetJob](#getjob). With a single `state` filter, `state` is that filter value; with an
+array or no filter it is resolved per job.
 
 Ordering is applied before pagination. Send the same `asc` value on every
 request when traversing multiple offset pages.
@@ -171,10 +182,11 @@ Look up a job by its custom ID (the `jobId` field from PUSH).
 **Response:**
 
 ```typescript
-{ ok: true, job: Job }
+{ ok: true, job: Job & { returnvalue?: unknown, failedReason?: string } }
 ```
 
-Returns an error if no job with that custom ID exists.
+The same view as [GetJob](#getjob), without `state`. Returns an error (`Job not found`) if
+no job with that custom ID exists.
 
 ---
 

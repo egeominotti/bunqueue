@@ -20,7 +20,11 @@ broker. It is designed to answer two different questions:
 
 The results were measured on 20 July 2026 at repository revision
 `8f276e03ae480bc1abc615869769e48e087f7804` (`bunqueue` 2.8.43). They are a
-dated engineering result, not a universal capacity promise.
+dated engineering result, not a universal capacity promise. The TypeScript rows
+were measured with the client API that is now `bunqueue-client/legacy`; the
+default `bunqueue-client` entry, which re-exports the Bun client, has not been
+measured by this campaign. The campaign's runner is not in the repository, so
+these tables cannot be regenerated from a checked-in script.
 
 <Aside type="tip">
 The producer result is deliberately boring: every SDK lands between 60K and
@@ -173,8 +177,10 @@ operating-system process resources.
 
 ## Highest-value SDK optimization
 
-The first SDK performance change should be event-driven slot refill in
-TypeScript, Go, and Python:
+At the measured revision, the first SDK performance change was event-driven
+slot refill in TypeScript, Go, and Python. The legacy TypeScript and Python
+Workers have since adopted it (see above); Go still waits a fixed 20 ms, so the
+recommendation now applies to Go only:
 
 1. signal a condition, channel, semaphore, or promise when an active handler
    releases its slot;
@@ -190,9 +196,10 @@ less benefit because processing time already dominates the 20–50 ms wait.
 
 <Aside type="caution">
 The expected gain above is an engineering hypothesis supported by the measured
-ceiling, not a published after-result. It must be confirmed by the same native
-campaign plus lease, shutdown, retry, heartbeat, and model-based correctness
-tests before changing SDK behavior.
+ceiling, not a published after-result: the worker table has not been
+re-measured since TypeScript and Python adopted the change. For Go it must be
+confirmed by the same native campaign plus lease, shutdown, retry, heartbeat,
+and model-based correctness tests before changing SDK behavior.
 </Aside>
 
 ## How to use these numbers

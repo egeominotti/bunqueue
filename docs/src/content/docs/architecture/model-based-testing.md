@@ -20,8 +20,10 @@ conservation/cardinality.
 bun run test:model
 ```
 
-The default broker campaign runs 150 generated histories of up to 80 commands.
-The workflow-engine campaign adds 40 histories of up to 12 commands, the
+The default broker campaign runs 150 generated histories of up to 80 commands,
+followed by a terminal-lifecycle campaign of 30 histories of up to 40 commands
+(completion, failure, retry, cancel and SIGKILL) and a cross-queue invariant
+campaign of 24 runs of 30 operations. The workflow-engine campaign adds 40 histories of up to 12 commands, the
 FlowProducer model adds 60 generated cross-queue flow sets, the backup
 campaign adds 50 histories of up to 30 commands, the worker monitoring
 campaign adds 500 histories of up to 80 actions, and the enterprise
@@ -80,7 +82,8 @@ The oracle checks these contracts together:
 - **Legal transitions:** delivery, retry, terminal completion/failure,
   promotion, delay, removal, and crash recovery follow the declared graph.
 - **Ordering:** priority first, FIFO or LIFO tie-break as configured, no delayed
-  or TTL-expired early delivery, one active job per FIFO group, and no parent
+  or TTL-expired early delivery, one active job per FIFO group with group
+  concurrency 1, and no parent
   before its dependencies.
 - **Failure policies:** fail-parent, ignore, continue, and remove-dependency
   modes produce their declared parent transition.

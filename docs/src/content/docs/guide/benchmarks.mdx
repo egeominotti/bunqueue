@@ -292,8 +292,22 @@ BUNQUEUE_DATA_PATH=/tmp/bunqueue-bench-embedded.db \
 BENCH_HOST=127.0.0.1 BENCH_PORT=16794 \
 bun run bench:pushbulk
 
-# Workflow Engine, both modes and all scenarios
-BENCH_OUTPUT=/tmp/workflow.json bun run bench:workflow
+# Workflow Engine, all scenarios, once per mode at the published sizes and
+# concurrency (the runner's defaults are concurrency 32, 7 runs and 200
+# compensation/signal executions)
+BENCH_MODE=embedded \
+BENCH_RUNS=7 BENCH_RUNS_LINEAR=21 BENCH_WARMUPS=1 \
+BENCH_N_LINEAR=1000 BENCH_N_PARALLEL=500 \
+BENCH_N_COMPENSATION=500 BENCH_N_SIGNAL=500 \
+BENCH_CONCURRENCY=128 BENCH_OUTPUT=/tmp/workflow-embedded.json \
+bun run bench:workflow
+
+BENCH_MODE=tcp \
+BENCH_RUNS=7 BENCH_RUNS_LINEAR=21 BENCH_WARMUPS=1 \
+BENCH_N_LINEAR=1000 BENCH_N_PARALLEL=500 \
+BENCH_N_COMPENSATION=500 BENCH_N_SIGNAL=500 \
+BENCH_CONCURRENCY=64 BENCH_OUTPUT=/tmp/workflow-tcp.json \
+bun run bench:workflow
 
 # Tuned host scale
 RATE_LIMIT_MAX_REQUESTS=1000000 \
@@ -303,6 +317,12 @@ bun run bench:workflow:scale
 
 Run without `BUNQUEUE_EMBEDDED=1`; that test variable forces clients into
 Embedded mode and would invalidate a TCP label.
+
+The SQLite `durable:true` table and the Worker concurrency (10K-job drain) table
+have no checked-in runner, so those rows are not scripted.
+`bench/tcp-process-sweep.ts` times enqueue plus processing rather than the drain of
+preloaded jobs, and `bun run bench:sqlite-lifecycle` times durable batches, so
+neither reproduces them.
 
 The bare `bun run bench:pushbulk` command does not configure an Embedded
 `dataPath`; its Embedded half is in-memory. It must not be used to reproduce an
@@ -340,8 +360,8 @@ bounded 4.1–4.3 MB WAL and post-GC collection bounds all passed.
 The current comparison is its own campaign, on its own page:
 [Benchmark vs BullMQ](/guide/bullmq-benchmark/), measured October 25, 2026 with
 bunqueue 2.9.20, BullMQ 6.4.2 and Redis 8.10.2 on an AMD Ryzen 9 7950X3D server
-(`bench/vs-bullmq`). In memory, bunqueue adds jobs 2.6–4x faster, drains a backlog
-1.1–1.3x faster and starts delayed jobs 8.5x closer to their due time; on disk,
+(`bench/vs-bullmq`). In memory, bunqueue adds jobs 2.6–4x faster with 64 in flight or in
+bulk (1.27x one at a time), drains a backlog 1.06–1.32x faster and starts delayed jobs 8.5x closer to their due time; on disk,
 Redis with AOF drains a backlog about 7x faster than bunqueue on SQLite. Do not
 combine those values with the campaigns above.
 
