@@ -713,8 +713,11 @@ WHERE EXISTS` in the same transaction, no extra lock), so a parent that a
 sibling already failed gets no record. A sibling that fails or releases the next
 parent concurrently (its own transaction holds the next parent's flow key, which
 the lower level does not) can still win the race: a record whose edge is gone and
-whose parent is `failed` or missing is dropped by the applier or by the sweep,
-because a parent's own failure removes every value really applied to it. This
+whose parent is `failed`, `completed` or missing is dropped by the applier or by
+the sweep, because the parent's failure, completion or removal already removed
+every value really applied to it (a sibling's `continueParentOnFailure` can
+release the parent, which then runs and completes before the lower level's
+record commits). This
 ordering differs from SQLite, which applies the levels under one in-process flow:
 in PostgreSQL a sibling's `failParentOnFailure` or `continueParentOnFailure` that
 commits between "mid failed" and the next-level apply wins, and mid's `fail`
@@ -723,9 +726,17 @@ record is then dropped (the next parent is already failed or running); an
 stays as a recorded failure value of the released parent, as a direct
 application to a still-linkable parent would store it.
 
-The sweep pages through every candidate (pending or orphaned) with a keyset on
-`(created_at, parent_id, child_id)`, 100 per page, and applies each record on its
-own, so records that keep failing cannot starve newer ones. Failures are logged
+The sweep reads candidates (pending or orphaned) with a keyset on
+`(created_at, parent_id, child_id)`, 100 per page and at most 10 pages per run
+(startup or one lease-recovery tick), so neither a tick nor broker readiness
+waits on a whole backlog. Each broker keeps its keyset cursor in memory: the
+next run continues after the last record read, and past the end it wraps to the
+oldest record and stops at its own starting point, so every record, including
+one older than the cursor, is reached within about ⌈candidates / 1,000⌉ + 1
+runs. With the default 30 s lease a run happens every 15 s, so one broker drains
+a crash backlog of 100,000 pending records in about 25 minutes (every live
+broker sweeps in parallel); normal operation leaves few or none. Each record is
+applied on its own, so records that keep failing cannot starve newer ones. A restarted broker starts from the oldest record. Failures are logged
 once and reported to the `flow-failure-recovery` maintenance health entry as one
 `AggregateError` that names the first failing parent/child pair and its cause; a
 startup sweep failure is reported, not fatal.

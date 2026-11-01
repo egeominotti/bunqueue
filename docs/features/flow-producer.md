@@ -361,9 +361,9 @@ broker (at startup and every lease-recovery tick) finishes.
 whose edge still exists, so a pending `ignore`/`continue` record is reported
 only after it is applied.
 The record is written only while that edge exists; a record that loses a race
-to a sibling that failed the next parent first (edge gone, parent `failed` or
-missing) is dropped, so a failed parent never reports a phantom ignored or
-continued failure. A sibling that commits between two levels wins, unlike the
+to a sibling that failed or released the next parent first (edge gone, parent
+`failed`, `completed` or missing) is dropped, so a failed or completed parent
+never reports a phantom ignored or continued failure. A sibling that commits between two levels wins, unlike the
 in-process SQLite loop; the ordering, sweep paging and mixed-version behavior
 are described in [PostgreSQL multi-broker](./postgres-multibroker.md).
 

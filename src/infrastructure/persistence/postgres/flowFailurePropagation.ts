@@ -29,6 +29,9 @@ import type { PostgresJobRow } from './types';
  * between two levels leaves the pending record for the recovery sweep of any broker.
  */
 
+/** Parent states whose transition already cleared every value applied to the parent. */
+const ORPHANING_STATES: readonly string[] = ['failed', 'completed'];
+
 async function deleteRecord(
   tx: TransactionSQL,
   ctx: PostgresContext,
@@ -74,13 +77,13 @@ export async function applyPostgresFlowFailurePropagation(
     postgresFlowFailureMode(child) !== null;
   if (!edge) {
     // An applied ignore/continue record is the stored failure value. A record whose
-    // parent failed or is gone was never applied (a parent's failure removes the values
-    // really applied to it): drop it, like fail/remove records and stale children.
+    // parent failed, completed or is gone is an orphan (that transition removed the
+    // values really applied to it): drop it, like fail/remove records and stale children.
     const [parent] = await tx<Array<{ state: string }>>`
       SELECT state FROM bunqueue_jobs
       WHERE namespace = ${ctx.config.namespace} AND id = ${String(item.parentId)}
     `;
-    const orphaned = !parent || parent.state === 'failed';
+    const orphaned = !parent || ORPHANING_STATES.includes(parent.state);
     if (!applicable || orphaned || record.mode === 'fail' || record.mode === 'remove') {
       await deleteRecord(tx, ctx, item);
     }
@@ -136,22 +139,37 @@ interface SweepRow {
   readonly created_at: number | string | bigint;
 }
 
-/** One keyset page of records to finish: pending (edge present) or orphaned. */
+/** Where a broker's sweep stopped; the next run continues there and wraps around. */
+interface SweepCursor {
+  after: SweepRow | null;
+}
+
+/** One cursor per broker context, so successive ticks continue instead of restarting. */
+const cursors = new WeakMap<PostgresContext, SweepCursor>();
+
+/** The page size and the page budget of one sweep run (startup or one tick). */
+export const POSTGRES_FLOW_FAILURE_SWEEP_PAGE = 100;
+export const POSTGRES_FLOW_FAILURE_SWEEP_PAGES = 10;
+
+/** A keyset page of records to finish (pending: edge present) or drop (orphaned). */
 async function sweepPage(
   ctx: PostgresContext,
   after: SweepRow | null,
+  until: SweepRow | null,
   limit: number
 ): Promise<SweepRow[]> {
-  const ns = ctx.config.namespace;
-  const createdAt = after ? Number(after.created_at) : -1;
-  const parentId = after?.parent_id ?? '';
-  const childId = after?.child_id ?? '';
+  const key = (row: SweepRow | null) =>
+    [row ? Number(row.created_at) : -1, row?.parent_id ?? '', row?.child_id ?? ''] as const;
+  const [afterAt, afterParent, afterChild] = key(after);
+  const [untilAt, untilParent, untilChild] = key(until);
   return await ctx.sql<SweepRow[]>`
     SELECT failure.parent_id, failure.child_id, failure.created_at
     FROM bunqueue_flow_failures AS failure
-    WHERE failure.namespace = ${ns}
+    WHERE failure.namespace = ${ctx.config.namespace}
       AND (failure.created_at, failure.parent_id, failure.child_id)
-        > (${createdAt}::bigint, ${parentId}::text, ${childId}::text)
+        > (${afterAt}::bigint, ${afterParent}::text, ${afterChild}::text)
+      AND (${until === null}::boolean OR (failure.created_at, failure.parent_id, failure.child_id)
+        <= (${untilAt}::bigint, ${untilParent}::text, ${untilChild}::text))
       AND (
         EXISTS (
           SELECT 1 FROM bunqueue_dependencies AS dependency
@@ -162,7 +180,7 @@ async function sweepPage(
         OR NOT EXISTS (
           SELECT 1 FROM bunqueue_jobs AS parent
           WHERE parent.namespace = failure.namespace AND parent.id = failure.parent_id
-            AND parent.state <> 'failed'
+            AND parent.state NOT IN ('failed', 'completed')
         )
       )
     ORDER BY failure.created_at, failure.parent_id, failure.child_id
@@ -177,27 +195,40 @@ function describeFailure(row: SweepRow, error: unknown): string {
 
 /**
  * Finish records a crashed or interrupted broker left between two levels, and drop
- * records orphaned by a parent that failed or vanished first. Pages through every
- * candidate with a keyset, each record on its own, so records that keep failing
- * cannot starve newer ones; the failures are logged and reported together.
+ * records orphaned by a parent that failed, completed or vanished first. One run reads
+ * at most `maxPages` keyset pages, starting where this context's previous run stopped:
+ * past the end it wraps to the oldest record and stops at its starting point, so every
+ * record is reached within a bounded number of runs. Each record is applied on its own,
+ * so records that keep failing cannot starve the others; failures are logged and
+ * reported together. Returns the number of records visited.
  */
 export async function recoverPostgresFlowFailurePropagations(
   ctx: PostgresContext,
-  pageSize = 100
+  pageSize = POSTGRES_FLOW_FAILURE_SWEEP_PAGE,
+  maxPages = POSTGRES_FLOW_FAILURE_SWEEP_PAGES
 ): Promise<number> {
   const limit = Math.max(1, pageSize);
+  const cursor = cursors.get(ctx) ?? { after: null };
+  cursors.set(ctx, cursor);
+  const start = cursor.after;
+  // Without a starting point the pass begins at the oldest record: its end is the cycle.
+  let wrapped = start === null;
   const failures: Array<{ row: SweepRow; error: unknown }> = [];
   let visited = 0;
-  let after: SweepRow | null = null;
-  for (;;) {
-    const rows = await sweepPage(ctx, after, limit);
+  for (let page = 0; page < Math.max(1, maxPages); page++) {
+    const rows = await sweepPage(ctx, cursor.after, wrapped ? start : null, limit);
     for (const row of rows) {
       const item = { parentId: row.parent_id as JobId, childId: row.child_id as JobId };
       await drain(ctx, [item]).catch((error: unknown) => failures.push({ row, error }));
     }
     visited += rows.length;
-    if (rows.length < limit) break;
-    after = rows[rows.length - 1];
+    if (rows.length === limit) {
+      cursor.after = rows[rows.length - 1];
+      continue;
+    }
+    cursor.after = null;
+    if (wrapped) break;
+    wrapped = true;
   }
   if (failures.length > 0) {
     const first = describeFailure(failures[0].row, failures[0].error);

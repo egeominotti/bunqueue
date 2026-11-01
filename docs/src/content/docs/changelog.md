@@ -107,6 +107,24 @@ head:
   `test/postgres-flow-fail-parent-propagation-multibroker.test.ts`,
   `test/postgres-flow-fail-parent-propagation-edges.test.ts`,
   `test/postgres-flow-propagation-stale-record.test.ts`)
+- **PostgreSQL: no phantom flow-failure value on a completed parent, and a
+  bounded recovery sweep.** A propagated `ignore`/`continue` record could be
+  written while the next parent's edge was still visible, after which a
+  sibling's `continueParentOnFailure` released that parent and it ran and
+  completed before the record committed; the completion had already cleared
+  the parent's values, so `getIgnoredChildrenFailures()` /
+  `getFailedChildrenValues()` on the completed parent reported a phantom
+  failure. A record without its edge on a `completed` parent is now dropped by
+  the applier and the recovery sweep, as one on a `failed` or missing parent
+  already was. The sweep also no longer clears a whole backlog in one run: each
+  run (startup or one lease-recovery tick) reads at most 10 pages of 100
+  records, and each broker keeps its cursor in memory, so the next run
+  continues where the previous one stopped and wraps around to older records;
+  broker readiness no longer waits on an unbounded startup sweep. A crash
+  backlog drains at up to 1,000 records per tick (every 15 s with the default
+  30 s lease) on each live broker.
+  (`test/postgres-flow-propagation-completed-parent.test.ts`,
+  `test/postgres-flow-propagation-sweep-budget.test.ts`)
 
 ### Tooling
 
