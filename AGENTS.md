@@ -1,69 +1,89 @@
 # AGENTS.md
 
 This file applies to the entire repository unless a more specific `AGENTS.md`
-exists in a subdirectory.
+exists in a subdirectory. Routing page for Codex: the mandatory rules and the work
+loop are here, reference material in the linked pages. `CLAUDE.md` has the same
+rules for Claude Code.
 
 ## Project overview
 
-bunqueue is a high-performance job queue written in TypeScript for Bun. The
-server and embedded runtime are Bun-only. Persistence uses `bun:sqlite`; public
-clients may run in other runtimes through the network protocol.
+bunqueue is a high-performance job queue written in TypeScript for Bun. The server
+and embedded runtime are Bun-only. Persistence uses `bun:sqlite`; public clients may
+run in other runtimes through the network protocol. Repository map:
+[docs/agents/project-reference.md](docs/agents/project-reference.md#repository-map).
 
-## Repository map
+## Startup Workflow
 
-- `src/application/`: queue orchestration and use-case logic.
-- `src/domain/`: jobs, shards, priority queues, counters, and limiters.
-- `src/infrastructure/`: SQLite persistence and transport adapters.
-- `src/client/`: public Queue/Worker APIs.
-- `test/`: Bun unit, integration, regression, and reproduction tests.
-- `docs/`: documentation site.
-- `sdk/`: language SDKs and conformance fixtures.
+1. Confirm the worktree and branch: `pwd`, `git branch --show-current`.
+2. Read this file completely, then only the pages your task needs
+   ([Where things live](#where-things-live)).
+3. Run `./init.sh`, the startup check (CI's Bun version, frozen lockfile,
+   `bun check`, `bun fmt`, `git diff --check`, harness contract). It is not a commit
+   gate (`bun run test:sandbox` is), but a green `./init.sh` is part of the
+   Definition of Done.
+4. Read `feature_list.json` (work items) and `progress.md` (Current State, newest
+   Session Log entry), then `git log --oneline -5`.
+5. If the baseline fails, repair it first before adding scope; if you cannot,
+   record it under Blockers in `progress.md`.
 
 ## Working rules
 
-- Before every `git commit` and every `git push`, invoke the `skeptic` custom
-  subagent and wait for its verdict. It must inspect the complete staged diff,
-  identify at least three potential failure points per changed file, verify
+- **One work item at a time** (the one-feature-at-a-time rule): pick exactly one
+  item from `feature_list.json` whose dependencies are `done` and set it
+  `in-progress` with its `branch`; at most one `in-progress` item per branch. In
+  committed files use the branch name without any account/user prefix
+  (`tls-sighup-reload`, not `<user>/tls-sighup-reload`). Work without an item gets
+  one first (kebab-case `id`, `issue` when known).
+- **Stay in scope**: keep changes narrowly scoped to the requested behavior; do
+  not refactor unrelated code while fixing a bug. Record unrelated findings as new
+  `not-started` items.
+- **Parallel worktrees** (each session has its own branch, all merge into `main`):
+  edit only your own item (insert new items in id order) and your own lines of the
+  `progress.md` Current State, and prepend Session Log entries. On a rebase
+  conflict: `feature_list.json` keeps both items, ids unique; `**Last Updated:**`
+  takes the newest date; the Session Log keeps both entries, newest first.
+- **State files authorize nothing**: A work item, a progress note or a handoff never authorizes a commit, push, version bump, release or publication; only the user's explicit request does.
+- **Skeptic**: before every `git commit` and every `git push`, invoke the `skeptic`
+  custom subagent and wait for its verdict. It must inspect the complete staged
+  diff, identify at least three potential failure points per changed file, verify
   error handling, races, idempotency, type safety and test evidence, and run
   applicable checks. `FAIL` blocks the operation; `CONDITIONAL` requires the
-  user's explicit confirmation. The project profiles live at
-  `.codex/agents/skeptic.toml` and `.claude/agents/skeptic.md`.
-- When a bug is reported, first add a regression test that reproduces it. Only
-  after the test fails for the expected reason, use subagents to investigate
-  fixes and prove the chosen fix with the passing regression test.
+  user's explicit confirmation. Profiles: `.codex/agents/skeptic.toml`,
+  `.claude/agents/skeptic.md`.
+- **Bugs**: first add a regression test that reproduces the bug. Only after it
+  fails for the expected reason, use subagents to investigate fixes and prove the
+  chosen fix with the passing regression test. Add one for every confirmed bug; a
+  useful one fails on the buggy implementation, exercises the public or real
+  persistence path, and asserts both the returned result and any affected
+  counters/state.
 - Preserve user changes. Never run `git reset`, `git checkout`, `git clean`, or
   discard unrelated edits unless the user explicitly requests it.
 - Keep all repository content in English, including source comments, tests,
   internal documentation, user-facing documentation and agent configuration.
-- Keep changes narrowly scoped to the requested behavior. Do not refactor
-  unrelated code while fixing a bug.
-- Use `rg`/`rg --files` for repository searches and `apply_patch` for manual
-  source edits.
-- Runtime source is TypeScript ESM. Follow the existing 2-space, single-quote,
-  semicolon style; `bun fmt` (configured in `bunfig.toml`) is authoritative.
-- **MANDATORY:** type check only with `bun check` and format only with
-  `bun fmt`, in every directory and every SDK (`bun run typecheck`,
-  `bun run format:check`; `--no-script` inside scripts and CI). Never use
-  `tsc --noEmit`, ESLint, Prettier, Biome, oxlint, oxfmt or lint-suppression
-  comments. `tsc` remains only where files are emitted (`build:lib`, the SDK
-  build), for typedoc and for compiler-API tests; non-JS SDKs keep their
-  language's own toolchain.
-- Keep hot queue paths synchronous while a shard lock is held. Do not introduce
-  an `await` inside a synchronous critical section.
+- Use `rg`/`rg --files` for searches and `apply_patch` for manual source edits.
+- Runtime source is TypeScript ESM, 2-space, single-quote, semicolon style;
+  `bun fmt` (configured in `bunfig.toml`) is authoritative.
+- **MANDATORY:** type check only with `bun check` and format only with `bun fmt`,
+  in every directory and every SDK (`bun run typecheck`, `bun run format:check`;
+  `--no-script` inside scripts and CI). Never use `tsc --noEmit`, ESLint,
+  Prettier, Biome, oxlint, oxfmt or lint-suppression comments. `tsc` remains only
+  where files are emitted (`build:lib`, the SDK build), for typedoc and for
+  compiler-API tests; non-JS SDKs keep their language's own toolchain.
+- Keep hot queue paths synchronous while a shard lock is held: no `await` inside a
+  synchronous critical section.
 - Maintain queue invariants together: heap membership, `jobIndex`, processing
   maps, counters, temporal indexes, group ownership, and concurrency slots must
   transition exactly once.
 - SQLite filtering, ordering, and pagination must happen in a consistent order.
   Use deterministic tie-breakers for paginated queries and add migrations for
   schema or index changes.
-- Do not silently change externally visible scheduling semantics. Add explicit
+- Do not silently change externally visible scheduling semantics; add explicit
   regression coverage when priority, delay, FIFO-group, retry, or recovery
   behavior changes.
-- Keep source files at or below 300 lines. Give each file one responsibility and
-  export only what is needed; split a file instead of growing it beyond that
-  boundary.
-- Respect the lock hierarchy: `jobIndex` -> `completedJobs` -> `shards[N]` ->
-  `processingShards[N]`. Read prerequisite state before acquiring the next lock
+- Keep source files at or below 300 lines, one responsibility each, exporting only
+  what is needed; split a file instead of growing it.
+- Respect the lock hierarchy `jobIndex` -> `completedJobs` -> `shards[N]` ->
+  `processingShards[N]`: read prerequisite state before acquiring the next lock
   and always release locks in `finally`.
 
 ## Documentation
@@ -82,237 +102,97 @@ clients may run in other runtimes through the network protocol.
 
 ## Validation
 
-Run repository tests in an isolated OrbStack Machine by default. A macOS host
-run is diagnostic only and does not count as final validation evidence. Run the
-narrowest relevant tests while iterating:
+Run repository tests in an isolated OrbStack Machine by default; a macOS host run
+is diagnostic only. Final Linux validation needs fresh disposable Machines (Ubuntu
+24.04 native, plus Debian 13 for every release, `--isolated --isolate-network`, no
+mounts or secrets); the Machine gate supplements the sandbox, never replaces it.
+TCP functional files use a fresh server, dynamic TCP/HTTP ports, and a unique
+temporary SQLite directory; never reuse a developer server or database. Run
+benchmarks only on native macOS, never in an OrbStack Machine or container. Machine
+gate and test hygiene: [docs/testing.md](docs/testing.md#agent-test-rules).
+Iterate with the narrowest tests:
 
 ```bash
 BUNQUEUE_EMBEDDED=1 bun test test/path-to-test.test.ts
-bun run test:model
 bun run typecheck
 bun fmt --check --no-script src test/path-to-test.test.ts
 git diff --check
 ```
 
-**MANDATORY: Run `bun run test:model` after every change that can affect job
-lifecycle, persistence/recovery, scheduling/order, dependencies, deduplication,
-leases, rate/concurrency limits, counters, temporal indexes, or `jobIndex`.**
-This command runs the `fast-check` asynchronous command model against a real
-TCP broker and SQLite. It is targeted iteration evidence, not a replacement for
-the final sandbox (the sandbox's unit suite runs it again).
+- **MANDATORY:** run `bun run test:model` after every change that can affect job
+  lifecycle, persistence/recovery, scheduling/order, dependencies, deduplication,
+  leases, rate/concurrency limits, counters, temporal indexes, or `jobIndex`. It
+  runs the `fast-check` model against a real TCP broker and SQLite; it is
+  iteration evidence, not a replacement for the sandbox. The invariants it must
+  keep enforcing are in [docs/testing.md](docs/testing.md#model-campaign-rules);
+  never weaken one. On failure record the seed, counterexample and replay path and
+  distinguish a model error from an engine divergence; for a confirmed engine bug
+  add a deterministic `test/repro-model-*.test.ts` regression before fixing it.
+- **MANDATORY:** after ANY code modification run `bun run test:sandbox` before
+  committing. It builds the worktree and runs ALL THREE required suites in
+  parallel disposable containers: `bun test --parallel=4`,
+  `bun scripts/tcp/run-all-tests.ts`, `bun scripts/embedded/run-all-tests.ts`. Do
+  not commit if any suite fails or could not be run. No exceptions.
+- **MANDATORY:** after ANY modification under `sdk/` run `bun run test:sandbox:sdk`
+  before handoff (and again before committing after more SDK edits): native tests
+  and shared protocol conformance checks of every official external SDK. Both
+  sandbox gates are required; a targeted native SDK test is diagnostic only.
+- Without Docker the native commands are a diagnostic fallback, not proof of
+  isolation: report the unavailable sandbox as a blocker before commit.
 
-The model must continue to enforce conservation, no loss/resurrection,
-exclusive delivery, custom-ID idempotency, retry/stall bounds, legal
-transitions, priority/FIFO/LIFO/delay/group/dependency ordering, unique keys,
-rate/concurrency/TTL resource rules, counter/index coherence, idempotent
-recovery, and DLQ exactly-once. When it fails, record the printed seed,
-counterexample, and replay path. Distinguish a model error from an engine
-divergence; for a confirmed engine bug, preserve the minimized sequence as a
-deterministic `test/repro-model-*.test.ts` regression before fixing it.
+## Definition of Done
 
-### OrbStack Machine gate
+A work item is `done` only when all of these hold and its `evidence` in
+`feature_list.json` names the commands, exact totals, artifact paths and commit:
 
-Final Linux validation must run in a fresh, disposable OrbStack Machine. The
-canonical local environment is Ubuntu 24.04 on the Mac's native architecture;
-on Apple Silicon this means `arm64`. Allocate 4 CPUs, request 16 GiB of memory,
-and at least 32 GiB of disk, then record the effective cgroup limits because
-OrbStack may clamp them to its global limits. GitHub Actions `ubuntu-latest`
-provides the independent native `amd64` gate. Every release must also run the
-same native product suites in a fresh Debian 13 Machine using the Mac's native
-architecture.
+- [ ] The behavior is implemented; a bug has a regression test that failed before
+      the fix and passes after it.
+- [ ] The required gates ran and passed: `bun run test:sandbox` after any code
+      change, `bun run test:model` and `bun run test:sandbox:sdk` when triggered,
+      `bun run typecheck`, `bun run format:check`.
+- [ ] `/docs` and the changelog `[Unreleased]` section describe the change.
+- [ ] The skeptic verdict is `PASS` (`CONDITIONAL` only with explicit confirmation).
+- [ ] `./init.sh` is green, so the next session can restart from it.
 
-Do not use a translated `amd64` Machine on Apple Silicon as final evidence.
-Rosetta is useful for diagnostics, but process-heavy Bun tests can behave
-differently under translation. Record such a run as diagnostic and repeat it
-on a native-architecture Machine.
+## End of Session
 
-Create Machines with both `--isolated` and `--isolate-network`. Do not use
-`--mount` or `--forward-ssh-agent`. Never expose the macOS repository, home
-directory, Docker socket, credentials, SSH agent, package-manager tokens, or
-real environment files to a Machine. A tracked placeholder-only template such
-as `.env.example` is allowed only after its contents have been reviewed.
-Transfer an explicit sanitized worktree snapshot over OrbStack's built-in SSH
-transport; it must contain all tracked and intended untracked
-changes while excluding `.git`, ignored files, `node_modules`, `artifacts`,
-SQLite databases, generated test output, secrets, and credentials.
-
-Provision the exact Bun version pinned by CI and install from the frozen
-lockfile. Then run, directly in each Machine:
-
-```bash
-bun test --parallel=4
-bun scripts/tcp/run-all-tests.ts
-bun scripts/embedded/run-all-tests.ts
-bun run typecheck
-bun run format:check
-```
-
-Use a unique Machine name for every final candidate and delete it after its
-logs and environment manifest have been copied to `artifacts/`. Record the
-distro, version, architecture, kernel, Bun version/revision, command, exit code,
-duration, and exact test totals. A reused Machine or a host-only run is not
-release evidence. OrbStack Machines and containers share OrbStack's underlying
-Linux kernel, so this is strong filesystem/process/network separation but not a
-separate-kernel or physical-machine security boundary.
-
-The Machine gate supplements rather than replaces the container gates below.
-Run `git diff --check` on the host before creating the sanitized snapshot,
-because the Machine deliberately receives no `.git` directory.
-Run benchmarks only on native macOS, never in an OrbStack Machine or container.
-
-**MANDATORY: After ANY code modification, run the isolated validation before
-committing:**
-
-```bash
-bun run test:sandbox
-```
-
-The sandbox builds the current worktree and runs ALL THREE required suites in
-parallel, in separate disposable containers:
-
-```bash
-bun test --parallel=4                   # Unit tests (four isolated file workers)
-bun scripts/tcp/run-all-tests.ts        # TCP integration tests (~50 suites)
-bun scripts/embedded/run-all-tests.ts   # Embedded integration tests (~35 suites)
-```
-
-Do not commit if any suite fails or could not be run. No exceptions.
-
-**MANDATORY: After ANY modification under `sdk/`, run the isolated SDK
-validation before handoff (and again before committing if more SDK edits were
-made):**
-
-```bash
-bun run test:sandbox:sdk
-```
-
-This second gate runs the native tests and shared protocol conformance checks
-for every official external SDK in separate disposable containers. Both
-`test:sandbox` and `test:sandbox:sdk` are required after SDK changes; a targeted
-native SDK test is diagnostic feedback, not a replacement for the sandbox.
-
-The exact native commands are a diagnostic fallback when Docker is unavailable,
-not proof that sandbox isolation passed. Report the unavailable sandbox as a
-blocker before commit.
-
-Add regression tests for every confirmed bug. A useful regression test should
-fail on the buggy implementation, exercise the public or real persistence path,
-and assert both the returned result and any affected counters/state.
-
-## Test hygiene
-
-- Prefer targeted tests in the current isolated development Machine during
-  iteration; use fresh disposable Machines and the sandbox for the final full
-  gates. A host-native run is diagnostic only. Never run one container per
-  individual unit test.
-- Model campaigns can be deepened without editing source:
-  `BUNQUEUE_MODEL_RUNS=500 BUNQUEUE_MODEL_COMMANDS=150 BUNQUEUE_MODEL_SIZE=max
-  BUNQUEUE_MODEL_SEED=<signed-seed> bun run test:model` (the command cap is the
-  real bound only with `BUNQUEUE_MODEL_SIZE=max`). Replay one failure with
-  `BUNQUEUE_MODEL_SEED`, `BUNQUEUE_MODEL_PATH` and `BUNQUEUE_MODEL_SIZE` as
-  printed. Preserve the sign printed by `fast-check`. Never remove or weaken an invariant merely to make a
-  generated history pass.
-- The three top-level suites run concurrently by default. Use
-  `BUNQUEUE_TEST_SEQUENTIAL=1` only to diagnose possible resource contention;
-  it runs the same commands with the same isolation.
-- Treat the sandbox as process, filesystem, network, database, port, and
-  environment isolation, not as separate physical machines. Suite containers
-  still share the OrbStack VM kernel, Docker daemon scheduling, CPU, memory,
-  and disk I/O. A failure seen only under parallel load must be reproduced with
-  `BUNQUEUE_TEST_SEQUENTIAL=1` before attributing it to application behavior.
-- Read complete suite output from `artifacts/test-sandbox/<timestamp>/`. On
-  failure, preserve the runner's retained container until the cause is known.
-- Read SDK-gate output from `artifacts/test-sandbox-sdk/<timestamp>/` with the
-  same anomaly and retained-container discipline.
-- Every sandbox run must emit complete logs, per-suite NDJSON resource samples,
-  per-suite JSON, and the aggregate `summary.json`/`summary.md`. Review reported
-  anomalies and slow-test rankings before handoff; do not report only pass/fail.
-- Treat memory slope or end-to-start growth as an investigation signal, not
-  proof of a leak. Individual tests share a process and heap; confirm suspected
-  leaks with a focused repeated-process, post-GC reproduction.
-- Never mount the repository, Docker socket, credentials, or the user's home
-  directory into a test container. Tests need no external network access.
-- TCP functional files must use a fresh server, dynamic ports, and a unique
-  temporary SQLite directory. Do not connect tests to an existing server.
-- Use unique queue names and unique temporary SQLite paths.
-- Close `QueueManager`, Queue, Worker, server, and database instances in cleanup.
-- Remove SQLite `.db`, `-wal`, and `-shm` files created by the test.
-- Avoid timing-only assertions when state can be observed directly. When testing
-  delays or long-polling, use generous bounds and deterministic timestamps.
-- Do not weaken an existing test merely to make a behavior change pass; update
-  it only when the intended contract has explicitly changed.
-- Never publish benchmark results from Docker or a VM. Run benchmarks natively,
-  with a fresh process, database, ports, queues, and competitor state per sample.
-  Docker Compose is only for functional tests requiring external services and
-  must use a unique project name and disposable volumes.
-
-## CPU and memory profiling
-
-- Profile a representative full workload for long enough to collect meaningful
-  samples; a short smoke run is only a harness check. Use fresh process/state and
-  record a separate unprofiled baseline. Profiled timings are diagnostic, never
-  publishable benchmark results.
-- Generate both CPU views in one native run:
-  `bun --cpu-prof --cpu-prof-md --cpu-prof-dir=<artifact-dir> <workload>`.
-  Use Markdown for self/total time and caller/callee triage, then the
-  `.cpuprofile` in Chrome DevTools or VS Code for interactive flame analysis.
-- Generate heap formats in separate native runs because `--heap-prof-md`
-  overrides `--heap-prof` when combined:
-  `bun --heap-prof --heap-prof-dir=<artifact-dir> <workload>` and
-  `bun --heap-prof-md --heap-prof-dir=<artifact-dir> <workload>`. Both snapshots
-  are written on process exit, so exercise cleanup and terminate normally.
-- Confirm leaks with repeated workload/cleanup cycles at equivalent checkpoints:
-  call `Bun.gc(true)`, record `bun:jsc` `heapStats()`, `process.memoryUsage()`, and
-  `QueueManager.getMemoryStats()`, then compare retained types and retainer chains.
-  RSS growth alone is not proof of a leak.
-- Bun has separate JavaScriptCore and native heaps. Use heap snapshots/stats for
-  JavaScript retention and opt-in `Bun.unsafe.mimallocDump()` for native allocator
-  diagnosis. Never expose profiling as an unauthenticated endpoint; snapshots may
-  contain job payloads or secrets. Store outputs only under ignored `artifacts/`.
-
-## Release blog posts
-
-Every release gets a professional blog post at
-`/blog/bunqueue-vX-Y-Z/`, in the style of Bun's release posts (bun.com/blog).
-The release-preparation commit (the one that dates the changelog section) must
-include it:
-
-1. Run `bun docs/scripts/generate-release-posts.ts`. It writes a draft post for
-   every dated changelog section (`docs/src/content/docs/blog/bunqueue-vX-Y-Z.md`)
-   with the install/upgrade box, feature sections, bugfixes and contributors.
-2. Rewrite the new release's draft by hand into a professional article: a
-   description that leads with the user-visible outcome and real numbers; a
-   short intro on why the release matters; one `##` section per notable change,
-   titled as a claim ("Dashboards no longer cost a full scan every 10 ms") with
-   prose plus before/after tables or code; then "Other improvements",
-   "Bugfixes", "Thanks to N contributors!" and the link to the previous
-   release. Every fact and figure must come from the changelog or real
-   measurements; never invent numbers, quotes or features.
-3. Delete the `<!-- Generated from changelog.md ... -->` marker from the
-   rewritten post. The generator never overwrites a post without the marker.
-4. After the release is tagged and published, run
-   `bun docs/scripts/generate-release-posts.ts --refresh` (contributors, npm,
-   Docker and GitHub release data in `docs/src/data/releaseMeta.json`), then
-   regenerate and update the hand-written post's install box and contributors.
-
-CI runs `generate-release-posts.ts --check`: a stale or missing post fails the
-docs job. The GitHub release body links to the post, the blog index and RSS
-list it, and the home page announces the newest release post.
+1. Update your lines of the `progress.md` Current State (`**Last Updated:**`, done,
+   next, Blockers/Risks) and prepend a dated Session Log entry.
+2. Update your item in `feature_list.json`: `status`, `evidence`, `branch`.
+3. For multi-session work, fill a handoff from `session-handoff.md` into that entry.
+4. Record every unresolved risk, blocker and check you could not run.
+5. Leave `./init.sh` green and the worktree clean enough to restart from.
+6. Commit only when authorized and through the gates below.
 
 ## Commits and handoff
 
-- Before every authorized `git commit`, update
-  `docs/src/content/docs/changelog.md` for the staged changes and include that
-  update in the same commit. The commit message is mandatory and must be a
-  non-empty, concise, specific English description of the actual changes;
-  generic placeholder messages are forbidden.
+- Before every authorized `git commit`, update `docs/src/content/docs/changelog.md`
+  for the staged changes in the same commit. The commit message is mandatory: a
+  non-empty, concise, specific English description of the actual changes; generic
+  placeholder messages are forbidden.
 - Before every authorized `git push`, verify that each outgoing commit already
-  contains its corresponding changelog update and has a compliant commit
-  message. Do not edit the changelog solely because a push is being performed.
+  contains its changelog update and a compliant message. Do not edit the changelog
+  solely because a push is being performed.
 - Do not create commits, push, bump the package version, or publish unless the
   user explicitly authorizes the relevant action. Version bumps and package
-  publication are separate release actions and are not implied by permission
-  to commit or push. Never publish locally: npm packages are published only by
-  the CI release jobs through npm trusted publishing (OIDC, environment `npm`).
-- Report the files changed, behavior fixed, and exact validation commands/results.
-- Call out any test or check that could not be run and why.
+  publication are separate release actions, not implied by permission to commit or
+  push. Never publish locally: npm packages are published only by the CI release
+  jobs through npm trusted publishing (OIDC, environment `npm`).
+- Every release gets a hand-written post drafted with
+  `bun docs/scripts/generate-release-posts.ts` in the release-preparation commit:
+  [docs/agents/release.md](docs/agents/release.md).
+- Report the files changed, behavior fixed, and exact validation commands/results;
+  call out any test or check that could not be run and why.
+
+## Where things live
+
+| Need | Read |
+| --- | --- |
+| Work items, state, handoff, startup check | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
+| The harness and its contract test | [docs/agents/README.md](docs/agents/README.md) |
+| Writing or running tests | [docs/testing.md](docs/testing.md) |
+| Architecture, repository map, env vars, TCP commands, CLI, schema | [docs/agents/project-reference.md](docs/agents/project-reference.md) |
+| Client APIs (Simple Mode, Workflow Engine, SDK options) | [docs/agents/client-reference.md](docs/agents/client-reference.md) |
+| Debug endpoints, CPU and memory profiling | [docs/agents/debugging.md](docs/agents/debugging.md) |
+| Publishing, release checklist, release posts | [docs/agents/release.md](docs/agents/release.md) |
+| Engineering reference | [docs/README.md](docs/README.md), [docs/architecture.md](docs/architecture.md), [docs/data-model.md](docs/data-model.md) |

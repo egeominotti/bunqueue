@@ -380,6 +380,32 @@ head:
   progress hook) accept `number | object`, like the main client; the broker
   already normalized objects the same way (0, with the object's JSON as the
   message when none is given), and the emitted JavaScript is unchanged.
+- An agent harness for coding agents, after the five-subsystem model of the
+  learn-harness-engineering `harness-creator` skill. `CLAUDE.md` (39 KB) and
+  `AGENTS.md` (17.5 KB) are now routing pages of under 12 KiB each: they keep
+  every mandatory rule and gate, and add a startup workflow, working rules (one
+  work item at a time, stay in scope, conflict rules for parallel worktrees, and
+  that no work item, progress note or handoff authorizes a commit, push, version
+  bump, release or publication), a definition of done and an end-of-session
+  routine. Their reference sections moved verbatim to `docs/agents/` (project,
+  client, debugging and release pages) and their test rules to a new "Agent test
+  rules" section of `docs/testing.md`; the introductions of those pages, the
+  release checklist and `docs/agents/README.md` are new text. New root files:
+  `feature_list.json` (work items with status, dependencies, evidence, issue and
+  branch, kept in id order), `progress.md` (current state, blockers, decisions,
+  session log), `session-handoff.md` (handoff template) and `init.sh`, a startup
+  check (about 5 s once dependencies are installed) that requires CI's Bun
+  version and runs `bun install --frozen-lockfile`, `bun run typecheck`,
+  `bun run format:check`, `git diff --check` (skipped where there is no Git
+  checkout) and the harness contract (`--full` adds `bun run test:sandbox`).
+  `test/agent-harness-instructions.test.ts` and `test/agent-harness-state.test.ts`
+  (in the unit suite; `bun test test/agent-harness`) enforce the contract: size
+  budget, sections, routing, mandatory invariants, links and heading anchors,
+  work-item and dependency rules, no harness file in the npm package, and every
+  file the contract reads present in the sandbox test image (`Dockerfile.test`
+  and its allow-list now include them). Structural score measured with the
+  course's `validate-harness.mjs`: 32/100 before, 100/100 after. Nothing in the
+  package or the runtime changes.
 
 ### Documentation
 

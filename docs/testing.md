@@ -5,6 +5,163 @@ test suites without reusing host processes, ports, databases, or environment
 state. Performance benchmarks use a different isolation model; see
 [Benchmarks are native](#benchmarks-are-native).
 
+## Agent test rules
+
+`CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) route here for the test
+procedure: this section is the checklist both instruction files rely on, and the
+sections after it give the rationale and the exact commands. The four subsections
+are moved verbatim from those files; this introduction and the startup-check
+paragraph are new.
+
+**Startup check.** Every session starts with `./init.sh` at the repository root
+(see [Agent Harness](./agents/README.md)). It fails when `bun --version` differs
+from `BUN_VERSION` in `.github/workflows/ci.yml`, then runs
+`bun install --frozen-lockfile --ignore-scripts`, `bun run typecheck` (whose
+`typecheck:prepare` step builds ignored output), `bun run format:check`,
+`git diff --check` (skipped with a notice where there is no Git checkout, as in a
+sanitized Machine snapshot) and the harness contract `bun test test/agent-harness`,
+and prints the active work items. It is not a commit gate (`bun run test:sandbox`
+is), but a green `./init.sh` is part of the Definition of Done in `CLAUDE.md` and
+`AGENTS.md`. `./init.sh --full` adds `bun run test:sandbox`, and the gates below
+apply unchanged.
+
+### Isolation rules
+
+- Run repository tests in isolated OrbStack Machines by default. A macOS-host test is diagnostic only and is not final validation evidence.
+- Use a fresh disposable Ubuntu 24.04 Machine on the Mac's native architecture (4 CPUs, request 16 GiB memory, at least 32 GiB disk) as the canonical local Linux gate. On Apple Silicon this is `arm64`; native `amd64` is covered independently by GitHub Actions `ubuntu-latest`. For every release, repeat the native product suites in a fresh Debian 13 Machine on the same host-native architecture. Record the effective cgroup limits because OrbStack may clamp requested resources.
+- A translated `amd64` Machine on Apple Silicon is diagnostic only. Repeat any result on a native-architecture Machine before using it as release evidence; process-heavy Bun tests may behave differently under Rosetta.
+- Create both Machines with `--isolated --isolate-network`. Never use `--mount` or `--forward-ssh-agent`, and never expose the repository, home directory, Docker socket, SSH agent, credentials, tokens, real `.env` files, or ignored files. A tracked placeholder-only template such as `.env.example` is allowed only after review. Copy an explicit sanitized snapshot over OrbStack's built-in SSH transport, including all intended worktree changes but excluding `.git`, dependencies, artifacts, SQLite files, generated output, and secrets.
+- Pin the same Bun version as CI and use the frozen lockfile. Directly inside each Machine run `bun test --parallel=4`, the TCP runner, the embedded runner, `bun run typecheck` (`bun check`), and `bun run format:check` (`bun fmt`). Run `git diff --check` on the host before snapshot transfer because `.git` is deliberately excluded. Record the OS, architecture, kernel, Bun version/revision, commands, exit codes, durations, and exact totals before deleting the Machine.
+- OrbStack Machines share OrbStack's underlying Linux kernel. Treat them as strong filesystem/process/network isolation, not as a separate-kernel or physical security boundary.
+- The Machine gates supplement `bun run test:sandbox` and `bun run test:sandbox:sdk`; they do not replace them. Benchmarks remain native macOS-only and must never be published from a Machine or container.
+- The three top-level suite containers run in parallel by default; use `BUNQUEUE_TEST_SEQUENTIAL=1` only to diagnose resource contention.
+- Isolation covers processes, writable filesystems, `/tmp`, network namespaces, ports, databases, and environment. It is not physical isolation: containers share the OrbStack VM kernel plus host CPU, memory, and disk scheduling. Reproduce parallel-only failures sequentially before classifying them as application bugs.
+- Use `artifacts/test-sandbox/<timestamp>/` for complete, untruncated suite logs; failed containers remain available for inspection.
+- Use `artifacts/test-sandbox-sdk/<timestamp>/` for the equivalent SDK logs,
+  telemetry and retained failed containers.
+- Every sandbox run must also preserve per-suite resource samples (`*.metrics.ndjson`), per-suite JSON, and aggregate `summary.json`/`summary.md`. Review CPU, memory, PID, I/O, duration, slow-test, OOM, and anomaly KPIs before handoff.
+- Container memory growth is an investigation signal, not automatic proof of a leak; individual tests share the same process and heap. Confirm leaks with focused repeated-process and post-GC evidence.
+- The sandbox must not mount the repository, Docker socket, credentials, or the user's home, and test containers must have no external network.
+- Every TCP functional test file gets a fresh server, dynamic TCP/HTTP ports, and a unique temporary SQLite directory. Never reuse a developer server or database.
+- CI pins the same Bun version and frozen lockfile as the sandbox. Do not replace either with `latest` or an unlocked install.
+- Docker Compose is only for functional tests that require external services, with a unique project name and disposable volumes.
+- Benchmarks are always native, never Docker/VM. Every sample needs a fresh server, database, ports, queues, and competitor state.
+
+### Model campaign rules
+
+**MANDATORY: Run `bun run test:model` after every change that can affect job
+lifecycle, persistence/recovery, scheduling/order, dependencies, deduplication,
+leases, rate/concurrency limits, counters, temporal indexes, or `jobIndex`.**
+This command runs the `fast-check` asynchronous command model against a real
+TCP broker and SQLite. It is targeted iteration evidence, not a replacement for
+the final sandbox (the sandbox's unit suite runs it again).
+
+The model must continue to enforce conservation, no loss/resurrection,
+exclusive delivery, custom-ID idempotency, retry/stall bounds, legal
+transitions, priority/FIFO/LIFO/delay/group/dependency ordering, unique keys,
+rate/concurrency/TTL resource rules, counter/index coherence, idempotent
+recovery, and DLQ exactly-once. When it fails, record the printed seed,
+counterexample, and replay path. Distinguish a model error from an engine
+divergence; for a confirmed engine bug, preserve the minimized sequence as a
+deterministic `test/repro-model-*.test.ts` regression before fixing it.
+
+### OrbStack Machine gate checklist
+
+Final Linux validation must run in a fresh, disposable OrbStack Machine. The
+canonical local environment is Ubuntu 24.04 on the Mac's native architecture;
+on Apple Silicon this means `arm64`. Allocate 4 CPUs, request 16 GiB of memory,
+and at least 32 GiB of disk, then record the effective cgroup limits because
+OrbStack may clamp them to its global limits. GitHub Actions `ubuntu-latest`
+provides the independent native `amd64` gate. Every release must also run the
+same native product suites in a fresh Debian 13 Machine using the Mac's native
+architecture.
+
+Do not use a translated `amd64` Machine on Apple Silicon as final evidence.
+Rosetta is useful for diagnostics, but process-heavy Bun tests can behave
+differently under translation. Record such a run as diagnostic and repeat it
+on a native-architecture Machine.
+
+Create Machines with both `--isolated` and `--isolate-network`. Do not use
+`--mount` or `--forward-ssh-agent`. Never expose the macOS repository, home
+directory, Docker socket, credentials, SSH agent, package-manager tokens, or
+real environment files to a Machine. A tracked placeholder-only template such
+as `.env.example` is allowed only after its contents have been reviewed.
+Transfer an explicit sanitized worktree snapshot over OrbStack's built-in SSH
+transport; it must contain all tracked and intended untracked
+changes while excluding `.git`, ignored files, `node_modules`, `artifacts`,
+SQLite databases, generated test output, secrets, and credentials.
+
+Provision the exact Bun version pinned by CI and install from the frozen
+lockfile. Then run, directly in each Machine:
+
+```bash
+bun test --parallel=4
+bun scripts/tcp/run-all-tests.ts
+bun scripts/embedded/run-all-tests.ts
+bun run typecheck
+bun run format:check
+```
+
+Use a unique Machine name for every final candidate and delete it after its
+logs and environment manifest have been copied to `artifacts/`. Record the
+distro, version, architecture, kernel, Bun version/revision, command, exit code,
+duration, and exact test totals. A reused Machine or a host-only run is not
+release evidence. OrbStack Machines and containers share OrbStack's underlying
+Linux kernel, so this is strong filesystem/process/network separation but not a
+separate-kernel or physical-machine security boundary.
+
+The Machine gate supplements rather than replaces the container gates below.
+Run `git diff --check` on the host before creating the sanitized snapshot,
+because the Machine deliberately receives no `.git` directory.
+Run benchmarks only on native macOS, never in an OrbStack Machine or container.
+
+### Test hygiene
+
+- Prefer targeted tests in the current isolated development Machine during
+  iteration; use fresh disposable Machines and the sandbox for the final full
+  gates. A host-native run is diagnostic only. Never run one container per
+  individual unit test.
+- Model campaigns can be deepened without editing source:
+  `BUNQUEUE_MODEL_RUNS=500 BUNQUEUE_MODEL_COMMANDS=150 BUNQUEUE_MODEL_SIZE=max
+  BUNQUEUE_MODEL_SEED=<signed-seed> bun run test:model` (the command cap is the
+  real bound only with `BUNQUEUE_MODEL_SIZE=max`). Replay one failure with
+  `BUNQUEUE_MODEL_SEED`, `BUNQUEUE_MODEL_PATH` and `BUNQUEUE_MODEL_SIZE` as
+  printed. Preserve the sign printed by `fast-check`. Never remove or weaken an invariant merely to make a
+  generated history pass.
+- The three top-level suites run concurrently by default. Use
+  `BUNQUEUE_TEST_SEQUENTIAL=1` only to diagnose possible resource contention;
+  it runs the same commands with the same isolation.
+- Treat the sandbox as process, filesystem, network, database, port, and
+  environment isolation, not as separate physical machines. Suite containers
+  still share the OrbStack VM kernel, Docker daemon scheduling, CPU, memory,
+  and disk I/O. A failure seen only under parallel load must be reproduced with
+  `BUNQUEUE_TEST_SEQUENTIAL=1` before attributing it to application behavior.
+- Read complete suite output from `artifacts/test-sandbox/<timestamp>/`. On
+  failure, preserve the runner's retained container until the cause is known.
+- Read SDK-gate output from `artifacts/test-sandbox-sdk/<timestamp>/` with the
+  same anomaly and retained-container discipline.
+- Every sandbox run must emit complete logs, per-suite NDJSON resource samples,
+  per-suite JSON, and the aggregate `summary.json`/`summary.md`. Review reported
+  anomalies and slow-test rankings before handoff; do not report only pass/fail.
+- Treat memory slope or end-to-start growth as an investigation signal, not
+  proof of a leak. Individual tests share a process and heap; confirm suspected
+  leaks with a focused repeated-process, post-GC reproduction.
+- Never mount the repository, Docker socket, credentials, or the user's home
+  directory into a test container. Tests need no external network access.
+- TCP functional files must use a fresh server, dynamic ports, and a unique
+  temporary SQLite directory. Do not connect tests to an existing server.
+- Use unique queue names and unique temporary SQLite paths.
+- Close `QueueManager`, Queue, Worker, server, and database instances in cleanup.
+- Remove SQLite `.db`, `-wal`, and `-shm` files created by the test.
+- Avoid timing-only assertions when state can be observed directly. When testing
+  delays or long-polling, use generous bounds and deterministic timestamps.
+- Do not weaken an existing test merely to make a behavior change pass; update
+  it only when the intended contract has explicitly changed.
+- Never publish benchmark results from Docker or a VM. Run benchmarks natively,
+  with a fresh process, database, ports, queues, and competitor state per sample.
+  Docker Compose is only for functional tests requiring external services and
+  must use a unique project name and disposable volumes.
+
 ## Validation layers
 
 `bun run typecheck` covers all of `src`, including `src/mcp`, and the test tree
@@ -580,7 +737,13 @@ consumed by structural regressions. The PostgreSQL manifest is required by the
 credential-safety test. The image includes `Dockerfile.test` itself so tests can
 verify that this contract stays synchronized with the workflow files, and the
 production `Dockerfile` so the release preflight regression checks the real
-variant build inputs instead of a missing file. It does
+variant build inputs instead of a missing file. It also contains the agent
+harness: `CLAUDE.md`, `AGENTS.md`, `feature_list.json`, `progress.md`,
+`session-handoff.md`, `init.sh` (COPY keeps its executable mode) and
+`docs/agents/`, because the harness contract (`test/agent-harness-*.test.ts`) reads
+them and checks their links; without them the unit container failed with
+`ENOENT /workspace/CLAUDE.md` while the host run passed, and the contract now
+checks that `Dockerfile.test` copies every file it reads. It does
 not install SDK toolchains or copy credentials into the core test image.
 `Dockerfile.test.dockerignore` limits the build context to those inputs.
 

@@ -1,73 +1,97 @@
 # bunqueue
 
+High-performance job queue server for Bun: SQLite persistence, cron jobs, priorities,
+DLQ, S3 backups. Routing page for Claude Code: the mandatory rules and the work loop
+are here, reference material in the linked pages. `AGENTS.md` has the same rules
+for Codex.
+
+## Startup Workflow
+
+1. Confirm the worktree and branch: `pwd`, `git branch --show-current`.
+2. Read this file completely, then only the pages your task needs
+   ([Where things live](#where-things-live)).
+3. Run `./init.sh`, the startup check: CI's Bun version, frozen lockfile,
+   `bun check`, `bun fmt`, `git diff --check`, harness contract. It is not a commit
+   gate (`bun run test:sandbox` is), but a green `./init.sh` is part of the
+   Definition of Done.
+4. Read `feature_list.json` (work items) and `progress.md` (Current State, newest
+   Session Log entry), then `git log --oneline -5`.
+5. If the baseline fails, repair it first before adding scope; if you cannot,
+   record it under Blockers in `progress.md`.
+
+## Working Rules
+
+- **One work item at a time** (the one-feature-at-a-time rule): pick exactly one
+  item from `feature_list.json` whose dependencies are `done` and set it
+  `in-progress` with its `branch`; at most one `in-progress` item per branch. In
+  committed files use the branch name without any account/user prefix
+  (`tls-sighup-reload`, not `<user>/tls-sighup-reload`). Work without an item gets
+  one first (kebab-case `id`, `issue` when known).
+- **Stay in scope**: change only what the item needs; record unrelated findings
+  as new `not-started` items instead of fixing them.
+- **Parallel worktrees** (each session has its own branch, all merge into `main`):
+  edit only your own item (insert new items in id order) and your own lines of the
+  `progress.md` Current State, and prepend Session Log entries. On a rebase
+  conflict: `feature_list.json` keeps both items, ids unique; `**Last Updated:**`
+  takes the newest date; the Session Log keeps both entries, newest first.
+- **State files authorize nothing**: A work item, a progress note or a handoff never authorizes a commit, push, version bump, release or publication; only the user's explicit request does.
+- **Bug reports**: "When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test."
+- **ENGLISH ONLY**: keep all repository content in English, including source
+  comments, tests, technical documentation, user documentation and agent
+  configuration.
+- **Code**: MAX 300 lines per file (split if larger), one concern per file,
+  export only what's needed.
+- **Lock hierarchy** (acquire in order): `jobIndex` → `completedJobs` →
+  `shards[N]` → `processingShards[N]`. Read first, then acquire the lock, and
+  release it in `finally`.
+
+## Mandatory Gates
+
 **MANDATORY — SKEPTIC AGENT**: before every `git commit` and every `git push`,
 invoke the `skeptic` agent and wait for its verdict. It must read the complete
 staged diff, identify at least three potential failure points per changed file,
 and verify race conditions, error handling, idempotency, type safety and test
 coverage. `FAIL` blocks commit and push; `CONDITIONAL` requires the user's
-explicit confirmation. The project profile is `.claude/agents/skeptic.md`.
+explicit confirmation. Profile: `.claude/agents/skeptic.md`.
 
-**MANDATORY — BUN-NATIVE TOOLING ONLY**: type check exclusively with
-`bun check` and format exclusively with `bun fmt`, everywhere in the repository
-and in every SDK: `src`, `test`, `scripts`, `bench`, `examples`,
-`sdk/typescript` and `sdk/conformance`. Use the scripts (`bun run typecheck`,
-`bun run format`, `bun run format:check`, `bun run check`); inside scripts,
-hooks and CI always pass `--no-script`. Never add or run `tsc --noEmit`, ESLint,
-Prettier, Biome, oxlint, oxfmt, dprint or any other type-check, lint or format
-library, and never add lint-suppression comments. `bun run typecheck` also
-checks the whole test tree (`tsconfig.test.json`); never exclude a file from it,
-and never fix a type error by changing what a test does. The only exceptions:
-`typescript`/`tsc` stays where files must be emitted (`build:lib` and SDK
-`.d.ts` builds, typedoc, compiler-API tests), because `bun check` never writes;
-and SDKs in languages Bun cannot format keep their language's own toolchain
-(`gofmt`/`go vet`, `cargo fmt`/`clippy`, `mix format`, `php -l`); the
-TypeScript in `sdk/conformance` still goes through `bun fmt`, and through
-`bun check` in the SDK workflow once the SDK it imports is built.
+**MANDATORY — BUN-NATIVE TOOLING ONLY**: type check exclusively with `bun check`
+and format exclusively with `bun fmt`, everywhere in the repository and in every
+SDK: `src`, `test`, `scripts`, `bench`, `examples`, `sdk/typescript` and
+`sdk/conformance`. Use the scripts (`bun run typecheck`, `bun run format`,
+`bun run format:check`, `bun run check`); inside scripts, hooks and CI always pass
+`--no-script`. Never add or run `tsc --noEmit`, ESLint, Prettier, Biome, oxlint,
+oxfmt, dprint or any other type-check, lint or format library, and never add
+lint-suppression comments. `bun run typecheck` also checks the whole test tree
+(`tsconfig.test.json`); never exclude a file from it, and never fix a type error by
+changing what a test does. Only exceptions: `typescript`/`tsc` stays where files
+must be emitted (`build:lib` and SDK `.d.ts` builds, typedoc, compiler-API tests),
+because `bun check` never writes; SDKs in languages Bun cannot format keep their
+language's own toolchain (`gofmt`/`go vet`, `cargo fmt`/`clippy`, `mix format`,
+`php -l`); the TypeScript in `sdk/conformance` still goes through `bun fmt`, and
+through `bun check` in the SDK workflow once the SDK it imports is built.
 
-**ENGLISH ONLY**: keep all repository content in English, including source
-comments, tests, technical documentation, user documentation and agent
-configuration.
+**MANDATORY — after ANY code modification, run `bun run test:sandbox` before
+committing.** It builds the worktree once and runs ALL THREE required suites
+concurrently in separate disposable containers: `bun test --parallel=4` (unit),
+`bun scripts/tcp/run-all-tests.ts` (TCP, ~50 suites) and
+`bun scripts/embedded/run-all-tests.ts` (embedded, ~35 suites). Never commit
+without all three passing. No exceptions.
 
-"When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test."
-
-**MANDATORY: After ANY code modification, run the isolated validation before committing:**
-
-```bash
-bun run test:sandbox
-```
-
-It builds the current worktree once and runs ALL THREE required suites concurrently in separate disposable containers:
-
-```bash
-bun test --parallel=4                   # Unit tests (four isolated file workers)
-bun scripts/tcp/run-all-tests.ts        # TCP integration tests (~50 suites)
-bun scripts/embedded/run-all-tests.ts   # Embedded integration tests (~35 suites)
-```
-
-Never commit without all three passing. No exceptions.
-
-**MANDATORY for core queue semantics: run the real-broker model before the
-sandbox:**
-
-```bash
-bun run test:model
-```
-
-Run it after every change to lifecycle transitions, SQLite/write buffering,
+**MANDATORY for core queue semantics — run `bun run test:model` before the
+sandbox** after every change to lifecycle transitions, SQLite/write buffering,
 startup or stall recovery, priority/FIFO/LIFO/delay scheduling, FIFO groups,
 dependencies, dedup/custom IDs, leases, limits, TTL, counters, temporal indexes,
-or `jobIndex`. The `fast-check` model executes generated command histories
-against a fresh TCP broker and SQLite database, including actual `SIGKILL`
-restarts. It checks conservation, no loss/resurrection/duplicate active lease,
-retry and stall bounds, legal transitions, ordering, resource limits,
-counter/index coherence, idempotent recovery, and DLQ exactly-once.
-
-On failure, retain the seed, minimized command history, and replay path. If the
-engine is wrong, add a deterministic `test/repro-model-*.test.ts` that fails
-before changing runtime code; if the specification is wrong, correct the model
-with evidence. Never weaken an invariant to make a campaign green. Deeper replay
-(`BUNQUEUE_MODEL_COMMANDS` is only the real bound with `BUNQUEUE_MODEL_SIZE=max`;
-at fast-check's default size a history has at most 10 commands):
+or `jobIndex`. The `fast-check` model runs generated command histories against a
+fresh TCP broker and SQLite database, with actual `SIGKILL` restarts, and checks
+conservation, no loss/resurrection/duplicate active lease, retry and stall
+bounds, legal transitions, ordering, resource limits, counter/index coherence,
+idempotent recovery, and DLQ exactly-once. On failure, retain the seed, minimized
+command history, and replay path. If the engine is wrong, add a deterministic
+`test/repro-model-*.test.ts` that fails before changing runtime code; if the
+specification is wrong, correct the model with evidence. Never weaken an
+invariant to make a campaign green. Deeper replay (`BUNQUEUE_MODEL_COMMANDS` is
+only the real bound with `BUNQUEUE_MODEL_SIZE=max`; at fast-check's default size
+a history has at most 10 commands):
 
 ```bash
 BUNQUEUE_MODEL_RUNS=500 BUNQUEUE_MODEL_COMMANDS=150 BUNQUEUE_MODEL_SIZE=max \
@@ -76,624 +100,96 @@ BUNQUEUE_MODEL_SEED=-1959189325 bun run test:model
 
 Replay one failure exactly with the seed, path and size fast-check prints:
 `BUNQUEUE_MODEL_SEED=<seed> BUNQUEUE_MODEL_PATH=<path> BUNQUEUE_MODEL_SIZE=<size> bun run test:model`.
-
-This targeted command does not replace `bun run test:sandbox`; the full
-`bun test --parallel=4` unit command inside the sandbox runs the model again.
-
-**MANDATORY: After ANY modification under `sdk/`, run before handoff (and run
-again before committing if the SDK changed afterward):**
-
-```bash
-bun run test:sandbox:sdk
-```
-
-It runs every official external SDK's native tests and shared protocol
-conformance checks in isolated disposable containers. SDK changes require both
-full gates (`test:sandbox` and `test:sandbox:sdk`); targeted native tests do not
-replace either one. Review `artifacts/test-sandbox-sdk/<timestamp>/summary.md`
-and its JSON/NDJSON artifacts before handoff.
-
-### Test isolation rules
-
-- Run repository tests in isolated OrbStack Machines by default. A macOS-host test is diagnostic only and is not final validation evidence.
-- Use a fresh disposable Ubuntu 24.04 Machine on the Mac's native architecture (4 CPUs, request 16 GiB memory, at least 32 GiB disk) as the canonical local Linux gate. On Apple Silicon this is `arm64`; native `amd64` is covered independently by GitHub Actions `ubuntu-latest`. For every release, repeat the native product suites in a fresh Debian 13 Machine on the same host-native architecture. Record the effective cgroup limits because OrbStack may clamp requested resources.
-- A translated `amd64` Machine on Apple Silicon is diagnostic only. Repeat any result on a native-architecture Machine before using it as release evidence; process-heavy Bun tests may behave differently under Rosetta.
-- Create both Machines with `--isolated --isolate-network`. Never use `--mount` or `--forward-ssh-agent`, and never expose the repository, home directory, Docker socket, SSH agent, credentials, tokens, real `.env` files, or ignored files. A tracked placeholder-only template such as `.env.example` is allowed only after review. Copy an explicit sanitized snapshot over OrbStack's built-in SSH transport, including all intended worktree changes but excluding `.git`, dependencies, artifacts, SQLite files, generated output, and secrets.
-- Pin the same Bun version as CI and use the frozen lockfile. Directly inside each Machine run `bun test --parallel=4`, the TCP runner, the embedded runner, `bun run typecheck` (`bun check`), and `bun run format:check` (`bun fmt`). Run `git diff --check` on the host before snapshot transfer because `.git` is deliberately excluded. Record the OS, architecture, kernel, Bun version/revision, commands, exit codes, durations, and exact totals before deleting the Machine.
-- OrbStack Machines share OrbStack's underlying Linux kernel. Treat them as strong filesystem/process/network isolation, not as a separate-kernel or physical security boundary.
-- The Machine gates supplement `bun run test:sandbox` and `bun run test:sandbox:sdk`; they do not replace them. Benchmarks remain native macOS-only and must never be published from a Machine or container.
-- The three top-level suite containers run in parallel by default; use `BUNQUEUE_TEST_SEQUENTIAL=1` only to diagnose resource contention.
-- Isolation covers processes, writable filesystems, `/tmp`, network namespaces, ports, databases, and environment. It is not physical isolation: containers share the OrbStack VM kernel plus host CPU, memory, and disk scheduling. Reproduce parallel-only failures sequentially before classifying them as application bugs.
-- Use `artifacts/test-sandbox/<timestamp>/` for complete, untruncated suite logs; failed containers remain available for inspection.
-- Use `artifacts/test-sandbox-sdk/<timestamp>/` for the equivalent SDK logs,
-  telemetry and retained failed containers.
-- Every sandbox run must also preserve per-suite resource samples (`*.metrics.ndjson`), per-suite JSON, and aggregate `summary.json`/`summary.md`. Review CPU, memory, PID, I/O, duration, slow-test, OOM, and anomaly KPIs before handoff.
-- Container memory growth is an investigation signal, not automatic proof of a leak; individual tests share the same process and heap. Confirm leaks with focused repeated-process and post-GC evidence.
-- The sandbox must not mount the repository, Docker socket, credentials, or the user's home, and test containers must have no external network.
-- Every TCP functional test file gets a fresh server, dynamic TCP/HTTP ports, and a unique temporary SQLite directory. Never reuse a developer server or database.
-- CI pins the same Bun version and frozen lockfile as the sandbox. Do not replace either with `latest` or an unlocked install.
-- Docker Compose is only for functional tests that require external services, with a unique project name and disposable volumes.
-- Benchmarks are always native, never Docker/VM. Every sample needs a fresh server, database, ports, queues, and competitor state.
-
-Full rationale and commands: `docs/testing.md`.
-
-**MANDATORY: Keep the technical documentation in `/docs` in sync with the code.**
-
-Any change to the code MUST update the corresponding technical documentation under `docs/` in the **same** change-set — never as a follow-up. This keeps the docs continuously aligned with the current state of the codebase.
-
-- The internal technical reference lives at `docs/README.md` (index), `docs/architecture.md`, `docs/data-model.md`, and `docs/features/<slug>.md` (one file per module).
-- When you touch a module, update its `docs/features/<slug>.md` (purpose, public interface, control flow, edge cases, config). New module → add a feature doc and link it from `docs/README.md` and `docs/architecture.md`.
-- Changing a type, SQLite table/index, TCP command, HTTP endpoint, env var, or default → update `docs/data-model.md` and/or the relevant feature doc.
-- Adding/removing a component or changing a data flow → update `docs/architecture.md` (component diagram, flows, module map).
-- The user-facing site (`docs/src/content/docs/**`, Astro) and `docs/src/content/docs/changelog.md` are separate; updating the internal `/docs` reference does not replace the changelog rule below.
-
-A code change is not complete until `/docs` reflects it. No exceptions.
-
-**MANDATORY: For every commit:**
-
-1. Update `docs/src/content/docs/changelog.md` for the staged changes and
-   include that update in the same commit.
-2. Use a mandatory, non-empty, concise, specific English commit message that
-   describes the actual changes; generic placeholder messages are forbidden.
-
-**MANDATORY: Before every push:**
-
-1. Verify that each outgoing commit already contains its corresponding
-   changelog update and has a compliant commit message.
-2. Do not edit the changelog solely because a push is being performed; the
-   push-time requirement is verification, not another changelog cycle.
-3. Run `git push origin main` only with the user's explicit authorization.
-
-Version bumps and package publication are separate release actions. Perform
-either one only when the user explicitly requests it; permission to commit or
-push does not authorize a version change or package publication. Never publish
-from a local machine: npm packages are published only by the CI release jobs
-through npm trusted publishing (see Publishing below).
-
-High-performance job queue server for Bun. SQLite persistence, cron jobs, priorities, DLQ, S3 backups.
-
-## Architecture Flow
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CLIENT                                          │
-│  Queue.add() ─────┐                              ┌───── Worker.process()    │
-│  Queue.addBulk() ─┤                              │                          │
-│                   ▼                              ▼                          │
-│            ┌──────────┐                   ┌──────────┐                      │
-│            │ TcpPool  │◄─── msgpack ────► │ TcpPool  │                      │
-│            └────┬─────┘                   └────┬─────┘                      │
-└─────────────────┼──────────────────────────────┼────────────────────────────┘
-                  │ TCP :6789                    │
-┌─────────────────┼──────────────────────────────┼────────────────────────────┐
-│                 ▼           SERVER             ▼                            │
-│          ┌───────────┐                  ┌───────────┐                       │
-│          │ TcpServer │                  │ TcpServer │                       │
-│          └─────┬─────┘                  └─────┬─────┘                       │
-│                │                              │                             │
-│                ▼                              ▼                             │
-│   ┌────────────────────────────────────────────────────────────┐           │
-│   │                    QueueManager                             │           │
-│   │  ┌─────────────────────────────────────────────────────┐   │           │
-│   │  │              N Shards (auto-detected)                │   │           │
-│   │  │  ┌─────────┬─────────┬─────────┬─────────┐          │   │           │
-│   │  │  │ Shard 0 │ Shard 1 │   ...   │ Shard N │          │   │           │
-│   │  │  │┌───────┐│┌───────┐│         │┌───────┐│          │   │           │
-│   │  │  ││PQueue ││PQueue ││         ││PQueue ││          │   │           │
-│   │  │  │└───────┘│└───────┘│         │└───────┘│          │   │           │
-│   │  │  └─────────┴─────────┴─────────┴─────────┘          │   │           │
-│   │  └─────────────────────────────────────────────────────┘   │           │
-│   │                           │                                 │           │
-│   │  ┌────────────────────────┼────────────────────────────┐   │           │
-│   │  │  jobIndex (Map)        │   completedJobs (Set)      │   │           │
-│   │  │  customIdMap (LRU)     │   jobResults (LRU)         │   │           │
-│   │  └────────────────────────┼────────────────────────────┘   │           │
-│   └───────────────────────────┼─────────────────────────────────┘           │
-│                               │                                             │
-│   ┌───────────────────────────┼─────────────────────────────────┐           │
-│   │                           ▼                                 │           │
-│   │  ┌─────────────┐    ┌──────────┐    ┌─────────────┐        │           │
-│   │  │ WriteBuffer │───►│ SQLite   │◄───│ Recovery /  │        │           │
-│   │  │ (10ms batch)│    │ WAL Mode │    │ SQL queries │        │           │
-│   │  └─────────────┘    └──────────┘    └─────────────┘        │           │
-│   │                      Persistence                            │           │
-│   └─────────────────────────────────────────────────────────────┘           │
-│                                                                             │
-│   ┌───────────────────────────────────────────────────────────┐             │
-│   │  Background Tasks                                          │             │
-│   │  • Scheduler (cron, delayed jobs)    • Stall detector     │             │
-│   │  • DLQ maintenance (retry, expire)   • Lock expiration    │             │
-│   │  • Cleanup (memory bounds)           • S3 backup          │             │
-│   └───────────────────────────────────────────────────────────┘             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-**Request Flow:**
-
-1. **PUSH**: Client → TcpPool → TcpServer → QueueManager → Shard[hash(queue)] → PriorityQueue → WriteBuffer → SQLite
-2. **PULL**: Client → TcpServer → QueueManager → Shard → PriorityQueue.pop() → Job (state: active)
-3. **ACK**: Client → TcpServer → AckBatcher → Shard.complete() → jobResults (LRU) + completedJobs (Set)
-4. **FAIL**: Client → TcpServer → Shard.fail() → retry (backoff) OR → DLQ (max attempts)
-
-## Directory Structure
-
-```
-src/
-├── cli/              # CLI interface (commands/, client.ts, output.ts)
-├── client/           # Embedded SDK (Queue, Worker, FlowProducer, QueueGroup)
-│   ├── queue/        # Queue with DLQ, stall detection
-│   ├── worker/       # Worker with heartbeat, ack batching
-│   └── tcp/          # Connection pool, reconnection
-├── domain/           # Pure business logic (types/, queue/)
-│   └── queue/        # Shard, PriorityQueue, DlqShard, UniqueKeyManager
-├── application/      # Use cases (operations/, managers)
-│   ├── operations/   # push, pull, ack, query, queueControl
-│   └── *Manager.ts   # DLQ, Events, Workers, JobLogs, Stats
-├── infrastructure/   # External (persistence/, server/, scheduler/, backup/)
-└── shared/           # Utilities (hash, lock, lru, skipList, minHeap)
-```
-
-## Code Guidelines
-
-- **MAX 300 lines per file** - split if larger
-- One concern per file (Single Responsibility)
-- Export only what's needed
-
-## Sharding (auto-detected from CPU cores)
-
-Shard count is automatically calculated based on CPU cores (power of 2, max 64):
-
-```typescript
-// Calculated at startup based on navigator.hardwareConcurrency
-// Examples: 4 cores → 4 shards, 10 cores → 16 shards, 20 cores → 32 shards
-const SHARD_COUNT = calculateShardCount(); // Power of 2, capped at 64
-const SHARD_MASK = SHARD_COUNT - 1;
-const shardIndex = (key: string) => fnv1aHash(key) & SHARD_MASK;
-```
-
-## Lock Hierarchy (acquire in order)
-
-1. `jobIndex` → 2. `completedJobs` → 3. `shards[N]` → 4. `processingShards[N]`
-
-```typescript
-// CORRECT: read first, then acquire lock
-const completed = completedJobs.has(id);
-const shard = await shards[idx].acquire();
-try {
-  /* work */
-} finally {
-  shard.release();
-}
-```
-
-## Memory Bounds
-
-| Collection     | Max Size          | Eviction                                     |
-| -------------- | ----------------- | -------------------------------------------- |
-| completedJobs  | 50,000            | FIFO batch                                   |
-| jobResults     | 10,000            | LRU                                          |
-| jobLogs        | 10,000            | LRU                                          |
-| customIdMap    | 50,000            | LRU                                          |
-| removedResults | 1,000 (60 s TTL)  | Expired first; 10% batch at cap; memory only |
-
-Cleanup runs every 10s (it also purges expired `removedResults`). Evicts 10% when full.
-
-## Environment Variables
-
-```bash
-# Server
-TCP_PORT=6789              HTTP_PORT=6790
-HOST=0.0.0.0               BUNQUEUE_DATA_PATH=./data/bunq.db
-AUTH_TOKENS=token1,token2  CORS_ALLOW_ORIGIN=*
-METRICS_AUTH=false          # Require auth for /metrics endpoint
-TCP_SOCKET_PATH=           # RESERVED, not wired: TCP always binds HOST:TCP_PORT
-                           # (client ConnectionOptions.socketPath is not read either)
-HTTP_SOCKET_PATH=          # Unix socket for HTTP (works)
-TLS_CERT_FILE=             # PEM cert — native TLS on TCP+HTTP (with TLS_KEY_FILE); SIGHUP reloads
-TLS_KEY_FILE=              # PEM private key (both or neither; partial = startup error)
-
-# Memory-only result of removeOnComplete jobs for late waits (memory/SQLite; 0 = off)
-BUNQUEUE_REMOVED_RESULT_RETENTION_MS=60000  BUNQUEUE_MAX_REMOVED_RESULTS=1000
-
-# Data path (priority: BUNQUEUE_DATA_PATH > BQ_DATA_PATH > DATA_PATH > SQLITE_PATH)
-# Or set programmatically: new Queue('q', { embedded: true, dataPath: './data/q.db' })
-
-# S3 Backup
-S3_BACKUP_ENABLED=0        S3_BUCKET=my-bucket
-S3_ACCESS_KEY_ID=          S3_SECRET_ACCESS_KEY=
-S3_REGION=us-east-1        S3_ENDPOINT=
-S3_BACKUP_INTERVAL=21600000  S3_BACKUP_RETENTION=7
-
-# Timeouts
-SHUTDOWN_TIMEOUT_MS=30000  STATS_INTERVAL_MS=300000
-WORKER_TIMEOUT_MS=30000    LOCK_TIMEOUT_MS=5000
-WEBHOOK_MAX_RETRIES=3      WEBHOOK_RETRY_DELAY_MS=1000
-
-# Cloud (bunqueue.io dashboard)
-BUNQUEUE_CLOUD_URL=        BUNQUEUE_CLOUD_API_KEY=
-BUNQUEUE_CLOUD_INSTANCE_ID=    # REQUIRED for cloud mode
-BUNQUEUE_CLOUD_INSTANCE_NAME=  # defaults to hostname
-BUNQUEUE_CLOUD_INTERVAL_MS=15000  # validated only; cadence is adaptive (5-30s by snapshot size)
-BUNQUEUE_CLOUD_USE_WEBSOCKET=true
-BUNQUEUE_CLOUD_USE_HTTP=true
-BUNQUEUE_CLOUD_REMOTE_COMMANDS=true   # opt out with false/0/no/off
-BUNQUEUE_CLOUD_INCLUDE_JOB_DATA=true  # opt out with false/0/no/off
-BUNQUEUE_CLOUD_REDACT_FIELDS=  # comma-separated
-BUNQUEUE_CLOUD_EVENTS=         # event filter, comma-separated
-BUNQUEUE_CLOUD_BUFFER_SIZE=720
-BUNQUEUE_CLOUD_CIRCUIT_BREAKER_THRESHOLD=5
-BUNQUEUE_CLOUD_CIRCUIT_BREAKER_RESET_MS=60000
-BUNQUEUE_CLOUD_SIGNING_SECRET=  # HMAC signing
-```
-
-## TCP Protocol Commands
-
-**Core:** `PUSH`, `PUSHB`, `PULL`, `PULLB`, `ACK`, `ACKB`, `FAIL`
-
-**Query:** `GetJob`, `GetState`, `GetResult`, `GetJobs`, `GetJobCounts`, `GetProgress`, `Count`
-
-**Control:** `Pause`, `Resume`, `Drain`, `Obliterate`, `Clean`, `Cancel`, `Promote`, `Update`, `ChangePriority`
-
-**DLQ:** `Dlq`, `RetryDlq`, `PurgeDlq`
-
-**Cron:** `Cron`, `CronDelete`, `CronList`
-
-**Monitor:** `Stats`, `Metrics`, `Prometheus`, `Ping`, `Heartbeat`, `JobHeartbeat`
-
-**Workers:** `RegisterWorker`, `UnregisterWorker`, `ListWorkers`
-
-**Webhooks:** `AddWebhook`, `RemoveWebhook`, `ListWebhooks`
-
-**Rate:** `RateLimit`, `RateLimitClear`, `SetConcurrency`, `ClearConcurrency`
-
-## CLI Usage
-
-```bash
-# Server
-bunqueue start --tcp-port 6789 --data-path ./data/queue.db
-
-# Client
-bunqueue push <queue> <json> [--priority N] [--delay ms]
-bunqueue pull <queue> [--timeout ms]
-bunqueue ack <id> [--result json]
-bunqueue fail <id> [--error msg]
-bunqueue job get|state|cancel|promote|discard <id>
-bunqueue queue pause|resume|drain|obliterate <queue>
-bunqueue dlq list|retry|purge <queue>
-bunqueue cron list|add|delete
-bunqueue stats|metrics|health
-```
-
-## Simple Mode (Bunqueue)
-
-All-in-one Queue + Worker with routes, middleware, and cron:
-
-```typescript
-import { Bunqueue } from 'bunqueue/client';
-
-const app = new Bunqueue('tasks', {
-  embedded: true,
-  // Single processor OR named routes
-  routes: {
-    'send-email': async (job) => { return { sent: true }; },
-    'send-sms': async (job) => { return { sent: true }; },
-  },
-  concurrency: 10,
-});
-
-// Middleware (onion model: mw1 → mw2 → processor → mw2 → mw1)
-app.use(async (job, next) => {
-  const start = Date.now();
-  const result = await next();
-  console.log(`${job.name} took ${Date.now() - start}ms`);
-  return result;
-});
-
-// Cron
-await app.cron('daily', '0 9 * * *', { type: 'report' });
-await app.every('ping', 30000, { type: 'health' });
-
-// Events, add, control
-app.on('completed', (job, result) => {});
-await app.add('send-email', { to: 'user@test.com' });
-app.pause(); app.resume();
-await app.close();
-```
-
-Key: `Bunqueue` = wrapper around `Queue` + `Worker`. Use `processor` OR `routes`, not both. Middleware wraps the processor. Cron delegates to `queue.upsertJobScheduler()`. For distributed (separate producer/consumer), use `Queue` + `Worker` directly.
-
-Source: `src/client/bunqueue.ts`
-
-## Workflow Engine
-
-Multi-step orchestration with saga compensation, branching, parallel steps, retry, nested workflows, loops (doUntil/doWhile), forEach, map, schema validation, subscribe, observability, and human-in-the-loop signals:
-
-```typescript
-import { Workflow, Engine } from 'bunqueue/workflow';
-
-const flow = new Workflow('order')
-  .step('validate', async (ctx) => {
-    const { orderId } = ctx.input as { orderId: string };
-    return { orderId };
-  })
-  .step('charge', async (ctx) => {
-    return { txId: 'tx_123' };
-  }, { compensate: async () => { /* auto-rollback on failure */ }, retry: 3 })
-  .parallel((w) => w
-    .step('notify-warehouse', async () => ({ notified: true }))
-    .step('notify-email', async () => ({ sent: true }))
-  )
-  .branch((ctx) => (ctx.steps['classify'] as { tier: string }).tier)
-  .path('vip', (w) => w.step('vip-handler', async () => ({ discount: 20 })))
-  .path('basic', (w) => w.step('basic-handler', async () => ({ discount: 0 })))
-  .forEach(                                        // iterate over items
-    (ctx) => (ctx.input as { items: unknown[] }).items,
-    'process-item', async (ctx) => { return { item: ctx.steps.__item }; },
-  )
-  .map('summary', (ctx) => ({ total: 42 }))       // synchronous transform
-  .doUntil(                                         // loop until condition
-    (ctx) => (ctx.steps['poll'] as any)?.ready,
-    (w) => w.step('poll', async () => ({ ready: true })),
-    { maxIterations: 10 },
-  )
-  .waitFor('approval', { timeout: 86400000 })      // pauses until engine.signal(), 24h timeout
-  .subWorkflow('payment', (ctx) => ({ amount: 99 }))  // nested workflow
-  .step('finalize', async (ctx) => {
-    const decision = ctx.signals['approval'];
-    const payment = ctx.steps['sub:payment'];
-    return { done: true };
-  });
-
-const engine = new Engine({ embedded: true, onEvent: (e) => console.log(e.type) });
-engine.register(flow);
-engine.on('step:retry', (e) => logger.warn(e));
-const run = await engine.start('order', { orderId: 'ORD-1' });
-await engine.signal(run.id, 'approval', { approved: true });
-engine.archive(7 * 24 * 60 * 60 * 1000); // archive old executions
-const unsub = engine.subscribe(run.id, (e) => console.log(e.type)); // per-execution subscribe
-```
-
-Key: `Workflow` = pure DSL builder (step/branch/path/parallel/waitFor/subWorkflow/doUntil/doWhile/forEach/map). `Engine` = facade over Queue + Worker + SQLite Store + Executor + Emitter. Each step runs as a bunqueue job on `__wf:steps` queue. Features: retry with exponential backoff, parallel via Promise.allSettled, nested workflows via polling, signal timeout, loops (doUntil/doWhile/forEach), map transforms, schema validation AND coercion (duck-typed `.parse()`, its return value is used), per-execution subscribe, typed events (15 types), cleanup/archival. Compensation runs in reverse start order on failure, and an unresolved failed reversal keeps the chain parked instead of reporting a clean rollback.
-
-Source: `src/client/workflow/` (workflow.ts, engine.ts, executor.ts, store.ts, runner.ts, emitter.ts, loops.ts, types.ts, compensator.ts, recovery.ts, waitFor.ts, rollbackControl.ts, storeSignals.ts, storeWaitExpiry.ts, storeCodec.ts, identity.ts, clock.ts, unwindPlan.ts, admission.ts)
-
-The decision logic is pure and separately testable: `unwindPlan.ts` decides what an
-unwind does with each record, `admission.ts` decides whether a node job may run, and
-`clock.ts` is the single source of time and randomness, so a seed can drive the engine's
-own non-determinism.
-
-## Client SDK
-
-```typescript
-import { Queue, Worker } from 'bunqueue/client';
-
-// Queue (TCP mode)
-const queue = new Queue<T>('emails', { connection: { port: 6789 } });
-
-// Queue (TCP + TLS): tls: true (system CAs) | { caFile } | { rejectUnauthorized: false }
-const tlsQueue = new Queue<T>('emails', {
-  connection: { host: 'queue.example.com', port: 6789, tls: { caFile: './ca.pem' } },
-});
-
-// Store-and-forward (edge → central): drains local jobs to a remote server.
-// Remote failure → local retry/DLQ (nothing lost); deterministic remote jobId
-// fwd:<queue>:<localId> dedupes re-forwards only while the remote job is live
-// (waiting, delayed or active); completion or the DLQ releases the custom id, so a
-// later re-forward creates a new job. Source: src/client/forwarder.ts
-const fwd = embeddedQueue.forward({
-  to: { host: 'central', port: 6789, tls: true },
-  queue: 'ingest', // optional remote name
-});
-fwd.on('forwarded', (info) => {});
-await fwd.close();
-
-// Queue (embedded mode — programmatic dataPath, no env var needed)
-const embeddedQueue = new Queue<T>('emails', {
-  embedded: true,
-  dataPath: './data/myapp.db',
-});
-await queue.add('send', { email: 'user@test.com' });
-await queue.add('payment', data, { durable: true }); // Immediate disk write
-queue.pause();
-queue.resume();
-queue.drain();
-queue.obliterate();
-
-// Worker
-const worker = new Worker(
-  'emails',
-  async (job) => {
-    await job.updateProgress(50);
-    return { sent: true };
-  },
-  { concurrency: 5, heartbeatInterval: 10000 }
-);
-
-worker.on('completed', (job, result) => {});
-worker.on('failed', (job, err) => {});
-
-// Stall Detection (embedded only)
-queue.setStallConfig({ stallInterval: 30000, maxStalls: 3, gracePeriod: 5000 });
-
-// DLQ (embedded only)
-queue.setDlqConfig({ autoRetry: true, maxAge: 604800000, maxEntries: 10000 });
-const entries = queue.getDlq({ reason: 'timeout' });
-queue.retryDlq();
-queue.purgeDlq();
-
-// Auto-batching (TCP mode, enabled by default)
-// Transparently batches concurrent add() calls into PUSHB commands.
-// Strategy: flush immediately if idle, buffer during in-flight flush.
-// Sequential await has zero overhead; concurrent adds get ~3x speedup.
-const queue2 = new Queue('jobs', {
-  autoBatch: { maxSize: 50, maxDelayMs: 5 },  // defaults
-});
-// Sequential: no penalty, each add() sends immediately
-for (const item of items) {
-  await queue2.add('task', item); // same speed as without batching
-}
-// Concurrent: adds batch into a single PUSHB round-trip (~3x faster)
-await Promise.all([
-  queue2.add('a', { x: 1 }),
-  queue2.add('b', { x: 2 }),
-  queue2.add('c', { x: 3 }),
-]);
-// Durable jobs bypass the batcher (sent as individual PUSH):
-await queue2.add('critical', data, { durable: true });
-// Disable auto-batching:
-const queue3 = new Queue('jobs', { autoBatch: { enabled: false } });
-```
-
-## Job Options
-
-```typescript
-interface JobOptions {
-  priority?: number; // Higher = sooner
-  delay?: number; // ms before processing
-  attempts?: number; // Max retries (default: 3)
-  backoff?: number; // Retry backoff (default: 1000ms)
-  timeout?: number; // Processing timeout
-  jobId?: string; // Custom ID (idempotent)
-  removeOnComplete?: boolean;
-  removeOnFail?: boolean;
-  durable?: boolean; // Bypass write buffer
-}
-```
-
-## Worker Options
-
-```typescript
-interface WorkerOptions {
-  concurrency?: number; // Parallel jobs (default: 1)
-  heartbeatInterval?: number; // Stall detection (default: 10000, 0=disabled)
-  batchSize?: number; // Pull batch (default: 10, max: 1000)
-  pollTimeout?: number; // Long poll (default: 0, max: 30000)
-  useLocks?: boolean; // Lock-based ownership (default: true)
-}
-```
-
-## SQLite Schema (Key Tables)
-
-```sql
--- Jobs: id, queue, data, priority, state, run_at, attempts, ...
-CREATE INDEX idx_jobs_queue_state ON jobs(queue, state);
-CREATE INDEX idx_jobs_run_at ON jobs(run_at)
-  WHERE state IN ('waiting','prioritized','waiting-children','delayed');
-
--- DLQ: id, job_id, queue, entry (msgpack blob), entered_at
--- Cron: name, queue, data, schedule, repeat_every, next_run, timezone
--- Results: job_id, result, completed_at
-```
-
-## Testing
-
-```bash
-bun test --parallel=4                   # Run in each required OrbStack Machine
-bun scripts/tcp/run-all-tests.ts        # Run in each required OrbStack Machine
-bun scripts/embedded/run-all-tests.ts   # Run in each required OrbStack Machine
-bun run test:sandbox                    # Additional container-isolated full gate
-bun run test:sandbox:sdk                # Additional gate after SDK changes
-bun run bench                           # Native macOS benchmarks only
-```
-
-## Publishing
-
-npm packages (`bunqueue` from `ci.yml`, `bunqueue-client` from
-`sdk-release.yml`) are published only by GitHub Actions through **npm trusted
-publishing** (OIDC, GitHub environment `npm`), with a provenance attestation and
-no long-lived npm token. Bun installs, builds and packs the tarball; the npm CLI
-(>= 11.5.1) dry-runs and publishes exactly that tarball, because Bun's publisher
-has no OIDC or provenance support. Never run `bun publish` or `npm publish`
-locally, and never reintroduce an `NPM_TOKEN` secret.
-
-## Release blog posts
-
-Every release gets a professional blog post at
-`/blog/bunqueue-vX-Y-Z/`, in the style of Bun's release posts (bun.com/blog).
-The release-preparation commit (the one that dates the changelog section) must
-include it:
-
-1. Run `bun docs/scripts/generate-release-posts.ts`. It writes a draft post for
-   every dated changelog section (`docs/src/content/docs/blog/bunqueue-vX-Y-Z.md`)
-   with the install/upgrade box, feature sections, bugfixes and contributors.
-2. Rewrite the new release's draft by hand into a professional article: a
-   description that leads with the user-visible outcome and real numbers; a
-   short intro on why the release matters; one `##` section per notable change,
-   titled as a claim ("Dashboards no longer cost a full scan every 10 ms") with
-   prose plus before/after tables or code; then "Other improvements",
-   "Bugfixes", "Thanks to N contributors!" and the link to the previous
-   release. Every fact and figure must come from the changelog or real
-   measurements; never invent numbers, quotes or features.
-3. Delete the `<!-- Generated from changelog.md ... -->` marker from the
-   rewritten post. The generator never overwrites a post without the marker.
-4. After the release is tagged and published, run
-   `bun docs/scripts/generate-release-posts.ts --refresh` (contributors, npm,
-   Docker and GitHub release data in `docs/src/data/releaseMeta.json`), then
-   regenerate and update the hand-written post's install box and contributors.
-
-CI runs `generate-release-posts.ts --check`: a stale or missing post fails the
-docs job. The GitHub release body links to the post, the blog index and RSS
-list it, and the home page announces the newest release post.
-
-## Performance
-
-| Mode               | Throughput      | Data Loss Risk |
-| ------------------ | --------------- | -------------- |
-| Buffered (default) | ~100k jobs/sec  | Up to 10ms     |
-| Durable            | ~10k jobs/sec   | None           |
-| Auto-batch (TCP)   | ~145k ops/s (concurrent), ~10k ops/s (sequential) | None (same as PUSH/PUSHB) |
-
-## Debug Endpoints
-
-```bash
-curl http://localhost:6790/health     # Health + memory
-curl http://localhost:6790/heapstats  # Object breakdown
-curl -X POST http://localhost:6790/gc # Force GC
-```
-
-## Memory Debugging
-
-```typescript
-import { heapStats } from 'bun:jsc';
-Bun.gc(true);
-const stats = heapStats();
-console.log(stats.objectCount, stats.objectTypeCounts);
-
-// Check internal collections
-const mem = queueManager.getMemoryStats();
-// jobIndex, completedJobs, processingTotal, queuedTotal, temporalIndexTotal
-```
-
-## CPU and Memory Profiling
-
-- Profile a representative full workload for long enough to collect meaningful
-  samples; a smoke run only validates the harness. Use fresh process/state and a
-  separate unprofiled baseline. Profiled timings are diagnostic, not publishable
-  benchmark results.
-- Generate both CPU views in one native run:
-  `bun --cpu-prof --cpu-prof-md --cpu-prof-dir=<artifact-dir> <workload>`.
-  Triage self/total time and callers in Markdown, then inspect the `.cpuprofile`
-  in Chrome DevTools or VS Code.
-- Generate heap formats in separate native runs because `--heap-prof-md`
-  overrides `--heap-prof` when combined:
-  `bun --heap-prof --heap-prof-dir=<artifact-dir> <workload>` and
-  `bun --heap-prof-md --heap-prof-dir=<artifact-dir> <workload>`. Exercise cleanup
-  and exit normally so the snapshots are written.
-- Prove leaks with repeated workload/cleanup cycles at equivalent checkpoints.
-  After `Bun.gc(true)`, record `bun:jsc` `heapStats()`, `process.memoryUsage()`, and
-  `QueueManager.getMemoryStats()`; compare retained types and retainer chains, not
-  RSS alone.
-- Bun has separate JavaScriptCore and native heaps. Use snapshots/stats for JS
-  retention and opt-in `Bun.unsafe.mimallocDump()` for native allocation. Never
-  expose profiles through an unauthenticated endpoint: snapshots may contain job
-  payloads or secrets. Keep outputs under ignored `artifacts/`.
-
-## Background Tasks
-
-| Task            | Interval | Purpose                        |
-| --------------- | -------- | ------------------------------ |
-| Cleanup         | 10s      | Memory cleanup, orphan removal |
-| Stall check     | 5s       | Detect unresponsive jobs       |
-| Dependency      | event-driven (30s safety fallback) | Process job dependencies |
-| DLQ maintenance | 60s      | Auto-retry, expiration         |
-| Lock expiration | 5s       | Remove expired locks           |
+Neither replaces `bun run test:sandbox`, whose unit suite runs the model again.
+
+**MANDATORY — after ANY modification under `sdk/`, run `bun run test:sandbox:sdk`**
+before handoff (and again before committing if the SDK changed afterward): every
+official external SDK's native tests and shared protocol conformance checks in
+isolated disposable containers. SDK changes require both full gates
+(`test:sandbox` and `test:sandbox:sdk`); targeted native tests replace neither.
+Review `artifacts/test-sandbox-sdk/<timestamp>/summary.md` and its JSON/NDJSON
+artifacts before handoff.
+
+**Test isolation** (all rules: [docs/testing.md](docs/testing.md#agent-test-rules)):
+run repository tests in isolated OrbStack Machines by default; a macOS-host run is
+diagnostic only. The Linux gate is a fresh disposable Ubuntu 24.04 Machine on the
+Mac's native architecture, plus Debian 13 for every release, created with
+`--isolated --isolate-network`, never `--mount`, a forwarded SSH agent or exposed
+secrets, with CI's Bun version and the frozen lockfile; Machine gates supplement
+the sandboxes, never replace them. Review the KPIs in
+`artifacts/test-sandbox/<timestamp>/` before handoff. Every TCP functional test
+file gets a fresh server, dynamic TCP/HTTP ports, and a unique temporary SQLite
+directory; never reuse a developer server or database. Benchmarks are native
+macOS only, never from a Machine or container.
+
+**MANDATORY — keep `/docs` in sync**: every code change updates the technical
+documentation in `docs/` in the same change-set, never as a follow-up: the
+module's `docs/features/<slug>.md` (purpose, public interface, control flow, edge
+cases, config); a new module gets a feature doc linked from `docs/README.md` and
+`docs/architecture.md`; a type, SQLite table/index, TCP command, HTTP endpoint,
+env var or default → `docs/data-model.md` and/or the feature doc; a component or
+data flow → `docs/architecture.md`. The user-facing site
+(`docs/src/content/docs/**`) and its changelog are separate: updating the internal
+`/docs` reference does not replace the changelog rule. A code change is not
+complete until `/docs` reflects it. No exceptions.
+
+## Definition of Done
+
+A work item is `done` only when all of these hold and its `evidence` in
+`feature_list.json` names the commands, exact totals, artifact paths and commit:
+
+- [ ] The behaviour is implemented; a bug has a reproducing test that failed
+      before the fix and passes after it.
+- [ ] The required gates ran and passed: `bun run test:sandbox` after any code
+      change, `bun run test:model` and `bun run test:sandbox:sdk` when triggered,
+      `bun run typecheck`, `bun run format:check`.
+- [ ] `/docs` and the changelog `[Unreleased]` section describe the change.
+- [ ] The skeptic verdict is `PASS` (`CONDITIONAL` only with the user's explicit
+      confirmation).
+- [ ] `./init.sh` is green, so the next session can restart from it.
+
+## End of Session
+
+1. Update your lines of the `progress.md` Current State (`**Last Updated:**`,
+   done, next, Blockers/Risks) and prepend a dated Session Log entry.
+2. Update your item in `feature_list.json`: `status`, `evidence`, `branch`.
+3. For multi-session work, fill a handoff from `session-handoff.md` into that
+   Session Log entry.
+4. Record every unresolved risk, blocker and gate you could not run.
+5. Leave `./init.sh` green and the worktree clean enough to restart from.
+6. Commit only through the gates (next section).
+
+## Commits, pushes and releases
+
+**MANDATORY — every commit**: update `docs/src/content/docs/changelog.md` for the
+staged changes and include it in the same commit, with a mandatory, non-empty,
+concise, specific English commit message describing the actual changes; generic
+placeholder messages are forbidden.
+
+**MANDATORY — before every push**: verify that each outgoing commit already
+contains its changelog update and a compliant message; do not edit the changelog
+solely because a push is being performed (the push-time requirement is
+verification, not another changelog cycle). Run `git push origin main` only with
+the user's explicit authorization.
+
+**Releases**: version bumps and package publication are separate release actions,
+performed only when the user explicitly requests them; permission to commit or
+push authorizes neither. Never publish from a local machine (never `bun publish`
+or `npm publish`, never an `NPM_TOKEN` secret): npm packages are published only by
+the CI release jobs through npm trusted publishing. Every release gets a
+hand-written post at `/blog/bunqueue-vX-Y-Z/` in the release-preparation commit,
+drafted with `bun docs/scripts/generate-release-posts.ts`:
+[docs/agents/release.md](docs/agents/release.md).
+
+## Where things live
+
+| Need | Read |
+| --- | --- |
+| Work items, state, handoff, startup check | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
+| The harness and its contract test | [docs/agents/README.md](docs/agents/README.md) |
+| Writing or running tests | [docs/testing.md](docs/testing.md) |
+| Architecture, env vars, TCP commands, CLI, schema | [docs/agents/project-reference.md](docs/agents/project-reference.md) |
+| Simple Mode, Workflow Engine, Client SDK, options | [docs/agents/client-reference.md](docs/agents/client-reference.md) |
+| Debug endpoints, profiling (never expose profiles unauthenticated) | [docs/agents/debugging.md](docs/agents/debugging.md) |
+| Publishing, release checklist, release posts | [docs/agents/release.md](docs/agents/release.md) |
+| Engineering reference | [docs/README.md](docs/README.md), [docs/architecture.md](docs/architecture.md), [docs/data-model.md](docs/data-model.md) |

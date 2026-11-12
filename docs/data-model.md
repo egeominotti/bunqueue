@@ -1832,7 +1832,8 @@ as `clientJobs` entries already did. The
 `maxWaitingDeps` compatibility option has a default of `10_000` but is not
 currently an admission or eviction limit. The other caps above reflect the
 source defaults in `src/application/types/config.ts` (for example
-`maxJobResults: 10_000`), matching the architecture summary in `CLAUDE.md`.
+`maxJobResults: 10_000`), matching the memory-bounds summary in
+[`agents/project-reference.md`](./agents/project-reference.md#memory-bounds).
 
 **Eviction policies:**
 

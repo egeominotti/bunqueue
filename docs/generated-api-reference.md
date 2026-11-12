@@ -215,7 +215,7 @@ can be added safely.
 
 ## Release integration
 
-The reference is **not** wired into the release flow yet. `bun run docs:api` is a manual step; running it after a version bump and before publishing keeps `/reference/` current. Automating it belongs with the version-bump step in `CLAUDE.md`.
+The reference is **not** wired into the release flow yet. `bun run docs:api` is a manual step; running it after a version bump and before publishing keeps `/reference/` current. Automating it belongs with the version-bump step of the [release checklist](./agents/release.md#release-checklist).
 
 **Commit the whole diff, not just the new tree.** A minor bump makes the demotion pass rewrite every page of the previous version, so `bun run docs:api` for v2.9 also touches all ~238 files under `v2.8/`. Staging only `v2.9/` leaves the published v2.8 indexable with a green build: `check-docs-data` validates `apiVersions.json` and tree tracking, not robots state, so nothing else would catch it.
 

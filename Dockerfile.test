@@ -29,6 +29,7 @@ COPY --chown=bun:bun docker-compose.postgres.yml ./
 COPY --chown=bun:bun docs/*.md ./docs/
 COPY --chown=bun:bun docs/benchmarks ./docs/benchmarks
 COPY --chown=bun:bun docs/features ./docs/features
+COPY --chown=bun:bun docs/agents ./docs/agents
 COPY --chown=bun:bun docs/src/content/docs ./docs/src/content/docs
 COPY --chown=bun:bun docs/src/components/examples ./docs/src/components/examples
 COPY --chown=bun:bun docs/src/lib/llms-full.ts ./docs/src/lib/llms-full.ts
@@ -36,6 +37,9 @@ COPY --chown=bun:bun docs/src/data/firstJob.ts ./docs/src/data/firstJob.ts
 COPY --chown=bun:bun docs/src/data/apiVersions.json ./docs/src/data/apiVersions.json
 COPY --chown=bun:bun docs/scripts/validate-discovery.ts ./docs/scripts/validate-discovery.ts
 COPY --chown=bun:bun README.md ./README.md
+# Agent harness (docs/agents/README.md): test/agent-harness-*.test.ts reads these.
+# COPY keeps the context's file mode, so init.sh stays executable.
+COPY --chown=bun:bun CLAUDE.md AGENTS.md feature_list.json progress.md session-handoff.md init.sh ./
 COPY --chown=bun:bun docs/src/lib/reference-seo.ts ./docs/src/lib/reference-seo.ts
 COPY --chown=bun:bun docs/src/lib/rehypeTableLabels.ts ./docs/src/lib/rehypeTableLabels.ts
 COPY --chown=bun:bun docs/src/styles/docs-theme.css docs/src/styles/docs-reading.css ./docs/src/styles/

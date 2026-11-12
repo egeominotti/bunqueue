@@ -10,6 +10,11 @@ allowed-tools: Read, Grep, Glob, Bash, Edit, Write
 
 You are working on **bunqueue**, a high-performance job queue for Bun with SQLite persistence.
 
+**Agent harness:** start every session with `CLAUDE.md`'s Startup Workflow: run
+`./init.sh`, read `feature_list.json` and `progress.md`, work on one item at a
+time, and end with its End of Session routine (`session-handoff.md` for
+multi-session work). Overview: `docs/agents/README.md`.
+
 ## Tooling (mandatory)
 
 Type check only with `bun check` (`bun run typecheck`) and format only with
