@@ -11,7 +11,7 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ## Current State
 
-**Last Updated:** 2026-11-12
+**Last Updated:** 2026-11-13
 **Active items:** many sessions run at once; the items in progress are the
 `in-progress` entries of `feature_list.json`, each with its owning `branch`.
 
@@ -30,16 +30,19 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 ### What's Next
 
 1. `release-2.9.22` (in progress at the user's explicit request): steps 1-5 of
-   [docs/agents/release.md](docs/agents/release.md) done and gated; after the push,
-   watch CI's version gate (tag, GitHub release, npm, Docker), then step 7
-   (`generate-release-posts.ts --refresh`, the post's install box and
-   contributors). See its `feature_list.json` evidence and the Session Log.
+   [docs/agents/release.md](docs/agents/release.md) done and gated. The push of
+   `769d9e2b` did not release (CI failed at Python 3.9 setup on Ubuntu 26.04); the
+   CI-fix commit is the one CI releases from. Watch that run's version gate (tag,
+   GitHub release, npm, Docker), then step 7 (`generate-release-posts.ts
+   --refresh`, the post's install box and contributors). See its
+   `feature_list.json` evidence.
 2. `issue-189-unix-socket-followups`: reproducing tests first for the two
    unix-socket rollback notes in `src/infrastructure/server/httpListener.ts`, then
    the fix.
 3. `agent-harness-followups`: the non-blocking notes of the harness review.
 4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
    `node` in the Bun-only OrbStack Machines.
+5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
 
 ## Blockers / Risks
 

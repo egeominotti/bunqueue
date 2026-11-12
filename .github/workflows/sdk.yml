@@ -151,13 +151,19 @@ jobs:
 
   python:
     name: Python ${{ matrix.python }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     services: *postgres-service
     strategy:
       fail-fast: false
+      # ubuntu-latest moved to Ubuntu 26.04, for which actions/setup-python has no
+      # Python 3.9 build, so the oldest supported runtime is pinned to ubuntu-24.04.
       matrix:
-        python: ['3.9', '3.13']
+        include:
+          - python: '3.9'
+            os: ubuntu-24.04
+          - python: '3.13'
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0

@@ -18,7 +18,7 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## [2.9.22] - 2026-11-12
+## [2.9.22] - 2026-11-13
 
 ### Features
 
@@ -470,6 +470,12 @@ head:
   and its allow-list now include them). Structural score measured with the
   course's `validate-harness.mjs`: 32/100 before, 100/100 after. Nothing in the
   package or the runtime changes.
+- The SDK workflow's Python 3.9 job runs on `ubuntu-24.04`. `ubuntu-latest`
+  moved to Ubuntu 26.04, for which `actions/setup-python` has no Python 3.9
+  build, so the job failed at setup and took the SDK gate, the quality gate and
+  the release with it. Python 3.13 stays on `ubuntu-latest`, so the matrix
+  still covers the oldest supported runtime and the current image.
+  (`test/repro-ci-python39-runner.test.ts`)
 
 ### Documentation
 

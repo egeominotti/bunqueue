@@ -580,7 +580,10 @@ workflow. Its six language jobs converge on `sdk-gate`; the root `quality-gate`
 requires that result together with every core/docs suite, and all binary,
 container, GitHub-release, and npm publication paths are downstream. The SDK
 workflow has no separate push trigger, avoiding a race where publishing could
-finish before an independent SDK failure arrived.
+finish before an independent SDK failure arrived. Every job runs on
+`ubuntu-latest` except Python 3.9, which is pinned to `ubuntu-24.04`:
+`ubuntu-latest` is Ubuntu 26.04, for which `actions/setup-python` has no
+Python 3.9 build (`test/repro-ci-python39-runner.test.ts`).
 
 SQLite disk-full, WAL/power-loss, and schema migration tests remain broker
 responsibilities. An SDK cannot inject a filesystem failure into a remote

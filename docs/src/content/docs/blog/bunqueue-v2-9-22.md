@@ -13,7 +13,7 @@ head:
   - tag: meta
     attrs:
       property: article:published_time
-      content: "2026-11-12"
+      content: "2026-11-13"
 ---
 
 <div class="bq-wrap bq-hero">
