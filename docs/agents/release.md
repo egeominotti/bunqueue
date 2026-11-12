@@ -29,6 +29,35 @@ work item in [`feature_list.json`](../../feature_list.json) (for example
 1. Set the root `package.json` version (only on the user's explicit request), then
    run `bun run docs:api` so the generated API reference (`/reference/`) matches
    the new version ([Release integration](../generated-api-reference.md#release-integration)).
+
+   **Run `docs:api` from a full clone, never from a git worktree.** TypeDoc
+   (0.28.20) looks for a repository only where `.git` is a directory. In a
+   worktree `.git` is a file, so TypeDoc finds no repository and silently drops
+   every "Defined in" GitHub source link: for 2.9.22, 259 changed files instead
+   of 64. A clone whose `origin` is a local path loses the links the same way,
+   so the clone's `origin` must be the GitHub URL. The procedure used for
+   2.9.22, with `WT` the release worktree, `MAIN` a checkout whose `.git` is a
+   directory, and `CLONE` a new directory outside the worktree:
+
+   ```bash
+   git clone -q --shared --no-checkout "$MAIN/.git" "$CLONE"  # shares objects, writes nothing to MAIN
+   cd "$CLONE"
+   git checkout -q "$(git -C "$WT" rev-parse HEAD)"
+   git remote set-url origin https://github.com/egeominotti/bunqueue.git
+   # Bring over the worktree's uncommitted changes to what TypeDoc reads
+   # (and copy any new untracked file under src/ by hand).
+   for f in $(git -C "$WT" diff --name-only HEAD -- package.json src typedoc.json \
+     tsconfig.json tsconfig.typedoc.json scripts/build-api-reference.ts docs/typedoc-theme.css); do
+     cp "$WT/$f" "$f"
+   done
+   ln -s "$WT/node_modules" node_modules
+   bun run docs:api
+   git diff -U0 -- docs/public/reference | grep '^+' | grep -c 'Defined in [^<]'  # must print 0
+   for f in $(git diff --name-only -- docs); do cp "$f" "$WT/$f"; done
+   diff -rq docs/public/reference "$WT/docs/public/reference"  # must print nothing
+   cd "$WT" && bun run check:docs-data && rm -rf "$CLONE"
+   ```
+
 2. Date the release's changelog section in `docs/src/content/docs/changelog.md`
    (`## [X.Y.Z] - YYYY-MM-DD`).
 3. Align the pinned Docker image references with the new version in `README.md`

@@ -20,6 +20,15 @@
       "issue": null
     },
     {
+      "id": "ci-script-tests-bun-only-machines",
+      "name": "CI-script tests survive a Bun-only Machine",
+      "description": "test/repro-docker-version-gate-errors.test.ts and test/repro-release-source-commit.test.ts run CI's version-gate bash, which calls node -p; in the documented Bun-only OrbStack Machine (docs/testing.md, node absent) they fail with node: command not found (6 tests), while CI and the sandbox (oven/bun node fallback) have node. Make them run the gate everywhere, e.g. by prepending a temporary node link to process.execPath on the PATH of the spawned bash, as the reviewer suggested, without weakening what they assert; then the release Machine gate needs no known-gap exception.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "",
+      "issue": null
+    },
+    {
       "id": "issue-189-tls-reload",
       "name": "Reload the TLS certificate on SIGHUP without a restart",
       "description": "Issue 189: a renewed certificate on disk was only served after a restart, and SIGHUP killed the process. With TLS configured, SIGHUP re-reads TLS_CERT_FILE/TLS_KEY_FILE, validates the pair and moves the TCP and HTTP listeners to it all-or-nothing, keeping open connections on their certificate and rolling back on failure.",
@@ -42,9 +51,10 @@
       "name": "Release bunqueue 2.9.22",
       "description": "Release checklist (docs/agents/release.md), every step only on the user's explicit request: set the package.json version to 2.9.22 and run bun run docs:api; date the 2.9.22 changelog section; align the Docker image references in README.md and the deployment, env-vars, installation and server guides as commit 2d617fd3 did for 2.9.21; generate and hand-write the release post per the release-post rules; gates: bun run test:sandbox, bun run test:sandbox:sdk (sdk/ changed since v2.9.21), fresh Ubuntu 24.04 and Debian 13 OrbStack Machines per docs/testing.md, skeptic PASS; push to main with explicit authorization (CI's version gate tags, releases and publishes); after publication run bun docs/scripts/generate-release-posts.ts --refresh and update the post.",
       "dependencies": ["issue-189-tls-reload"],
-      "status": "not-started",
-      "evidence": "",
-      "issue": null
+      "status": "in-progress",
+      "evidence": "Gates green; the item stays in-progress until the post-publication refresh. 2026-11-12, base 18bfc76f; the release-preparation commit is the one that adds this entry. Gated trees: 386b8522 (sandboxes, Machine round 1) and a4146e29 (= 386b8522 plus the reviewed docs-only Upgrade-notes patch to changelog.md, the 2.9.22 post and docs/agents/release.md; Machine round 2). bun run test:sandbox on 386b8522: unit 11668 / 0 / 398, tcp 553 / 0, embedded 349 / 0, no anomalies (artifacts/test-sandbox/2026-11-12T20-47-51.451Z/). bun run test:sandbox:sdk on 386b8522: typescript 881 / 0, python 219 / 0, php 105 / 0, go 114 / 0 / 1, rust 92 / 0 / 1, elixir 145 / 0 / 1, conformance 18 / 18 (artifacts/test-sandbox-sdk/2026-11-12T20-57-47.983Z/). OrbStack Machines, fresh Ubuntu 24.04.5 and Debian 13, arm64, 4 CPU / 16 GiB, Bun 1.4.4+38afee6c8, round 2 on a4146e29 (artifacts/machines/20261112T212315Z/manifest.md): TCP 69/69 suites 553/553, embedded 43/43 349/349, typecheck, format:check and tinyfs green in both; unit 11793 pass / 398 skip / 6 fail in both, the 6 being the known environment gap of a Bun-only Machine (test/repro-docker-version-gate-errors.test.ts 2, test/repro-release-source-commit.test.ts 4: CI's version-gate bash needs node, exit 127); those two files pass 22 / 0 with the oven/bun node fallback and pass in CI and in the sandbox. Host after the docs patch: generate-release-posts.ts --check OK (259 posts), bun test test/docs-*.test.ts test/agent-harness-*.test.ts 144 / 0, git diff --cached --check clean. bun run test:model not triggered (no src/ change). Skeptic: FAIL (incomplete Upgrade notes), fixed, then PASS on the final delta.",
+      "issue": null,
+      "branch": "tls-a-renewed-certificate-is-only-served-after-a"
     }
   ]
 }

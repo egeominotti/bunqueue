@@ -29,13 +29,17 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Next
 
-1. `release-2.9.22` (not started, and only on the user's explicit request): the
-   checklist in its `feature_list.json` description and
-   [docs/agents/release.md](docs/agents/release.md).
+1. `release-2.9.22` (in progress at the user's explicit request): steps 1-5 of
+   [docs/agents/release.md](docs/agents/release.md) done and gated; after the push,
+   watch CI's version gate (tag, GitHub release, npm, Docker), then step 7
+   (`generate-release-posts.ts --refresh`, the post's install box and
+   contributors). See its `feature_list.json` evidence and the Session Log.
 2. `issue-189-unix-socket-followups`: reproducing tests first for the two
    unix-socket rollback notes in `src/infrastructure/server/httpListener.ts`, then
    the fix.
 3. `agent-harness-followups`: the non-blocking notes of the harness review.
+4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
+   `node` in the Bun-only OrbStack Machines.
 
 ## Blockers / Risks
 
@@ -60,6 +64,38 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-12 — release-2.9.22 (preparation)
+
+- Objective: checklist steps 1-4 of [docs/agents/release.md](docs/agents/release.md),
+  at the user's explicit request; status `in-progress`, branch
+  `tls-a-renewed-certificate-is-only-served-after-a`, base `18bfc76f`, nothing
+  committed.
+- Done: `package.json` 2.9.22; `bun run docs:api` (64 files of
+  `docs/public/reference/v2.9`); the changelog section dated
+  `## [2.9.22] - 2026-11-12`; the 15 Docker image references in `README.md` and
+  the deployment, env-vars, installation and server guides, as `2d617fd3` did;
+  the hand-written `docs/src/content/docs/blog/bunqueue-v2-9-22.md` (generated
+  marker removed). No `sdk/` file changed.
+- Decision: TypeDoc 0.28.20 only treats a `.git` directory as a repository, so
+  in a worktree (`.git` is a file) `docs:api` dropped every "Defined in" source
+  link (259 files changed). The reference was regenerated in a temporary full
+  clone of the same tree in the scratchpad and copied back: 64 files, links
+  kept (1,712 before, 1,771 after), `diff -r` identical to the clone.
+- Evidence (host, diagnostic): `generate-release-posts.ts --check` OK (259
+  posts); `bun test test/docs-*.test.ts` 122 / 0; `bun test test/agent-harness`
+  22 / 0; version and release tests 74 / 0 (7 files); `check:docs-data` OK;
+  `bun run typecheck` and `bun run format:check` clean; `git diff --check`
+  clean; `./init.sh` green.
+- Gates (exact totals in the `feature_list.json` evidence): `bun run test:sandbox`
+  and `bun run test:sandbox:sdk` green on tree `386b8522`; the skeptic then
+  required the flow Upgrade notes (docs-only patch, tree `a4146e29`); the
+  Ubuntu 24.04 and Debian 13 Machines are green on `a4146e29` except the known
+  Bun-only gap of 6 CI-script tests that need `node`
+  (`artifacts/machines/20261112T212315Z/manifest.md`), now the
+  `ci-script-tests-bun-only-machines` item.
+- Next: the push; after publication, `generate-release-posts.ts --refresh` and
+  the post's install box and contributors.
 
 ### 2026-11-12 — agent-harness
 

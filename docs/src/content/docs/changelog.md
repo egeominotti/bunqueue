@@ -18,7 +18,7 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
-## [Unreleased]
+## [2.9.22] - 2026-11-12
 
 ### Features
 
@@ -49,7 +49,12 @@ head:
   previous certificate` with the reason; `TLS reload failed and left a listener
   degraded; restart the server` when a rollback itself failed; or `SIGHUP
   ignored: the server is shutting down`, since a `SIGHUP` during a shutdown
-  never rebinds a listener. Without TLS nothing changes: the server installs no
+  never rebinds a listener. With TLS the server claims `SIGHUP` before anything
+  binds, because a client can reach the port and signal the process before the
+  reload is wired; a `SIGHUP` handled in that window (in practice only while a
+  failed bind is shutting startup down) changes nothing and logs
+  `SIGHUP ignored: the server is still starting`. Without TLS nothing changes:
+  the server installs no
   `SIGHUP` handler, as in 2.9.21. In Docker, the images still declare no stop
   signal, so `docker kill -s HUP` counts as a manual stop and the restart policy
   does not restart the container after its next exit. To keep the policy,
@@ -252,7 +257,10 @@ head:
   longer stops when that terminal closes; stop it with `SIGTERM` or `SIGINT`,
   or run it under a supervisor. Under `nohup`, where `SIGHUP` used to be
   ignored, a TLS server now reloads its certificate on it (for example on an
-  SSH logout or a logrotate `kill -HUP`). A server without TLS is unchanged: it
+  SSH logout or a logrotate `kill -HUP`). A TLS server claims `SIGHUP` before
+  its listeners bind: a `SIGHUP` handled before the reload is wired (in practice
+  only while a failed bind is shutting startup down) logs `SIGHUP ignored: the
+  server is still starting` instead. A server without TLS is unchanged: it
   installs no `SIGHUP` handler, so the default action or an inherited `nohup`
   ignore still applies.
 - **TLS listeners set SO_REUSEPORT**, so that a reload can bind its replacement
@@ -272,6 +280,62 @@ head:
   same `TLS cert file not found` / `TLS key file not found` error; an unreadable
   one (for example a permission error) now fails startup with the file-system
   error that names the path.
+- **The first start on 2.9.22 repairs flow parents that older versions
+  stranded.** A
+  parent in `waiting-children` with a dependency edge on a child that failed
+  terminally (in the DLQ) carrying a failure policy, and no `flow_failures`
+  record, gets the missing record at startup, and the outbox replay applies it:
+  the parent is failed, released or promoted, and a repaired `fail` keeps
+  climbing the tree. A promoted parent runs at once and a released one when its
+  other dependencies are done, possibly long after its child failed. On SQLite
+  the log names the repaired pairs (the first 20) and their count. The parents
+  the repair never touches keep waiting, as listed in the startup repair entry
+  under Bug fixes.
+- **PostgreSQL: every broker start makes a paced repair pass over
+  `bunqueue_dependencies`.** Each broker process reads the whole table in
+  primary-key order on every start: one slice of at most 1,000 edges at
+  startup, before the broker is ready, then one slice 250 ms after the previous
+  one finished. A slice holds one pool connection while it runs. About 4,000
+  edges/s per broker is a ceiling, and every broker makes its own pass, so ten
+  brokers restarting on a 1,000,000-edge table each spend at least about 4
+  minutes of reads. Errors stay in the `maintenance:flow-failure-repair` health
+  entry until a pass completes cleanly; like any stored PostgreSQL runtime
+  error, that marks HTTP health/readiness degraded and sets
+  `bunqueue_storage_degraded=1`. A pass with errors starts over after 60 s,
+  doubling up to one hour; after a clean pass no repair timer stays armed.
+  Broker readiness no longer waits on an unbounded flow-failure recovery sweep:
+  each sweep run (startup or one lease-recovery tick) reads at most 10 pages of
+  100 records, so a crash backlog drains at up to 1,000 records per tick (every
+  15 s with the default 30 s lease) on each live broker.
+- **Child failure policies apply on every terminal failure.** A child that uses
+  up its attempts (or `maxStalls`) in startup recovery, on lock expiry or
+  through stall detection now applies its policy to its parent and emits the
+  child `flow:failed` dashboard event, as a terminal worker FAIL does (the other
+  worker-FAIL bookkeeping, such as `dlq:added` and `totalFailed`, is unchanged on
+  these paths); before, its parent kept waiting. PostgreSQL mode already did
+  this. A parent that `failParentOnFailure` fails now applies its own policy to
+  its parent, level by level up the tree, as BullMQ does, so
+  `failParentOnFailure` on every level fails the whole branch up to the root;
+  before, the grandparent kept waiting. Such a parent, when it carries a
+  policy, also emits the child-level `flow:failed` event toward its own parent.
+  On PostgreSQL each next level applies in its own transaction, so a sibling's
+  failure or `continueParentOnFailure` that commits between two levels wins,
+  and a pending `ignore`/`continue` record is not reported by
+  `getIgnoredChildrenFailures()` or `getFailedChildrenValues()` until it is
+  applied.
+- **A parent failed by several siblings at once emits its failure once.** Its
+  `failed` event and the parent-level `flow:failed` dashboard event are emitted
+  once, with the reason of the child whose call moved it, instead of once per
+  sibling, so webhooks, event subscribers and `waitUntilFinished` callers see
+  one failure. PostgreSQL mode was not affected.
+- **PostgreSQL rolling upgrades: older brokers keep the old flow behavior.**
+  They do not apply the next level or run the sweep, so a chain they fail still
+  stops at one level, and a mid-level parent they fail writes no record; their
+  `getIgnoredChildrenFailures()` / `getFailedChildrenValues()` reads can briefly
+  report a pending `ignore`/`continue` record that a newer broker committed. The
+  startup repair pass of the next newer broker to start writes the missing
+  record and finishes the chain, including for a parent that an older broker
+  strands after a newer broker finished its pass.
 
 ### Tooling
 
