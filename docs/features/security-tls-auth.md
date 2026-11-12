@@ -1,6 +1,6 @@
 # Security: TLS, Auth, CORS
 
-> **Category:** Infrastructure · **Source:** `src/infrastructure/server/tls.ts`, `src/client/resolveToken.ts`, `src/shared/webhookValidation.ts`, `src/config/resolve.ts`, `src/config/auth.ts`, `src/infrastructure/server/http.ts`, `src/infrastructure/server/tcp.ts`, `src/infrastructure/server/handler.ts`, `src/client/tcp/connection.ts`, `src/shared/hash.ts`, `src/application/webhookManager.ts`, `src/infrastructure/cloud/httpSender.ts`
+> **Category:** Infrastructure · **Source:** `src/infrastructure/server/tls.ts`, `src/infrastructure/server/tlsReload.ts`, `src/infrastructure/server/httpListener.ts`, `src/client/resolveToken.ts`, `src/shared/webhookValidation.ts`, `src/config/resolve.ts`, `src/config/auth.ts`, `src/infrastructure/server/http.ts`, `src/infrastructure/server/tcp.ts`, `src/infrastructure/server/handler.ts`, `src/client/tcp/connection.ts`, `src/shared/hash.ts`, `src/application/webhookManager.ts`, `src/infrastructure/cloud/httpSender.ts`
 
 ## Purpose
 
@@ -10,7 +10,8 @@ This module groups the transport- and application-layer security primitives that
 
 Owns:
 
-- **Server TLS option building** — validating PEM cert/key paths and producing the `tls` object passed to `Bun.listen`/`Bun.serve` (`tls.ts`); partial-config fail-fast (`resolve.ts`).
+- **Server TLS option building** — validating PEM cert/key paths and reading the `tls` bytes passed to `Bun.listen`/`Bun.serve` (`tls.ts`); partial-config fail-fast (`resolve.ts`).
+- **Certificate reload** — `SIGHUP` re-reads the cert and key and swaps the TCP and HTTP listeners to the new pair without dropping open connections (`tlsReload.ts`, the replaceable listeners in `tcp.ts` and `httpListener.ts`).
 - **Client TLS option mapping** — translating `tls: true | { caFile } | { rejectUnauthorized }` into Bun's `tls` connect option (`connection.ts`).
 - **Token resolution precedence** for the client SDK and CLI (`resolveToken.ts`).
 - **Bearer-token auth gates** on the HTTP fetch handler and the TCP command router, including the constant-time token compare (`hash.ts`).
@@ -38,7 +39,9 @@ External / runtime (all Bun built-ins):
 
 - `Bun.listen` / `Bun.serve` `tls` option (server termination).
 - `Bun.connect` `tls` option (client).
-- `Bun.file(path)` — lazily reads PEM cert/key/CA files.
+- `node:fs` `readFileSync` — reads the server PEM cert/key into bytes; `Bun.file(path)` / `readFileSync` for the client CA file.
+- `node:tls` `createSecureContext` — validates a reloaded pair (parse + key match) without binding.
+- `node:crypto` `X509Certificate` — subject, expiry and SHA-256 fingerprint of a reloaded certificate.
 - `Bun.CryptoHasher('sha256', secret)` — HMAC-SHA256 for webhooks.
 - `crypto.subtle` (WebCrypto) — HMAC-SHA256 for Cloud uploads.
 - `node:fs` `existsSync` — cert/key path existence check.
@@ -53,7 +56,36 @@ interface TlsServerOptions {
   certFile: string;
   keyFile: string;
 }
-function loadTlsOptions(tls: TlsServerOptions): { cert: BunFile; key: BunFile };
+interface TlsMaterial {
+  cert: Buffer;
+  key: Buffer;
+}
+interface TlsCertificateInfo {
+  subject: string; // e.g. 'CN=queue.example.com'
+  notAfter: string; // validTo, ISO-8601
+  fingerprint256: string; // colon-separated hex, as getPeerCertificate() reports it
+}
+function readTlsMaterial(tls: TlsServerOptions): TlsMaterial; // existsSync + readFileSync
+function validateTlsMaterial(material: TlsMaterial): void; // createSecureContext, throws
+function describeCertificate(cert: Buffer): TlsCertificateInfo; // leaf (first) certificate
+
+// src/infrastructure/server/tlsReload.ts
+interface TlsListenerSwap {
+  commit(): void; // retire the old listener (its connections stay), serve the new one
+  abort(): void; // drop the new listener, keep the old one
+}
+interface TlsReloadTarget {
+  prepareTlsReload(material: TlsMaterial): TlsListenerSwap; // TcpServer, HttpServer
+}
+type TlsReloadOutcome = 'kept-previous' | 'shutting-down' | 'degraded';
+type TlsReloadResult =
+  | { ok: true; certificate: TlsCertificateInfo }
+  | { ok: false; error: string; outcome: TlsReloadOutcome };
+class TlsReloadShuttingDownError extends Error {} // prepare after beginDrain()/stop()
+class TlsReloadDegradedError extends Error {} // unix: new bind and rebind both failed
+function reloadServerTls(targets: readonly TlsReloadTarget[], tls: TlsServerOptions): TlsReloadResult;
+function handleTlsReloadSignal(targets: readonly TlsReloadTarget[], tls: TlsServerOptions): void;
+function settleOnce(swap: TlsListenerSwap): TlsListenerSwap; // commit/abort run at most once
 
 // src/config/resolve.ts
 function resolveTlsServerOptions(config: {
@@ -114,8 +146,22 @@ Events emitted (via `queueManager.emitDashboardEvent`):
 1. `resolveServerConfig` pulls `tlsCertFile`/`tlsKeyFile` from `TLS_CERT_FILE`/`TLS_KEY_FILE` (config file wins) — `resolve.ts:42-43`.
 2. `resolveTlsServerOptions` returns `null` when neither is set, and **throws** when exactly one is set (`resolve.ts:70-92`). The bootstrap catches this and `process.exit(1)` before any listener binds (`bootstrap.ts:114-121`) — TLS is all-or-nothing.
 3. When TLS is configured, the resolved `{ certFile, keyFile }` is passed identically to both `createTcpServer` and `createHttpServer` (`bootstrap.ts:131-151`).
-4. Each server calls `loadTlsOptions` **before** binding (`http.ts:254-268`, `tcp.ts:120-125`). `loadTlsOptions` does an `existsSync` check on each path and throws a descriptive error on a missing file (`tls.ts:22-29`), then returns `{ cert: Bun.file(...), key: Bun.file(...) }` which is spread into the listener's `tls` option. Validating before bind avoids a half-started listener on a bad path.
-5. **Per-socket init is lazy and idempotent** (`TcpConnectionRegistry.init`, `tcp/connections.ts:27-49`). Under native TLS, Bun can deliver a `data` event **before** `open` runs; the handler previously destructured a null `socket.data`, and the resulting `TypeError` escalated to the process-level unhandledRejection handler — a single unauthenticated connection to the TLS port could shut the whole server down (pre-auth remote DoS, #108). `registry.init` runs from both `open` and lazily from `data` (`tcp.ts:29-36`, guarded by `if (socket.data) return`), preserving that first frame; `close`/`drain` early-return when `socket.data` is absent.
+4. Each server calls `readTlsMaterial` **before** binding (`createHttpListener` in `httpListener.ts`, `createTcpServer` in `tcp.ts`). It does an `existsSync` check on each path and throws a descriptive error on a missing file (`TLS cert file not found: <path>` / `TLS key file not found: <path>`), then reads both files into `{ cert: Buffer, key: Buffer }`, the listener's `tls` option. Validating before bind avoids a half-started listener on a bad path. The bytes (not lazy `Bun.file` handles) are what a listener serves, so the HTTP unix-socket listener can rebind exactly the previous pair when a reload fails.
+5. **TLS listeners are replaceable.** On an IP port, a TLS listener (TCP and HTTP alike) binds with `reusePort: true` (SO_REUSEPORT), so a reload can bind a second listener on the same port. A configured port other than `0` is first probed with a plain exclusive bind on the same `hostname:port` (`Bun.listen` for TCP, `Bun.serve` for HTTP), closed at once: SO_REUSEPORT co-binding needs both sockets to set it, and the probe fails with the usual address-in-use error (`Failed to listen at <host>`, `Failed to start server. Is port <port> in use?`) whenever anything already holds the port, so a second broker can never silently share it. Plain listeners bind exactly as before (exclusive, no probe). `bun-types` does not declare `reusePort` for `Bun.listen` (the runtime supports it); `tcp.ts` declares a local `ReusableTcpListenOptions` interface for it. `TcpServer.server` and `HttpServer.server` are getters that return the listener accepting connections now.
+6. **Per-socket init is lazy and idempotent** (`TcpConnectionRegistry.init`, `tcp/connections.ts:27-49`). Under native TLS, Bun can deliver a `data` event **before** `open` runs; the handler previously destructured a null `socket.data`, and the resulting `TypeError` escalated to the process-level unhandledRejection handler — a single unauthenticated connection to the TLS port could shut the whole server down (pre-auth remote DoS, #108). `registry.init` runs from both `open` and lazily from `data` (`tcp.ts:29-36`, guarded by `if (socket.data) return`), preserving that first frame; `close`/`drain` early-return when `socket.data` is absent.
+
+### Certificate reload (SIGHUP)
+
+Bun ignores `reload({ tls })` on both `Bun.listen` and `Bun.serve`, so a listener takes a renewed certificate by being replaced. With TLS configured, `bootServer` routes `SIGHUP` to `handleTlsReloadSignal([tcpServer, httpServer], tls)`. Without TLS it installs no `SIGHUP` handler at all, so the signal keeps its inherited disposition (default action, or `nohup`'s ignore), as in 2.9.21 (see [TCP Server & Handlers](./tcp-server-handlers.md)).
+
+1. `reloadServerTls` re-reads both files (`readTlsMaterial`), validates them with `createSecureContext` (garbage or empty PEM: `ERR_OSSL_PEM_NO_START_LINE`; cert/key mismatch: `ERR_OSSL_X509_KEY_VALUES_MISMATCH`) and describes the leaf certificate. Any failure returns `{ ok: false, error, outcome: 'kept-previous' }` before any listener is touched.
+2. It calls `prepareTlsReload(material)` on each target in order. A prepare binds the replacement: TCP binds a new `Bun.listen` on the **bound** port (`server.port`, never a configured `0`) with `reusePort: true` and the same `socketHandlers` object, so connections accepted by either listener share one `TcpConnectionRegistry`; HTTP on a port binds a new `Bun.serve` with the same `fetch`/`websocket` handlers. A unix socket path cannot be shared, so the HTTP unix listener stops the old server first (graceful `stop()`, which unlinks the path at once while its open connections stay served) and binds the path with the new pair; when that bind fails it rebinds the previous bytes and rethrows, and when the rebind fails too it throws `TlsReloadDegradedError` (the unix listener is then down). Recreating the path would reset what an operator set on it after startup, so the listener `statSync`s the socket file before stopping the old server and, after each bind of the path (new pair, rollback, abort), re-applies the old mode (`chmodSync(path, mode & 0o7777)`) and, when the uid/gid differ, the owner and group (`chownSync`). `EPERM`, the usual result without privileges (a process may only pick one of its own groups), keeps the owner the new file was created with and logs a warning, `HTTP unix socket owner not restored after a TLS reload` with `{ path, uid, gid, keptUid, keptGid, error }`, so an operator sees that, for example, a `chgrp www-data` was lost. For the bind of the **new** pair the restore is strict: any other restore failure counts as a failed bind (the path is unbound again and the reload rolls back). For the **rollback** rebind of the previous pair (after a failed new bind, or in `abort`) it is best-effort: a restore failure logs `HTTP unix socket permissions not restored after a TLS reload rollback` with `{ path, mode, error }` and the rebound listener stays up, so the rollback still succeeds. Between the bind and the `chmod` (synchronous, no event-loop turn) the new socket file has the mode the process umask gives a new file; another local process that connects in that instant is checked against that mode. A path that is already gone has nothing to restore.
+3. When a prepare throws, the targets already prepared are aborted in reverse order (TCP: `next.stop(false)`; HTTP port: `next.stop()`; HTTP unix: stop the new server and rebind the previous pair) and the result is `{ ok: false, error, outcome }` naming the prepare error (and any rollback error). The outcome is `kept-previous` when every rollback succeeded (every listener keeps the previous certificate), `shutting-down` when a target refused with `TlsReloadShuttingDownError` (its `beginDrain()` or `stop()` already ran), and `degraded` when any abort threw or the prepare threw `TlsReloadDegradedError`: then a listener may be on neither certificate, or not listening.
+4. Otherwise every swap is committed: the reference moves to the new listener and the old one stops accepting without closing what it accepted (`Bun.listen` `stop(false)`, `Bun.serve` graceful `stop()`). New handshakes get the new certificate on both ports; established TCP connections, WebSockets, SSE streams and in-flight requests stay on the listener that accepted them, keep their original certificate, and are served until they close. The result is `{ ok: true, certificate: { subject, notAfter, fingerprint256 } }`; a commit that throws makes it `{ ok: false, error: 'listener swap incomplete: …', outcome: 'degraded' }`.
+
+The whole reload is synchronous (no `await`), so two `SIGHUP`s cannot interleave. `handleTlsReloadSignal` logs exactly one outcome line per reload (the unix-socket restore may add its own warning, see above), chosen by the result so that it never claims more than is true: success → info `TLS certificate reloaded` with `{ subject, notAfter, fingerprint256 }`; `kept-previous` → error `TLS reload failed; still serving the previous certificate` with `{ error }`; `shutting-down` → warn `SIGHUP ignored: the server is shutting down` with `{ error }`; `degraded` → error `TLS reload failed and left a listener degraded; restart the server` with `{ error }`. `prepareTlsReload` throws without TLS (`TLS is not enabled on the TCP server` / `... HTTP server`) and, as `TlsReloadShuttingDownError`, once `beginDrain()` or `stop()` ran (`TCP server is shutting down` / `HTTP server is shutting down`), so a `SIGHUP` during shutdown never rebinds a listener. `TcpServer.stop()` still ends every connection, including those accepted by a retired listener (`registry.closeAll()`), and after it the port is free again (`test/repro-issue-189-tls-reload.test.ts`, `test/repro-issue-189-tls-reload-process.test.ts`, `test/repro-issue-189-tls-reload-outcomes.test.ts`).
+
+**Docker.** `docker kill -s <signal>` marks the container as manually stopped, which disables its restart policy for the next exit, unless the container declares a stop signal and the signal sent differs from it. The official images declare none (declaring one would change `docker kill -s INT` and every other non-`TERM` signal for every user), so `docker kill -s HUP` reloads the certificate but the restart policy no longer restarts the container after its next exit. A reload that keeps the policy is sent from inside the container (`docker exec <c> kill -HUP 1` on Alpine, `sh -c 'kill -HUP 1'` on Debian and slim), or the operator opts in with `--stop-signal SIGTERM` / Compose `stop_signal: SIGTERM` (the only option on distroless), which also makes other non-`TERM`/`KILL` signals stop counting as a manual stop for that container. See [Docker images](./docker-images.md).
 
 ### Client TLS
 
@@ -173,7 +219,11 @@ No queue locks are taken in this module. The only per-connection mutable securit
 
 ## Edge Cases & Failure Modes
 
-- **TLS all-or-nothing:** exactly one of cert/key set → startup throw + `process.exit(1)` (`resolve.ts:75-91`, `bootstrap.ts:114-121`). Missing file at a configured path → throw at server creation before bind (`tls.ts:22-29`).
+- **TLS all-or-nothing:** exactly one of cert/key set → startup throw + `process.exit(1)` (`resolve.ts:75-91`, `bootstrap.ts:114-121`). Missing file at a configured path → throw at server creation before bind (`readTlsMaterial`).
+- **Reload swap window (Linux):** while both listeners are bound (a synchronous moment inside one reload), the kernel spreads new TCP handshakes across both SO_REUSEPORT sockets. A handshake that completed in the old listener's accept queue but was not yet accepted when that listener closes is reset (Linux migrates such requests only with `net.ipv4.tcp_migrate_req=1`); the client sees a connection reset and reconnects. Established connections are never affected.
+- **Probe race:** the exclusive probe and the `reusePort` bind are two binds; another process that binds the same port **with** SO_REUSEPORT (in practice only a second TLS broker starting at the same instant) could join in between. A plain exclusive listener cannot.
+- **Reload refused:** a mismatch, a garbage or empty PEM, or a missing/unreadable file leaves every listener on the previous certificate (`kept-previous`); the next `SIGHUP` with a good pair succeeds.
+- **`nohup` and SIGHUP:** a handler replaces an inherited `SIG_IGN`. That is why a server without TLS installs none (it keeps 2.9.21's behavior), while a TLS server reloads on `SIGHUP` also under `nohup`. A reload also re-reads the paths resolved at startup: changing `TLS_CERT_FILE`/`TLS_KEY_FILE` requires a restart.
 - **Open server:** with no `AUTH_TOKENS`, HTTP `checkAuth` returns null for everything and TCP connections start pre-authenticated. `/gc` and `/heapstats` then have **no** auth (known gotcha — debug endpoints lack auth unless tokens are configured).
 - **CORS default discrepancy:** `createHttpServer` defaults to `['*']` only when `corsOrigins` is `undefined` (`http.ts:73`). The server bootstrap always passes an array, and an unset `CORS_ALLOW_ORIGIN` resolves to `[]` (`resolve.ts:51`) → empty Set → `getCorsOrigin()` returns the empty string, so `Access-Control-Allow-Origin` is `""` rather than `*`. The permissive `*` default applies only to direct `createHttpServer` calls.
 - **constantTimeEqual length leak:** it folds `a.length ^ b.length` into the result and iterates over `minLen`, so it compares content in constant time for equal-length inputs but does reveal a length mismatch via early divergence — acceptable for fixed-format tokens.
@@ -186,7 +236,7 @@ No queue locks are taken in this module. The only per-connection mutable securit
 
 | Variable                        | Default      | Effect                                                                                                                                                                                                                                                                                       |
 | ------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TLS_CERT_FILE`                 | unset        | PEM cert/chain path. Both or neither with key, else startup error.                                                                                                                                                                                                                           |
+| `TLS_CERT_FILE`                 | unset        | PEM cert/chain path. Both or neither with key, else startup error. Re-read with the key on `SIGHUP` (certificate reload).                                                                                                                                                                    |
 | `TLS_KEY_FILE`                  | unset        | PEM private-key path.                                                                                                                                                                                                                                                                        |
 | `AUTH_TOKENS`                   | unset → `[]` | Comma-separated bearer tokens, each trimmed; stray commas are ignored. Unset or empty = open server; a value with no token (`,`) is a startup error.                                                                                                                                         |
 | `METRICS_AUTH`                  | `false`      | When true (`1`, `true`, `yes`, `on`, any case), `/prometheus` requires a valid token; an empty `AUTH_TOKENS` set returns 503 instead of exposing metrics, as in 2.9.10, and the server logs a startup warning. Another word keeps it off, with a startup warning (2.9.10 compared `'true'`). |

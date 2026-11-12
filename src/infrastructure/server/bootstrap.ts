@@ -35,6 +35,7 @@ import {
   storageStartupError,
 } from './storageManager';
 import { createServerShutdown } from './shutdownCoordinator';
+import { handleTlsReloadSignal } from './tlsReload';
 
 export { backupStartupError } from './storageManager';
 
@@ -160,6 +161,15 @@ export async function bootServer(
   });
   printBanner(config, cloudConfig?.url);
 
+  // With TLS, SIGHUP reloads the certificate. It is claimed before anything binds: the
+  // kernel completes TCP handshakes as soon as a socket listens, so a client can signal
+  // before the handlers below are installed, and the default action would kill the
+  // process (exit 129) without a drain. Without TLS nothing is installed: SIGHUP keeps
+  // the disposition the process inherited (the default action, or `nohup`'s "ignore").
+  const reloadTls = tlsConfig;
+  let onHangup = (): void => serverLog.warn('SIGHUP ignored: the server is still starting');
+  if (reloadTls) process.on('SIGHUP', () => onHangup());
+
   // Start TCP + HTTP servers; a bind failure must not leave a half-started process
   let tcpServer: ReturnType<typeof createTcpServer>;
   let httpServer: ReturnType<typeof createHttpServer>;
@@ -257,6 +267,8 @@ export async function bootServer(
 
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  // SIGHUP with TLS: reload the certificate (TCP, then HTTP; a shutdown refuses it).
+  if (reloadTls) onHangup = () => handleTlsReloadSignal([tcpServer, httpServer], reloadTls);
 
   process.on('uncaughtException', (err) => {
     serverLog.error('Uncaught exception - initiating shutdown', {

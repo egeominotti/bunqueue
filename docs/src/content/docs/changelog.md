@@ -20,6 +20,50 @@ head:
 
 ## [Unreleased]
 
+### Features
+
+- **`SIGHUP` reloads the TLS certificate without a restart** (#189). The server
+  read `TLS_CERT_FILE`/`TLS_KEY_FILE` once, when it bound its TCP and HTTP
+  listeners, so a renewed certificate on disk was only served after a restart,
+  and `SIGHUP` was unhandled: its default action killed the process (exit 129)
+  without the graceful drain `SIGTERM` gets, dropping every client. With TLS
+  configured, `SIGHUP` now re-reads both files, validates the pair and moves
+  both listeners to it: new handshakes on the TCP and HTTP ports (`https://`,
+  `wss://`, SSE) get the new certificate, while connections that are already
+  open, WebSockets and SSE streams included, stay on the socket and the
+  certificate they were opened with. Bun ignores `reload({ tls })` on
+  `Bun.listen` and `Bun.serve`, so each listener is replaced: a new one binds
+  the same port with SO_REUSEPORT and the new pair, then the old one stops
+  accepting without closing what it accepted. The HTTP unix socket, which
+  cannot be shared, is rebound in place: it rebinds the previous pair if the
+  new bind fails, and the new socket file gets back the mode (and, when the
+  server's user may set them, the owner and group) the old one had, so a
+  `chmod 660` made after startup survives (an owner or group the process may not
+  set is kept as created and logged). The reload is synchronous and
+  all-or-nothing: a pair that cannot be loaded (cert/key mismatch, missing or
+  unreadable file, not PEM) is refused before any listener changes, a listener
+  that cannot take it rolls the others back, and every port keeps the previous
+  certificate. Each reload logs one outcome line that never claims more than is
+  true: `TLS certificate reloaded` with the new certificate's subject, expiry
+  (`notAfter`) and SHA-256 fingerprint; `TLS reload failed; still serving the
+  previous certificate` with the reason; `TLS reload failed and left a listener
+  degraded; restart the server` when a rollback itself failed; or `SIGHUP
+  ignored: the server is shutting down`, since a `SIGHUP` during a shutdown
+  never rebinds a listener. Without TLS nothing changes: the server installs no
+  `SIGHUP` handler, as in 2.9.21. In Docker, the images still declare no stop
+  signal, so `docker kill -s HUP` counts as a manual stop and the restart policy
+  does not restart the container after its next exit. To keep the policy,
+  reload from inside the container (`docker exec <container> kill -HUP 1` on
+  alpine, `docker exec <container> sh -c 'kill -HUP 1'` on debian and slim), or
+  opt in with `--stop-signal SIGTERM` / Compose `stop_signal: SIGTERM` (the only
+  way on distroless; it also stops `docker kill -s <signal>` with any signal
+  other than `SIGTERM` and `SIGKILL` from counting as a manual stop for that
+  container). See
+  [Renewing certificates](/guide/tls/#renewing-certificates).
+  (`test/repro-issue-189-tls-reload.test.ts`,
+  `test/repro-issue-189-tls-reload-process.test.ts`,
+  `test/repro-issue-189-tls-reload-outcomes.test.ts`)
+
 ### Performance
 
 - A batch `ACKB` that carries results (what a TCP `Worker` sends whenever its
@@ -201,6 +245,34 @@ head:
   affected. (`test/flow-coverage-concurrent-siblings-engine.test.ts`,
   `test/flow-coverage-concurrent-siblings.test.ts`)
 
+### Upgrade notes
+
+- **`SIGHUP` on a server with TLS reloads the certificate instead of
+  terminating the process.** A TLS server started in an interactive terminal no
+  longer stops when that terminal closes; stop it with `SIGTERM` or `SIGINT`,
+  or run it under a supervisor. Under `nohup`, where `SIGHUP` used to be
+  ignored, a TLS server now reloads its certificate on it (for example on an
+  SSH logout or a logrotate `kill -HUP`). A server without TLS is unchanged: it
+  installs no `SIGHUP` handler, so the default action or an inherited `nohup`
+  ignore still applies.
+- **TLS listeners set SO_REUSEPORT**, so that a reload can bind its replacement
+  on the same port. A TLS listener on an IP port (TCP, and HTTP unless
+  `HTTP_SOCKET_PATH` is set) first makes a plain exclusive probe bind on the
+  configured port: a port that anything already holds still fails startup with
+  the same address-in-use error, so a second broker cannot share it. Plain
+  (non-TLS) listeners bind exactly as before.
+- **On Linux, a connection that races a reload can be reset.** During the
+  synchronous swap both listeners are bound and the kernel spreads new TCP
+  handshakes across them; a handshake that completed in the old listener's
+  accept queue but was not accepted before it closes is reset, and the client
+  reconnects (the bunqueue SDKs do so on their own). Established connections
+  are never affected.
+- TLS startup reads the cert and key files into memory before binding instead
+  of handing `Bun.file` handles to the listener. A missing file fails with the
+  same `TLS cert file not found` / `TLS key file not found` error; an unreadable
+  one (for example a permission error) now fails startup with the file-system
+  error that names the path.
+
 ### Tooling
 
 - Type checking uses Bun's built-in `bun check` (`bun run typecheck`), and
@@ -311,6 +383,11 @@ head:
 
 ### Documentation
 
+- The [TLS guide](/guide/tls/#renewing-certificates) has a "Renewing
+  certificates" section: replace the files, send `SIGHUP` (`kill -HUP <pid>`,
+  `docker kill -s HUP <container>`), what is logged for each outcome, and how to
+  reload a container without losing its restart policy (`docker exec` with
+  `kill -HUP 1`, or the opt-in `--stop-signal SIGTERM` / `stop_signal: SIGTERM`).
 - The [2.9.21 release post](/blog/bunqueue-v2-9-21/) is now a full write-up:
   - a diagram of the event traffic workers received before and after the
     `eventTypes` filter;

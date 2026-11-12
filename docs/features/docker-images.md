@@ -24,7 +24,21 @@ All images run as numeric UID/GID `1001:1001`, expose TCP 6789 and HTTP 6790,
 and persist SQLite at `/app/data/bunqueue.db`. Named volumes inherit the data
 directory ownership. Operators must set matching ownership on bind mounts.
 The JSON-form probe invokes `/app/bunqueue healthcheck`; see [CLI](./cli.md).
-Distroless contains neither a shell nor a package manager.
+Distroless contains neither a shell nor a package manager. Alpine has a `kill`
+binary (busybox); Debian 13 and slim have only the shell builtin.
+
+The images declare no stop signal. Docker therefore records any
+`docker kill -s <signal>`, including `docker kill -s HUP` (the TLS certificate
+reload, see [Security: TLS, Auth, CORS](./security-tls-auth.md)), as a manual stop:
+the container keeps running, but the restart policy does not restart it after its
+next exit. A reload that keeps the policy is sent from inside the container
+(`docker exec <c> kill -HUP 1` on Alpine, `docker exec <c> sh -c 'kill -HUP 1'` on
+Debian 13 and slim), or the container is run with `--stop-signal SIGTERM` (Compose
+`stop_signal: SIGTERM`), a runtime setting that works on every variant and is the
+only option on distroless. That setting also stops counting `docker kill -s <signal>`
+with any signal other than `SIGTERM`/`SIGKILL` (for example `INT`) as a manual stop,
+so `--restart always`/`unless-stopped` would start such a container again. Declaring
+a stop signal in the image would change that for every user, so the images do not.
 
 ## Validation and publication
 

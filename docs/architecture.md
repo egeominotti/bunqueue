@@ -77,7 +77,7 @@ Producers ──add()──┐                          ┌──process()──
 | **Bun `SQL` + PostgreSQL 15–18**         | [`src/infrastructure/persistence/postgres/`](../src/infrastructure/persistence/postgres)                                                                                                                           | Optional server-only multi-broker coordination. PostgreSQL is the source of truth; row/advisory locks, `SKIP LOCKED`, database-clock leases, and durable events provide distributed ownership without adding a JavaScript database dependency.                           |
 | **Bun `cron`**                           | [`src/infrastructure/scheduler/cronParser.ts`](../src/infrastructure/scheduler/cronParser.ts)                                                                                                                      | Native five-field calendar, timezone and DST evaluation. A small seconds-field adapter preserves bunqueue's documented six-field syntax without an external parser.                                                                                                      |
 | **MessagePack** (`msgpackr`)             | [`src/shared/msgpack.ts`](../src/shared/msgpack.ts), [`src/shared/msgpackByteViews.ts`](../src/shared/msgpackByteViews.ts) (with `msgpackByteViewRewrite.ts`, `msgpackProbe.ts`), [`src/infrastructure/persistence/sqliteSerializer.ts`](../src/infrastructure/persistence/sqliteSerializer.ts) | Compact binary storage and wire format. The shared hybrid decoder keeps the fast common path while preserving dangerous-looking JSON keys as safe own properties. The encoder writes a non-byte TypedArray or `DataView` as a `bin` of its own bytes. |
-| **Native TCP + TLS**                     | [`src/infrastructure/server/tcp.ts`](../src/infrastructure/server/tcp.ts), [`src/config/resolve.ts`](../src/config/resolve.ts)                                                                                     | Length-prefixed binary frames over `Bun.listen` give ~100k+ ops/s without an HTTP/serialization tax. TLS is the same socket with `tls: { certFile, keyFile }`; partial cert/key fails fast at startup rather than silently serving plaintext.                            |
+| **Native TCP + TLS**                     | [`src/infrastructure/server/tcp.ts`](../src/infrastructure/server/tcp.ts), [`src/config/resolve.ts`](../src/config/resolve.ts)                                                                                     | Length-prefixed binary frames over `Bun.listen` give ~100k+ ops/s without an HTTP/serialization tax. TLS is the same socket with `tls: { certFile, keyFile }`; partial cert/key fails fast at startup, and `SIGHUP` reloads a renewed pair live.                         |
 | **One runtime npm dependency**           | [`package.json`](../package.json)                                                                                                                                                                                  | Only `msgpackr` ships at runtime; `@modelcontextprotocol/sdk` is an **optional** peer needed only for the MCP binary. Cron and PostgreSQL use Bun's built-ins.                                                                                                           |
 | **4-ary heaps / queue-local skip-lists** | [`src/shared/minHeap.ts:2`](../src/shared/minHeap.ts), [`src/domain/queue/priorityQueue.ts:56`](../src/domain/queue/priorityQueue.ts), [`src/domain/queue/temporalIndex.ts`](../src/domain/queue/temporalIndex.ts) | 4-ary branching improves cache locality vs binary heaps; one skip-list per queue orders cleanup candidates, with a reverse job-ID index for direct deletion. A compacting 4-ary min-heap tracks delayed jobs.                                                            |
 
@@ -234,9 +234,12 @@ do not re-poll in a tight loop.
   `createTcpServer` / `createHttpServer`, `CronScheduler`, `S3BackupManager`,
   `CloudAgent`, plus `QueueCountsScheduler` for coalesced WS/SSE count updates.
   HTTP responsibilities are split across `http.ts` (server/auth/upgrades),
+  `httpListener.ts` (the `Bun.serve` listener, replaceable under TLS),
   `httpRouter.ts` (REST dispatch), `httpEndpoints.ts` (health/stats/debug),
   `httpDashboardEndpoints.ts` (dashboard aggregation), and `httpResponse.ts`
-  (response helpers). `server/bootstrap.ts` is the single composition root and
+  (response helpers). `server/tlsReload.ts` swaps both TLS listeners to a renewed
+  certificate on `SIGHUP`, all-or-nothing and without dropping open connections.
+  `server/bootstrap.ts` is the single composition root and
   supplies live TCP connection counts plus the pre-backup persistence flush.
 - **`client/`** — In-process SDK: `Queue`, `Worker`, `SandboxedWorker`,
   `QueueEvents`, `FlowProducer`, `QueueGroup`, `Bunqueue` (simple mode), the
@@ -880,7 +883,13 @@ Its order is intake stop (listeners refuse connections, pulls deliver nothing)
 served, so workers can ACK/FAIL/heartbeat → TCP and HTTP close → storage
 shutdown; the drain ends as soon as no job is active, and jobs still active at
 `shutdownTimeoutMs` are left `active` for the next process's startup recovery
-([TCP Server & Handlers](./features/tcp-server-handlers.md)).
+([TCP Server & Handlers](./features/tcp-server-handlers.md)). `SIGINT` and `SIGTERM`
+start it. With TLS, `SIGHUP` reloads the certificate instead: each listener binds a
+replacement on the same port (SO_REUSEPORT) with the new pair, then the old one stops
+accepting while the connections it accepted stay served
+([Security: TLS, Auth, CORS](./features/security-tls-auth.md)). Without TLS the
+server installs no `SIGHUP` handler, so the signal keeps the disposition the process
+inherited (as in 2.9.21; `nohup` keeps a non-TLS server running).
 
 - **Admission and outcomes.** Jobs, dependencies, result/DLQ state, repeat links,
   metrics, and durable events change inside PostgreSQL transactions. Independent

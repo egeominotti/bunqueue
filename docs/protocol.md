@@ -514,6 +514,11 @@ port. Clients MUST verify the server certificate by default (issue #109
 class) and MAY offer CA-file pinning and an explicit opt-out. A client MUST
 NOT silently accept unverified peers.
 
+The server certificate can change while the server runs (`SIGHUP` reloads a
+renewed pair): an established connection keeps the certificate it was opened
+with, and a reconnect receives the current one. A client that pins a
+certificate rather than a CA must expect a new certificate after a renewal.
+
 ## 9. Timeouts, reconnection, half-open links
 
 - Clients SHOULD apply a per-command timeout (reference default 30 s;

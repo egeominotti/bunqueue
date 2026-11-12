@@ -1,6 +1,6 @@
 # HTTP / REST / SSE / WebSocket API
 
-> **Category:** Transport · **Source:** `src/infrastructure/server/http.ts`, `src/infrastructure/server/httpAuth.ts`, `src/infrastructure/server/httpRouter.ts`, `src/infrastructure/server/httpEndpoints.ts`, `src/infrastructure/server/httpDashboardEndpoints.ts`, `src/infrastructure/server/httpRouteJobs.ts`, `src/infrastructure/server/httpRouteQueues.ts`, `src/infrastructure/server/httpRouteQueueConfig.ts`, `src/infrastructure/server/httpRouteResources.ts`, `src/infrastructure/server/sseHandler.ts`, `src/infrastructure/server/wsHandler.ts`
+> **Category:** Transport · **Source:** `src/infrastructure/server/http.ts`, `src/infrastructure/server/httpListener.ts`, `src/infrastructure/server/httpAuth.ts`, `src/infrastructure/server/httpRouter.ts`, `src/infrastructure/server/httpEndpoints.ts`, `src/infrastructure/server/httpDashboardEndpoints.ts`, `src/infrastructure/server/httpRouteJobs.ts`, `src/infrastructure/server/httpRouteQueues.ts`, `src/infrastructure/server/httpRouteQueueConfig.ts`, `src/infrastructure/server/httpRouteResources.ts`, `src/infrastructure/server/sseHandler.ts`, `src/infrastructure/server/wsHandler.ts`
 
 ## Purpose
 
@@ -10,7 +10,7 @@ This module is the HTTP-side transport for bunqueue, served on port `6790` by de
 
 Owns:
 
-- Bun HTTP server creation, binding (TCP port or Unix socket), and optional TLS termination (`createHttpServer`, `http.ts:45`).
+- Bun HTTP server creation, binding (TCP port or Unix socket), and optional TLS termination (`createHttpServer`, `http.ts:45`; the listening socket itself, replaceable for a TLS certificate reload, is `createHttpListener` in `httpListener.ts`).
 - Request routing: URL/method → internal `Command`, via pre-compiled regexes and four sub-routers (jobs, queues, queue-config, resources).
 - Auth gate, CORS headers/preflight, and per-IP rate limiting on the HTTP edge.
 - Diagnostic/observability endpoints: `/health`, `/healthz`, `/live`, `/ready`, `/stats`, `/metrics`, `/prometheus`, `/gc`, `/heapstats`, `/dashboard*`.
@@ -20,7 +20,7 @@ Does NOT own (delegated):
 
 - Actual command execution and queue mutations — delegated to `handleCommand` / `QueueManager` ([Core Queue Engine](./core-queue-engine.md), [TCP Server Command Handlers](./tcp-server-handlers.md)).
 - Command parsing for the WS typed-command path — delegated to `parseCommand`/`serializeResponse` from the [TCP Wire Protocol & Framing](./tcp-protocol.md) module.
-- TLS file loading/validation — delegated to `loadTlsOptions` ([Security: TLS, Auth, CORS](./security-tls-auth.md)).
+- TLS file loading/validation and the reload orchestration — delegated to `readTlsMaterial` / `reloadServerTls` ([Security: TLS, Auth, CORS](./security-tls-auth.md)).
 - The event source itself — `QueueManager.subscribe` / `setDashboardEmit` produce the events that SSE/WS merely forward ([Webhooks, Events & Job Logs](./webhooks-and-events.md)).
 - Prometheus text generation — `QueueManager.getPrometheusMetrics()` ([Stats, Metrics & Monitoring](./stats-and-monitoring.md)).
 
@@ -32,7 +32,7 @@ Internal:
 - `QueueManager` — `subscribe`, `setDashboardEmit`, `emitDashboardEvent`, `getStats`, `getQueueJobCounts`, `getPerQueueStats`, `getDlqEntries`, `getDlqStats`, `getStorageStatus`, `getMemoryStats`, `getPrometheusMetrics`, `releaseClientJobs`, `unregisterWorkersByClientId`, `workerManager`, `listCrons`.
 - `parseCommand`, `serializeResponse`, `errorResponse`, `validateQueueName` (`protocol.ts`).
 - `getRateLimiter()` (`rateLimiter.ts`) — sliding-window per-client limiter.
-- `checkAuth` (`httpAuth.ts`, bearer-token check with `constantTimeEqual`); `loadTlsOptions` (`tls.ts`); `uuid` (`shared/hash.ts`); `throughputTracker`, `latencyTracker`; `pausedView` (`shared/pausedView.ts`); `VERSION`.
+- `checkAuth` (`httpAuth.ts`, bearer-token check with `constantTimeEqual`); `readTlsMaterial` (`tls.ts`); `settleOnce`, `TlsListenerSwap` (`tlsReload.ts`); `uuid` (`shared/hash.ts`); `throughputTracker`, `latencyTracker`; `pausedView` (`shared/pausedView.ts`); `VERSION`.
 
 External/runtime:
 
@@ -42,7 +42,7 @@ External/runtime:
 
 Exported symbols:
 
-- `createHttpServer(queueManager: QueueManager, config: HttpServerConfig)` — `http.ts:45`. Returns `{ server, wsClients, sseClients, getWsClientCount(), getSseClientCount(), beginDrain(), stop() }`. `beginDrain()` (server shutdown, before the active-job drain) aborts the server's drain signal, which every HTTP request and WebSocket message context carries, so `PULL`/`PULLB` (including a parked long poll) claim no job, and stops the Bun server from accepting connections; open WebSockets and in-flight requests keep being served, so a WebSocket worker can still ACK/FAIL/heartbeat. A drained pull with `timeout > 0` holds its empty answer until its timeout, until the HTTP client disconnects (`req.signal`) or the WebSocket closes (`ws.data.closed`), or until `stop()`; with `timeout` 0 it answers at once (see [TCP Server & Handlers](./tcp-server-handlers.md)). `stop()` aborts the stop signal (ending every held pull), unsubscribes from the event bus, stops WS broadcasts, closes all SSE streams, and stops the Bun server.
+- `createHttpServer(queueManager: QueueManager, config: HttpServerConfig)` — `http.ts:45`. Returns `{ server, wsClients, sseClients, getWsClientCount(), getSseClientCount(), beginDrain(), stop(), prepareTlsReload(material) }`; `server` is a getter for the `Bun.serve` instance accepting connections now (a TLS reload replaces it). `beginDrain()` (server shutdown, before the active-job drain) aborts the server's drain signal, which every HTTP request and WebSocket message context carries, so `PULL`/`PULLB` (including a parked long poll) claim no job, and stops the Bun server from accepting connections; open WebSockets and in-flight requests keep being served, so a WebSocket worker can still ACK/FAIL/heartbeat. A drained pull with `timeout > 0` holds its empty answer until its timeout, until the HTTP client disconnects (`req.signal`) or the WebSocket closes (`ws.data.closed`), or until `stop()`; with `timeout` 0 it answers at once (see [TCP Server & Handlers](./tcp-server-handlers.md)). `stop()` aborts the stop signal (ending every held pull), unsubscribes from the event bus, stops WS broadcasts, closes all SSE streams, and stops the Bun server.
 - `interface HttpServerConfig` — `http.ts`: `port?`, `hostname?`,
   `socketPath?`, `authTokens?: string[]`, `corsOrigins?: string[]`,
   `requireAuthForMetrics?: boolean`,
@@ -233,7 +233,8 @@ The HTTP layer holds no shard locks itself; all locking happens inside `handleCo
   (`METRICS_AUTH=true`). When required but no token is configured it returns
   503, preventing a configuration mistake from making metrics public.
   `/health*` and `/ready` never require auth.
-- **TLS fail-fast**: `loadTlsOptions(config.tls)` runs before binding so bad cert/key paths abort startup rather than serving plaintext (`http.ts:259-260`).
+- **TLS fail-fast**: `readTlsMaterial(config.tls)` runs before binding so bad cert/key paths abort startup rather than serving plaintext (`createHttpListener`).
+- **Replaceable TLS listener** (`httpListener.ts`): on a port, the TLS `Bun.serve` binds with `reusePort: true`, after a plain exclusive `Bun.serve` probe on a configured port other than `0` (a busy port still fails with `Failed to start server. Is port <port> in use?`). `prepareTlsReload(material)` binds a second `Bun.serve` on the bound port with the same `fetch`/`websocket` handlers; `commit` serves it and stops the old one gracefully (`stop()`: its in-flight requests, SSE streams and WebSockets keep being served), `abort` stops the new one. On a Unix socket (`HTTP_SOCKET_PATH`), which cannot be shared, prepare stops the old server first (`stop()` unlinks the path at once), binds the path with the new pair, and on a bind failure rebinds the previous bytes and rethrows (`TlsReloadDegradedError` when that rebind fails too); `abort` stops the new server and rebinds the previous bytes. After every such bind the socket file gets back the mode, and when permitted the owner and group, it had before the reload (`statSync` before the stop, then `chownSync` and `chmodSync`), so permissions set after startup survive; for the synchronous instant in between, the new file has the umask default mode. An owner/group the process may not set (`EPERM`) is kept as created and logged (`HTTP unix socket owner not restored after a TLS reload`, naming the path and the uid/gid). The restore is strict for the new pair (a failure fails the bind and rolls back) and best-effort for the rollback rebind (a failure is logged as `HTTP unix socket permissions not restored after a TLS reload rollback` and the previous listener stays up). `beginDrain()` and `stop()` refuse any later prepare. Plain HTTP binds exactly as before. See [Security: TLS, Auth, CORS](./security-tls-auth.md).
 
 ## Configuration
 
@@ -243,7 +244,7 @@ Resolved in `config/resolve.ts` (config file > env > default) and passed into `H
 | ---------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------- |
 | `HTTP_PORT`                                                                  | `port`                  | `6790`                                                            |
 | `HOST`                                                                       | `hostname`              | `0.0.0.0`                                                         |
-| `HTTP_SOCKET_PATH`                                                           | `socketPath`            | unset (overrides host/port → Unix socket bind, `http.ts:262-268`) |
+| `HTTP_SOCKET_PATH`                                                           | `socketPath`            | unset (overrides host/port → Unix socket bind, `httpListener.ts`) |
 | `AUTH_TOKENS` (comma-sep, trimmed, non-empty)                                | `authTokens`            | `[]` (auth disabled)                                              |
 | `CORS_ALLOW_ORIGIN` (comma-sep)                                              | `corsOrigins`           | `[]` (see CORS gotcha above)                                      |
 | `METRICS_AUTH`                                                               | `requireAuthForMetrics` | `false`                                                           |

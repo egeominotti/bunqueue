@@ -1,4 +1,4 @@
-import type { Socket, TCPSocketListener } from 'bun';
+import type { Socket, TCPSocketListener, TCPSocketListenOptions } from 'bun';
 import type { QueueManager } from '../../application/queueManager';
 import type { Command } from '../../domain/types/command';
 import { tcpLog } from '../../shared/logger';
@@ -12,10 +12,16 @@ import { TcpConnectionRegistry } from './tcp/connections';
 import { resolveIdleTimeoutMs, resolveMaxWriteQueueBytes } from './tcp/constants';
 import { handleEventSubscription } from './tcp/eventSubscriptions';
 import { serializeTcpResponse, tcpErrorResponse } from './tcp/responses';
-import { loadTlsOptions } from './tls';
+import { readTlsMaterial, type TlsMaterial } from './tls';
+import { settleOnce, TlsReloadShuttingDownError, type TlsListenerSwap } from './tlsReload';
 import type { TcpConnectionData, TcpServerConfig } from './types/tcpServer';
 
 export type { TcpServerConfig } from './types/tcpServer';
+
+/** Bun.listen supports `reusePort` at runtime; bun-types only declares it for connect. */
+interface ReusableTcpListenOptions extends TCPSocketListenOptions<TcpConnectionData> {
+  reusePort?: boolean;
+}
 
 /**
  * Create and start the MessagePack TCP server. The transport and rate-limiter settings
@@ -125,16 +131,43 @@ export function createTcpServer(queueManager: QueueManager, config: TcpServerCon
     },
   };
 
-  const tlsOptions = config.tls ? loadTlsOptions(config.tls) : undefined;
-  const server: TCPSocketListener<TcpConnectionData> = Bun.listen<TcpConnectionData>({
-    hostname: config.hostname ?? '0.0.0.0',
-    port: config.port ?? 6789,
-    ...(tlsOptions && { tls: tlsOptions }),
-    socket: socketHandlers,
-  });
+  const hostname = config.hostname ?? '0.0.0.0';
+  // A TLS listener is replaceable (SO_REUSEPORT), so it can take a renewed certificate:
+  // a new listener joins the port with the new pair, then the old one stops accepting.
+  const bindTls = (port: number, material: TlsMaterial) => {
+    const options: ReusableTcpListenOptions = {
+      hostname,
+      port,
+      reusePort: true,
+      tls: material,
+      socket: socketHandlers,
+    };
+    return Bun.listen<TcpConnectionData>(options);
+  };
+
+  let server: TCPSocketListener<TcpConnectionData>;
+  if (config.tls) {
+    const material = readTlsMaterial(config.tls);
+    const port = config.port ?? 6789;
+    // SO_REUSEPORT would let a second broker silently share the port: an exclusive probe
+    // bind fails with the usual address-in-use error whenever anything holds it.
+    if (port !== 0) Bun.listen({ hostname, port, socket: { data() {} } }).stop(true);
+    server = bindTls(port, material);
+  } else {
+    server = Bun.listen<TcpConnectionData>({
+      hostname,
+      port: config.port ?? 6789,
+      socket: socketHandlers,
+    });
+  }
+  // Set by `beginDrain()`/`stop()`: a listener that stopped accepting never rebinds.
+  let closed = false;
 
   return {
-    server,
+    /** The listener now accepting connections (replaced by each TLS reload). */
+    get server(): TCPSocketListener<TcpConnectionData> {
+      return server;
+    },
     connections: registry.connections,
     _socketHandlers: socketHandlers,
 
@@ -152,14 +185,38 @@ export function createTcpServer(queueManager: QueueManager, config: TcpServerCon
      * workers can finish the jobs they hold before `stop()`.
      */
     beginDrain(): void {
+      closed = true;
       drainController.abort();
       server.stop(false);
     },
 
     stop(): void {
+      closed = true;
       // After a drain, jobs still held are abandoned to the next process's recovery.
+      // `closeAll` also ends the connections accepted by listeners a reload retired.
       registry.closeAll(drainController.signal.aborted);
       server.stop(true);
+    },
+
+    /**
+     * Bind a listener with `material` on the bound port, sharing the socket handlers (and
+     * so the connection registry). `commit` retires the old listener without closing the
+     * connections it accepted; `abort` drops the new one.
+     */
+    prepareTlsReload(material: TlsMaterial): TlsListenerSwap {
+      if (!config.tls) throw new Error('TLS is not enabled on the TCP server');
+      if (closed) throw new TlsReloadShuttingDownError('TCP server is shutting down');
+      const previous = server;
+      const next = bindTls(previous.port, material);
+      return settleOnce({
+        commit() {
+          server = next;
+          previous.stop(false);
+        },
+        abort() {
+          next.stop(false);
+        },
+      });
     },
   };
 }

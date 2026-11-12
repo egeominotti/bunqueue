@@ -60,7 +60,7 @@ Internal:
   non-disk infrastructure diagnostics.
 - `src/application/throughputTracker.ts`, `src/application/latencyTracker.ts` — rate/latency snapshots for stats, metrics, dashboard.
 - `src/domain/types/webhook.ts` — `WEBHOOK_EVENTS` allow-list for webhook validation.
-- `bootstrap.ts` additionally depends on `./tcp`, `./http`, `../backup` (`S3BackupManager`), `../cloud` (`CloudAgent`), `./rateLimiter`, `../../config`, `../../shared/logger`.
+- `bootstrap.ts` additionally depends on `./tcp`, `./http`, `./tlsReload` (`handleTlsReloadSignal`), `../backup` (`S3BackupManager`), `../cloud` (`CloudAgent`), `./rateLimiter`, `../../config`, `../../shared/logger`.
 
 External / runtime: Bun (`Bun.env`, `Bun.sleep`, `process.memoryUsage`, signal handlers), msgpack via the transport (not in this module directly). Zero third-party runtime deps.
 
@@ -268,6 +268,26 @@ then does bootstrap print the banner and bind TCP + HTTP. `S3BackupManager` star
 only for persistent SQLite. Shutdown dispatches to synchronous SQLite cleanup or
 awaited PostgreSQL lease/worker/broker/listener/pool cleanup.
 
+Signals: `SIGINT` and `SIGTERM` run the graceful shutdown (`createServerShutdown`,
+below), and so do `uncaughtException` and `unhandledRejection`. `SIGHUP` depends on
+TLS. With `TLS_CERT_FILE`/`TLS_KEY_FILE` it reloads the certificate on the TCP
+listener and then the HTTP listener (`handleTlsReloadSignal`, see
+[Security: TLS, Auth, CORS](./security-tls-auth.md)) and the process keeps running.
+Without TLS, bootstrap installs **no** `SIGHUP` handler, so the signal keeps the
+disposition the process inherited, as in 2.9.21: the default action (terminate, exit
+129, no drain), or the "ignore" of `nohup`, which a handler would override; a non-TLS
+broker under `nohup` survives an SSH logout or a logrotate `kill -HUP`
+(`test/repro-issue-189-tls-reload-process.test.ts`). With TLS, `SIGHUP` is claimed
+with `process.on` just **before** the listeners bind, through a dispatch that the
+synchronous block after the bind points at the reload: the kernel completes TCP
+handshakes as soon as a socket listens, so a client can reach the port, and signal
+the process, before JavaScript returns from the bind. A `SIGHUP` that is dispatched
+while startup is still awaiting (only the bind-failure path awaits after that point)
+logs `SIGHUP ignored: the server is still starting`. A `SIGHUP` during a shutdown
+never rebinds a listener: after `beginDrain()`, `prepareTlsReload` throws
+`TlsReloadShuttingDownError` and the server logs `SIGHUP ignored: the server is
+shutting down`.
+
 ## Concurrency & Locking
 
 The handler layer itself takes **no locks** — every mutation is delegated to `QueueManager`, which owns the lock hierarchy (`jobIndex → completedJobs → shards[N] → processingShards[N]`). See [Concurrency & Locking](./concurrency-and-locking.md).
@@ -312,7 +332,7 @@ Concurrency relevant to this layer:
   `createTcpServer`/`createHttpServer` (`TCP_*`, `RATE_LIMIT_*`) still apply the
   same rules before anything binds.
 - **Shutdown order:** `createServerShutdown` (`shutdownCoordinator.ts`) runs, each step best-effort: stats timer → **intake stop** (`stopTcpIntake` → `TcpServer.beginDrain()`, `stopHttpIntake` → `HttpServer.beginDrain()`) → S3 backup stop → **active-job drain** → TCP stop → HTTP stop → rate-limiter cleanup → `server:shutdown` event → Cloud stop (bounded) → storage shutdown (bounded, retried once). Previously TCP and HTTP were stopped before the drain, so no ACK/FAIL could reach the broker during it: the drain always ran the full `shutdownTimeoutMs` (30 s, longer than `docker stop`'s 10 s grace) and the rows stayed `active`, to be charged by startup recovery (`test/repro-sigterm-active-jobs-penalized.test.ts`).
-- **Intake stop:** `beginDrain()` stops the listener from accepting connections (`Bun.listen` `stop(false)`, `Bun.serve` `stop()`, the same for TLS and the HTTP Unix socket) and aborts a server-wide drain signal. Every pull context carries it (TCP: `AbortSignal.any` with the connection's own signal; HTTP requests and WebSocket messages: the signal itself), so `PULL`/`PULLB`, including long polls already parked, claim no job (the PostgreSQL claim loop also checks the signal before every claim). **Drain-time pulls:** a pull that comes back empty during the drain does not answer at once (`holdEmptyPullWhileDraining`, `handlers/pull.ts`): one with `timeout > 0`, new or already parked, holds without delivering until its own timeout expires or its connection ends (`HandlerContext.connectionSignal`: the client disconnects, or `stop()` closes the connection or aborts the HTTP server's stop signal), then returns `null` / `[]`. A pull with `timeout` 0 returns empty immediately, as for an empty queue, and a pull whose own client is gone is not held. Answering every drained long poll at once made an SDK Worker with `pollTimeout > 0` re-poll every 10 ms for the whole drain (about 180 PULLs per worker in 2 s); holding keeps it to one pull per `pollTimeout` (`test/server-drain-long-poll.test.ts`). Held pulls are not active jobs, so they never extend the drain. Every other command keeps working on the open TCP connections and WebSockets: ACK/ACKB/FAIL, `JobHeartbeat`/`ExtendLock`, `Progress`, and also `PUSH`/`PUSHB`/flows, which are accepted and persisted by the storage shutdown (SQLite flushes the WriteBuffer on close; PostgreSQL writes are transactional). Plain HTTP requests need a new connection and are refused, so an HTTP-only worker cannot ACK during the drain (its job is handled as one still active at the deadline). An SDK worker without a long poll re-polls on its usual empty-queue cadence (`drainDelay`, 50 ms by default) until the server closes its connection (`test/server-shutdown-intake.test.ts`).
+- **Intake stop:** `beginDrain()` stops the current listener from accepting connections (`Bun.listen` `stop(false)`, `Bun.serve` `stop()`, the same for TLS and the HTTP Unix socket; a listener retired by a TLS reload already stopped accepting, and the connections it accepted are drained and closed like any other) and aborts a server-wide drain signal. Every pull context carries it (TCP: `AbortSignal.any` with the connection's own signal; HTTP requests and WebSocket messages: the signal itself), so `PULL`/`PULLB`, including long polls already parked, claim no job (the PostgreSQL claim loop also checks the signal before every claim). **Drain-time pulls:** a pull that comes back empty during the drain does not answer at once (`holdEmptyPullWhileDraining`, `handlers/pull.ts`): one with `timeout > 0`, new or already parked, holds without delivering until its own timeout expires or its connection ends (`HandlerContext.connectionSignal`: the client disconnects, or `stop()` closes the connection or aborts the HTTP server's stop signal), then returns `null` / `[]`. A pull with `timeout` 0 returns empty immediately, as for an empty queue, and a pull whose own client is gone is not held. Answering every drained long poll at once made an SDK Worker with `pollTimeout > 0` re-poll every 10 ms for the whole drain (about 180 PULLs per worker in 2 s); holding keeps it to one pull per `pollTimeout` (`test/server-drain-long-poll.test.ts`). Held pulls are not active jobs, so they never extend the drain. Every other command keeps working on the open TCP connections and WebSockets: ACK/ACKB/FAIL, `JobHeartbeat`/`ExtendLock`, `Progress`, and also `PUSH`/`PUSHB`/flows, which are accepted and persisted by the storage shutdown (SQLite flushes the WriteBuffer on close; PostgreSQL writes are transactional). Plain HTTP requests need a new connection and are refused, so an HTTP-only worker cannot ACK during the drain (its job is handled as one still active at the deadline). An SDK worker without a long poll re-polls on its usual empty-queue cadence (`drainDelay`, 50 ms by default) until the server closes its connection (`test/server-shutdown-intake.test.ts`).
 - **Shutdown drain bound:** active jobs are awaited only up to `shutdownTimeoutMs`, and the drain ends at the first poll that finds none (it polls once per second), so a worker that ACKs during the drain shortens shutdown accordingly. Jobs still active after the deadline are abandoned to the next process's startup recovery: `TcpServer.stop()` after a drain calls `closeAll(true)`, which closes the remaining connections without the disconnect release, so their rows stay `active` (a `stop()` without a drain still releases). The drain polls with `sleep`, never one timer for the whole window, so any `shutdownTimeoutMs` (including one above 2^31 - 1 ms) is waited in full and never skipped; the Cloud and storage step timeouts use `safeTimeout` (`test/server-runtime-shutdown-drain.test.ts`, `test/server-shutdown-coordinator.test.ts`).
 
 ## Configuration

@@ -20,7 +20,9 @@ import {
   gcEndpoint,
   heapStatsEndpoint,
 } from './httpEndpoints';
-import { loadTlsOptions, type TlsServerOptions } from './tls';
+import type { TlsMaterial, TlsServerOptions } from './tls';
+import type { TlsListenerSwap } from './tlsReload';
+import { createHttpListener } from './httpListener';
 import { routeHttpRequest } from './httpRouter';
 import { sanitizeServerError } from './errors';
 import { checkAuth } from './httpAuth';
@@ -255,28 +257,14 @@ export function createHttpServer(queueManager: QueueManager, config: HttpServerC
     },
   };
 
-  // Create server (validate TLS files BEFORE binding, fail fast on bad paths)
-  const tlsOptions = config.tls ? loadTlsOptions(config.tls) : undefined;
-  let server: Server<WsData>;
-  if (config.socketPath) {
-    server = Bun.serve<WsData>({
-      unix: config.socketPath,
-      ...(tlsOptions && { tls: tlsOptions }),
-      fetch,
-      websocket,
-    });
-  } else {
-    server = Bun.serve<WsData>({
-      hostname: config.hostname ?? '0.0.0.0',
-      port: config.port ?? 6790,
-      ...(tlsOptions && { tls: tlsOptions }),
-      fetch,
-      websocket,
-    });
-  }
+  // Bind (validates the TLS files first). With TLS the listener is replaceable.
+  const listener = createHttpListener(config, { fetch, websocket });
 
   return {
-    server,
+    /** The listener now accepting connections (replaced by each TLS reload). */
+    get server(): Server<WsData> {
+      return listener.server;
+    },
     wsClients: wsHandler.getClients(),
     sseClients: sseHandler.getClients(),
     getWsClientCount: () => wsHandler.size,
@@ -284,14 +272,18 @@ export function createHttpServer(queueManager: QueueManager, config: HttpServerC
     /** Shutdown drain: refuse new connections and pulls; open WebSockets stay served. */
     beginDrain(): void {
       drainController.abort();
-      void server.stop();
+      listener.stop();
     },
     stop(): void {
       stopController.abort();
       unsubscribe();
       wsHandler.stopBroadcasts();
       sseHandler.closeAll();
-      void server.stop();
+      listener.stop();
+    },
+    /** New pair for new handshakes; open requests and WebSockets stay on the old one. */
+    prepareTlsReload(material: TlsMaterial): TlsListenerSwap {
+      return listener.prepareTlsReload(material);
     },
   };
 }

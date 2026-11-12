@@ -173,6 +173,8 @@ On `SIGINT` or `SIGTERM` the server:
 4. Flushes SQLite writes or drains admitted PostgreSQL operations and maintenance
 5. Exits cleanly
 
+With TLS enabled, `SIGHUP` does not stop the server: it reloads the certificate and key from disk without dropping connections (see [Renewing certificates](/guide/tls/#renewing-certificates)). Without TLS the server does not handle `SIGHUP`, as in earlier releases: the default action ends the process without this sequence (under `nohup` the signal is ignored).
+
 ## Connect AI agents (MCP)
 
 AI agents can drive a running server through the bundled MCP server, which talks to bunqueue over TCP:

@@ -1,6 +1,6 @@
 ---
 title: "Native TLS Encryption for bunqueue TCP & HTTP"
-description: Encrypt bunqueue TCP and HTTP traffic with native TLS, no reverse proxy needed. Server cert/key setup, client options, CLI flags, self-signed certs.
+description: Encrypt bunqueue TCP and HTTP traffic with native TLS, no reverse proxy needed. Server cert/key setup, client options, CLI flags, self-signed certs, certificate renewal without a restart.
 head:
   - tag: meta
     attrs:
@@ -215,6 +215,78 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
 ```
 
 Clients then connect with the CA-file option pointing at `cert.pem` (`caFile` in TypeScript and PHP, `ca_file` in Python, Rust, and Elixir, `CAFile` in Go): the self-signed cert acts as its own CA. That keeps full verification, no verification opt-out needed.
+
+## Renewing certificates
+
+When a certificate is renewed (Let's Encrypt, cert-manager, an internal CA), replace the cert and key files at the paths the server was started with, then send the server `SIGHUP`. It re-reads both files and serves the new certificate without a restart:
+
+```bash
+# 1. Replace both files (write a sibling, then rename it over the live path)
+cp renewed/fullchain.pem /etc/bunqueue/cert.pem.new && mv /etc/bunqueue/cert.pem.new /etc/bunqueue/cert.pem
+cp renewed/privkey.pem /etc/bunqueue/key.pem.new && mv /etc/bunqueue/key.pem.new /etc/bunqueue/key.pem
+
+# 2. Tell bunqueue to reload them
+kill -HUP <pid>                                     # bare process
+docker kill -s HUP <container>                      # Docker (see below)
+systemctl kill -s HUP --kill-whom=main bunqueue     # systemd
+```
+
+The server does not watch the files: nothing changes until it gets the signal, so put the `SIGHUP` in your renewal hook (for example certbot's `--deploy-hook`).
+
+What happens on `SIGHUP`:
+
+- New TLS handshakes on both ports, TCP and HTTP (`https://`, `wss://`, SSE), get the new certificate.
+- Connections that are already open are not touched: workers keep their jobs, and WebSockets and SSE streams keep streaming on the certificate they were opened with. The process keeps running.
+- The server logs one line per reload with the new certificate's subject, expiry and SHA-256 fingerprint (with `LOG_FORMAT=json`; the text format prints the same fields):
+
+  ```json
+  {"timestamp":"2026-11-12T09:30:00.000Z","level":"info","component":"Server","message":"TLS certificate reloaded","data":{"subject":"CN=queue.example.com","notAfter":"2027-02-10T12:00:00.000Z","fingerprint256":"3D:3D:7B:1A:…:5A:F5"}}
+  ```
+
+- A pair that cannot be loaded (the key does not match the certificate, a file is missing or unreadable, a file is not PEM) is refused: the server logs `TLS reload failed; still serving the previous certificate` with the reason and keeps serving the current certificate on both ports. Fix the files and send `SIGHUP` again.
+- With `HTTP_SOCKET_PATH`, if the server's user may not give the recreated socket file its previous owner or group, the reload still succeeds and the server warns `HTTP unix socket owner not restored after a TLS reload`, naming the path and the uid/gid it could not restore.
+- If a listener could not be put back on the previous certificate (rare: for example the HTTP unix socket path could not be bound again), the server logs `TLS reload failed and left a listener degraded; restart the server` with the reason. Restart the server.
+- A `SIGHUP` that arrives while the server is shutting down changes nothing and logs `SIGHUP ignored: the server is shutting down`.
+
+Replace both files before you signal. A `SIGHUP` that lands between the two writes sees a new cert with the old key, is refused as a mismatch, and the next `SIGHUP` picks up the complete pair.
+
+Changing the cert or key **path** still needs a restart; a reload always re-reads the paths from startup.
+
+With `HTTP_SOCKET_PATH`, a reload recreates the socket file (a unix socket cannot be shared between two listeners). The server copies the old file's mode onto the new one right away, and its owner and group when its user is allowed to set them, so a `chmod 660` or `chgrp` made after startup survives the reload. In the instant between the two, the new socket has the mode a new file gets from the process umask.
+
+Without TLS, bunqueue does not handle `SIGHUP` at all, exactly as in earlier releases: the default action ends the process at once, without the graceful drain, and under `nohup` the signal is ignored. Stop a server with `SIGTERM` or `SIGINT`. With TLS, `SIGHUP` always means "reload", also under `nohup`.
+
+If clients trust a self-signed certificate directly (its own `caFile`), a renewed self-signed certificate is a new CA: give clients the new file before you reload, or sign the server certificates with a private CA that clients trust instead.
+
+On Linux, a client whose TCP connection arrives in the instant the server swaps listeners can see a connection reset; bunqueue clients reconnect on their own.
+
+### Reloading in Docker
+
+The official images declare no stop signal, so Docker records `docker kill -s HUP <container>` as a manual stop. The certificate is reloaded and the container keeps running, but the next time it exits on its own (a crash, for example) the restart policy does not start it again. Two ways keep the policy:
+
+- Send the signal from inside the container. Docker does not see that as a stop:
+
+  ```bash
+  docker exec <container> kill -HUP 1            # alpine images (busybox provides kill)
+  docker exec <container> sh -c 'kill -HUP 1'    # debian and slim images (no kill binary, shell builtin)
+  ```
+
+- Run the container with a declared stop signal. It is a runtime setting, so it works for every variant; on the distroless image, which has neither a shell nor `kill`, it is the only way to keep the policy:
+
+  ```bash
+  docker run --stop-signal SIGTERM ...
+  ```
+
+  ```yaml
+  # docker-compose.yml
+  services:
+    bunqueue:
+      stop_signal: SIGTERM
+  ```
+
+  `docker kill -s HUP` then no longer counts as a manual stop, and `docker stop` sends `SIGTERM` as it already did. The setting changes every other signal too: for that container, a `docker kill -s <signal>` with any signal except `SIGTERM` and `SIGKILL` is no longer a manual stop, so a container stopped with `docker kill -s INT`, for example, is started again by `--restart always` or `unless-stopped`.
+
+The same tool limits apply to `kubectl exec` in Kubernetes.
 
 ## Good to know
 

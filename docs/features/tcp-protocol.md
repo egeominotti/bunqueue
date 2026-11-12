@@ -12,7 +12,7 @@ Owns:
 
 - **Length-prefixed framing** — `FrameParser` (`protocol/frameParser.ts`) reassembles complete frames from arbitrary TCP segment boundaries, and `FrameParser.frame()` prepends the 4-byte big-endian length prefix on the way out.
 - **MessagePack (de)serialization of the wire body** — the hardened `encodeMessagePack`/`decodeMessagePack` helpers wrap `msgpackr` (`shared/msgpack.ts:69-81`); the server decodes inbound commands in `tcp.ts:58-64` and frames responses in `tcp/responses.ts:5-10`. A non-byte TypedArray (`Float32Array`, `Uint16Array`, `BigInt64Array`, ...) or a `DataView` is encoded as a msgpack `bin` holding exactly its own bytes (respecting `byteOffset`/`byteLength`), so a reader gets a `Uint8Array` with those bytes; the element type is not preserved. `Uint8Array`/`Buffer`/`ArrayBuffer` encode as before. See "Binary views" under Edge cases.
-- **TCP listener lifecycle** — `createTcpServer()` (`tcp.ts:20-148`) wires `Bun.listen` with `open`/`data`/`close`/`error`/`drain` socket handlers, plus `broadcast()` and `stop()`.
+- **TCP listener lifecycle** — `createTcpServer()` (`tcp.ts`) wires `Bun.listen` with `open`/`data`/`close`/`error`/`drain` socket handlers, plus `broadcast()`, `beginDrain()`, `stop()` and, with TLS, the listener swap of a certificate reload (`prepareTlsReload`).
 - **Per-connection pipelining** — frames in one read are decoded and processed in parallel, bounded by a `Semaphore` of `MAX_CONCURRENT_PER_CONNECTION = 50` (`tcp/constants.ts:6`, `tcp/connections.ts:52`, `tcp.ts:93-108`).
 - **Write-side backpressure** — `SocketWriteQueue` (`socketWriteQueue.ts:24`) buffers unwritten tails on short writes and flushes them on `drain`.
 - **Transport DoS bounds** — 64MB max frame size (`protocol/frameParser.ts:1`), slowloris stall timer (`tcp/connections.ts:52-73`), and a write-queue byte cap (`tcp/constants.ts:29-57`, `tcp/connections.ts:75-86`).
@@ -28,7 +28,7 @@ Does NOT own (delegated elsewhere):
 - **Command dispatch / business logic** — `handleCommand()` routes to the handler groups; see [TCP Server Command Handlers](./tcp-server-handlers.md).
 - **Authentication / authorization** — gated inside `handleCommand` (`Auth`, token check); see [Security: TLS, Auth, CORS](./security-tls-auth.md). This module only carries the `Auth`/`Hello` frames and supplies the `authTokens` set + `authenticated` flag in the handler context.
 - **Rate limiting policy** — `getRateLimiter()` is consulted once per complete decoded frame, but the limiter itself lives in [Rate Limiting & Concurrency Control](./rate-limiting-and-concurrency.md).
-- **TLS certificate loading** — `loadTlsOptions()` from `src/infrastructure/server/tls.ts`; see [Security: TLS, Auth, CORS](./security-tls-auth.md).
+- **TLS certificate loading and reload** — `readTlsMaterial()` from `src/infrastructure/server/tls.ts` and `reloadServerTls()` from `src/infrastructure/server/tlsReload.ts`; see [Security: TLS, Auth, CORS](./security-tls-auth.md). This module only provides the replaceable TLS listener (`prepareTlsReload`).
 - **Client-side framing/reconnect/batching** — the client reuses the same `FrameParser` but owns its own connection logic; see [Client Transport](./client-transport.md).
 - **HTTP/SSE/WebSocket transport** — see [HTTP / REST / SSE / WebSocket API](./http-api.md).
 
@@ -40,7 +40,8 @@ Internal:
 - `./protocol` — `FrameParser`, `FrameSizeError`, `createConnectionState`, `ConnectionState`, `MAX_FRAME_SIZE`.
 - `./socketWriteQueue` — `SocketWriteQueue`.
 - `./rateLimiter` — `getRateLimiter()`.
-- `./tls` — `loadTlsOptions`, `TlsServerOptions`.
+- `./tls` — `readTlsMaterial`, `TlsMaterial`, `TlsServerOptions`.
+- `./tlsReload` — `settleOnce`, `TlsListenerSwap`.
 - `../../shared/semaphore` — `Semaphore`, `withSemaphore`.
 - `../../shared/hash` — `uuid` (per-connection clientId).
 - `../../shared/logger` — `tcpLog`.
@@ -70,11 +71,13 @@ export function createTcpServer(
   queueManager: QueueManager,
   config: TcpServerConfig
 ): {
-  server: TCPSocketListener<ConnectionData>;
+  readonly server: TCPSocketListener<ConnectionData>; // getter: the listener accepting now
   connections: Map<string, Socket<ConnectionData>>;
   getConnectionCount(): number;
   broadcast(message: unknown): void;
+  beginDrain(): void;
   stop(): void;
+  prepareTlsReload(material: TlsMaterial): TlsListenerSwap; // throws without TLS or once draining
 };
 
 export type TcpServer = ReturnType<typeof createTcpServer>;
@@ -336,8 +339,9 @@ connections (`closeAll`) and stops the listener; see the shutdown order in
   apply the same projection; SQLite disk-full retains its actionable detail.
 - **Job release on disconnect with retry:** `releaseClientJobsWithRetry` (`tcp/clientRelease.ts:4-23`) retries up to 3× with exponential backoff (100/200/400ms). If all retries fail, `TcpConnectionRegistry.close` falls back to `forceReleaseClientJobs` (`tcp/connections.ts:116-124`), which unconditionally clears client tracking (prevents a `connections`/ownership Map leak) and resets heartbeats so the stall detector recovers any orphaned `active` jobs on its next tick — chosen over leaking the jobs. Both paths act only on deliveries the connection still owns: a job recovered from it (stall, orphan, lock expiry, timeout) is detached at recovery, and a later delivery to another worker is never released or expired by this connection's close (see [Webhooks, Events & Job Logs](./webhooks-and-events.md)).
 - **Idempotency** is a command-level concern (`jobId`/`uniqueKey`/`dedup`), not a transport one; the transport delivers exactly the frames it parsed. `reqId` is purely for client-side response correlation and is echoed back verbatim, including on errors.
-- **TLS startup invariant:** `loadTlsOptions` runs _before_ `Bun.listen` binds the port (`tcp.ts:120-126`), so a bad cert/key path fails fast at startup instead of leaving a half-started listener.
-- **`stop()`** terminates every connection through `TcpConnectionRegistry.closeAll()` and then stops the listener (`tcp.ts:141-144`); `broadcast()` frames the message once and fans it out through each connection's `SocketWriteQueue` (`tcp/connections.ts:114-124`).
+- **TLS startup invariant:** `readTlsMaterial` runs _before_ `Bun.listen` binds the port, so a bad cert/key path fails fast at startup instead of leaving a half-started listener.
+- **Replaceable TLS listener:** with TLS the listener binds with `reusePort: true` (after a plain exclusive probe bind on a configured port other than `0`, so a busy port still fails with `Failed to listen at <host>` and a second broker cannot share it). `prepareTlsReload(material)` binds a second listener on the bound port with the new pair and the **same** `socketHandlers` object, so every connection, accepted by either listener, lives in the one `TcpConnectionRegistry`; `commit` points `server` at it and stops the old one with `stop(false)` (its connections stay open), `abort` stops the new one. `beginDrain()` and `stop()` refuse any later prepare. A plain listener binds exactly as before (no probe, no SO_REUSEPORT) and has no reload.
+- **`stop()`** terminates every connection through `TcpConnectionRegistry.closeAll()` (including those a reload-retired listener accepted) and then stops the current listener; `broadcast()` frames the message once and fans it out through each connection's `SocketWriteQueue` (`tcp/connections.ts:114-124`).
 
 ## Configuration
 
@@ -349,7 +353,7 @@ connections (`closeAll`) and stops the listener; see the shutdown order in
 | `TcpServerConfig.authTokens` / `AUTH_TOKENS`                       | `[]`              | If empty, connections are auto-authenticated; otherwise `Auth` is required.                                                                                                                                                                                                                                                                                                                                                                 |
 | `TcpServerConfig.idleTimeoutMs` / `TCP_IDLE_TIMEOUT_MS`            | `60000`           | Slowloris stall timeout (ms) for in-progress partial frames; `0` disables. Env: whole ms >= 0 (any length, `safeTimeout`); config: finite ms >= 0. Anything else fails server creation.                                                                                                                                                                                                                                                     |
 | `TcpServerConfig.maxWriteQueueBytes` / `TCP_MAX_WRITE_QUEUE_BYTES` | `67108864` (64MB) | Max buffered outbound bytes before dropping the connection; `0` disables. Whole bytes >= 0; `64MB`, `1e9` or `abc` fail server creation.                                                                                                                                                                                                                                                                                                    |
-| `TcpServerConfig.tls` / `TLS_CERT_FILE` + `TLS_KEY_FILE`           | —                 | Native TLS termination (both files required).                                                                                                                                                                                                                                                                                                                                                                                               |
+| `TcpServerConfig.tls` / `TLS_CERT_FILE` + `TLS_KEY_FILE`           | —                 | Native TLS termination (both files required). The bound listener is replaceable: `SIGHUP` reloads the pair (`prepareTlsReload`, [Security](./security-tls-auth.md)).                                                                                                                                                                                                                                                                        |
 | `MAX_FRAME_SIZE` (constant)                                        | 64MB              | Hard cap on a single frame body; not env-tunable on the server (`FrameParser` constructor takes an override used in tests).                                                                                                                                                                                                                                                                                                                 |
 | `MAX_CONCURRENT_PER_CONNECTION` (constant)                         | `50`              | Per-connection pipelining concurrency.                                                                                                                                                                                                                                                                                                                                                                                                      |
 

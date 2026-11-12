@@ -112,7 +112,7 @@ BUNQUEUE_BROKER_ID=broker-a \
 bunqueue start
 ```
 
-**TLS.** Set both `TLS_CERT_FILE` and `TLS_KEY_FILE` or neither, setting only one is a startup error (fail fast, never silent plaintext). See the [TLS guide](/guide/tls/).
+**TLS.** Set both `TLS_CERT_FILE` and `TLS_KEY_FILE` or neither, setting only one is a startup error (fail fast, never silent plaintext). After a renewal, replace the files and send the server `SIGHUP`: it serves the new certificate without a restart (see [Renewing certificates](/guide/tls/#renewing-certificates)). See the [TLS guide](/guide/tls/).
 
 :::caution[`TCP_SOCKET_PATH` is not functional yet]
 The variable is accepted and shown in the startup banner, but the TCP listener always binds `HOST:TCP_PORT` today. Use `HTTP_SOCKET_PATH` for Unix-socket access (HTTP API), or bind to `HOST=127.0.0.1` for local-only access.

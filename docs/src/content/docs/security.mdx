@@ -168,7 +168,9 @@ Three options, in order of preference for typical deployments:
 
    Clients verify against system certificate authorities by default and
    accept a custom CA bundle (`tls: { caFile: './ca.pem' }`). Disabling
-   verification is possible for development only. See the
+   verification is possible for development only. A renewed certificate is
+   picked up with `SIGHUP`, without a restart or dropped connections; a pair
+   that does not load is refused and the current one stays in use. See the
    [TLS guide](/guide/tls/).
 
 2. **A Unix domain socket for the HTTP API** on same host deployments, where

@@ -289,7 +289,7 @@ METRICS_AUTH=false          # Require auth for /metrics endpoint
 TCP_SOCKET_PATH=           # RESERVED, not wired: TCP always binds HOST:TCP_PORT
                            # (client ConnectionOptions.socketPath is not read either)
 HTTP_SOCKET_PATH=          # Unix socket for HTTP (works)
-TLS_CERT_FILE=             # PEM cert — native TLS on TCP+HTTP (with TLS_KEY_FILE)
+TLS_CERT_FILE=             # PEM cert — native TLS on TCP+HTTP (with TLS_KEY_FILE); SIGHUP reloads
 TLS_KEY_FILE=              # PEM private key (both or neither; partial = startup error)
 
 # Memory-only result of removeOnComplete jobs for late waits (memory/SQLite; 0 = off)
