@@ -199,6 +199,22 @@ head:
 
 ### Testing
 
+- Four PostgreSQL regression files now run (`postgres-tests-never-run`). Their
+  cases skip unless `BUNQUEUE_TEST_POSTGRES_URL` is set, and only
+  `bun run test:postgres` (the CI `test-postgres` job) sets it, but that runner
+  selected `test/postgres-*.test.ts` only, so the 21 cases were skipped in every
+  run: `test/repro-postgres-own-terminal-refresh.test.ts` (14, issues #158 and
+  #161), `test/repro-postgres-cron-native-persisted-migration.test.ts` (4),
+  `test/repro-postgres-prometheus-per-queue.test.ts` (2) and the PostgreSQL case
+  of `test/repro-compat-job-past-run-time.test.ts`. The runner now selects
+  `test/repro-postgres-*.test.ts` too (also in the `battle` profile); the
+  PostgreSQL case moved unchanged to
+  `test/repro-postgres-compat-job-past-run-time.test.ts`, so the SQLite cases of
+  the compat file stay in the unit job only. The new guard
+  `test/postgres-runner-coverage.test.ts` fails when a test file reads the URL,
+  directly or through a test module it imports, and the runner does not select
+  it. On their first run, against PostgreSQL 16, 17 and 18.6, all 21 cases pass;
+  nothing in the runtime changes.
 - `test/cronScheduler.test.ts` no longer fails when the unit suite runs at 23:59
   local time (`cron-test-midnight-boundary`). The test "cron with both schedule
   and repeatEvery uses schedule for nextRun" read the real clock and required the

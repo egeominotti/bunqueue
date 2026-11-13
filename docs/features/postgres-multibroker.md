@@ -1329,7 +1329,10 @@ Intentional boundaries:
 ## Validation
 
 Dedicated tests require `BUNQUEUE_TEST_POSTGRES_URL` and create a unique namespace
-per case:
+per case. `test:postgres` and `test:postgres:battle` select every
+`test/postgres-*.test.ts` and `test/repro-postgres-*.test.ts` file; a test that needs
+the URL must use one of those names, which `test/postgres-runner-coverage.test.ts`
+enforces:
 
 ```bash
 BUNQUEUE_TEST_POSTGRES_URL=postgres://... bun run test:postgres

@@ -2,6 +2,17 @@
 
 const ROOT = `${import.meta.dir}/..`;
 
+/**
+ * The selection rule of `bun run test:postgres`: every top-level test file whose name
+ * starts with `postgres-` or `repro-postgres-`. A test that skips without
+ * `BUNQUEUE_TEST_POSTGRES_URL` must live in such a file, or no runner ever sets the URL
+ * for it; `test/postgres-runner-coverage.test.ts` fails when one does not.
+ */
+export const postgresTestPatterns = [
+  'test/postgres-*.test.ts',
+  'test/repro-postgres-*.test.ts',
+] as const;
+
 export const postgresTestProfiles = {
   smoke: [
     'test/postgres-config.test.ts',
@@ -43,7 +54,7 @@ export const postgresTestProfiles = {
     'test/postgres-public-api-extreme.test.ts',
     'test/postgres-ten-processes.test.ts',
   ],
-  battle: ['test/postgres-*.test.ts'],
+  battle: postgresTestPatterns,
 } as const;
 
 function profileFiles(files: readonly string[]): readonly string[] {
@@ -56,7 +67,7 @@ function profileFiles(files: readonly string[]): readonly string[] {
 
 function expandTestFiles(files: readonly string[], root: string): string[] {
   const selected = profileFiles(files);
-  const requested = selected.length > 0 ? selected : ['test/postgres-*.test.ts'];
+  const requested = selected.length > 0 ? selected : postgresTestPatterns;
   const expanded = requested.flatMap((file) => {
     if (!/[*?[{]/.test(file)) return [file];
     return [...new Bun.Glob(file).scanSync({ cwd: root, onlyFiles: true })];

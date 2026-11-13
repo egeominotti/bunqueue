@@ -166,6 +166,15 @@
       "issue": null
     },
     {
+      "id": "postgres-runner-guard-destructuring",
+      "name": "Make the PostgreSQL runner-coverage guard see destructured env reads",
+      "description": "test/postgres-runner-coverage.test.ts finds files that read BUNQUEUE_TEST_POSTGRES_URL by matching process.env.BUNQUEUE_TEST_POSTGRES_URL / process.env['...'] text, so a file that destructures it (const { BUNQUEUE_TEST_POSTGRES_URL } = process.env) or reads it through a helper would again be skipped by every runner without the guard failing. Widen the detection (any mention of the variable name in a test file) and prove it on a mutant file.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "",
+      "issue": null
+    },
+    {
       "id": "postgres-sigkill-hook-timeout-flake",
       "name": "PostgreSQL SIGKILL recovery test: a hook timed out once on PostgreSQL 17",
       "description": "test/postgres-public-api-extreme.test.ts failed once in the PostgreSQL 17.x Integration Tests job of CI run 43355036181, attempt 1, on commit e1cbfc99 (499 pass / 1 fail): after \"PostgreSQL 17 extreme public API concurrency > recovers an active public Worker job after its broker is SIGKILLed\" passed (45.3 s), bun printed \"killed 1 dangling process\" and \"(fail) (unnamed) [5000.37ms]: a beforeEach/afterEach hook timed out\"; the file's afterEach is the only per-test hook. The job passed on the rerun (attempt 2). Not the same file or cause as postgres-lifecycle-race-flake. Reproduce first (a stress loop of that test against PostgreSQL 17), then give the hook a bounded wait for the killed broker or a longer hook timeout, without weakening what the test asserts.",
@@ -179,8 +188,8 @@
       "name": "Four PostgreSQL regression files never run anywhere",
       "description": "test/repro-postgres-own-terminal-refresh.test.ts (issues #158 and #161), test/repro-postgres-cron-native-persisted-migration.test.ts, test/repro-postgres-prometheus-per-queue.test.ts and the PostgreSQL test of test/repro-compat-job-past-run-time.test.ts skip unless BUNQUEUE_TEST_POSTGRES_URL is set. The only runner that sets it, scripts/test-postgres.ts (CI job test-postgres, bun run test:postgres), selects test/postgres-*.test.ts, and the unit job has no PostgreSQL URL, so these tests are skipped in every run (docs/testing.md describes the first one as if it ran). Fix: rename them to postgres-*.test.ts or widen the runner's selection, run them against the CI PostgreSQL matrix, and fix or record whatever fails; do not delete them. Found by the test-suite-pruning audit.",
       "dependencies": [],
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "2026-11-13, base 2f1ad824; lands in the commit that adds this entry. bun run test:sandbox green on tree e8548701 (unit 11738 pass / 0 fail / 402 skip, tcp 553/0, embedded 349/0; artifacts/test-sandbox/2026-11-13T14-34-55.655Z/), the only change after it being this state update; skeptic PASS. Host checks before the gate: : implemented in the working tree, not committed; bun run test:sandbox, the skeptic and CI still owed. 2026-11-13, base 2f1ad824. Never-run files (skipped in every run: the unit job has no URL and scripts/test-postgres.ts selected test/postgres-*.test.ts only): test/repro-postgres-own-terminal-refresh.test.ts (14), test/repro-postgres-cron-native-persisted-migration.test.ts (4), test/repro-postgres-prometheus-per-queue.test.ts (2), the PostgreSQL case of test/repro-compat-job-past-run-time.test.ts (1); a scan of the whole test/ tree (direct reads of BUNQUEUE_TEST_POSTGRES_URL plus importers of the two support modules that read it) found no other. First-ever run of the four unmodified files with the CI env vars, local Docker postgres:16-alpine (16.16), 17-alpine (17.12), 18.6-alpine (18.6) on 127.0.0.1: 36 pass / 0 fail / 0 skip on each (21 skip without the URL). No test or product bug found; nothing in src/ changed, bun run test:model not triggered. Fix: postgresTestPatterns = test/postgres-*.test.ts + test/repro-postgres-*.test.ts (default and battle profile); the PostgreSQL case moved unchanged to test/repro-postgres-compat-job-past-run-time.test.ts; guard test/postgres-runner-coverage.test.ts (4 tests) fails with exactly the four files listed when the old rule is restored. bun run test:postgres on the final tree: PG 16 547 pass / 1 skip / 0 fail, 548 tests in 123 files (235 s); PG 17 547 / 1 / 0 (219 s); PG 18.6 547 / 1 / 0 (215 s); the skip is the opt-in ten-broker soak, as in CI. Without the URL test:postgres exits 1. Host: guard + quality-gate + compat files without PG 21 pass / 1 skip / 0 fail; docs, harness and skills tests 260 / 0; bun run typecheck, bun run format:check, git diff --check clean; ./init.sh green",
       "issue": null
     },
     {

@@ -878,7 +878,8 @@ that a lease renewal, batched completion, local claim, or queue refresh that
 supersedes it clears the per-job health key so `/ready` returns 200, that a
 cancelled or fenced-out ticket leaves the error to its repair refresh, and that
 a failed job read re-queues a retry. Own-write regressions
-(`test/repro-postgres-own-terminal-refresh.test.ts`, issue #158) hold a full-queue
+(`test/repro-postgres-own-terminal-refresh.test.ts`, issue #158, run by
+`bun run test:postgres` against PostgreSQL) hold a full-queue
 refresh after PostgreSQL returned its read model, pause the broker's event
 stream, make a terminal failure, batched completion, claim, push, cancellation,
 DLQ removal or durable drain on that broker, and assert the broker still reports
@@ -1199,6 +1200,15 @@ declared `needs` dependency and an explicitly checked result, so a failed or
 cancelled PostgreSQL 18.6/17/16 matrix cannot leave the release DAG green.
 PostgreSQL 15 left the matrix: it is no longer tested, and 16 is the minimum
 supported version.
+Each matrix entry runs `bun run test:postgres` with `BUNQUEUE_TEST_POSTGRES_URL`
+set; the unit job has no database, so its PostgreSQL cases skip. The runner
+(`scripts/test-postgres.ts`, `postgresTestPatterns`) selects every top-level
+`test/postgres-*.test.ts` and `test/repro-postgres-*.test.ts` file, so a test
+that skips without the URL must live in a file with one of those names (database-free
+files with those names run in both jobs). `test/postgres-runner-coverage.test.ts`
+fails when a test file reads the URL, directly or through a test module it
+imports, and the runner does not select it: before that guard, four regression
+files named `repro-*` read the URL and were skipped in every run.
 Expiry boundary cases derive timestamps from the PostgreSQL clock so
 host/container clock skew cannot turn lifecycle coverage into a timing-only
 failure. The version gate, binary matrix, container publication, and GitHub release are all

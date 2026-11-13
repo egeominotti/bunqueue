@@ -11,15 +11,16 @@
  *   the job ready, never `delayed`. The public `moveToDelayed(timestamp)` keeps 2.9.10's client-side
  *   `max(0, timestamp - now)` (a numeric-string timestamp coerced, as 2.9.10's `-` did),
  *   and the PostgreSQL engine keeps its own 2.9.10 clamp of a negative ChangeDelay to now
- *   (the engines differed on 2.9.10).
+ *   (the engines differed on 2.9.10). The PostgreSQL case needs a database, so it lives in
+ *   `test/repro-postgres-compat-job-past-run-time.test.ts`, which `bun run test:postgres`
+ *   selects.
  * - `attempts: -1` ran the job exactly once on 2.9.10 embedded (`attempts <
  *   maxAttempts` is false after the first failure); the candidate refused it.
  * - A direct `QueueManager.pull*` wait above 60 s was honoured by 2.9.10; the
  *   candidate capped it at 60 s.
  */
 
-import { afterAll, afterEach, describe, expect, test } from 'bun:test';
-import { PostgresQueueManager } from '../src/application/postgresQueueManager';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { createJob } from '../src/domain/job/create';
 import { MAX_JOB_DURATION_MS, pullTimeoutArgument } from '../src/domain/job/options';
@@ -31,26 +32,17 @@ import { handleCommand } from '../src/infrastructure/server/handler';
 import type { HandlerContext } from '../src/infrastructure/server/types';
 import { delayUntil } from '../src/client/queue/commandArgs';
 import { CoreE2eHarness, type CoreE2eMode } from './core-e2e/support/harness';
-import { cleanupPostgresNamespace } from './support/postgres-event-race';
 
 const PAST = -5_000;
-const postgresUrl = Bun.env.BUNQUEUE_TEST_POSTGRES_URL;
-const namespace = `test-compat-past-run-${Date.now()}-${crypto.randomUUID()}`;
 
 let harness: CoreE2eHarness | null = null;
 let manager: QueueManager | null = null;
-let postgres: PostgresQueueManager | null = null;
 
 afterEach(async () => {
   await harness?.close();
   harness = null;
   manager?.shutdown();
   manager = null;
-});
-
-afterAll(async () => {
-  await postgres?.shutdownPostgres();
-  if (postgresUrl) await cleanupPostgresNamespace(postgresUrl, namespace);
 });
 
 async function drainNames(broker: QueueManager, queue: string): Promise<string[]> {
@@ -208,32 +200,6 @@ describe('direct QueueManager pull waits are not capped at 60 s', () => {
       0,
     ]);
   });
-});
-
-describe('PostgreSQL keeps its own 2.9.10 results', () => {
-  test.skipIf(!postgresUrl)(
-    'push keeps a past run time; changeDelay clamps a negative delay to now',
-    async () => {
-      postgres = new PostgresQueueManager({
-        postgres: { url: postgresUrl!, namespace, brokerId: 'compat-past' },
-      });
-      await postgres.waitUntilReady();
-      await postgres.push('pg-past', { name: 'first', data: {} });
-      const late = await postgres.push('pg-past', { name: 'late', data: {}, delay: PAST });
-      expect(late.runAt).toBe(late.createdAt + PAST);
-      const moved = await postgres.push('pg-past', { name: 'moved', data: {}, delay: 60_000 });
-      const before = Date.now();
-      // 2.9.10's PostgreSQL engine applied `now + Math.max(0, delay)`; the engines differed.
-      expect(await postgres.changeDelay(moved.id, PAST * 2)).toBe(true);
-      expect(await postgres.getJobState(moved.id)).toBe('waiting');
-      expect((await postgres.getJob(moved.id))!.runAt).toBeGreaterThanOrEqual(before - 1_000);
-      const order: string[] = [];
-      for (let index = 0; index < 3; index++) {
-        order.push((await postgres.pull('pg-past', 0))?.name ?? '-');
-      }
-      expect(order).toEqual(['late', 'first', 'moved']);
-    }
-  );
 });
 
 describe('moveToDelayed accepts a numeric-string timestamp, as 2.9.10 coerced it', () => {

@@ -168,6 +168,24 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
 
+### 2026-11-13 — postgres-tests-never-run
+
+- Branch `postgres-tests-never-run`, base `2f1ad824`. Four files read
+  `BUNQUEUE_TEST_POSTGRES_URL` but were not named `postgres-*`, so no runner set the
+  URL for them and their 21 cases were skipped everywhere.
+- First-ever run against local Docker PostgreSQL 16.16, 17.12 and 18.6 with the CI
+  env vars: 36 pass / 0 fail on each. No test or product bug; `src/` unchanged.
+- Changed: `scripts/test-postgres.ts` (`postgresTestPatterns`, adds
+  `test/repro-postgres-*.test.ts`), the PostgreSQL case of the compat past-run-time
+  file moved to `test/repro-postgres-compat-job-past-run-time.test.ts`, new guard
+  `test/postgres-runner-coverage.test.ts`, `docs/testing.md`,
+  `docs/features/postgres-multibroker.md`, changelog `[Unreleased]` Testing.
+- `bun run test:postgres` on each local version: 547 pass / 1 skip (ten-broker
+  soak) / 0 fail in 123 files. `bun run test:sandbox` green on tree `e8548701`
+  (unit 11738 / 0 / 402, tcp 553 / 0, embedded 349 / 0); item `done`.
+- New item `postgres-runner-guard-destructuring`: the guard does not see a
+  destructured `BUNQUEUE_TEST_POSTGRES_URL` read.
+
 ### 2026-11-13 — drop-postgres-15
 
 - Owner decision: remove the PostgreSQL 15 tests (branch `drop-postgres-15`, base
