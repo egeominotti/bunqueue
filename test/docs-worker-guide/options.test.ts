@@ -1,6 +1,5 @@
 /**
  * Executable proof for /guide/worker/options/ ("WorkerOptions Reference").
- *
  * Every row of the reference table is checked: the documented default, and the
  * documented behaviour when the option is set.
  */
@@ -9,6 +8,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { Worker } from '../../src/client';
 import {
   type CoreE2eHarness,
+  FAST_STALL_SWEEP,
   MODES,
   closeHarness,
   startHarness,
@@ -169,7 +169,7 @@ for (const mode of MODES) {
     }, 30_000);
 
     test('skipLockRenewal stops this worker renewing its lease', async () => {
-      harness = await startHarness('worker-options', mode);
+      harness = await startHarness('worker-options', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('skip-renewal');
 
       await queue.setStallConfigAsync({
@@ -195,7 +195,7 @@ for (const mode of MODES) {
     }, 60_000);
 
     test('maxStalledCount is accepted but does not change broker recovery', async () => {
-      harness = await startHarness('worker-options', mode);
+      harness = await startHarness('worker-options', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('max-stalled');
 
       // Worker asks for 99 stalls; the queue policy allows exactly one.

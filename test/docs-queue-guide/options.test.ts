@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
   type CoreE2eHarness,
+  FAST_STALL_SWEEP,
   MODES,
   closeHarness,
   startHarness,
@@ -225,7 +226,7 @@ for (const mode of MODES) {
     }, 30_000);
 
     test('stallTimeout overrides the queue stall interval for one job', async () => {
-      harness = await startHarness('options', mode);
+      harness = await startHarness('options', mode, FAST_STALL_SWEEP);
       const impatient = harness.queue('stall-override');
       const patient = harness.queue('stall-default');
       const stalled: Record<string, string[]> = { override: [], control: [] };
@@ -254,8 +255,9 @@ for (const mode of MODES) {
       await waitForState(impatient, override.id, 'active', 10_000);
       await waitForState(patient, control.id, 'active', 10_000);
 
-      // The broker sweeps for stalls every 5s, so the per-job override fires
-      // within a few sweeps while the control job keeps the 120s queue default.
+      // The broker sweeps for stalls every stallCheckMs (5s by default, 100ms here), so
+      // the per-job override fires within a few sweeps while the control job keeps the
+      // 120s queue default.
       await waitUntil(
         async () =>
           stalled.override.includes(override.id) ||

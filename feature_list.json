@@ -51,6 +51,15 @@
       "issue": null
     },
     {
+      "id": "cpu-intensive-blocking-test-flake",
+      "name": "Flaky, mostly vacuous test: a non-yielding handler gets recovered",
+      "description": "test/docs-worker-guide/cpu-intensive.test.ts 'a non-yielding handler starves heartbeats and gets recovered' [tcp] failed once in 3 unchanged host runs on 2f1ad824 (2026-11-13, during the test-suite-speedups baseline: 'timed out waiting for the blocked job to be recovered by the broker' after 30 s). The handler busy-loops 3 s in the test process, which also hosts the broker (embedded manager or the in-process TCP server), so no stall sweep can run during the block, and the job then completes. The wait accepts state 'waiting', the job's state before the worker pulls it, so the test passes only when its first poll beats the pull and fails when the pull wins. Make it observe real recovery (for example a broker in another process, or a block that outlasts several sweeps of a short stallCheckMs while the broker's timers can fire) without weakening the page's claim; reproduce the flake first.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "",
+      "issue": null
+    },
+    {
       "id": "cron-test-midnight-boundary",
       "name": "Cron test fails when the unit suite crosses midnight UTC",
       "description": "test/cronScheduler.test.ts:819 (\"cron with both schedule and repeatEvery uses schedule for nextRun\") expects the next midnight to be more than 60 s away and fails when the unit suite crosses 23:59 UTC: sandbox run artifacts/test-sandbox/2026-11-12T23-56-09.256Z/ in the agent-skills worktree, unit 11739 pass / 1 fail at 23:59:13 UTC. Reproduce first (a deterministic test that fails at 23:59:xx), then fix with an injected clock or a schedule that cannot be less than 60 s away, without weakening what the test asserts.",
@@ -258,6 +267,15 @@
       "issue": null
     },
     {
+      "id": "split-oversized-test-files",
+      "name": "Split the test files that exceed the 300-line limit",
+      "description": "test/workflow-new-features.test.ts (647 lines), test/client-dlq-dedup.test.ts (714), test/long-running-timeout.test.ts (350), test/docs-queue-guide/advanced-batching.test.ts (309) and test/lockExpiration.test.ts (307) are over the 300-line rule; split each by concern without changing any test.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "",
+      "issue": null
+    },
+    {
       "id": "test-suite-pruning",
       "name": "Delete redundant and never-executed tests",
       "description": "Owner request: delete useless tests, each only after re-verifying that another test asserts the same behaviour through the same code path with equal or stronger assertions. Deletes the five fully commented-out SandboxedWorker files, test/bug-unregister-worker-field.test.ts, test/repro-delayed-error-zero-max-delay.test.ts and test/client-pipelining.test.ts (its 500-job id-uniqueness check moves to test/server-pipelining.test.ts), plus individual duplicate tests in the lock, cron, S3 backup, write-buffer, flow, ack, TLS and backoff files; replaces the no-op assertion of test/docs-dlq-guide/configuration.test.ts with the expiry it names. Records postgres-tests-never-run, sandboxed-worker-missing-cases and test-suite-speedups. No src/ change.",
@@ -271,8 +289,8 @@
       "name": "Remove fixed sleeps from the slowest unit test files",
       "description": "The slowest unit files spend most of their time in fixed waits, not in work (summed test time from the green sandbox run artifacts/test-sandbox/2026-11-13T03-20-41.934Z/, unit 566 s wall, 2,123 s summed): test/docs-dlq-guide/configuration.test.ts 124 s (two tests wait the 60 s dlqMaintenanceMs default), test/docs-worker-guide/cpu-intensive 63 s, stalls 57 s, stall-detection 56 s, options 48 s, events 47 s, test/docs-dlq-guide/reference.test.ts 47 s and test/docs-queue-guide/options.test.ts 24 s (two 5 s stallCheckMs sweeps per mode), test/lockExpiration.test.ts (seven fixed 6 s sleeps for the 5 s sweep after test-suite-pruning, 60 s before it), test/lock-race-conditions.test.ts (two 6.5 s sleeps) and test/bug-lock-token-race.test.ts 28 s (could use QueueManager({ stallCheckMs: 100 }) and poll), test/workflow-new-features.test.ts 49 s (three fixed 10 s sleeps; waitForWorkflowState instead), test/docs-queue-guide/advanced-batching.test.ts 31 s (close() waits the 30 s command timeout to an unreachable remote; a 2 s commandTimeout), test/long-running-timeout.test.ts 28 s, test/client-dlq-dedup.test.ts 24 s (a fixed 500 ms sleep 40 times; wait for 'failed'). Estimated saving about 600 s summed, about 150 s of unit wall time (about 27 %), unmeasured. Keep as they are: repro-cli-audit-runtime and repro-mcp-tcp-handler-longpoll (the 30 s wait is the behaviour under test) and the model-based suites. Needed seam: getSharedManager() (src/client/manager.ts) takes no stall or DLQ maintenance configuration, so the embedded docs harness (test/core-e2e/support/harness.ts) cannot shorten the sweeps; adding one is a src/ change, and when the interval is lowered in tests a test must still assert that DEFAULT_CONFIG.stallCheckMs is 5000 (the stall-detection page documents two 5 s sweeps). Measure before and after on the native host; existing assertions stay unchanged.",
       "dependencies": [],
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "2026-11-13, base 2f1ad824; lands in the commit that adds this entry. bun run test:sandbox green on tree 293c1594 (unit 11748 pass / 0 fail / 402 skip in 6.79 min against 9.40 min for the same day's unchanged-suite run, tcp 553/0, embedded 349/0; artifacts/test-sandbox/2026-11-13T15-25-31.774Z/), the only change after it being this state update; skeptic CONDITIONAL on this gate, the 300-line fix to test/docs-worker-guide/options.test.ts and recording the unexplained failure, all done; the DLQ purge test's maxAge raised from 1 s to 4 s for margin under load. Host checks before the gate: 2026-11-13, branch test-suite-speedups, base 2f1ad824, staged, not committed. Host medians of 3 runs per file (4 files at a time; baseline from an untouched git archive 2f1ad824 copy), before -> after in s: docs-dlq-guide/configuration 119.7 -> 6.9; docs-worker-guide/cpu-intensive 62.0 -> 22.9; stall-detection 56.0 -> 13.0; stalls 55.1 -> 16.6; workflow-new-features 48.8 -> 9.9; docs-worker-guide/options 47.6 -> 8.4; events 47.2 -> 8.0; docs-dlq-guide/reference 47.1 -> 7.9; lockExpiration 42.2 -> 1.0; docs-queue-guide/advanced-batching 30.6 -> 3.6; long-running-timeout 28.1 -> 8.5; bug-lock-token-race 27.7 -> 0.4; docs-queue-guide/options 24.5 -> 5.1; client-dlq-dedup 24.1 -> 4.5; lock-race-conditions 15.5 -> 0.6; new test/shared-manager-timers 0.1. Sum 676.0 -> 117.4 s (558.7 s saved, about 140 s of unit wall time on 4 workers). All 48 after-runs passed with the same test counts, plus 4 new tests in DLQ configuration and 2 in stall-detection. The baseline failed once in 3 runs on cpu-intensive (unchanged test, recorded as cpu-intensive-blocking-test-flake). Seam: getSharedManager(dataPath, timers?) (src/client/manager.ts, internal, creation-only, throws on an existing manager), CoreE2eHarness.start(mode, prefix, timers?), startHarness(page, mode, timers?). Defaults asserted: 5000 ms stall sweep, 60000 ms DLQ maintenance. Host checks: bun run test:model 12 pass / 0 fail (63.6 s); bun test test/agent-harness test/docs-*.test.ts 159 / 0; every suite that uses the harness, docs-guide-support or getSharedManager (164 files, --parallel=4): 4 runs: 2463 pass / 0 fail in three, 2462 pass / 1 fail / 1 skip in the first, whose failing test was not captured (output not retained; not reproduced in the next three); bun run typecheck clean (890 + 2,095 files); bun run format:check 2294 files formatted; git diff --check clean; ./init.sh green Open: the single failing test in the first of the 4 host runs was not captured and is unexplained; the skeptic's 3 further loaded runs of the 105 affected files (1876 pass / 1 skip / 0 fail each, 6 CPU burners) did not reproduce it.",
       "issue": null
     },
     {

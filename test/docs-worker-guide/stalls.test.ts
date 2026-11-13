@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
   type CoreE2eHarness,
+  FAST_STALL_SWEEP,
   MODES,
   closeHarness,
   startHarness,
@@ -51,7 +52,7 @@ for (const mode of MODES) {
     }, 60_000);
 
     test('a worker without heartbeats is detected as stalled', async () => {
-      harness = await startHarness('worker-stalls', mode);
+      harness = await startHarness('worker-stalls', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('silent');
 
       await queue.setStallConfigAsync({
@@ -147,7 +148,7 @@ for (const mode of MODES) {
     }, 30_000);
 
     test('a redelivery to the same worker starts a new processing generation', async () => {
-      harness = await startHarness('worker-stalls', mode);
+      harness = await startHarness('worker-stalls', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('redelivery');
       let deliveries = 0;
 

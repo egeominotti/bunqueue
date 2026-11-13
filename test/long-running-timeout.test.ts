@@ -5,9 +5,9 @@
  * concurrent long-running jobs, progress tracking, and timeout with retry.
  *
  * Note: In embedded mode, job timeouts and stall detection are handled by
- * the QueueManager's background tasks. The timeout check runs every 5s
- * (jobTimeoutCheckMs) and the stall check runs every 5s (stallCheckMs)
- * using two-phase detection (candidate -> confirmed).
+ * the QueueManager's background tasks. A job timeout fires from its own timer;
+ * the stall check runs every stallCheckMs (5s by default; test 3 creates the
+ * shared manager with 100ms) using two-phase detection (candidate -> confirmed).
  */
 
 import { describe, test, expect, afterEach } from 'bun:test';
@@ -121,6 +121,9 @@ describe('Long-running Jobs & Timeouts - Embedded', () => {
   }, 30000);
 
   test('3. stall detection — job without heartbeat is detected as stalled', async () => {
+    // A fresh shared manager with a 100ms stall sweep instead of the 5s default.
+    shutdownManager();
+    const manager = getSharedManager(undefined, { stallCheckMs: 100 });
     const queue = new Queue('lr-stall-3', { embedded: true });
     queue.obliterate();
 
@@ -135,8 +138,7 @@ describe('Long-running Jobs & Timeouts - Embedded', () => {
 
     // Subscribe to stall events directly from the QueueManager.
     // The two-phase stall detection marks candidates on one check cycle
-    // and confirms them on the next (each cycle is 5s by default).
-    const manager = getSharedManager();
+    // and confirms them on the next.
     const unsubscribe = manager.subscribe((event) => {
       if (event.queue === 'lr-stall-3' && event.eventType === 'stalled') {
         stalledJobIds.push(String(event.jobId));
@@ -159,9 +161,8 @@ describe('Long-running Jobs & Timeouts - Embedded', () => {
 
     await queue.add('stall-job', { value: 1 });
 
-    // Wait for stall detection to fire
-    // Phase 1 (~5s): job marked as candidate
-    // Phase 2 (~10s): job confirmed as stalled
+    // Wait for stall detection to fire: one sweep marks the job as a candidate,
+    // the next confirms it as stalled.
     for (let i = 0; i < 200; i++) {
       if (stalledJobIds.length > 0) break;
       await Bun.sleep(100);
@@ -309,7 +310,7 @@ describe('Long-running Jobs & Timeouts - Embedded', () => {
       return w;
     }
 
-    await queue.add(
+    const job = await queue.add(
       'retry-timeout-job',
       { value: 1 },
       {
@@ -320,16 +321,18 @@ describe('Long-running Jobs & Timeouts - Embedded', () => {
     );
 
     // Run through up to 3 worker cycles (one per attempt).
-    // Each cycle: create worker -> wait ~5s for timeout check -> force close.
-    // The timeout check interval is 5s, so each timed-out attempt takes ~5s.
+    // Each cycle: create worker -> wait for this attempt to time out -> force close.
     for (let cycle = 0; cycle < 3; cycle++) {
       if (completed) break;
 
+      const attemptsBefore = attemptCount;
       const w = await createAndRunWorker();
 
-      // Wait for either completion or the timeout check to fire (~5s).
+      // Wait (at most 6s) for completion, or for this cycle's attempt to have
+      // started and then left 'active' because its 500ms timeout fired.
       for (let i = 0; i < 60; i++) {
         if (completed) break;
+        if (attemptCount > attemptsBefore && (await queue.getJobState(job.id)) !== 'active') break;
         await Bun.sleep(100);
       }
 

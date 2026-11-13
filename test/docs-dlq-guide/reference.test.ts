@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
   type CoreE2eHarness,
+  FAST_STALL_SWEEP,
   MODES,
   closeHarness,
   startHarness,
@@ -85,7 +86,7 @@ for (const mode of MODES) {
     }, 60_000);
 
     test('stalled is the terminal reason for a job that stops heartbeating', async () => {
-      harness = await startHarness('dlq-reference', mode);
+      harness = await startHarness('dlq-reference', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('stalled');
 
       await queue.setStallConfigAsync({
@@ -168,7 +169,7 @@ for (const mode of MODES) {
     }, 90_000);
 
     test('ttl_expired and worker_lost stay reserved categories', async () => {
-      harness = await startHarness('dlq-reference', mode);
+      harness = await startHarness('dlq-reference', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('reserved');
 
       // A disconnected worker is classified as stalled, not worker_lost.

@@ -84,6 +84,14 @@ explicitly `N/A` and empty. GitHub Actions uploads both files as the
 `core-public-api-e2e-matrix` artifact even when the job fails, so a missing or
 interrupted method remains inspectable.
 
+`CoreE2eHarness.start(mode, prefix, timers?)` takes optional broker periods
+(`stallCheckMs`, `dlqMaintenanceMs`): TCP builds the server's `QueueManager` with
+them, embedded creates the shared manager with them
+(`getSharedManager(dataPath, timers)`), and `restartBroker()` reuses them. Without
+`timers` the broker runs on the shipped defaults. The documentation suites use it
+through `startHarness(page, mode, FAST_STALL_SWEEP | FAST_DLQ_MAINTENANCE)`
+(`test/docs-guide-support.ts`, 100 ms) only in tests that wait for a sweep.
+
 The TCP harness always sets `embedded: false` explicitly. This matters because
 the repository test preload sets `BUNQUEUE_EMBEDDED=1`; relying on implicit mode
 selection would silently exercise the local manager instead of the broker.

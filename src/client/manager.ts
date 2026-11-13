@@ -4,11 +4,18 @@
 
 import { realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { QueueManager } from '../application/queueManager';
+import { QueueManager, type QueueManagerConfig } from '../application/queueManager';
 import { readRemovedResultRetention } from '../config/componentEnv';
 
 /** Shared manager type export */
 export type SharedManager = QueueManager;
+
+/**
+ * Background periods the shared manager can be created with. Test seam only: the
+ * client never passes them, so the embedded runtime keeps the QueueManager defaults
+ * (stall sweep 5000 ms, DLQ maintenance 60000 ms).
+ */
+export type SharedManagerTimers = Pick<QueueManagerConfig, 'stallCheckMs' | 'dlqMaintenanceMs'>;
 
 interface SharedManagerState {
   instance: QueueManager;
@@ -48,9 +55,17 @@ function displayDataPath(dataPath: string | undefined): string {
  * Get the process-wide QueueManager.
  * A later explicit dataPath must identify the database selected on first use. The first
  * call also reads `BUNQUEUE_REMOVED_RESULT_RETENTION_MS` and `BUNQUEUE_MAX_REMOVED_RESULTS`.
+ * `timers` (a test seam) applies only to the call that creates the manager: passing it
+ * while a manager exists throws, so a test never runs on periods it did not choose.
  */
-export function getSharedManager(dataPath?: string): QueueManager {
+export function getSharedManager(dataPath?: string, timers?: SharedManagerTimers): QueueManager {
   if (shared) {
+    if (timers !== undefined) {
+      throw new Error(
+        'Embedded QueueManager timers apply only when the manager is created: call ' +
+          'shutdownManager() first.'
+      );
+    }
     if (dataPath !== undefined) {
       const requestedDataPath = normalizeDataPath(dataPath);
       if (requestedDataPath !== shared.dataPath) {
@@ -70,6 +85,7 @@ export function getSharedManager(dataPath?: string): QueueManager {
   const instance = new QueueManager({
     dataPath: selectedDataPath,
     ...readRemovedResultRetention(),
+    ...timers,
   });
   shared = { instance, dataPath: selectedDataPath };
   return instance;

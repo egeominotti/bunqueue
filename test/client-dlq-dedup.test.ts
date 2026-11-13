@@ -8,6 +8,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
 
+/** Poll `predicate` every 10ms until it holds or `timeoutMs` passes; the assertions decide. */
+async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await predicate()) && Date.now() < deadline) await Bun.sleep(10);
+}
+
+const inDlq = (queue: Queue<Record<string, unknown>>, id: string) => () =>
+  queue.getDlq().some((entry) => entry.job.id === id);
+
 /**
  * Helper: add a job and process it through a worker that always fails,
  * causing the job to land in the DLQ after exhausting all attempts.
@@ -33,7 +42,7 @@ async function addAndFailJob(
   );
 
   // Wait for the job to exhaust attempts and land in DLQ
-  await Bun.sleep(500);
+  await waitFor(inDlq(queue, job.id));
   await worker.close();
 
   return job.id;
@@ -586,7 +595,7 @@ describe('DLQ Worker Integration', () => {
       { concurrency: 1 }
     );
 
-    await Bun.sleep(500);
+    await waitFor(inDlq(queue, job.id));
     await worker.close();
 
     expect(failCount).toBeGreaterThanOrEqual(1);
@@ -612,7 +621,7 @@ describe('DLQ Worker Integration', () => {
       { concurrency: 1 }
     );
 
-    await Bun.sleep(500);
+    await waitFor(inDlq(queue, job.id));
     await worker1.close();
 
     // Verify job is in DLQ
@@ -634,7 +643,7 @@ describe('DLQ Worker Integration', () => {
       { concurrency: 1 }
     );
 
-    await Bun.sleep(500);
+    await waitFor(async () => callCount >= 2 && (await queue.getJobState(job.id)) === 'completed');
     await worker2.close();
 
     // Should have been called at least twice (once fail, once success)
@@ -659,7 +668,7 @@ describe('DLQ Worker Integration', () => {
       { concurrency: 1 }
     );
 
-    await Bun.sleep(500);
+    await waitFor(inDlq(queue, job.id));
     await worker.close();
 
     const dlqEntries = queue.getDlq();

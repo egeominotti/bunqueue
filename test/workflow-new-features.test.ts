@@ -15,6 +15,12 @@ import { waitForWorkflowState } from './workflowTestUtils';
 
 setDefaultTimeout(30_000);
 
+/** Poll `predicate` until it holds or `timeoutMs` passes; the assertions that follow decide. */
+async function waitUntil(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate() && Date.now() < deadline) await Bun.sleep(10);
+}
+
 describe('Workflow Engine - Step Retry', () => {
   let engine: Engine;
   afterEach(async () => {
@@ -309,7 +315,10 @@ describe('Workflow Engine - Cleanup & Archival', () => {
     await engine.start('cleanup-test');
     await engine.start('cleanup-test');
     await engine.start('cleanup-test');
-    await new Promise((r) => setTimeout(r, 1500));
+    await waitUntil(() => {
+      const runs = engine.listExecutions('cleanup-test');
+      return runs.length === 3 && runs.every((e) => e.state === 'completed');
+    });
 
     const before = engine.listExecutions('cleanup-test');
     expect(before.length).toBe(3);
@@ -329,8 +338,8 @@ describe('Workflow Engine - Cleanup & Archival', () => {
     engine = new Engine({ embedded: true });
     engine.register(flow);
 
-    await engine.start('cleanup-states');
-    await new Promise((r) => setTimeout(r, 1000));
+    const run = await engine.start('cleanup-states');
+    await waitForWorkflowState(engine, run.id, 'completed');
 
     // Only remove 'failed' — our completed execution should survive
     const removed = engine.cleanup(0, ['failed']);
@@ -348,7 +357,10 @@ describe('Workflow Engine - Cleanup & Archival', () => {
 
     await engine.start('archive-test');
     await engine.start('archive-test');
-    await new Promise((r) => setTimeout(r, 1500));
+    await waitUntil(() => {
+      const runs = engine.listExecutions('archive-test');
+      return runs.length === 2 && runs.every((e) => e.state === 'completed');
+    });
 
     expect(engine.listExecutions('archive-test').length).toBe(2);
 
@@ -381,7 +393,7 @@ describe('Workflow Engine - Observability', () => {
     engine.register(flow);
 
     const run = await engine.start('events-test');
-    await new Promise((r) => setTimeout(r, 1500));
+    await waitUntil(() => events.some((e) => e.type === 'workflow:completed'));
 
     const types = events.map((e) => e.type);
     expect(types).toContain('workflow:started');
@@ -439,7 +451,9 @@ describe('Workflow Engine - Observability', () => {
     engine.register(flow);
 
     await engine.start('fail-events');
-    await new Promise((r) => setTimeout(r, 2000));
+    await waitUntil(
+      () => lifecycleTypes.includes('failed') && lifecycleTypes.includes('compensating')
+    );
 
     expect(lifecycleTypes).toContain('failed');
     expect(lifecycleTypes).toContain('compensating');
@@ -457,7 +471,7 @@ describe('Workflow Engine - Observability', () => {
     engine.register(flow);
 
     await engine.start('onevent-test');
-    await new Promise((r) => setTimeout(r, 1500));
+    await waitUntil(() => events.includes('workflow:completed'));
 
     expect(events).toContain('workflow:started');
     expect(events).toContain('workflow:completed');
@@ -474,8 +488,9 @@ describe('Workflow Engine - Observability', () => {
     engine.off('step:completed', listener);
     engine.register(flow);
 
-    await engine.start('off-test');
-    await new Promise((r) => setTimeout(r, 1000));
+    const run = await engine.start('off-test');
+    // step:completed is emitted before the run completes, so this wait covers it.
+    await waitForWorkflowState(engine, run.id, 'completed');
 
     expect(events.filter((t) => t === 'step:completed').length).toBe(0);
   });
@@ -515,7 +530,7 @@ describe('Workflow Engine - Nested Workflows', () => {
     engine.register(parent);
 
     const run = await engine.start('order');
-    await new Promise((r) => setTimeout(r, 10_000));
+    await waitForWorkflowState(engine, run.id, 'completed', 10_000);
 
     const exec = engine.getExecution(run.id);
     expect(exec!.state).toBe('completed');
@@ -553,7 +568,11 @@ describe('Workflow Engine - Nested Workflows', () => {
     engine.register(parent);
 
     const run = await engine.start('parent-with-bad-child');
-    await new Promise((r) => setTimeout(r, 10_000));
+    // 'failed' is written before the rollback runs; wait for the rollback to settle too.
+    await waitUntil(() => {
+      const exec = engine.getExecution(run.id);
+      return exec?.state === 'failed' && exec.rollbackStatus !== undefined;
+    }, 10_000);
 
     const exec = engine.getExecution(run.id);
     expect(exec!.state).toBe('failed');
@@ -616,7 +635,7 @@ describe('Workflow Engine - Combined Features', () => {
     engine.register(flow);
 
     const run = await engine.start('ecommerce');
-    await new Promise((r) => setTimeout(r, 10_000));
+    await waitForWorkflowState(engine, run.id, 'completed', 10_000);
 
     const exec = engine.getExecution(run.id);
     expect(exec!.state).toBe('completed');

@@ -18,12 +18,21 @@ describe('Bug #28: Invalid or expired lock token at high concurrency', () => {
   let qm: QueueManager;
 
   beforeEach(() => {
-    qm = new QueueManager();
+    // The lock-expiration sweep runs every stallCheckMs (default 5 s): 50 ms here.
+    qm = new QueueManager({ stallCheckMs: 50 });
   });
 
   afterEach(() => {
     qm.shutdown();
   });
+
+  // Poll (up to 5 s) until the background sweep has removed the lease and requeued the job.
+  const requeued = async (id: JobId) =>
+    qm.getLockInfo(id) === null && ['waiting', 'delayed'].includes(await qm.getJobState(id));
+  async function waitForRequeue(ids: JobId[], deadline = Date.now() + 5_000): Promise<void> {
+    const done = async () => (await Promise.all(ids.map(requeued))).every(Boolean);
+    while (!(await done()) && Date.now() < deadline) await Bun.sleep(10);
+  }
 
   test('fail() gracefully returns after lock expired and was cleaned by background task', async () => {
     await qm.push('race-test', { data: { msg: 'slow-job' }, maxAttempts: 5 });
@@ -40,7 +49,7 @@ describe('Bug #28: Invalid or expired lock token at high concurrency', () => {
     expect(qm.verifyLock(jobId, oldToken)).toBe(false);
 
     // Wait for background lock expiration task to clean up
-    await Bun.sleep(6_000);
+    await waitForRequeue([jobId]);
 
     expect(qm.getLockInfo(jobId)).toBeNull();
     const state = await qm.getJobState(jobId);
@@ -61,15 +70,14 @@ describe('Bug #28: Invalid or expired lock token at high concurrency', () => {
     const jobId = job!.id;
 
     // Wait for lock to expire + background task to requeue
-    await Bun.sleep(6_500);
+    await waitForRequeue([jobId]);
     const state = await qm.getJobState(jobId);
     expect(['waiting', 'delayed']).toContain(state);
 
-    // Worker B pulls the same job (new lock)
-    await Bun.sleep(2_000);
+    // Worker B pulls the same job (new lock) once the retry backoff allows it, up to 5 s
     let pulled = await qm.pullWithLock('conflict-test', 'worker-B', 0, 30_000);
-    if (!pulled.job) {
-      await Bun.sleep(3_000);
+    for (const deadline = Date.now() + 5_000; !pulled.job && Date.now() < deadline;) {
+      await Bun.sleep(20);
       pulled = await qm.pullWithLock('conflict-test', 'worker-B', 0, 30_000);
     }
 
@@ -99,7 +107,7 @@ describe('Bug #28: Invalid or expired lock token at high concurrency', () => {
     }
     expect(pulled.length).toBe(WORKER_COUNT);
 
-    await Bun.sleep(6_500);
+    await waitForRequeue(pulled.map((p) => p.jobId));
 
     // FIX: All fail() calls should resolve gracefully
     const results = await Promise.allSettled(
@@ -115,7 +123,7 @@ describe('Bug #28: Invalid or expired lock token at high concurrency', () => {
     const { job, token } = await qm.pullWithLock('ack-race', 'worker-A', 0, 50);
     expect(job).not.toBeNull();
 
-    await Bun.sleep(6_500);
+    await waitForRequeue([job!.id]);
 
     await expect(qm.ack(job!.id, { done: true }, token!)).resolves.toBeUndefined();
   }, 15_000);

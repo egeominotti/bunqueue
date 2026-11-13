@@ -106,6 +106,11 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 12. `test-suite-speedups`: fixed sleeps on the 5 s stall sweep and the 60 s DLQ
     maintenance in the slowest unit files (estimated 150 s of unit wall time);
     needs a stall/DLQ configuration seam in `getSharedManager()`.
+11. `sandboxed-worker-missing-cases`: three SandboxedWorker cases (draining
+    `stop()`, unique wrapper names, `on()`/`once()` chaining) lost with the
+    commented-out files `test-suite-pruning` deleted; write them as live tests.
+12. `split-oversized-test-files`: five test files exceed 300 lines (found by the
+    test-suite-speedups skeptic); split them by concern without changing a test.
 9. `postgres-sigkill-hook-timeout-flake` (in progress, same worktree and branch
    `postgres-flakes`, uncommitted): reproduced (the `afterAll` broker stop, not the
    afterEach) and fixed with explicit teardown deadlines derived from the harness
@@ -254,6 +259,33 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Gates: `bun run test:sandbox` green on tree `d1f6710f` (unit 11739 / 0 / 402,
   tcp 553 / 0, embedded 349 / 0); skeptic round 4 CONDITIONAL only on that gate.
   Next: `worker-close-register-error`.
+### 2026-11-13 — test-suite-speedups
+
+- Branch `test-suite-speedups`, base `2f1ad824`. The user asked for the unit job to
+  be faster without losing coverage or weakening an assertion, with no default
+  users see changed; no commit, push, stash or `bun run test:sandbox` in this
+  session.
+- Done: the fifteen slowest unit files poll the real condition with a deadline
+  instead of sleeping. Stall and DLQ maintenance waits run on 100 ms (docs guide
+  suites, `long-running-timeout`) or 50 ms (`lockExpiration`,
+  `lock-race-conditions`, `bug-lock-token-race`) sweeps. The workflow and DLQ
+  waits poll the state, and the unreachable-remote forward has a 3 s
+  `commandTimeout`. The seam is `getSharedManager(dataPath, timers?)` in
+  `src/client/manager.ts`: it is internal, applies only when it creates the
+  manager, and throws if a manager exists. It is threaded through
+  `CoreE2eHarness.start(mode, prefix, timers?)` and `startHarness(page, mode,
+  timers?)`. Defaults stay asserted: 5000 ms in `test/shared-manager-timers.test.ts`
+  and stall-detection, 60000 ms in the DLQ configuration suite.
+- Measured on the host (3 runs per file, 4 at a time, baseline from an untouched
+  `git archive 2f1ad824` copy): medians 676 s summed before, 117 s after, so about
+  140 s of unit wall time saved on 4 workers. Per file in `feature_list.json`.
+- Found: the cpu-intensive "non-yielding handler" test failed once in the
+  unchanged baseline and is mostly vacuous. It is recorded as
+  `cpu-intensive-blocking-test-flake`, not fixed here.
+- Gates: `bun run test:sandbox` green on tree `293c1594`: unit 11748 / 0 / 402 in
+  6.79 min (9.40 min on the same day's unchanged suite), tcp 553 / 0, embedded
+  349 / 0. One host failure in the first of 4 runs stays unexplained (not
+  captured, not reproduced in 3 loaded skeptic runs). Item `done`.
 
 ### 2026-11-13 — drop-postgres-15
 

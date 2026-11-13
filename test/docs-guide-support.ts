@@ -9,11 +9,23 @@
 
 import { QueueEvents } from '../src/client';
 import type { ConnectionOptions } from '../src/client';
+import type { QueueManager } from '../src/application/queueManager';
+import type { SharedManagerTimers } from '../src/client/manager';
 import { CoreE2eHarness, type CoreE2eMode } from './core-e2e/support/harness';
 
 export type Mode = CoreE2eMode;
 
 export const MODES = ['embedded', 'tcp'] as const satisfies readonly Mode[];
+
+/**
+ * Broker periods for a test that waits on a background sweep. The shipped defaults
+ * (stall sweep 5000 ms, DLQ maintenance 60000 ms) stay asserted by the stall-detection
+ * and DLQ configuration suites; a fast sweep only shortens the wait, never the claim.
+ */
+export const FAST_STALL_SWEEP = { stallCheckMs: 100 } as const satisfies SharedManagerTimers;
+export const FAST_DLQ_MAINTENANCE = {
+  dlqMaintenanceMs: 100,
+} as const satisfies SharedManagerTimers;
 
 /** Minimal structural view of the Queue methods the helpers below need. */
 export interface StatefulQueue {
@@ -68,9 +80,19 @@ export async function waitForValue<T>(
   return value;
 }
 
+/** The stall-sweep and DLQ-maintenance periods a broker's QueueManager resolved. */
+export function brokerPeriods(manager: QueueManager): Required<SharedManagerTimers> {
+  const { config } = manager as unknown as { config: Required<SharedManagerTimers> };
+  return { stallCheckMs: config.stallCheckMs, dlqMaintenanceMs: config.dlqMaintenanceMs };
+}
+
 /** Start a harness bound to one documentation page and runtime mode. */
-export function startHarness(page: string, mode: Mode): Promise<CoreE2eHarness> {
-  return CoreE2eHarness.start(mode, `docs-${page}`);
+export function startHarness(
+  page: string,
+  mode: Mode,
+  timers?: SharedManagerTimers
+): Promise<CoreE2eHarness> {
+  return CoreE2eHarness.start(mode, `docs-${page}`, timers);
 }
 
 /**

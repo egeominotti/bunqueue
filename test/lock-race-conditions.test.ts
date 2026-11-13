@@ -8,17 +8,26 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { shardIndex } from '../src/shared/hash';
+import type { JobId } from '../src/domain/types/job';
 
 describe('Lock Race Conditions', () => {
   let qm: QueueManager;
 
   beforeEach(() => {
-    qm = new QueueManager();
+    // The lock-expiration sweep runs every stallCheckMs (default 5 s): 50 ms here.
+    qm = new QueueManager({ stallCheckMs: 50 });
   });
 
   afterEach(() => {
     qm.shutdown();
   });
+
+  // Poll (up to 5 s) until the background sweep has removed the lease and requeued the job.
+  async function waitForRequeue(id: JobId, deadline = Date.now() + 5_000): Promise<void> {
+    const done = async () =>
+      qm.getLockInfo(id) === null && ['waiting', 'delayed'].includes(await qm.getJobState(id));
+    while (!(await done()) && Date.now() < deadline) await Bun.sleep(10);
+  }
 
   // 1. Pull with lock returns a lock token
   test('pull with lock returns a valid lock token', async () => {
@@ -48,16 +57,16 @@ describe('Lock Race Conditions', () => {
     const { job } = await qm.pullWithLock('expire-repull', 'w1', 0, 50);
     const jobId = job!.id;
 
-    await Bun.sleep(6_500);
+    await waitForRequeue(jobId);
 
     expect(qm.getLockInfo(jobId)).toBeNull();
     const state = await qm.getJobState(jobId);
     expect(['waiting', 'delayed']).toContain(state);
 
-    await Bun.sleep(2_000);
+    // The retry backoff may hold the job delayed: poll the pull for up to 4 s.
     let job2 = await qm.pull('expire-repull', 0);
-    if (!job2) {
-      await Bun.sleep(2_000);
+    for (const deadline = Date.now() + 4_000; !job2 && Date.now() < deadline;) {
+      await Bun.sleep(20);
       job2 = await qm.pull('expire-repull', 0);
     }
     if (job2) {
@@ -152,7 +161,7 @@ describe('Lock Race Conditions', () => {
     await qm.push(queue, { data: { v: 1 }, maxAttempts: 10 });
     const { job } = await qm.pullWithLock(queue, 'w1', 0, 50);
 
-    await Bun.sleep(6_500);
+    await waitForRequeue(job!.id);
 
     expect(['waiting', 'delayed']).toContain(await qm.getJobState(job!.id));
     expect(qm.getDlq(queue).length).toBe(0);

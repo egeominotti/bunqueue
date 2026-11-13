@@ -9,9 +9,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Queue } from '../../src/client';
 import { QueueManager } from '../../src/application/queueManager';
+import { DEFAULT_CONFIG } from '../../src/application/types';
 import {
   type CoreE2eHarness,
+  FAST_STALL_SWEEP,
   MODES,
+  brokerPeriods,
   closeHarness,
   queueEvents,
   startHarness,
@@ -38,6 +41,15 @@ for (const mode of MODES) {
       expect(config.stallInterval).toBe(30_000);
       expect(config.maxStalls).toBe(3);
       expect(config.gracePeriod).toBe(5_000);
+    });
+
+    test('the broker sweeps for stalls every 5 seconds by default', async () => {
+      harness = await startHarness('stall-detection', mode);
+      harness.queue('sweep-default');
+
+      // The page's "two consecutive 5-second sweeps"; other tests shorten it explicitly.
+      expect(DEFAULT_CONFIG.stallCheckMs).toBe(5_000);
+      expect(brokerPeriods(harness.brokerManager()).stallCheckMs).toBe(5_000);
     });
 
     test('setStallConfig writes the policy and reads it back', async () => {
@@ -81,7 +93,7 @@ for (const mode of MODES) {
     });
 
     test('disabling stall detection stops recovery entirely', async () => {
-      harness = await startHarness('stall-detection', mode);
+      harness = await startHarness('stall-detection', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('disabled');
 
       await queue.setStallConfigAsync({
@@ -99,13 +111,13 @@ for (const mode of MODES) {
 
       const job = await queue.add('silent', {}, { durable: true });
       await waitForState(queue, job.id, 'active', 10_000);
-      await Bun.sleep(2_000);
+      await Bun.sleep(1_000); // about ten 100 ms sweeps; two would confirm a stall
 
       expect(await queue.getJobState(job.id)).toBe('active');
     }, 30_000);
 
     test('gracePeriod protects a job right after it starts', async () => {
-      harness = await startHarness('stall-detection', mode);
+      harness = await startHarness('stall-detection', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('grace');
 
       await queue.setStallConfigAsync({
@@ -123,13 +135,13 @@ for (const mode of MODES) {
 
       const job = await queue.add('silent', {}, { durable: true });
       await waitForState(queue, job.id, 'active', 10_000);
-      await Bun.sleep(2_000);
+      await Bun.sleep(1_000); // about ten 100 ms sweeps; two would confirm a stall
 
       expect(await queue.getJobState(job.id)).toBe('active');
     }, 30_000);
 
     test('a stalled job is retried and eventually lands in the DLQ as stalled', async () => {
-      harness = await startHarness('stall-detection', mode);
+      harness = await startHarness('stall-detection', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('recovering');
 
       await queue.setStallConfigAsync({
@@ -155,7 +167,7 @@ for (const mode of MODES) {
     }, 60_000);
 
     test('QueueEvents delivers the stalled event', async () => {
-      harness = await startHarness('stall-detection', mode);
+      harness = await startHarness('stall-detection', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('events');
       const events = queueEvents(harness, queue.name);
       const stalled: string[] = [];

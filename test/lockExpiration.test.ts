@@ -10,12 +10,14 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { shardIndex } from '../src/shared/hash';
+import type { JobId } from '../src/domain/types/job';
 
 describe('Lock Expiration', () => {
   let qm: QueueManager;
 
   beforeEach(() => {
-    qm = new QueueManager();
+    // The lock-expiration sweep runs every stallCheckMs (default 5 s): 50 ms here.
+    qm = new QueueManager({ stallCheckMs: 50 });
   });
 
   afterEach(() => {
@@ -26,6 +28,13 @@ describe('Lock Expiration', () => {
   async function pullWithLock(queue: string, ttlMs: number = 100) {
     return qm.pullWithLock(queue, 'test-worker', 0, ttlMs);
   }
+
+  // Poll (up to 5 s) for the background sweep's result
+  async function waitFor(done: () => boolean | Promise<boolean>, deadline = Date.now() + 5_000) {
+    while (!(await done()) && Date.now() < deadline) await Bun.sleep(10);
+  }
+  const requeued = async (id: JobId) =>
+    qm.getLockInfo(id) === null && ['waiting', 'delayed'].includes(await qm.getJobState(id));
 
   describe('lock lifecycle', () => {
     test('lock that has not expired is not affected by expiration check', async () => {
@@ -43,9 +52,7 @@ describe('Lock Expiration', () => {
       expect(statsBefore.active).toBe(1);
       expect(statsBefore.waiting).toBe(0);
 
-      // Manually trigger expired lock check (nothing should expire)
-      // Access internal lock context via the public API indirectly
-      // The lock has a long TTL, so nothing should change
+      // The lock has a long TTL, so the expiration check changes nothing
       const lockInfo = qm.getLockInfo(job!.id);
       expect(lockInfo).not.toBeNull();
       expect(lockInfo!.expiresAt).toBeGreaterThan(Date.now());
@@ -96,12 +103,8 @@ describe('Lock Expiration', () => {
       // Verify lock has expired
       expect(qm.verifyLock(job!.id, token!)).toBe(false);
 
-      // Trigger the background lock expiration check
-      // We need to wait for the background task or call it manually.
-      // Background tasks run on stallCheckMs interval (5s by default).
-      // Instead, we use a short wait and rely on the background interval.
-      // For a more direct test, we'll wait for the background task.
-      await new Promise((r) => setTimeout(r, 6_000));
+      // Wait for the background lock-expiration sweep (every stallCheckMs).
+      await waitFor(() => requeued(job!.id));
 
       // After expiration processing, job should be requeued (waiting or delayed)
       const state2 = await qm.getJobState(job!.id);
@@ -114,10 +117,6 @@ describe('Lock Expiration', () => {
       // Stats should show no active jobs (removed from processing)
       const stats = qm.getStats();
       expect(stats.active).toBe(0);
-
-      // Job state should confirm it's requeued (already verified above)
-      // Note: shard running counters may not reflect requeued jobs from lock expiration,
-      // so we verify via job state query rather than aggregate stats.
     }, 15_000);
 
     test('expired lock increments stallCount', async () => {
@@ -128,7 +127,7 @@ describe('Lock Expiration', () => {
       const jobId = job!.id;
 
       // Wait for lock to expire and be processed
-      await new Promise((r) => setTimeout(r, 6_000));
+      await waitFor(() => requeued(jobId));
 
       // Get the requeued job and check stallCount
       const requeuedJob = await qm.getJob(jobId);
@@ -152,7 +151,7 @@ describe('Lock Expiration', () => {
       expect(job).not.toBeNull();
 
       // Wait for lock to expire and be processed
-      await new Promise((r) => setTimeout(r, 6_000));
+      await waitFor(async () => (await qm.getJobState(job!.id)) === 'failed');
 
       // Job should be in DLQ now (stallCount becomes 1, >= maxStalls of 1)
       const state = await qm.getJobState(job!.id);
@@ -204,12 +203,12 @@ describe('Lock Expiration', () => {
       expect(stats1.active).toBe(pushCount);
 
       // Wait for all locks to expire and be processed
-      await new Promise((r) => setTimeout(r, 6_000));
+      await waitFor(async () =>
+        (await Promise.all(pulled.map((p) => requeued(p.job!.id)))).every(Boolean)
+      );
 
       // All locks should be cleaned up
-      for (const p of pulled) {
-        expect(qm.getLockInfo(p.job!.id)).toBeNull();
-      }
+      for (const p of pulled) expect(qm.getLockInfo(p.job!.id)).toBeNull();
 
       // All jobs should be requeued (not active)
       const stats2 = qm.getStats();
@@ -236,8 +235,9 @@ describe('Lock Expiration', () => {
       expect(short.job).not.toBeNull();
       expect(long.job).not.toBeNull();
 
-      // Wait for short lock to expire
-      await new Promise((r) => setTimeout(r, 6_000));
+      // Short lock processed, then ~10 more sweeps over the still-valid long lock
+      await waitFor(() => requeued(short.job!.id));
+      await Bun.sleep(500);
 
       // Short lock should be cleaned up, long lock should still be valid
       expect(qm.getLockInfo(short.job!.id)).toBeNull();
@@ -268,7 +268,7 @@ describe('Lock Expiration', () => {
       expect(job).not.toBeNull();
 
       // Wait for lock to expire and be processed
-      await new Promise((r) => setTimeout(r, 6_000));
+      await waitFor(() => events.some((e) => e.eventType === 'stalled'));
 
       // Should have emitted a stalled event
       const stalledEvent = events.find(
@@ -295,7 +295,7 @@ describe('Lock Expiration', () => {
       expect(job).not.toBeNull();
 
       // Wait for lock to expire and be processed
-      await new Promise((r) => setTimeout(r, 6_000));
+      await waitFor(() => events.some((e) => e.eventType === 'failed'));
 
       // Should have emitted a failed event (max stalls reached)
       const failedEvent = events.find(

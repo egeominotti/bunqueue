@@ -215,6 +215,37 @@ head:
   directly or through a test module it imports, and the runner does not select
   it. On their first run, against PostgreSQL 16, 17 and 18.6, all 21 cases pass;
   nothing in the runtime changes.
+- The fifteen slowest unit test files no longer sleep a fixed time for a
+  background sweep (`test-suite-speedups`). Measured on the host, median of 3 runs
+  per file, they took 676 s summed before and 117 s after, about 140 s less unit
+  job wall time on 4 workers. Each wait now polls the real condition until a
+  deadline, and the timer behind it is shortened:
+  - The docs guide suites that wait for a stall (`docs-worker-guide` stalls,
+    stall-detection, cpu-intensive, options and events, `docs-dlq-guide/reference`,
+    `docs-queue-guide/options`) start their broker with a 100 ms stall sweep
+    instead of 5 s, in those tests only.
+  - `docs-dlq-guide/configuration` uses a 100 ms DLQ maintenance period instead of
+    60 s for the purge test. The "reported as expired" check is now its own test on
+    a default broker.
+  - `lockExpiration`, `lock-race-conditions` and `bug-lock-token-race` use
+    `QueueManager({ stallCheckMs: 50 })`. `long-running-timeout` creates its shared
+    manager with a 100 ms stall sweep.
+  - `workflow-new-features` waits for the execution state with
+    `waitForWorkflowState`, and `client-dlq-dedup` waits for the DLQ entry.
+  - The store-and-forward test in `docs-queue-guide/advanced-batching` gives its
+    unreachable remote a 3 s `commandTimeout`, so `close()` no longer waits out
+    30 s.
+
+  No assertion is weakened and no test is removed. Tests that check that nothing
+  happens still wait long enough to cover several sweeps, which is stronger than
+  before: the old 2 s wait in stall-detection covered no 5 s sweep at all. The
+  defaults users get are unchanged and asserted: a 5000 ms stall sweep and 60000 ms
+  DLQ maintenance (new tests in `test/shared-manager-timers.test.ts` and the
+  stall-detection and DLQ configuration guide suites). The broker periods reach
+  the embedded shared manager through a new internal test seam,
+  `getSharedManager(dataPath, timers)`. It is not exported from
+  `bunqueue/client`, and no client code passes `timers`. Passing it while a
+  manager already exists throws.
 - `test/cronScheduler.test.ts` no longer fails when the unit suite runs at 23:59
   local time (`cron-test-midnight-boundary`). The test "cron with both schedule
   and repeatEvery uses schedule for nextRun" read the real clock and required the

@@ -10,6 +10,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import type { Job } from '../../src/client';
 import {
   type CoreE2eHarness,
+  FAST_STALL_SWEEP,
   MODES,
   closeHarness,
   startHarness,
@@ -187,7 +188,7 @@ for (const mode of MODES) {
     }, 20_000);
 
     test('stalled is delivered in this mode with a job id and a reason', async () => {
-      harness = await startHarness('worker-events', mode);
+      harness = await startHarness('worker-events', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('stalling');
       const stalled: Array<{ jobId: string; reason: string }> = [];
 
@@ -237,7 +238,7 @@ for (const mode of MODES) {
     }, 30_000);
 
     test('skipStalledCheck silences the listener without stopping recovery', async () => {
-      harness = await startHarness('worker-events', mode);
+      harness = await startHarness('worker-events', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('skip-stalled');
       const stalled: string[] = [];
 

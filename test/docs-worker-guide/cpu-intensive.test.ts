@@ -9,6 +9,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
   type CoreE2eHarness,
+  FAST_STALL_SWEEP,
   MODES,
   closeHarness,
   startHarness,
@@ -131,7 +132,7 @@ for (const mode of MODES) {
     }, 60_000);
 
     test('heartbeatInterval: 0 disables lease renewal, as the caution warns', async () => {
-      harness = await startHarness('cpu-intensive', mode);
+      harness = await startHarness('cpu-intensive', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('no-renewal');
 
       await queue.setStallConfigAsync({
@@ -157,7 +158,7 @@ for (const mode of MODES) {
     }, 60_000);
 
     test('delivery is at least once: a recovered job is delivered again', async () => {
-      harness = await startHarness('cpu-intensive', mode);
+      harness = await startHarness('cpu-intensive', mode, FAST_STALL_SWEEP);
       const queue = harness.queue('at-least-once');
       const deliveries: string[] = [];
 

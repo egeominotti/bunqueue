@@ -177,6 +177,19 @@ Run benchmarks only on native macOS, never in an OrbStack Machine or container.
   assert the exact expected timestamp, including the boundary just before it:
   against the real clock such an assertion fails whenever the suite runs at that
   boundary (`test/cronScheduler.test.ts` pins noon and 23:59:30 local time).
+- Fast tests: never sleep a fixed time for a background sweep. Poll the real
+  condition with a deadline (`waitUntil`/`waitForState` in
+  `test/docs-guide-support.ts`, `waitForWorkflowState` in
+  `test/workflowTestUtils.ts`), and shorten the timer itself: an own
+  `QueueManager` takes `stallCheckMs`/`dlqMaintenanceMs`, the embedded shared
+  manager takes them through the test seam `getSharedManager(dataPath, timers)`
+  after `shutdownManager()`, and the docs harness through
+  `startHarness(page, mode, FAST_STALL_SWEEP)`. Bound a pending TCP command with
+  `connection.commandTimeout` instead of waiting out the 30 s default. A test that
+  asserts nothing happens keeps a fixed wait that covers several sweeps. The
+  shipped 5000 ms stall sweep and 60000 ms DLQ maintenance stay asserted
+  (`test/shared-manager-timers.test.ts`, the stall-detection and DLQ configuration
+  guide suites).
 - Do not weaken an existing test merely to make a behavior change pass; update
   it only when the intended contract has explicitly changed.
 - Never publish benchmark results from Docker or a VM. Run benchmarks natively,

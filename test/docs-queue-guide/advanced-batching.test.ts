@@ -284,9 +284,10 @@ describe('queue guide · store-and-forward', () => {
       })
     );
 
-    // Port 1 is not listening: the forward stays pending against the broker's
-    // command timeout instead of dropping the job.
-    const forwarder = edge.forward({ to: { host: '127.0.0.1', port: 1 }, concurrency: 1 });
+    // Port 1 is not listening: the forward stays pending until the command timeout
+    // (3 s, default 30 s: it outlasts the checks below, and close() waits for it).
+    const remote = { host: '127.0.0.1', port: 1, commandTimeout: 3_000 };
+    const forwarder = edge.forward({ to: remote, concurrency: 1 });
     forwarder.on('error', () => undefined);
     const delivered: unknown[] = [];
     forwarder.on('forwarded', (info) => delivered.push(info));

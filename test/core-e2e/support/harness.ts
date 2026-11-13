@@ -10,7 +10,7 @@ import {
 } from '../../../src/client';
 import type { Job, QueueOptions, WorkerOptions } from '../../../src/client';
 import { QueueManager } from '../../../src/application/queueManager';
-import { getSharedManager } from '../../../src/client/manager';
+import { getSharedManager, type SharedManagerTimers } from '../../../src/client/manager';
 import { createTcpServer, type TcpServer } from '../../../src/infrastructure/server/tcp';
 import { Engine } from '../../../src/client/workflow';
 
@@ -26,21 +26,34 @@ export class CoreE2eHarness {
   private server: TcpServer | null = null;
   private tcpPort: number | null = null;
   private sequence = 0;
+  /** Broker background periods; undefined keeps the QueueManager defaults. */
+  private readonly timers: SharedManagerTimers | undefined;
 
-  private constructor(mode: CoreE2eMode, prefix: string) {
+  private constructor(mode: CoreE2eMode, prefix: string, timers?: SharedManagerTimers) {
     this.mode = mode;
+    this.timers = timers;
     this.dataDir = mkdtempSync(join(tmpdir(), `bunqueue-core-e2e-${prefix}-${mode}-`));
     this.dataPath = join(this.dataDir, 'queue.db');
   }
 
-  static async start(mode: CoreE2eMode, prefix: string): Promise<CoreE2eHarness> {
+  /**
+   * `timers` shortens the broker's stall sweep or DLQ maintenance period, in both modes
+   * (embedded: the shared manager is created with them; TCP: the server's QueueManager).
+   */
+  static async start(
+    mode: CoreE2eMode,
+    prefix: string,
+    timers?: SharedManagerTimers
+  ): Promise<CoreE2eHarness> {
     shutdownManager();
     closeAllSharedPools();
-    const harness = new CoreE2eHarness(mode, prefix);
+    const harness = new CoreE2eHarness(mode, prefix, timers);
     if (mode === 'tcp') {
-      harness.manager = new QueueManager({ dataPath: harness.dataPath });
+      harness.manager = new QueueManager({ dataPath: harness.dataPath, ...timers });
       harness.server = createTcpServer(harness.manager, { hostname: '127.0.0.1', port: 0 });
       harness.tcpPort = harness.server.server.port;
+    } else if (timers) {
+      getSharedManager(harness.dataPath, timers);
     }
     return harness;
   }
@@ -148,9 +161,11 @@ export class CoreE2eHarness {
     closeAllSharedPools();
     shutdownManager();
 
-    if (this.mode === 'tcp') {
+    if (this.mode === 'embedded' && this.timers) {
+      getSharedManager(this.dataPath, this.timers);
+    } else if (this.mode === 'tcp') {
       await Bun.sleep(20);
-      this.manager = new QueueManager({ dataPath: this.dataPath });
+      this.manager = new QueueManager({ dataPath: this.dataPath, ...this.timers });
       this.server = createTcpServer(this.manager, {
         hostname: '127.0.0.1',
         port: port ?? 0,

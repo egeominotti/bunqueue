@@ -5,10 +5,13 @@
  */
 
 import { afterEach, describe, expect, test } from 'bun:test';
+import { DEFAULT_CONFIG } from '../../src/application/types';
 import { Queue } from '../../src/client';
 import {
   type CoreE2eHarness,
+  FAST_DLQ_MAINTENANCE,
   MODES,
+  brokerPeriods,
   closeHarness,
   startHarness,
   waitForState,
@@ -148,7 +151,7 @@ for (const mode of MODES) {
       expect(entry?.expiresAt).toBe((entry?.enteredAt ?? 0) + 600_000);
     }, 40_000);
 
-    test('an expired entry is removed by DLQ maintenance', async () => {
+    test('an expired entry is reported as expired until maintenance runs', async () => {
       harness = await startHarness('dlq-config', mode);
       const queue = harness.queue('expired');
       await queue.setDlqConfigAsync({ maxAge: 50 });
@@ -168,13 +171,38 @@ for (const mode of MODES) {
           ),
         'the entry to be reported as expired'
       );
+      expect(brokerPeriods(harness.brokerManager()).dlqMaintenanceMs).toBe(60_000);
+    }, 40_000);
 
-      // Maintenance runs every 60s by default; give it one full cycle.
+    test('DLQ maintenance runs every 60 seconds by default', async () => {
+      harness = await startHarness('dlq-config', mode);
+      harness.queue('maintenance-default');
+
+      expect(DEFAULT_CONFIG.dlqMaintenanceMs).toBe(60_000);
+      expect(brokerPeriods(harness.brokerManager()).dlqMaintenanceMs).toBe(60_000);
+    });
+
+    test('an expired entry is removed by DLQ maintenance', async () => {
+      // A 100 ms maintenance period instead of the 60 s default (asserted above):
+      // the purge path is the same, only the wait for the first run is shorter.
+      harness = await startHarness('dlq-config', mode, FAST_DLQ_MAINTENANCE);
+      const queue = harness.queue('purged');
+      // Many periods long, so the entry is observable before the purge even on a
+      // loaded host.
+      await queue.setDlqConfigAsync({ maxAge: 4_000 });
+
+      harness.worker(queue.name, async () => {
+        throw new Error('boom');
+      });
+      const job = await queue.add('job', {}, { attempts: 1, durable: true });
+      await waitForState(queue, job.id, 'failed', 20_000);
+      expect((await queue.getDlqAsync()).some((item) => item.job.id === job.id)).toBe(true);
+
       await waitUntil(
         async () => (await queue.getDlqAsync()).length === 0,
         'the expired entry to be purged by maintenance',
-        90_000
+        20_000
       );
-    }, 120_000);
+    }, 40_000);
   });
 }
