@@ -68,6 +68,9 @@ overview: [docs/agents/README.md](docs/agents/README.md).
    still say 75 MCP tools; the server registers 79.
 8. `machine-gate-real-rerun`: run `machine-gate.sh` on real OrbStack again; the
    cleanup, delete-retry and time-bound fixes have run against fakes only.
+9. `postgres-sigkill-hook-timeout-flake`: in `test/postgres-public-api-extreme.test.ts`
+   a hook timed out after the SIGKILL recovery test on PostgreSQL 17.x (CI run
+   43355036181, attempt 1; green on the rerun); reproduce first with a stress loop.
 
 ## Blockers / Risks
 
@@ -79,10 +82,10 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   the last green run, and the SDK sandbox and both OrbStack Machines come on top.
 - `harness-production-grade`: `CLAUDE.md` and `AGENTS.md` are 71 and 52 bytes under
   the 12,288-byte budget after the CI rule; the next rule added to them needs more
-  non-rule prose moved out first. `scripts/ci-watch.sh` was checked against real
-  past runs and a fake `gh`, but has not yet watched a run from queued to finished,
-  nor one waiting for the `npm` environment approval (that status is handled from
-  GitHub's documentation, not from an observed run). The Machine gate fixes
+  non-rule prose moved out first. `scripts/ci-watch.sh` has watched one live run
+  (43355036181: FAILED, then FLAKY after a rerun), but not yet one waiting for the
+  `npm` environment approval (that status is handled from GitHub's documentation,
+  not from an observed run). The Machine gate fixes
   (detached cleanup, repeated delete, 15-minute bounds) are proven with a fake
   OrbStack only; the real run predates them.
 - `--isolate-network` does not isolate an OrbStack Machine from sibling Machines,
@@ -103,6 +106,25 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — ci-flakes-record
+
+- State and docs only (branch `ci-flakes-record`, base `e1cbfc99`, staged, not
+  committed). `ci-watch.sh --sha` watched its first live run, CI run 43355036181 on
+  `e1cbfc99`: FAILED on attempt 1 (PostgreSQL 17.x Integration Tests, 499 pass /
+  1 fail: a `beforeEach/afterEach` hook timed out after 5000.37 ms, once the
+  SIGKILL recovery test of `test/postgres-public-api-extreme.test.ts` had passed),
+  then FLAKY after one `gh run rerun --failed`. CI is green on `e1cbfc99`.
+- The flake is the new item `postgres-sigkill-hook-timeout-flake`; it is a different
+  file and cause from `postgres-lifecycle-race-flake`, so the two stay separate.
+- The `harness-production-grade` evidence is corrected in three places: what tree
+  `a0628e56` was, that the skeptic's second note was corrected against `sdk.yml`
+  rather than applied as written, and the live `ci-watch.sh` run.
+- Checks (host): `bun test test/agent-harness test/agent-skills.test.ts` 68 / 0,
+  `generate-release-posts.ts --check` OK, `./init.sh` green; `bun run test:sandbox`
+  on this state and docs change before the commit. Its first run failed on one
+  unrelated test (`test/repro-wait-hold-routing.test.ts`, 80 of 100 completions),
+  recorded as `wait-hold-routing-flake`; the gate was run again.
 
 ### 2026-11-13 — harness-production-grade
 

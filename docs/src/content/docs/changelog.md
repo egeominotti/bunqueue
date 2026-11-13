@@ -150,6 +150,10 @@ head:
   a listener in a sibling Machine and the Mac's LAN address are reachable, and so
   is the internet. The docs, the skill and its manual procedure now say exactly
   that; tests that need no network run in the sandbox containers.
+- The four flaky tests seen on 2026-11-12 and 2026-11-13, two in the sandbox and
+  two in CI, are tracked as work items in `feature_list.json`:
+  `cron-test-midnight-boundary`, `postgres-lifecycle-race-flake`,
+  `postgres-sigkill-hook-timeout-flake` and `wait-hold-routing-flake`.
 
 ### Documentation
 
