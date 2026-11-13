@@ -701,6 +701,19 @@ and the test process compete for the same cores, so a 15s bound turned CPU
 starvation into a false timeout. Those suites assert exactly-once semantics, so
 the bound is deliberately generous and the wall time of the file grows with it.
 
+Their teardown hooks need explicit deadlines for the same reason; Bun's 5 s hook
+default does not cover them. `closeClients()` ends each Worker with a best-effort
+command bounded by the 45 s command timeout, and stopping a broker waits up to
+`POSTGRES_BROKER_STOP_GRACE_MS` (5 s) after SIGTERM before SIGKILL, because a
+graceful shutdown drains in-flight maintenance and a maintenance statement can wait
+up to the PostgreSQL lock timeout. Every broker of a file starts together, so their
+60 s periodic sweeps fire together and contend for the same advisory locks. Hooks
+use `POSTGRES_PUBLIC_API_CLIENT_CLOSE_TIMEOUT_MS` for `closeClients()` and
+`POSTGRES_PUBLIC_API_TEARDOWN_TIMEOUT_MS` for `close()`
+(`test/support/postgres-public-api-harness.ts`).
+`test/postgres-public-api-extreme.test.ts` failed its `afterAll` once in CI
+because its SIGKILL case ends the file right at the first sweep.
+
 The multi-process PostgreSQL harness (`test/support/postgres-process-cluster.ts`)
 follows the same policy for the same reason: reserving a pair releases the probe
 sockets before the broker binds them, so a concurrent worker can win that
@@ -843,6 +856,11 @@ PostgreSQL Fast Check scopes delete every generated namespace in one set-based
 transaction and use an explicit database-hook timeout. Deep campaigns therefore
 retain complete cleanup without opening one pool per generated case or depending
 on Bun's short default hook deadline.
+
+PostgreSQL reads by a list of IDs (`PostgresQueueStore.getJobs(ids)`) are set
+lookups without `ORDER BY`. The row order follows the plan: index order for an
+index scan, heap order for a bitmap or sequential scan. Assert on them as a set
+(sorted IDs, or a map by ID), never on the input order.
 
 PostgreSQL lifecycle regressions use explicit post-commit barriers rather than
 timing guesses. They pause admission, claim, relationship mutation, and startup

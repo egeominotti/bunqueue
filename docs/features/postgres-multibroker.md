@@ -113,6 +113,10 @@ transactional-outbox payload after feature-bearing batch decisions;
 separate terminal writes, generation retention, and reads; and
 `dependencyDestruction.ts`, `destructiveMutations.ts`, and
 `queueDestruction.ts` share the dependency-safe removal protocol.
+`getJobs(ids)` (`getPostgresJobs` in `queries.ts`) is a set lookup with no
+`ORDER BY`: duplicate IDs collapse, missing IDs are absent, and rows come back in
+plan order (index order or heap order), not in input order. Its callers index the
+result by ID.
 The high-volume path is split further: `batchAdmission.ts`, `claimSelection.ts`,
 `claimBatch.ts`, `batchCompletion.ts`, `batchEvents.ts`, and
 `completionEvents.ts` keep candidate selection, bulk SQL, event retention, and

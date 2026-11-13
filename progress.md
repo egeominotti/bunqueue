@@ -75,6 +75,10 @@ overview: [docs/agents/README.md](docs/agents/README.md).
    ("serializes set-based batch admission after obliterate") failed once on
    PostgreSQL 16.x in CI run 43336453775, attempt 1, and passed on the rerun;
    reproduce first with a stress loop against PostgreSQL 16.
+3. `postgres-lifecycle-race-flake` (in progress on `postgres-flakes`, uncommitted):
+   reproduced and fixed in the test. The assertion depended on the row order of an
+   unordered `getJobs(ids)` read; there is no engine race. Next: `bun run
+   test:sandbox`, the skeptic, commit on request, CI.
 4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
    `node` in the Bun-only OrbStack Machines.
 5. `ci-python39-runner-pin` (in progress, branch `drop-python-39`): the Python
@@ -105,6 +109,15 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 12. `test-suite-speedups`: fixed sleeps on the 5 s stall sweep and the 60 s DLQ
     maintenance in the slowest unit files (estimated 150 s of unit wall time);
     needs a stall/DLQ configuration seam in `getSharedManager()`.
+9. `postgres-sigkill-hook-timeout-flake` (in progress, same worktree and branch
+   `postgres-flakes`, uncommitted): reproduced (the `afterAll` broker stop, not the
+   afterEach) and fixed with explicit teardown deadlines derived from the harness
+   bounds. Next: as item 3.
+10. `postgres-completion-prune-plan`: the completion-retention candidate query takes
+    about 10 s on about 300 rows of a fresh namespace while it holds its advisory
+    lock; found while reproducing item 9.
+11. `worker-close-heartbeat-error` and `worker-force-close-unreachable-broker`: two
+    client findings from the same stress runs.
 
 ## Blockers / Risks
 
@@ -127,6 +140,15 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   `machine-gate-real-rerun` should exit 0, and any unit failure there is now a real
   failure (exit 3 is retired). On hosts with a real Node (CI) these two files now run
   the gate's `node -p` calls with Bun too; CI's own version-gate job still uses Node.
+- `postgres-flakes`: two work items are `in-progress` in one worktree, but the
+  harness allows one per branch. `postgres-lifecycle-race-flake` records
+  `postgres-flakes`, and `postgres-sigkill-hook-timeout-flake` records the label
+  `postgres-flakes-sigkill` so that `./init.sh` stays green. Split them into two
+  branches or commits, or align the field, before committing. Not run yet:
+  `bun run test:sandbox`, the skeptic, CI. The other two users of
+  `test/support/postgres-public-api-harness.ts` (`postgres-public-api-flow`,
+  `postgres-public-api-queue-worker`) still use Bun's 5 s default for the same
+  teardown hooks.
 - `--isolate-network` does not isolate an OrbStack Machine from sibling Machines,
   the Mac's LAN address or the internet (measured on OrbStack 2.2.5). Only the
   sandbox containers run tests without a network.
@@ -329,6 +351,28 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   skills and docs tests 190 / 0; typecheck, format check, `git diff --check`,
   `./init.sh` green. Blockers before `done`: `bun run test:sandbox`, the skeptic
   verdict and the commit have not run.
+### 2026-11-13 — postgres-flakes
+
+- Branch `postgres-flakes`, base `bfa290c7`, uncommitted, staged with `git add -A`.
+  Two items in one worktree, as requested: `postgres-lifecycle-race-flake` and
+  `postgres-sigkill-hook-timeout-flake`, both `in-progress` with `PARTIAL`
+  evidence. Disposable `postgres:16-alpine` (16.16) and `postgres:17-alpine`
+  (17.12) containers on 127.0.0.1, removed at the end.
+- Lifecycle: no engine race. The assertion compared the rows of an unordered
+  `getJobs(ids)` with the input order. It failed 3/50 with exactly the CI diff on
+  a heap-order plan (index scans disabled, churned table) and 0/50 after the fix;
+  20/20 on each version on default databases.
+- SIGKILL: the `afterAll` stop of the brokers hit Bun's 5 s default deadline. The
+  file ends at the brokers' first 60 s sweep, a sweep waits on the
+  completion-retention advisory lock held by a 10 s prune query, and a graceful
+  shutdown drains that wait. It failed 2/36 locally before the fix and 0/36 after;
+  the deterministic probe failed 5/5 with the default deadline and passed 5/5 with
+  the explicit one.
+- New items: `postgres-completion-prune-plan`, `worker-close-heartbeat-error`,
+  `worker-force-close-unreachable-broker`.
+- Checks (host): `bun run typecheck`, `bun run format:check`, `git diff --check`,
+  `./init.sh` green. Not run: `bun run test:sandbox` (excluded by the request), the
+  skeptic, CI. Nothing committed or pushed.
 
 ### 2026-11-13 — ci-flakes-record
 

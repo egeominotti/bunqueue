@@ -256,6 +256,44 @@ head:
   run) and `test-suite-speedups` (fixed sleeps on the 5 s stall sweep and the
   60 s DLQ maintenance in the slowest files, an estimated 150 s of unit wall
   time).
+- The PostgreSQL 15 leg of the CI compatibility matrix is removed
+  (`.github/workflows/ci.yml`, job `test-postgres`): the complete
+  `bun run test:postgres` suite now runs against `postgres:18.6-alpine`,
+  `postgres:17-alpine` and `postgres:16-alpine`. The `quality-gate` job still
+  requires `test-postgres` and checks its result, so a failed or cancelled leg
+  of the three remaining ones still blocks the release jobs. The native
+  benchmark runner `bun run bench:postgres:versions` now defaults to majors
+  16, 17 and 18 (`BUNQUEUE_PG_BENCH_VERSIONS` still accepts any list). The
+  README, the guides, the internal reference, the package description and the
+  two social cover images that named the range say PostgreSQL 16–18; the
+  2026-08-26 benchmark reports, which measured PostgreSQL 15.19, and earlier
+  changelog entries are unchanged.
+- `test/postgres-queue-lifecycle-races.test.ts` ("serializes set-based batch
+  admission after obliterate") no longer depends on row order. It compared the
+  rows of `PostgresQueueStore.getJobs(ids)` with the input order, but that read is
+  a set lookup without `ORDER BY`: an index scan returns `batch-new-a` first,
+  while a bitmap or sequential scan returns heap order, and `batch-new-b` can land
+  on an earlier heap page. This failed once on PostgreSQL 16 in CI (both jobs
+  present, reversed). The test now compares the sorted IDs, so it still requires
+  both jobs and only those. With plain index scans disabled on a churned
+  PostgreSQL 16 database, the old assertion failed in 3 of 50 runs and the new
+  one in 0 of 50.
+- `test/postgres-public-api-extreme.test.ts` gives its teardown hooks explicit
+  deadlines instead of Bun's 5 s default. The SIGKILL recovery case spends 45 s
+  in the victim Worker's `close(true)`, so the file ends about 60 s after its four
+  brokers started, when every broker runs its periodic sweeps. A broker's graceful
+  shutdown drains in-flight maintenance, and a sweep that waits for a PostgreSQL
+  advisory lock keeps the broker alive until that wait ends (up to the 5 s lock
+  timeout), so stopping the brokers in `afterAll` took the whole 5 s SIGTERM grace
+  and Bun failed the hook ("killed 1 dangling process"), once in 152 CI
+  PostgreSQL jobs. The deadlines now derive from the harness bounds
+  (`POSTGRES_PUBLIC_API_CLIENT_CLOSE_TIMEOUT_MS`, 60 s, and
+  `POSTGRES_PUBLIC_API_TEARDOWN_TIMEOUT_MS`, 80 s). A probe that holds the
+  namespace's completion-retention lock during teardown failed the default hook
+  in 5 of 5 runs and passed with the explicit deadline in 5 of 5 runs
+  (`harness.close()` about 10.05 s). Under CPU contention on PostgreSQL 17 the
+  unchanged file failed this way in 2 of 36 runs, and the fixed file in 0 of 36.
+  No assertion changes.
 
 ### Documentation
 
@@ -319,21 +357,6 @@ head:
   (measured by `scripts/bench-tcp-batch-notify.ts` and covered by
   `test/bug-batch-notify-single-waiter.test.ts`) and the unused `elysia`
   devDependency (its example was deleted in January 2026).
-
-### Testing
-
-- The PostgreSQL 15 leg of the CI compatibility matrix is removed
-  (`.github/workflows/ci.yml`, job `test-postgres`): the complete
-  `bun run test:postgres` suite now runs against `postgres:18.6-alpine`,
-  `postgres:17-alpine` and `postgres:16-alpine`. The `quality-gate` job still
-  requires `test-postgres` and checks its result, so a failed or cancelled leg
-  of the three remaining ones still blocks the release jobs. The native
-  benchmark runner `bun run bench:postgres:versions` now defaults to majors
-  16, 17 and 18 (`BUNQUEUE_PG_BENCH_VERSIONS` still accepts any list). The
-  README, the guides, the internal reference, the package description and the
-  two social cover images that named the range say PostgreSQL 16–18; the
-  2026-08-26 benchmark reports, which measured PostgreSQL 15.19, and earlier
-  changelog entries are unchanged.
 
 ### Bug fixes
 

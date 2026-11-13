@@ -77,8 +77,12 @@ describe('PostgreSQL queue lifecycle race coverage', () => {
 
         release.resolve(undefined);
         await Promise.all([rowBlock, destruction, admission]);
-        expect((await producer.getJobs(jobs.map(({ id }) => id))).map(({ job }) => job.id)).toEqual(
-          jobs.map(({ id }) => id)
+        // getJobs(ids) is a set lookup without ORDER BY: rows come back in the
+        // plan's order (heap order for a bitmap or sequential scan), so compare
+        // the admitted IDs as a sorted set. Both jobs, and only those, must exist.
+        const admitted = await producer.getJobs(jobs.map(({ id }) => id));
+        expect(admitted.map(({ job }) => String(job.id)).sort()).toEqual(
+          jobs.map(({ id }) => String(id)).sort()
         );
       } finally {
         release.resolve(undefined);

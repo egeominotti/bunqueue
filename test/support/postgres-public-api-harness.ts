@@ -11,10 +11,32 @@ import {
 import {
   cleanupPostgresNamespace,
   crashPostgresProcessBroker,
+  POSTGRES_BROKER_STOP_GRACE_MS,
   startPostgresProcessCluster,
   stopPostgresProcessCluster,
   type PostgresProcessBroker,
 } from './postgres-process-cluster';
+
+// Four brokers, one PostgreSQL and the client share a CI runner, so a single
+// command can queue behind a saturated broker. The suites assert exactly-once
+// semantics, not latency: keep the bound generous.
+const COMMAND_TIMEOUT_MS = 45_000;
+const TEARDOWN_MARGIN_MS = 15_000;
+
+/**
+ * Hook deadline for `closeClients()`. Clients close in parallel, and a close ends
+ * with a best-effort command (a Worker's `UnregisterWorker`) that is bounded by the
+ * command timeout, not by Bun's 5 s default hook deadline.
+ */
+export const POSTGRES_PUBLIC_API_CLIENT_CLOSE_TIMEOUT_MS = COMMAND_TIMEOUT_MS + TEARDOWN_MARGIN_MS;
+
+/**
+ * Hook deadline for `close()`: the client closes, then every broker's stop (up to
+ * the SIGTERM grace before SIGKILL, because a graceful shutdown drains maintenance
+ * that may wait for a PostgreSQL lock), then the namespace cleanup.
+ */
+export const POSTGRES_PUBLIC_API_TEARDOWN_TIMEOUT_MS =
+  POSTGRES_PUBLIC_API_CLIENT_CLOSE_TIMEOUT_MS + POSTGRES_BROKER_STOP_GRACE_MS + TEARDOWN_MARGIN_MS;
 
 /** Four-process fixture for exercising public clients against one PostgreSQL namespace. */
 export class PostgresPublicApiHarness {
@@ -60,10 +82,7 @@ export class PostgresPublicApiHarness {
     const broker = this.brokers[index];
     if (!broker) throw new Error(`PostgreSQL public API broker ${index} is unavailable`);
     return {
-      // Four brokers, one PostgreSQL and the client share a CI runner, so a
-      // single command can queue behind a saturated broker. The suite asserts
-      // exactly-once semantics, not latency: keep the bound generous.
-      commandTimeout: 45_000,
+      commandTimeout: COMMAND_TIMEOUT_MS,
       host: '127.0.0.1',
       pingInterval: 0,
       poolSize: 1,

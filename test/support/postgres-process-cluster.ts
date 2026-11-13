@@ -10,6 +10,13 @@ import { isBindCollision } from './bind-collision';
 type BrokerProcess = ReturnType<typeof Bun.spawn>;
 
 const STARTUP_TIMEOUT_MS = 30_000;
+/**
+ * How long a stop waits for a broker to exit after SIGTERM before it sends SIGKILL.
+ * A graceful shutdown drains in-flight maintenance, and a maintenance statement
+ * can wait up to the PostgreSQL lock timeout (5 s by default), so a stop alone can
+ * use this whole grace: a hook that stops brokers needs more than Bun's 5 s default.
+ */
+export const POSTGRES_BROKER_STOP_GRACE_MS = 5000;
 const leasedPorts = new Set<number>();
 
 export interface PostgresProcessBroker {
@@ -248,7 +255,7 @@ async function terminatePostgresProcessBroker(
       } else if (
         !(await Promise.race([
           broker.process.exited.then(() => true),
-          Bun.sleep(5000).then(() => false),
+          Bun.sleep(POSTGRES_BROKER_STOP_GRACE_MS).then(() => false),
         ])) &&
         broker.process.exitCode === null
       ) {

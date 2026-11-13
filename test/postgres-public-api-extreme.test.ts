@@ -1,5 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
-import { PostgresPublicApiHarness, waitFor } from './support/postgres-public-api-harness';
+import {
+  POSTGRES_PUBLIC_API_CLIENT_CLOSE_TIMEOUT_MS,
+  POSTGRES_PUBLIC_API_TEARDOWN_TIMEOUT_MS,
+  PostgresPublicApiHarness,
+  waitFor,
+} from './support/postgres-public-api-harness';
 import { expectedPostgresVersionPrefix } from './support/postgres-version';
 
 const postgresUrl = Bun.env.BUNQUEUE_TEST_POSTGRES_URL;
@@ -10,14 +15,18 @@ beforeAll(async () => {
   harness = await PostgresPublicApiHarness.start(postgresUrl, expectedPostgresVersionPrefix);
 });
 
+// Explicit teardown deadlines: Bun's 5 s hook default is shorter than the harness
+// bounds. The SIGKILL case ends about 60 s into the file, when every broker runs its
+// periodic sweeps; a broker whose sweep waits for a PostgreSQL lock exits only after
+// that wait (up to the 5 s lock timeout) or the 5 s SIGKILL grace.
 afterEach(async () => {
   await harness?.closeClients();
-});
+}, POSTGRES_PUBLIC_API_CLIENT_CLOSE_TIMEOUT_MS);
 
 afterAll(async () => {
   await harness?.close();
   harness = null;
-});
+}, POSTGRES_PUBLIC_API_TEARDOWN_TIMEOUT_MS);
 
 function fixture(): PostgresPublicApiHarness {
   if (!harness) throw new Error('PostgreSQL public API harness is not running');
