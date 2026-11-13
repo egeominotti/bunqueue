@@ -127,7 +127,11 @@ The CPU-intensive guide also contains an application responsibility that a
 broker cannot enforce: user code must move non-yielding computation off the
 control loop. The executable evidence covers bunqueue's enforceable side of
 that contract: isolated processors, heartbeats, lock ownership, timeout and
-stall recovery.
+stall recovery. The non-yielding-handler case runs its broker in a separate
+process (`test/docs-worker-guide/broker-process.ts`), as in the guide's
+topology, so the broker's stall sweep runs while the handler blocks the
+worker's event loop; the handler asks the broker after the block and must find
+the job taken back (`waiting` or `delayed`, one attempt counted).
 
 ## Cron
 

@@ -190,6 +190,16 @@ Run benchmarks only on native macOS, never in an OrbStack Machine or container.
   shipped 5000 ms stall sweep and 60000 ms DLQ maintenance stay asserted
   (`test/shared-manager-timers.test.ts`, the stall-detection and DLQ configuration
   guide suites).
+- A handler that blocks the event loop (a synchronous busy loop) also blocks
+  every broker in the same process, the embedded manager and an in-process TCP
+  server alike: no stall sweep, lock check or timer runs until it returns. A test
+  that needs the broker to act during such a block runs the broker in another
+  process (`startBrokerProcess(stallCheckMs)` in
+  `test/docs-worker-guide/broker-process.ts`, which starts
+  `test/fixtures/stall-sweep-broker.ts` on a dynamic port with a fresh SQLite
+  directory). Assert a state only the awaited transition produces: a state the
+  job also has before the worker pulls it (`waiting`) makes the test pass or fail
+  on a race.
 - Do not weaken an existing test merely to make a behavior change pass; update
   it only when the intended contract has explicitly changed.
 - Never publish benchmark results from Docker or a VM. Run benchmarks natively,

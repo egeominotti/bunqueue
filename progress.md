@@ -58,6 +58,8 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 2. `cpu-intensive-blocking-test-flake`: the non-yielding-handler test in
    `test/docs-worker-guide/cpu-intensive.test.ts` passes or fails on a race with
    the pull; make it observe real recovery.
+1. `worker-close-register-error`: the heartbeat `ClientClosedError` defect, in
+   `registerWithServer()` (context `worker-register`); reproduce first.
 3. `postgres-completion-read-model-plan`: `loadPostgresCompletionResults` has the
    prune's stale-statistics plan problem (quadratic, 1.6 s on 4,834 completions).
 4. `postgres-runner-guard-destructuring`: the runner-coverage guard misses a
@@ -126,6 +128,24 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Docs: `docs/features/client-worker-sdk.md`, changelog `[Unreleased]` Bug fixes.
 - Gates: `bun run test:sandbox` green on tree `c92b8cf5` (unit 11777 / 0 / 403,
   tcp 553 / 0, embedded 349 / 0); skeptic CONDITIONAL only on that gate.
+### 2026-11-13 — cpu-intensive-blocking-test-flake
+
+- Branch `cpu-intensive-blocking-test-flake`, base `154d6fc5`; done. Root cause in the test: its handler busy-looped 3 s in the process
+  that hosted the broker, so no stall sweep ran during the block, and its wait
+  accepted `waiting`, the state before the pull. Forcing the pull to win (wait
+  for the handler to start before polling) made it fail 4 / 4 (embedded and
+  TCP, job completed, never recovered); with stall detection disabled in `src/`
+  the old test still passed 6 / 6.
+- Fix (tests and docs only): `test/fixtures/stall-sweep-broker.ts` (broker in
+  its own process, 100 ms sweep, dynamic port, exits when stdin closes) and
+  `test/docs-worker-guide/broker-process.ts`; the handler asks the broker after
+  the block and must see the job `waiting`/`delayed` with an attempt counted,
+  then `completed`. Not a defect found on the way: the stale processor's late
+  ACK completes the requeued job (Issue #33, `completeStallRetriedJob`).
+- Proof: the new test fails on the stall-detection mutant (`Received: "active"`);
+  passes 20 / 20, 20 / 20 under 18 CPU burners (load 41), whole file 27 / 27 under
+  load. `bun run test:sandbox` green on tree `216e7069` (unit 11772 / 0 / 403, tcp
+  553 / 0, embedded 349 / 0); skeptic CONDITIONAL only on that gate.
 
 ### 2026-11-13 — integration of six items
 

@@ -199,6 +199,19 @@ head:
 
 ### Testing
 
+- The CPU-intensive workers guide test "a non-yielding handler starves
+  heartbeats and gets recovered" now observes the recovery it claims
+  (`cpu-intensive-blocking-test-flake`). Its handler busy-looped 3 s in the
+  process that also hosted the broker, so no stall sweep could run during the
+  block, and the wait accepted `waiting`, the job's state before the pull: the
+  test passed only when its first poll beat the pull and timed out otherwise
+  (once in 3 host runs); with stall detection disabled it still passed 6 / 6.
+  The broker now runs in its own process (`test/fixtures/stall-sweep-broker.ts`,
+  100 ms stall sweep), and the blocked handler asks it after the block: the job
+  must already be `waiting` or `delayed` with one attempt counted, then
+  completed. The embedded and in-process TCP variants are gone, since a broker
+  that shares the blocked event loop cannot recover anything during the block.
+
 - Four PostgreSQL regression files now run (`postgres-tests-never-run`). Their
   cases skip unless `BUNQUEUE_TEST_POSTGRES_URL` is set, and only
   `bun run test:postgres` (the CI `test-postgres` job) sets it, but that runner

@@ -7,6 +7,8 @@
  */
 
 import { afterEach, describe, expect, test } from 'bun:test';
+import { Queue, Worker } from '../../src/client';
+import { type BrokerProcess, startBrokerProcess } from './broker-process';
 import {
   type CoreE2eHarness,
   FAST_STALL_SWEEP,
@@ -18,10 +20,18 @@ import {
 } from '../docs-guide-support';
 
 let harness: CoreE2eHarness | null = null;
+let broker: BrokerProcess | null = null;
+const closers: Array<() => unknown> = [];
 
 afterEach(async () => {
-  await closeHarness(harness);
-  harness = null;
+  try {
+    for (const close of closers.splice(0).reverse()) await close();
+  } finally {
+    await broker?.stop();
+    broker = null;
+    await closeHarness(harness);
+    harness = null;
+  }
 });
 
 /** Busy-loop that never yields for `ms`, blocking timers and I/O. */
@@ -41,39 +51,67 @@ async function blockWithYields(ms: number): Promise<void> {
   }
 }
 
+// The broker runs in its own process, as in the page's topology: the handler
+// blocks only the worker's event loop, so the broker's stall sweep keeps running
+// during the block. An in-process broker would be blocked too, and could not
+// recover anything until the handler had already returned and acknowledged.
+describe('worker guide · CPU-intensive workers [tcp, broker in another process]', () => {
+  test('a non-yielding handler starves heartbeats and gets recovered', async () => {
+    broker = await startBrokerProcess(FAST_STALL_SWEEP.stallCheckMs);
+    const connection = { host: '127.0.0.1', port: broker.port, poolSize: 1 };
+    const queue = new Queue(`cpu-blocking-${crypto.randomUUID()}`, {
+      embedded: false,
+      connection,
+      autoBatch: { enabled: false },
+    });
+    closers.push(() => queue.close());
+
+    await queue.setStallConfigAsync({
+      enabled: true,
+      stallInterval: 200,
+      maxStalls: 5,
+      gracePeriod: 0,
+    });
+    let jobId = '';
+    const seenAfterBlock: Array<{ state: string | null; attemptsMade: number }> = [];
+    const worker = new Worker(
+      queue.name,
+      async () => {
+        if (seenAfterBlock.length === 0) {
+          blockFor(3_000); // 15 x stallInterval, no yield point
+          // Still inside the stale processor: ask the broker what it did meanwhile.
+          const state = await queue.getJobState(jobId);
+          const attemptsMade = (await queue.getJob(jobId))?.attemptsMade ?? -1;
+          seenAfterBlock.push({ state, attemptsMade });
+        }
+        return true;
+      },
+      // One slot: the requeued job must not be pulled into a second slot while the
+      // stale handler is still asking the broker for its state.
+      { embedded: false, connection, heartbeatInterval: 50, useLocks: true, concurrency: 1 }
+    );
+    worker.on('error', () => undefined);
+    closers.push(() => worker.close(true));
+
+    const job = await queue.add('heavy', {}, { attempts: 10, backoff: 100, durable: true });
+    jobId = job.id;
+    await waitUntil(() => seenAfterBlock.length > 0, 'the blocking handler to return', 30_000);
+
+    // The broker took the job back from the starved processor while it was blocked:
+    // it is no longer active, and the stall counted as an attempt.
+    const [seen] = seenAfterBlock;
+    expect(seen?.state === 'waiting' || seen?.state === 'delayed' ? 'recovered' : seen?.state).toBe(
+      'recovered'
+    );
+    expect(seen?.attemptsMade).toBeGreaterThanOrEqual(1);
+    // The job still finishes: by the late ACK of the stale generation (Issue #33)
+    // or by its redelivery, whichever reaches the broker first.
+    await waitForState(queue, job.id, 'completed', 30_000);
+  }, 60_000);
+});
+
 for (const mode of MODES) {
   describe(`worker guide · CPU-intensive workers [${mode}]`, () => {
-    test('a non-yielding handler starves heartbeats and gets recovered', async () => {
-      harness = await startHarness('cpu-intensive', mode);
-      const queue = harness.queue('blocking');
-
-      await queue.setStallConfigAsync({
-        enabled: true,
-        stallInterval: 200,
-        maxStalls: 5,
-        gracePeriod: 0,
-      });
-      const worker = harness.worker(
-        queue.name,
-        async () => {
-          blockFor(3_000); // longer than stallInterval, no yield point
-          return true;
-        },
-        { heartbeatInterval: 50, useLocks: true }
-      );
-      worker.on('error', () => undefined);
-
-      const job = await queue.add('heavy', {}, { attempts: 10, durable: true });
-      await waitUntil(
-        async () => {
-          const state = await queue.getJobState(job.id);
-          return state === 'waiting' || state === 'failed';
-        },
-        'the blocked job to be recovered by the broker',
-        30_000
-      );
-    }, 60_000);
-
     test('the same work with cooperative yields keeps the lease alive', async () => {
       harness = await startHarness('cpu-intensive', mode);
       const queue = harness.queue('yielding');
