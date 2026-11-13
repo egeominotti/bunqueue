@@ -10,10 +10,15 @@
  * - a create that appears only after the settle window is reported, never hidden;
  * - a Machine whose name exists is never touched, also when `orb list` is slow, and a
  *   failing `orb list` never reads as "the name is free";
- * - cleanup signals only live workers of its own gate.
+ * - cleanup signals only live workers of its own gate;
+ * - a burst of Ctrl-C (SIGINT to the whole process group) during cleanup still copies
+ *   the logs back and deletes every Machine, and the cleanup note says which logs were
+ *   copied; a failed `orb delete` is retried until `orb list` no longer shows the name,
+ *   with every exit code recorded.
  */
 
 import { afterAll, describe, expect, test } from 'bun:test';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -73,6 +78,80 @@ describe('Machine gate: interrupts', () => {
     // The fake daemon then really finishes: the report was right not to claim "deleted".
     for (let tick = 0; tick < 100 && bed.machines().length < 2; tick++) await Bun.sleep(100);
     expect(bed.machines()).toEqual(['bunqueue-ci-late', 'bunqueue-debian-late']);
+  }, 60_000);
+});
+
+describe('Machine gate: cleanup under repeated signals and failing deletes', () => {
+  test.skipIf(!Bun.which('perl'))(
+    'a burst of Ctrl-C during cleanup still copies the logs and deletes every Machine',
+    async () => {
+      const bed = machineBed(join(scratch, 'bed-burst'), 60);
+      for (const flag of ['signal-prone', 'rsync-ok']) writeFileSync(join(bed.orb, flag), '');
+      // detached: the gate leads a process group of its own, as under a terminal.
+      const gate = spawn('bash', [bed.gate, '--run-id', 'burst'], {
+        env: { ...process.env, ...bed.env },
+        detached: true,
+        stdio: 'ignore',
+      });
+      const exited = new Promise<number | null>((resolve) => gate.on('exit', resolve));
+      const started = () =>
+        ['ci', 'debian'].every((d) => existsSync(join(bed.orb, `started-bunqueue-${d}-burst`)));
+      for (let tick = 0; tick < 200 && !started(); tick++) await Bun.sleep(100);
+      expect(started()).toBe(true);
+      let over = false;
+      void exited.then(() => (over = true));
+      while (!over) {
+        try {
+          process.kill(-gate.pid!, 'SIGINT');
+        } catch {
+          // The group is gone.
+        }
+        await Bun.sleep(30);
+      }
+      expect(await exited).toBe(130);
+      expect(bed.machines()).toEqual([]);
+      expect(bed.deleted()).toEqual(['bunqueue-ci-burst', 'bunqueue-debian-burst']);
+      const run = runDir(bed, 'burst');
+      expect(text(run, 'run.env')).toContain('cleanup=deleted');
+      expect(text(run, 'run.env')).toMatch(
+        /cleanup_note=.*logs copied from: bunqueue-ci-burst bunqueue-debian-burst; not copied from: none/
+      );
+      expect(text(run, 'run.env')).toContain(
+        'delete_exit=bunqueue-ci-burst:0 bunqueue-debian-burst:0'
+      );
+      expect(text(run, 'delete.log')).toContain(
+        'orb delete -f bunqueue-ci-burst: exit 0 (attempt 1)'
+      );
+      expect(existsSync(join(run, 'bunqueue-ci-burst/copied-back'))).toBe(true);
+    },
+    60_000
+  );
+
+  test('a failed orb delete is retried, and the note says the logs were not copied', () => {
+    const bed = machineBed(join(scratch, 'bed-retry'), 0);
+    writeFileSync(join(bed.orb, 'delete-fails'), '1');
+    const run = Bun.spawnSync(
+      ['bash', bed.gate, '--run-id', 'retry', '--distros', 'ubuntu:24.04'],
+      {
+        env: { ...process.env, ...bed.env },
+      }
+    );
+    expect(run.exitCode).toBe(4); // the fake Machine has no SSH: an infrastructure failure
+    expect(bed.machines()).toEqual([]);
+    const dir = runDir(bed, 'retry');
+    expect(text(dir, 'delete.log')).toContain(
+      'orb delete -f bunqueue-ci-retry: exit 1 (attempt 1)'
+    );
+    expect(text(dir, 'delete.log')).toContain(
+      'orb delete -f bunqueue-ci-retry: exit 0 (attempt 2)'
+    );
+    expect(text(dir, 'run.env')).toContain('delete_exit=bunqueue-ci-retry:1,0');
+    expect(text(dir, 'run.env')).toMatch(
+      /cleanup=deleted\ncleanup_note=.*logs copied from: none; not copied from: bunqueue-ci-retry/
+    );
+    expect(text(dir, 'manifest.md')).toContain(
+      'exit codes per Machine, one per attempt: bunqueue-ci-retry:1,0'
+    );
   }, 60_000);
 });
 

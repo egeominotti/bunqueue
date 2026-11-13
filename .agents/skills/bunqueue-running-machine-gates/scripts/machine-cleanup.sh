@@ -7,6 +7,8 @@ set -euo pipefail
 # The settle window is an environment variable only so that tests can shorten it.
 readonly SETTLE_SECONDS=${BUNQUEUE_MACHINE_SETTLE_SECONDS:-60}
 readonly COPY_SECONDS=120
+readonly DELETE_SECONDS=120
+readonly DELETE_TRIES=5
 
 usage() {
   cat <<'EOF'
@@ -24,13 +26,19 @@ Usage: machine-cleanup.sh --run-dir DIR --state-dir DIR [--pids "PID ..."]
    recorded as not-deleted, with its name.
 3. Copies gate-out/ and gate-runner.log back from every Machine named in
    STATE-DIR/created that exists, each copy bounded to 120 s.
-4. Deletes those Machines with `orb delete -f` (not with --keep), logging to
-   RUN-DIR/delete.log, then checks that none is left. Only names in STATE-DIR/created
-   are deleted: a worker records a name only after checking that no Machine has it.
-5. Appends `cleanup=deleted|kept|not-deleted|none` and `cleanup_note=` to RUN-DIR/run.env.
+4. Deletes those Machines with `orb delete -f` (not with --keep), each attempt bounded
+   to 120 s and repeated, up to 5 times, until `orb list` no longer shows the name;
+   RUN-DIR/delete.log keeps the output and the exit code of every attempt. Only names
+   in STATE-DIR/created are deleted: a worker records a name only after checking that
+   no Machine has it.
+5. Appends `cleanup=deleted|kept|not-deleted|none`, `cleanup_note=` (which logs were
+   copied and which were not) and `delete_exit=` to RUN-DIR/run.env.
 
-SIGINT and SIGTERM are ignored while it runs, so a second Ctrl-C cannot leave a
-Machine behind; it is bounded to about 60 s plus 2 x 120 s per Machine.
+SIGINT and SIGTERM are ignored while it runs, and every rsync and orb call runs in a
+session of its own (setsid, or perl's POSIX::setsid on macOS): a repeated Ctrl-C
+signals the terminal's whole process group, and rsync and the orb CLI install their
+own handlers, so ignoring the signal in this shell alone did not protect them. It is
+bounded to about 60 s plus, per Machine, 2 x 120 s of copies and 5 x 120 s of deletes.
 
 Options:
   --dry-run   Print every command; stop, copy, write and delete nothing
@@ -74,7 +82,9 @@ if [ "$dry_run" -eq 1 ]; then
   echo "# wait up to ${SETTLE_SECONDS}s in orb list for interrupted creates, then for each created Machine:"
   echo "+ rsync -a -e 'ssh $ssh_opts' <name>@orb:gate-out/ $run_dir/<name>/"
   echo "+ rsync -a -e 'ssh $ssh_opts' <name>@orb:gate-runner.log $run_dir/<name>/"
-  if [ "$keep" -eq 1 ]; then echo '# --keep: no Machine is deleted'; else echo '+ orb delete -f <name>'; fi
+  if [ "$keep" -eq 1 ]; then echo '# --keep: no Machine is deleted'; else
+    echo "+ orb delete -f <name>   # repeated, up to $DELETE_TRIES times, until orb list -q no longer shows it"
+  fi
   echo "# then check orb list -q and append cleanup= to $run_dir/run.env"
   exit 0
 fi
@@ -121,11 +131,22 @@ stop_tree() {
   done
   kill -KILL $left 2>/dev/null || true
 }
-# bounded SECONDS CMD...: run CMD, and stop its tree once SECONDS have passed.
+# detached CMD...: run CMD in a session of its own, out of reach of the terminal's
+# signals and of a kill of this process group.
+detach=none
+if command -v setsid >/dev/null 2>&1; then detach=setsid; elif command -v perl >/dev/null 2>&1; then detach=perl; fi
+detached() {
+  case "$detach" in
+    setsid) setsid "$@" ;;
+    perl) perl -MPOSIX -e 'setsid(); exec { $ARGV[0] } @ARGV or exit 127' "$@" ;;
+    *) "$@" ;;
+  esac
+}
+# bounded SECONDS CMD...: run CMD detached, and stop its tree once SECONDS have passed.
 bounded() {
   local limit=$1 pid rc=0 ticks=0
   shift
-  "$@" &
+  detached "$@" </dev/null &
   pid=$!
   while alive "$pid"; do
     [ "$ticks" -lt $((limit * 2)) ] || { stop_tree "$pid" && break; }
@@ -154,8 +175,8 @@ workers='' skipped=''
 for pid in $pids; do
   if [ "$(parent_of "$pid")" = "$parent" ]; then workers="$workers $pid"; else skipped="$skipped $pid"; fi
 done
-printf 'workers to stop:%s\nnot workers of this run, left alone:%s\n' "${workers:- none}" "${skipped:- none}" \
-  >>"$run_dir/cleanup.log"
+printf 'workers to stop:%s\nnot workers of this run, left alone:%s\nrsync and orb run detached with: %s\n' \
+  "${workers:- none}" "${skipped:- none}" "$detach" >>"$run_dir/cleanup.log"
 for pid in $workers; do stop_tree "$pid"; done
 
 touch "$state_dir/created"
@@ -163,7 +184,7 @@ created=$(LC_ALL=C sort -u "$state_dir/created")
 inflight=$(cd "$state_dir" && for f in creating.*; do [ ! -e "$f" ] || echo "${f#creating.}"; done)
 waited=0 missing='' problem=''
 while [ -n "$inflight" ]; do
-  listed=$(orb list -q 2>/dev/null || true) missing=''
+  listed=$(detached orb list -q 2>/dev/null || true) missing=''
   for name in $inflight; do has_line "$listed" "$name" || missing="$missing $name"; done
   [ -n "$missing" ] && [ "$waited" -lt "$SETTLE_SECONDS" ] || break
   sleep 1 && waited=$((waited + 1))
@@ -174,38 +195,58 @@ if [ -n "$missing" ]; then
 fi
 
 listed='' existing=''
-if [ -n "$created" ] && ! listed=$(orb list -q 2>/dev/null); then
+if [ -n "$created" ] && ! listed=$(detached orb list -q 2>/dev/null); then
   say 'machine-cleanup.sh: orb list failed; cannot tell which Machines exist'
   listed='' problem="${problem:+$problem; }orb list failed during cleanup: check orb list by hand"
 fi
 for name in $created; do ! has_line "$listed" "$name" || existing="$existing $name"; done
+copied='' uncopied=''
 for name in $existing; do
   mkdir -p "$run_dir/$name"
-  bounded "$COPY_SECONDS" rsync -a -e "ssh $ssh_opts" "$name@orb:gate-out/" "$run_dir/$name/" \
-    >>"$run_dir/$name/copy-back.log" 2>&1 || say "machine-cleanup.sh: [$name] no gate-out/ copied back"
+  if bounded "$COPY_SECONDS" rsync -a -e "ssh $ssh_opts" "$name@orb:gate-out/" "$run_dir/$name/" \
+    >>"$run_dir/$name/copy-back.log" 2>&1; then copied="$copied $name"; else
+    uncopied="$uncopied $name"
+    say "machine-cleanup.sh: [$name] no gate-out/ copied back"
+  fi
   bounded "$COPY_SECONDS" rsync -a -e "ssh $ssh_opts" "$name@orb:gate-runner.log" "$run_dir/$name/" \
     >>"$run_dir/$name/copy-back.log" 2>&1 || true
 done
+logs="logs copied from:${copied:- none}; not copied from:${uncopied:- none}"
 
+deletes=''
 if [ -z "$created" ]; then state=none note='no Machine was created'
 elif [ "$keep" -eq 1 ]; then
-  state=kept note="kept with --keep (diagnostic only); delete with orb delete -f$existing"
+  state=kept note="kept with --keep (diagnostic only); delete with orb delete -f$existing; $logs"
   say "machine-cleanup.sh: kept:$existing"
 else
-  for name in $existing; do
-    orb delete -f "$name" >>"$run_dir/delete.log" 2>&1 || say "machine-cleanup.sh: orb delete -f $name failed"
-  done
+  # The orb CLI can fail, or even panic, after the daemon deleted the Machine, and can be
+  # stopped before it did: orb list decides, the exit codes are only recorded.
   left=''
-  if listed=$(orb list -q 2>/dev/null); then
+  for name in $existing; do
+    tries=0 codes=''
+    while :; do
+      rc=0
+      bounded "$DELETE_SECONDS" orb delete -f "$name" >>"$run_dir/delete.log" 2>&1 || rc=$?
+      tries=$((tries + 1)) codes="$codes${codes:+,}$rc"
+      echo "orb delete -f $name: exit $rc (attempt $tries)" >>"$run_dir/delete.log"
+      if listed=$(detached orb list -q 2>/dev/null) && ! has_line "$listed" "$name"; then break; fi
+      [ "$tries" -lt "$DELETE_TRIES" ] || break
+      sleep 2
+    done
+    [ "$codes" = 0 ] || say "machine-cleanup.sh: orb delete -f $name exited $codes"
+    deletes="$deletes${deletes:+ }$name:$codes"
+  done
+  if listed=$(detached orb list -q 2>/dev/null); then
     for name in $created; do ! has_line "$listed" "$name" || left="$left $name"; done
   else
     left=' (orb list failed)'
   fi
-  state=deleted note='deleted with orb delete -f after the logs were copied'
+  state=deleted note="orb list shows none of them (orb delete -f exit codes: ${deletes:-none ran}); $logs"
   [ -z "$left" ] || problem="${problem:+$problem; }still present:$left; delete by hand with orb delete -f"
   [ -z "$left" ] || say "machine-cleanup.sh: still present:$left"
 fi
 [ -z "$problem" ] || { state=not-deleted && note="NOT DELETED: $problem"; }
-[ ! -f "$run_dir/run.env" ] || printf 'cleanup=%s\ncleanup_note=%s\n' "$state" "$note" >>"$run_dir/run.env"
+[ ! -f "$run_dir/run.env" ] ||
+  printf 'cleanup=%s\ncleanup_note=%s\ndelete_exit=%s\n' "$state" "$note" "${deletes:-none}" >>"$run_dir/run.env"
 [ "$state" != not-deleted ] || exit 4
 exit 0

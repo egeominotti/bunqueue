@@ -1,6 +1,6 @@
 ---
 name: bunqueue-fixing-bugs
-description: "Runs the bunqueue reproduce-first bug workflow end to end: a regression test that fails for the right reason, subagents that implement and prove the fix, /docs and the changelog in the same change, the required gates, and skeptic review rounds until PASS before any commit or push. Use when a bug, regression, crash, wrong result, data loss, hang or flaky behavior is reported in bunqueue (server, client, workflow engine, CLI, MCP, SDKs), when a GitHub issue describes a defect, or when a skeptic, model-campaign or CI finding needs a fix. Not for new features without a defect, release preparation (bunqueue-releasing), or only running the gates (bunqueue-running-gates)."
+description: "Runs the bunqueue reproduce-first bug workflow. Use when a bug, regression, crash, wrong result, data loss, hang or flaky behavior is reported in bunqueue (server, client, workflow engine, CLI, MCP, SDKs), when a GitHub issue describes a defect, or when a skeptic, model-campaign or CI finding needs a fix. Covers the regression test that fails first, subagents that prove the fix, docs and changelog in the same change, the gates, and skeptic rounds until PASS. Not for features without a defect, or for only running the gates (bunqueue-running-gates)."
 license: MIT
 metadata:
   short-description: Reproduce, fix and prove a bunqueue bug

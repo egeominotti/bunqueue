@@ -1,6 +1,6 @@
 ---
 name: bunqueue-running-gates
-description: "Selects, runs and reads the bunqueue validation gates: bun run test:sandbox (unit, TCP and embedded suites in disposable containers), bun run test:model for queue semantics, bun run test:sandbox:sdk for sdk/ changes, plus typecheck, format and whitespace checks. Covers the artifacts and KPIs under artifacts/test-sandbox, how to classify a failure (parallel-only, environment, real), how a new file reaches the test image, and how to prove that a change made after a green gate is docs-only. Use when about to commit any bunqueue change, when a sandbox, model or SDK gate fails or shows anomalies, when a test passes on the host but fails in the container, or when asked whether a change still needs a gate. Not for OrbStack Machine runs (bunqueue-running-machine-gates) or benchmarks, which run natively on macOS only."
+description: "Selects, runs and reads the bunqueue validation gates. Use when about to commit a bunqueue change or asked which gate it needs, when bun run test:sandbox, test:model or test:sandbox:sdk fails or shows anomalies, when a test passes on the host but fails in the container, when reading a report, totals or KPIs under artifacts/test-sandbox, when a change lands after a green gate, or when watching CI after a push. Covers failure classification and model replay by seed. Not for OrbStack Machine runs (bunqueue-running-machine-gates) or benchmarks."
 license: MIT
 metadata:
   short-description: Choose, run and read the bunqueue test gates
@@ -23,6 +23,7 @@ them so the result is evidence for the tree you commit.
 | Always | `bun run typecheck`, `bun run format:check`, `git diff --check` and `git diff --cached --check` |
 | Final Linux validation of a candidate | a fresh Ubuntu 24.04 OrbStack Machine on the native architecture, plus Debian 13 for every release (bunqueue-running-machine-gates) |
 | Only docs or state files, after a green gate | prove the delta and rerun the tests that read them ([below](#prove-a-post-gate-delta)) |
+| Anything, once it is pushed | watch the CI run of the pushed commit until it is green ([below](#after-the-push-watch-ci)) |
 
 Repository tests run in isolated OrbStack Machines by default, iteration included: a
 run on the macOS host is diagnostic only ([CLAUDE.md](../../../CLAUDE.md#mandatory-gates)).
@@ -103,7 +104,99 @@ lists the focused tests to rerun), 1 (code changed: rerun the gate) or 4 (Git er
 The image comparison and what counts as docs-only:
 [references/post-gate-deltas.md](references/post-gate-deltas.md).
 
+## After the push: watch CI
+
+A push is not finished when `git push` returns. The work item is done when the CI run
+of the pushed commit is green ([CLAUDE.md](../../../CLAUDE.md#definition-of-done),
+[AGENTS.md](../../../AGENTS.md#definition-of-done)): two pushes once went out with a red
+run that nobody opened, and a later one needed a rerun for a flaky job. The push itself
+still needs the user's authorization; watching only reads.
+
+1. Find the run of the commit you pushed, by its full SHA:
+
+   ```bash
+   gh run list --commit "$(git rev-parse HEAD)" --json databaseId,workflowName,status,conclusion
+   gh run list --branch main --limit 1 --workflow CI --json databaseId,headSha,status,conclusion
+   ```
+
+   The second command is the newest `CI` run on `main`: check that its `headSha` is your
+   commit before trusting it.
+
+2. Wait for it with a bound (a push run takes roughly 10 to 20 minutes; a publication
+   run waits for an approval and takes longer). Run the script rather than typing the
+   loop:
+
+   ```bash
+   bash .agents/skills/bunqueue-running-gates/scripts/ci-watch.sh --sha "$(git rev-parse HEAD)"
+   ```
+
+   [scripts/ci-watch.sh](scripts/ci-watch.sh) takes `--sha <full sha>` or `--run <id>`,
+   gives up after `--timeout` seconds (default 2700) and exits 0 (GREEN), 1 (FAILED),
+   3 (FLAKY: green only after a rerun) or 4 (NO VERDICT: `gh` missing or failing, no
+   run, a cancelled run, a run waiting for an approval, or still running at the
+   timeout). It never reruns, cancels or approves anything. The same by hand:
+
+   ```bash
+   id=<run id>
+   for poll in $(seq 1 90); do # 90 x 30 s = 45 minutes, then stop waiting
+     [ "$(gh run view "$id" --json status --jq .status)" = completed ] && break
+     sleep 30
+   done
+   gh run view "$id" --json status,conclusion,jobs \
+     --jq '{status, conclusion, failed: [.jobs[] | select(.conclusion == "failure") | .name]}'
+   ```
+
+3. Red (exit 1): read the failed steps before deciding anything:
+
+   ```bash
+   gh run view <id> --log-failed | tail -n 120
+   ```
+
+4. Flake or regression? One attempt cannot tell, and neither can a single red matrix
+   leg: the Python 3.9 SDK job failed on three pushes in a row while every other leg
+   was green, because the runner image had lost Python 3.9. Signs of a regression or a
+   broken runner: the log names something the commit changed, the same job is red on
+   earlier commits (`gh run list --branch main --workflow CI --limit 5`), or it fails
+   locally. Signs of a flake: a timing or race assertion in a test the commit does not
+   touch (a docs-only commit, for example). Then rerun the failed jobs once:
+
+   ```bash
+   gh run rerun <id> --failed
+   bash .agents/skills/bunqueue-running-gates/scripts/ci-watch.sh --run <id>
+   ```
+
+   - Exit 3, green on the rerun: CI is green and the flake is real. Add a
+     `not-started` work item naming the test, the job, the run id and the attempt,
+     with "reproduce first" in its description (a stress loop in the environment that
+     failed); `postgres-lifecycle-race-flake` is the model. A flake is never silently
+     ignored and never rerun a second time.
+   - Exit 1 again: a job that fails in every attempt is a regression or a broken
+     runner. `main` is red: say so, then fix it with a reproducing test first
+     (bunqueue-fixing-bugs).
+
+   Do not rerun a run that reached the release jobs (tag, GitHub release, Docker, npm):
+   a rerun repeats them, and those are the user's to request (bunqueue-releasing).
+
+5. Record it in the evidence: `CI run <id> (attempt <n>) on <sha>: GREEN (ci-watch.sh
+   exit 0), <url>`, or the flake's work item id next to an exit 3.
+
+After an `sdk/` change, check the SDK jobs too. On a push they are not a run of their
+own: `CI` calls the `SDK` workflow, so they are the `Official SDKs / ...` jobs of the
+`CI` run that `ci-watch.sh` already judges, and a red one makes that run FAILED. The
+`SDK` workflow runs by itself only on its weekly schedule and on a manual dispatch;
+watch such a run with `--workflow SDK` (`ci-watch.sh --sha <full sha> --workflow SDK`,
+or `gh run list --workflow SDK --limit 3` to find it). Without such a run for the
+commit, `--workflow SDK` waits until the timeout and exits 4.
+
 ## Gotchas
+
+- `gh run list --branch main --limit 1` alone returns the newest run of any workflow:
+  an `issue_comment` run of the Claude Code workflow, concluded `skipped`, is often
+  newer than CI. Filter with `--workflow CI`, or list by `--commit`.
+- `gh run list --commit` wants the full 40-character SHA; for an abbreviated one it
+  returns an empty list, which reads as "no run yet".
+- `gh run watch <id>` has no time bound and a green rerun looks like any green run:
+  `ci-watch.sh` is bounded and reports the rerun as exit 3.
 
 - `bun run test:sandbox` is matched by nothing else: `test:sandbox:sdk`, a host
   `bun test` or `./init.sh --full` on a different tree do not replace it.

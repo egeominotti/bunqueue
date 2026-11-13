@@ -60,6 +60,96 @@ head:
   `Dockerfile.test` now copies `.agents/` and `.claude/skills/`, so they also run
   in the sandbox, and `./init.sh` runs them and lists the skills. Nothing in the
   package or the runtime changes.
+- **CI is part of done for agent sessions.** Two pushes had gone out with a red
+  GitHub Actions run that nobody opened, and a later one needed a rerun for a flaky
+  job. The Definition
+  of Done and End of Session of `CLAUDE.md` and `AGENTS.md` now require a green CI
+  run on the pushed commit, with a flaky job rerun once and turned into a work item
+  (the contract test pins the rule; both pages stay under their 12 KiB budget). The
+  `bunqueue-running-gates` skill gains "After the push: watch CI" and
+  `scripts/ci-watch.sh`, a bounded, read-only wait on `gh` for one run (`--run`) or
+  for the `CI` runs of a commit (`--sha`): exit 0 green, 1 failed with the failed
+  jobs and the commands to read and rerun them, 3 green only after a rerun (the
+  jobs that failed first are listed), 4 no verdict (no run, a cancelled run, a run
+  waiting for an approval, a timeout, a failing `gh`). It does not guess a flake
+  from one attempt: a single red matrix leg can be a real failure of that leg.
+  `test/agent-skills-ci-watch.test.ts` checks it against a fake `gh`. The
+  `bunqueue-releasing` skill and the release checklist now say that a release is
+  done only when the version gate, the tag, the GitHub release, the Docker images
+  and npm are verified, that npm is published by the `workflow_dispatch` run with
+  `npm_version` whose approval belongs to the user, and that npm is checked against
+  the registry rather than a cached `npm view`.
+- **New contributor skill `bunqueue-working-autonomously`**: the unattended work loop
+  of a local session, used only when the user explicitly asks for it (Codex never
+  invokes it implicitly, and its first step stops without that request). One ready
+  work item at a time, each on its own branch and worktree: `./init.sh`, the matching
+  skill, the gates, skeptic rounds until `PASS`, the commit, the pre-push skeptic, a
+  push only under the user's own standing authorization (otherwise it stops at the
+  commit), CI watched to green, evidence, then the next item. A question only the
+  user can answer sets the item `blocked` with the exact question in `progress.md`
+  instead of stalling the loop. Version bumps, releases, publication, security
+  disclosures, destructive actions outside the repository and branch-protection
+  bypass always go to the user. The skill adds no authorization, and it says why a
+  cloud routine cannot run it: the gates need local Docker and OrbStack.
+- **Agent harness follow-ups.** `./init.sh` asks Git whether it stands at the root
+  of a checkout instead of comparing path strings, so a repository entered through
+  a differently cased path on a case-insensitive volume no longer skips the git
+  checks; `./init.sh --workspace` prints the workspace and stops. `./init.sh` runs
+  the fast harness and skills contracts only (about 10 s instead of about 32 s);
+  the Machine lifecycle and worker tests stay in the unit suite, and a contract test fails
+  when a contract test file is neither run by `init.sh` nor on that list. The
+  contract's `Dockerfile.test` reader follows backslash-continued `COPY`
+  instructions and fails, quoting the instruction, on a form it cannot read; the
+  link check skips inline code by backtick-run length, so a double-backtick span
+  hides no link; a `done` work item's evidence must name a command and either an
+  artifact path or a commit or tree hash. The branch-name convention for parallel
+  contributors (a short unique suffix when two people may pick the same topic) is
+  documented in `docs/agents/README.md`. The `bunqueue-running-machine-gates`
+  skill states what an interrupt during `orb create` does: the gate waits the
+  settle window, then exits 130 only when every Machine is confirmed deleted and 4
+  otherwise. A flaky
+  PostgreSQL 16 test seen in CI is recorded as a work item
+  (`postgres-lifecycle-race-flake`). Nothing in the package or the runtime
+  changes.
+- **Skill trigger evaluations run against real agent CLIs.**
+  `bun scripts/agents/run-skill-evals.ts` runs the `trigger_queries` of each skill's
+  `evals/evals.json` in read-only headless sessions of Claude Code, Codex or Gemini
+  CLI and reports which skill each session loaded; `--dry-run` prints the planned
+  commands and starts none (`test/agent-skills-evals-runner.test.ts` checks that,
+  and type checks the runner). Measured on 2026-11-13, one run per query, and
+  recorded with the method, the cost and the limits in `docs/agents/skill-evals.md`:
+  with Claude Code, rewriting the descriptions of six skills so that "Use when"
+  comes first moved the should-trigger hits from 40/54 to 51/54 and the false
+  triggers from 1/54 to 0/54. With Codex, measured after the rewrite only, the
+  five skills it lists scored 3/3 should-trigger hits each, with 2/3 false triggers
+  on `bunqueue-working-sessions`. Gemini CLI lists 7 of 7 skills; its trigger rate
+  was not measured, because the CLI on the measuring machine had no
+  authentication.
+- **The OrbStack Machine gate after its first real run** (`machine-gate.sh` on
+  `3e08f75b`, OrbStack 2.2.5: exit 3 in 24 min 41 s; in both Machines unit
+  11871 pass / 6 fail / 399 skip, tcp 69/69 suites and 553/553 assertions, embedded
+  43/43 and 349/349, tinyfs 9 / 0; SIGTERM and SIGINT during the create, the
+  provisioning and the steps all ended 130 with nothing left). The run found
+  defects the fake OrbStack could not show, now fixed with tests. A repeated
+  Ctrl-C during cleanup killed `rsync` and the `orb` CLI although the cleanup
+  shell ignored the signal (the logs were lost, the delete was cut short, and
+  `run.env` still said the logs had been copied): cleanup runs both in a session
+  of their own, repeats `orb delete -f` up to five times until `orb list` no
+  longer shows the name, and records which logs were copied and every delete
+  attempt's exit code. `orb create`, the package install, the Bun download and
+  each copy are stopped after 15 minutes and reported as an infrastructure failure
+  (exit 4). The manifest carries the content hash computed inside each Machine and
+  the delete exit codes, and an interrupted Machine shows the steps it had
+  recorded instead of "no steps.tsv or DONE". The worker prints every step that
+  starts or finishes, with its exit code, and every command log ends with its exit
+  code; dpkg no longer draws its progress into `apt.log`. The skill lists what is
+  proven on real OrbStack and what only with fakes.
+- **Correction: `--isolate-network` does not isolate an OrbStack Machine from the
+  network.** `docs/testing.md` said it blocked the host and other Machines.
+  Measured on OrbStack 2.2.5: `host.orb.internal` and the gateway are refused, but
+  a listener in a sibling Machine and the Mac's LAN address are reachable, and so
+  is the internet. The docs, the skill and its manual procedure now say exactly
+  that; tests that need no network run in the sandbox containers.
 
 ### Documentation
 

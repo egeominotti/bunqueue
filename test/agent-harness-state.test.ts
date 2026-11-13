@@ -26,6 +26,7 @@ import {
   agentPages,
   copiedBy,
   copySources,
+  evidenceProblems,
   harnessMarkdown,
   headings,
   publishedByFiles,
@@ -58,6 +59,29 @@ describe('agent harness: state and scope', () => {
         problems.push(`${item.id}: in-progress without a branch`);
       }
     }
+    expect(problems).toEqual([]);
+  });
+
+  test('the evidence heuristic wants a command and an artifact path or a hash', () => {
+    expect(evidenceProblems('All green, should be fine.')).toHaveLength(2);
+    expect(evidenceProblems('bun run test:sandbox green: unit 11668 / 0.')).toHaveLength(1);
+    expect(evidenceProblems('Commit da289219 on main; everything passed.')).toHaveLength(1);
+    // A count, a run id or a date is not a commit or tree hash.
+    expect(evidenceProblems('bun test test/x.test.ts 11668 / 0, run 43336453775.')).toHaveLength(1);
+    expect(evidenceProblems('./init.sh green on tree bbd565ca.')).toEqual([]);
+    expect(
+      evidenceProblems(
+        'bun run test:sandbox green (artifacts/test-sandbox/2026-11-12T20-20-16.500Z/).'
+      )
+    ).toEqual([]);
+  });
+
+  test('every done item names a command and an artifact path or a commit or tree hash', () => {
+    const problems = workItems()
+      .filter((item) => item.status === 'done')
+      .flatMap((item) =>
+        evidenceProblems(item.evidence).map((problem) => `${item.id}: done evidence ${problem}`)
+      );
     expect(problems).toEqual([]);
   });
 
@@ -179,11 +203,38 @@ describe('agent harness: packaging', () => {
     expect(published).toEqual([]);
   });
 
+  test('COPY sources are read from continued lines, and an unreadable COPY is an error', () => {
+    const multiLine = [
+      'COPY --chown=bun:bun package.json bun.lock ./',
+      'COPY --chown=bun:bun \\',
+      '    CLAUDE.md \\',
+      '    # a comment inside the continuation',
+      '    ./docs/agents/ \\',
+      '    ./',
+      'RUN cp a b',
+    ].join('\n');
+    expect(copySources(multiLine)).toEqual([
+      'package.json',
+      'bun.lock',
+      'CLAUDE.md',
+      'docs/agents',
+    ]);
+    for (const unreadable of [
+      'COPY ["CLAUDE.md", "./"]',
+      'COPY --from=build /out ./out',
+      'COPY <<EOF /etc/motd',
+      'COPY CLAUDE.md',
+    ]) {
+      expect(() => copySources(unreadable)).toThrow(/COPY the harness contract cannot read/);
+    }
+  });
+
   test('the sandbox test image contains every file the harness contract reads', () => {
     const sources = copySources(read('Dockerfile.test'));
     expect(sources).toContain('src');
     const needed = new Set<string>([
       'package.json',
+      'bunfig.toml',
       'Dockerfile.test',
       ...INSTRUCTION_FILES,
       ...STATE_ARTIFACTS,

@@ -114,8 +114,12 @@ gap_reason() {
 classify_machine() {
   local dir=$1 wanted=$2 step rc bad='' reason
   if [ -f "$dir/INFRA" ]; then printf 'infra\t%s\n' "$(head -n 1 "$dir/INFRA")" && return; fi
-  [ -f "$dir/steps.tsv" ] && [ -f "$dir/DONE" ] ||
-    { printf 'fail\tthe Machine run did not finish (no steps.tsv or DONE)\n' && return; }
+  [ -f "$dir/steps.tsv" ] ||
+    { printf 'fail\tthe Machine run did not finish (no steps.tsv was copied back)\n' && return; }
+  if [ ! -f "$dir/DONE" ]; then
+    bad=$(awk -F '\t' 'NR > 1 { printf " %s(exit %s)", $1, $2 }' "$dir/steps.tsv")
+    printf 'fail\tthe Machine run did not finish (no DONE); steps recorded before it stopped:%s\n' "${bad:- none}" && return
+  fi
   for step in install build-client $(printf '%s' "$wanted" | tr ',' ' '); do
     rc=$(step_field "$dir" "$step" 2)
     if [ -z "$rc" ]; then bad="$bad $step(missing)"; elif [ "$rc" != 0 ] && [ "$step" != unit ]; then bad="$bad $step(exit $rc)"; fi
@@ -164,6 +168,7 @@ $reason
 | cgroup cpu.max / memory.max / swap | $(env_line "$m" cgroup.cpu.max) / $(env_line "$m" cgroup.memory.max) / $(env_line "$m" cgroup.memory.swap.max) |
 | Bun / node | $(env_line "$m" bun) / $(env_line "$m" node) |
 | Time zone | $(env_line "$m" tz) |
+| Content hash in the Machine | $(head -n 1 "$m/content-hash.txt" 2>/dev/null || echo 'not recorded') |
 
 | Step | Exit | Seconds | Totals |
 |---|---:|---:|---|
@@ -237,6 +242,7 @@ cat <<EOF
 - Created with: \`orb create --isolated --isolate-network --arch $(kv "$env_file" arch) --cpus 4 --memory 16G --disk 32G <distro> <name>\`; copied with rsync over \`ssh -o ForwardAgent=no -o ClearAllForwardings=yes\`
 - Not in the snapshot: $(kv "$env_file" outside)
 - Machines: ${cleanup:-unknown}; $(kv "$env_file" cleanup_note)
+- \`orb delete -f\` exit codes per Machine, one per attempt: $(kv "$env_file" delete_exit | grep . || echo 'not recorded')
 - Started / finished (UTC): $(kv "$env_file" started) / $(kv "$env_file" finished)
 $body
 EOF

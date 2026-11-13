@@ -1,15 +1,14 @@
 # AGENTS.md
 
 This file applies to the entire repository unless a more specific `AGENTS.md`
-exists in a subdirectory. Routing page for Codex: the mandatory rules and the work
-loop are here, reference material in the linked pages. `CLAUDE.md` has the same
-rules for Claude Code.
+exists in a subdirectory. Routing page for Codex: mandatory rules and the work
+loop; reference in the linked pages. `CLAUDE.md` has the same rules for Claude Code.
 
 ## Project overview
 
-bunqueue is a high-performance job queue written in TypeScript for Bun. The server
-and embedded runtime are Bun-only. Persistence uses `bun:sqlite`; public clients may
-run in other runtimes through the network protocol. Repository map:
+bunqueue is a high-performance job queue for Bun, in TypeScript: a Bun-only server
+and embedded runtime, `bun:sqlite` persistence, network-protocol clients for other
+runtimes. Repository map:
 [docs/agents/project-reference.md](docs/agents/project-reference.md#repository-map).
 
 ## Startup Workflow
@@ -17,13 +16,12 @@ run in other runtimes through the network protocol. Repository map:
 1. Confirm the worktree and branch: `pwd`, `git branch --show-current`.
 2. Read this file completely, then only the pages your task needs
    ([Where things live](#where-things-live)).
-3. Run `./init.sh`, the startup check (CI's Bun version, frozen lockfile,
-   `bun check`, `bun fmt`, `git diff --check`, harness contract). It is not a commit
-   gate (`bun run test:sandbox` is), but a green `./init.sh` is part of the
-   Definition of Done.
+3. Run `./init.sh`, the startup check (`--help` lists its steps). It is not a commit
+   gate (`bun run test:sandbox` is), but a green run is part of the Definition of
+   Done.
 4. Read `feature_list.json` (work items) and `progress.md` (Current State, newest
    Session Log entry), then `git log --oneline -5`.
-5. If the baseline fails, repair it first before adding scope; if you cannot,
+5. If the baseline fails, repair it before adding scope; if you cannot,
    record it under Blockers in `progress.md`.
 
 ## Working rules
@@ -37,7 +35,7 @@ run in other runtimes through the network protocol. Repository map:
 - **Stay in scope**: keep changes narrowly scoped to the requested behavior; do
   not refactor unrelated code while fixing a bug. Record unrelated findings as new
   `not-started` items.
-- **Parallel worktrees** (each session has its own branch, all merge into `main`):
+- **Parallel worktrees** (one branch per session, all merged into `main`):
   edit only your own item (insert new items in id order) and your own lines of the
   `progress.md` Current State, and prepend Session Log entries. On a rebase
   conflict: `feature_list.json` keeps both items, ids unique; `**Last Updated:**`
@@ -153,6 +151,8 @@ A work item is `done` only when all of these hold and its `evidence` in
 - [ ] `/docs` and the changelog `[Unreleased]` section describe the change.
 - [ ] The skeptic verdict is `PASS` (`CONDITIONAL` only with explicit confirmation).
 - [ ] `./init.sh` is green, so the next session can restart from it.
+- [ ] After a push, CI is green on the pushed commit; a flaky job is rerun once and
+      becomes a work item, never ignored.
 
 ## End of Session
 
@@ -163,6 +163,7 @@ A work item is `done` only when all of these hold and its `evidence` in
 4. Record every unresolved risk, blocker and check you could not run.
 5. Leave `./init.sh` green and the worktree clean enough to restart from.
 6. Commit only when authorized and through the gates below.
+7. After a push, watch CI until it is green (bunqueue-running-gates).
 
 ## Commits and handoff
 
@@ -189,7 +190,7 @@ A work item is `done` only when all of these hold and its `evidence` in
 | Need | Read |
 | --- | --- |
 | Work items, state, handoff, startup check | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
-| The harness and its contract test | [docs/agents/README.md](docs/agents/README.md) |
+| The harness and its contract | [docs/agents/README.md](docs/agents/README.md) |
 | Procedures (Agent Skills) | [.agents/skills/](.agents/skills/) |
 | Writing or running tests | [docs/testing.md](docs/testing.md) |
 | Architecture, repository map, env vars, TCP commands, CLI, schema | [docs/agents/project-reference.md](docs/agents/project-reference.md) |

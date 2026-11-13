@@ -10,8 +10,10 @@ state. Performance benchmarks use a different isolation model; see
 `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) route here for the test
 procedure: this section is the checklist both instruction files rely on, and the
 sections after it give the rationale and the exact commands. The four subsections
-are moved verbatim from those files; this introduction and the startup-check
-paragraph are new.
+are moved verbatim from those files, except one sentence of the isolation rules
+that claimed network isolation for the Machines and was corrected after a
+measurement on 2026-11-13; this introduction, the startup-check paragraph and the
+after-the-push paragraph are new.
 
 **Startup check.** Every session starts with `./init.sh` at the repository root
 (see [Agent Harness](./agents/README.md)). It fails when `bun --version` differs
@@ -19,12 +21,25 @@ from `BUN_VERSION` in `.github/workflows/ci.yml`, then runs
 `bun install --frozen-lockfile --ignore-scripts`, `bun run typecheck` (whose
 `typecheck:prepare` step builds ignored output), `bun run format:check`,
 `git diff --check` (skipped with a notice where there is no Git checkout, as in a
-sanitized Machine snapshot) and the harness and skills contracts
-`bun test test/agent-harness test/agent-skills`, and prints the active work items and
-the agent skills. It is not a commit gate (`bun run test:sandbox`
+sanitized Machine snapshot) and the fast harness and skills contracts
+(`bun test test/agent-harness` plus the skills tests the script lists; the Machine
+lifecycle and worker tests, about 50 s, stay in the unit suite), and prints the active work items
+and the agent skills, in about 10 s. It is not a commit gate (`bun run test:sandbox`
 is), but a green `./init.sh` is part of the Definition of Done in `CLAUDE.md` and
 `AGENTS.md`. `./init.sh --full` adds `bun run test:sandbox`, and the gates below
 apply unchanged.
+
+**After the push.** The gates below run before a commit; GitHub Actions runs after
+the push, and a work item is not done until the CI run of the pushed commit is green.
+`scripts/ci-watch.sh` of the
+[`bunqueue-running-gates` agent skill](../.agents/skills/bunqueue-running-gates/SKILL.md)
+waits for that run with a bound and only reads (`gh run list`, `gh run view`): exit 0
+is green, 1 failed, 3 green only after a rerun (a flake, which becomes a work item
+with a reproducing test and is never silently ignored) and 4 no verdict (no run, a
+cancelled run, a run waiting for an approval, a timeout, or a failing `gh`). A red
+run is read with `gh run view <id> --log-failed`, rerun once with
+`gh run rerun <id> --failed`, and treated as a regression when it fails again.
+`test/agent-skills-ci-watch.test.ts` checks the verdicts with a fake `gh`.
 
 ### Isolation rules
 
@@ -33,7 +48,7 @@ apply unchanged.
 - A translated `amd64` Machine on Apple Silicon is diagnostic only. Repeat any result on a native-architecture Machine before using it as release evidence; process-heavy Bun tests may behave differently under Rosetta.
 - Create both Machines with `--isolated --isolate-network`. Never use `--mount` or `--forward-ssh-agent`, and never expose the repository, home directory, Docker socket, SSH agent, credentials, tokens, real `.env` files, or ignored files. A tracked placeholder-only template such as `.env.example` is allowed only after review. Copy an explicit sanitized snapshot over OrbStack's built-in SSH transport, including all intended worktree changes but excluding `.git`, dependencies, artifacts, SQLite files, generated output, and secrets.
 - Pin the same Bun version as CI and use the frozen lockfile. Directly inside each Machine run `bun test --parallel=4`, the TCP runner, the embedded runner, `bun run typecheck` (`bun check`), and `bun run format:check` (`bun fmt`). Run `git diff --check` on the host before snapshot transfer because `.git` is deliberately excluded. Record the OS, architecture, kernel, Bun version/revision, commands, exit codes, durations, and exact totals before deleting the Machine.
-- OrbStack Machines share OrbStack's underlying Linux kernel. Treat them as strong filesystem/process/network isolation, not as a separate-kernel or physical security boundary.
+- OrbStack Machines share OrbStack's underlying Linux kernel. Treat them as strong filesystem/process isolation, not as a separate-kernel or physical security boundary, and not as network isolation: with `--isolate-network` a Machine still reaches the internet, the other Machines and the Mac's LAN address.
 - The Machine gates supplement `bun run test:sandbox` and `bun run test:sandbox:sdk`; they do not replace them. Benchmarks remain native macOS-only and must never be published from a Machine or container.
 - The three top-level suite containers run in parallel by default; use `BUNQUEUE_TEST_SEQUENTIAL=1` only to diagnose resource contention.
 - Isolation covers processes, writable filesystems, `/tmp`, network namespaces, ports, databases, and environment. It is not physical isolation: containers share the OrbStack VM kernel plus host CPU, memory, and disk scheduling. Reproduce parallel-only failures sequentially before classifying them as application bugs.
@@ -108,8 +123,9 @@ logs and environment manifest have been copied to `artifacts/`. Record the
 distro, version, architecture, kernel, Bun version/revision, command, exit code,
 duration, and exact test totals. A reused Machine or a host-only run is not
 release evidence. OrbStack Machines and containers share OrbStack's underlying
-Linux kernel, so this is strong filesystem/process/network separation but not a
-separate-kernel or physical-machine security boundary.
+Linux kernel, so this is strong filesystem/process separation but not a
+separate-kernel or physical-machine security boundary, and not network isolation
+(see [OrbStack Machine isolation](#orbstack-machine-isolation)).
 
 The Machine gate supplements rather than replaces the container gates below.
 Run `git diff --check` on the host before creating the sanitized snapshot,
@@ -448,7 +464,18 @@ Machine the run created; a Machine whose name already exists is never touched.
 If such a create has not appeared by then, the run is recorded as not deleted (exit
 4) with the names to check. `test/agent-skills-machine-lifecycle.test.ts` checks these
 paths with a fake `orb`: an interrupt during `orb create` leaves no Machine and no
-worker process. A run with a step
+worker process. A first run on real OrbStack (2026-11-13) changed four things. A
+repeated Ctrl-C reached `rsync` and the `orb` CLI although the cleanup shell ignored
+the signal, so the logs were lost and the delete was cut short: cleanup now runs both
+in a session of their own, repeats `orb delete -f` (up to five times) until `orb list`
+no longer shows the name, and writes into `run.env` which logs were copied and every
+delete attempt's exit code. `orb create`, the package install, the Bun download and
+each copy had no time bound: each is now stopped after 15 minutes and reported as an
+infrastructure failure. The manifest now carries the content hash computed inside each
+Machine and the delete exit codes, and an interrupted Machine shows the steps it had
+recorded. The worker prints every step that starts or finishes, with its exit code.
+`test/agent-skills-machine-worker.test.ts` checks the bounds, the hash and the progress
+with a fake Machine. A run with a step
 subset or `--keep` is diagnostic (exit 5), never release evidence, and `--dry-run`
 prints every command and creates nothing.
 
@@ -464,9 +491,17 @@ must pass with it. `machine-gate.sh` performs these reruns itself and reports th
 known environment gap (exit 3) apart from a real failure (exit 1); it matches the
 failures by file and test title.
 
-`--isolated` removes macOS filesystem and integration access;
-`--isolate-network` also blocks direct access to the host and other Machines.
-It does not create an independent kernel: OrbStack Machines and containers
+`--isolated` removes macOS filesystem and integration access.
+`--isolate-network` is narrower than its name. Measured on OrbStack 2.2.5 on
+2026-11-13, in Machines created with both flags: `host.orb.internal` and the
+gateway refused the connection; a listener in the Ubuntu Machine was readable
+from the Debian Machine; the Mac's LAN address (`en0`) answered; and the
+internet is reachable, which the gate itself relies on to install packages and
+Bun. So a Machine is isolated from the Mac's filesystem, integrations and
+`host.orb.internal`, and not from sibling Machines, the LAN or the internet.
+Tests that must run without a network run in the sandbox containers
+(`--network none`), never in a Machine.
+Neither flag creates an independent kernel: OrbStack Machines and containers
 share OrbStack's underlying Linux kernel. The Machine layer therefore catches
 clean-host, architecture, distribution, and hidden-state problems, while the
 container sandbox remains the authoritative offline per-suite containment

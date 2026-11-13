@@ -1,6 +1,6 @@
 ---
 name: bunqueue-working-sessions
-description: "Runs the bunqueue agent-harness session lifecycle: confirm the worktree and branch, run ./init.sh, claim exactly one feature_list.json work item as in-progress with a branch name free of any account prefix, keep feature_list.json and progress.md mergeable across parallel worktrees, record Definition of Done evidence, and finish with the end-of-session routine and a session-handoff.md handoff. Use when starting or ending any bunqueue coding session, when resuming or handing off work, when ./init.sh fails, when editing feature_list.json or progress.md, or when resolving a rebase conflict in them. Not for the content of a fix or a release (bunqueue-fixing-bugs, bunqueue-releasing) or for running the test gates (bunqueue-running-gates)."
+description: "Runs the bunqueue agent-harness session lifecycle. Use when starting, resuming or ending a bunqueue coding session, when handing off work, when ./init.sh fails, when claiming, adding or editing a work item in feature_list.json or progress.md, when asked what evidence marks an item done, or when those files conflict in a rebase or fail the harness contract test. Covers one in-progress item per branch, Definition of Done evidence and session-handoff.md. Not for the content of a fix or a release, or for running the gates."
 license: MIT
 metadata:
   short-description: Start, track and hand off a bunqueue session
@@ -34,6 +34,10 @@ file authorizes a commit, push, version bump, release or publication.
   prefix. `git branch --show-current | sed 's#^[^/]*/##'` turns
   `<user>/tls-sighup-reload` into `tls-sighup-reload`; the stripped name, never the
   full one, goes into committed files.
+- Without the prefix two people's branches can share a name, and the
+  one-item-per-branch check then reads them as one branch. Name the branch `<topic>`;
+  when someone else may pick the same topic, add a short unique suffix
+  (`tls-sighup-reload-k7`).
 - A branch owns at most one `in-progress` item. If this branch already owns one (a
   release in progress, for example), finish or block it first, or work on another
   branch.
@@ -58,6 +62,8 @@ A `done` item needs evidence and may depend only on `done` items.
 4. Record every risk, blocker and check you could not run; a gate that did not run is
    a blocker, not a pass.
 5. Leave `./init.sh` green. Commit only when the user asked, through the gates.
+6. After a push, the session is not over until the CI run of the pushed commit is
+   green: watch it and handle a red or flaky run as bunqueue-running-gates describes.
 
 ## Rebase conflicts in the state files
 
@@ -77,13 +83,14 @@ order, dependencies and the one-item-per-branch rule.
   a Session Log line or a handoff that names `<user>/<branch>`.
 - Two sessions that each add an item at the end of `features[]` conflict on the same
   lines; inserting at the id-sorted position avoids most conflicts.
-- `./init.sh` is the startup check, not a gate: it runs no product suite. `./init.sh
-  --full` adds `bun run test:sandbox`, on the current working tree.
-- `./init.sh` compares `pwd -P` with `git rev-parse --show-toplevel`; entering the
-  repository through a differently cased path on macOS makes it skip the git checks with
-  only a notice. `cd` to the canonical path.
-- In a sanitized Machine snapshot (no `.git`) `./init.sh` skips the git steps by design;
-  run `git diff --check` on the host instead.
+- `./init.sh` is the startup check, not a gate: it runs no product suite, and of the
+  harness and skills contracts only the fast ones (the Machine lifecycle and worker
+  tests, about 50 s, run in the unit suite). `./init.sh --full` adds `bun run test:sandbox`, on the
+  current working tree.
+- `./init.sh --workspace` prints the directory, branch and `HEAD` and stops. A notice
+  that the git steps are skipped means the directory is not the root of a checkout: a
+  sanitized Machine snapshot (no `.git`) skips them by design, so run
+  `git diff --check` on the host instead.
 - `init.sh` writes ignored output only (`node_modules`, `dist`, `sdk/typescript/dist`,
   `docs/node_modules`); a dirty `git status` after it means something else changed.
 - Never run `git reset`, `git checkout`, `git clean`, or discard unrelated edits unless

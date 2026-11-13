@@ -1,6 +1,6 @@
 ---
 name: bunqueue-running-machine-gates
-description: "Runs the bunqueue OrbStack Machine gate with scripts/machine-gate.sh: fresh isolated Machines on the native architecture (Ubuntu 24.04 for every candidate, Debian 13 too for a release), a git-archive snapshot of one exact tree, the CI-pinned Bun, the unit, TCP, embedded, typecheck, format and tinyfs steps, a manifest under artifacts/machines, and deletion of every Machine it created, also after a failure or an interrupt. Reports the known Bun-only node gap apart from real failures. Use when a candidate needs its final Linux validation, when asked to validate on Ubuntu, Debian, OrbStack, orb create or a clean Linux host, or when reading or rerunning a Machine manifest. Not a replacement for bun run test:sandbox, and not for Docker sandbox failures (bunqueue-running-gates)."
+description: "Runs the bunqueue OrbStack Machine gate with scripts/machine-gate.sh. Use when a candidate or release needs its Linux validation on Ubuntu 24.04 or Debian 13 Machines, when asked to validate on OrbStack, orb create or a clean Linux host rather than Docker, when machine-gate.sh exits non-zero or reports the known node gap, when copying a snapshot of the tree into an isolated Machine, or when reading or rerunning a manifest under artifacts/machines. Not a replacement for bun run test:sandbox, and not for Docker sandbox failures (bunqueue-running-gates)."
 license: MIT
 metadata:
   short-description: OrbStack Ubuntu and Debian Machine gate for bunqueue
@@ -46,8 +46,10 @@ host; run the first one rather than typing the steps:
    bash .agents/skills/bunqueue-running-machine-gates/scripts/machine-gate.sh --tree <hash>
    ```
 
-   It prints one progress line per step change on stderr and, at the end, the exit code
-   and `artifacts/machines/<run-id>/manifest.md`.
+   It prints every step that starts or finishes, with its exit code, on stderr (one
+   poll every 30 s) and, at the end, the exit code and
+   `artifacts/machines/<run-id>/manifest.md`. `orb create`, the package install, the
+   Bun download and each copy are stopped after 15 minutes each (exit 4).
 4. Read the manifest, then copy its verdict, totals and path into the evidence.
 
 `--steps` takes a subset for diagnosis; the verdict is then DIAGNOSTIC (exit 5).
@@ -78,14 +80,25 @@ SIGINT. It freezes each live worker's process tree before signalling it (so no
 already exited is dropped from the list, because its pid may belong to another process
 by then. It waits up to 60 s for a create the OrbStack daemon may still finish after its
 CLI is gone, copies back `gate-out/` and `gate-runner.log` from every Machine the run
-created, deletes them, and records `cleanup=` in `run.env`; `cleanup.log` and
-`delete.log` stay in the run directory. If an interrupted create has still not appeared
+created, and deletes them: `orb delete -f` is repeated, up to five times, until
+`orb list` no longer shows the name, because the CLI can fail (it has panicked) after
+the daemon deleted the Machine, and can be stopped before it did. `run.env` records
+`cleanup=`, a `cleanup_note=` that says which Machines' logs were copied and which were
+not, and `delete_exit=` with every attempt's exit code; `cleanup.log` and `delete.log`
+stay in the run directory. If an interrupted create has still not appeared
 after that wait, it may appear later: the run is recorded as `not-deleted` with the
 names, exits 4, and you check `orb list` and delete them by hand. A Machine whose name
 already exists is never created, touched or deleted, and a failing `orb list` is an
-infrastructure failure, never "the name is free". Cleanup ignores further signals and
-is bounded (about 60 s plus two 120 s copies per Machine).
+infrastructure failure, never "the name is free". Cleanup ignores further signals, and
+runs every `rsync` and `orb` call in a session of its own: a repeated Ctrl-C signals
+the terminal's whole process group, and on real OrbStack it killed the copy and the
+delete although the cleanup shell ignored it. It is bounded (about 60 s plus, per
+Machine, two 120 s copies and five 120 s deletes).
 `test/agent-skills-machine-lifecycle.test.ts` proves all of this with a fake OrbStack.
+
+So an interrupt during `orb create` does not return at once: the gate waits the settle
+window, then exits 130 only when every Machine the run started creating is confirmed
+deleted. In every other case the exit is 4, with the names to check.
 
 ## The known environment gap
 
@@ -119,8 +132,23 @@ embedded <n>/<n>, typecheck and format clean, tinyfs <n> / 0; Machines deleted.
 Doing it by hand, and what each manifest field means:
 [references/manual-procedure.md](references/manual-procedure.md).
 
+What stands behind the scripts, as of 2026-11-13 (OrbStack 2.2.5, macOS 27.2.1, arm64,
+on `3e08f75b`, before the changes of that day's review):
+
+| Proven on real OrbStack | Proven with fakes only |
+| --- | --- |
+| The canonical run: exit 3 in 24 min 41 s; in both Machines unit 11871 pass / 6 fail / 399 skip, tcp 69/69 suites and 553/553, embedded 43/43 and 349/349, tinyfs 9 / 0 | A create that appears after the settle window (exit 4, not deleted) |
+| SIGTERM and SIGINT during `orb create`, during provisioning and during the steps: exit 130, no Machine and no process left | A failing or slow `orb list` |
+| A step subset and `--keep`: exit 5; an existing Machine name: exit 4, the Machine untouched | The rule that only children of the gate are signalled |
+| The gap: six node-dependent tests fail, 22 / 0 with the shim | Exit 0 and exit 1 (no real log ended that way), and the other infrastructure failures |
+| | The 15-minute bounds, the repeated delete and the detached cleanup: written after the real run, which showed the need; not yet rerun on OrbStack |
+| | An `amd64` host |
+
 ## Gotchas
 
+- After an interrupt, let the gate finish (up to the 60 s settle window plus the log
+  copies). A second, harder kill (`kill -9`) skips the cleanup and can leave a Machine
+  that the daemon creates later; read the exit code, and after a 4 run `orb list`.
 - Started with `&` from a non-interactive shell (an agent's background command), the
   gate ignores SIGINT: that is the shell's rule for background jobs. Stop it with
   SIGTERM (`kill <pid>`), which runs the same cleanup.
@@ -142,5 +170,13 @@ Doing it by hand, and what each manifest field means:
   creates Machines of the host's native architecture.
 - Running the Machines while a sandbox runs on the same host shares the OrbStack VM's
   CPUs. Results stay valid, but compare durations only between quiet runs.
-- The Machines and containers share OrbStack's kernel: strong process, filesystem and
-  network isolation, not a separate-kernel boundary.
+- The Machines and containers share OrbStack's kernel: strong process and filesystem
+  isolation, not a separate-kernel boundary.
+- `--isolate-network` is not a network sandbox. Measured on OrbStack 2.2.5: a Machine
+  created with it cannot reach `host.orb.internal` or the gateway, but it reached a
+  listener in the sibling Machine and the Mac's LAN address, and it has the internet
+  (the gate installs packages and Bun through it). Only the Docker sandbox runs tests
+  without a network; never treat a Machine as offline.
+- `create.log`, `rsync.log` and `delete.log` hold little more than `(exit N)` lines:
+  `orb` and `rsync` print nothing when they are not on a terminal. The exit codes are
+  the record.

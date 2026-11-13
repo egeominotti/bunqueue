@@ -190,6 +190,18 @@ describe('agent skills: SKILL.md', () => {
       const implicit = yaml.policy?.allow_implicit_invocation;
       expect(implicit === undefined || typeof implicit === 'boolean').toBe(true);
       if (explicitOnly) expect({ name, implicit }).toEqual({ name, implicit: false });
+      // Other clients load a skill from its description alone, so a skill Codex may
+      // not invoke implicitly opens with the guard that stops without the request.
+      if (implicit === false) {
+        const opening = parseSkill(name).body.split(/\n## /)[0]!.replace(/\s+/g, ' ');
+        for (const needle of ['Claude Code and other clients can', 'first step is the guard']) {
+          expect({ name, needle, present: opening.includes(needle) }).toEqual({
+            name,
+            needle,
+            present: true,
+          });
+        }
+      }
     });
   }
 });

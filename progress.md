@@ -33,6 +33,14 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   plugin's MCP tool count are corrected, `.dockerignore` is documented; sandbox
   green on tree `ddcfaf6f`, skeptic `CONDITIONAL` with docs-only notes, applied.
   Evidence in `feature_list.json`.
+- `agent-harness-followups`: every review note is addressed by
+  `harness-production-grade` (same change-set); it has no gate of its own.
+- `harness-production-grade`: CI is part of done (routing pages,
+  `bunqueue-running-gates`, `scripts/ci-watch.sh`, release verification), the
+  `bunqueue-working-autonomously` skill, the harness follow-ups, a faster
+  `./init.sh`, the Machine gate fixes from its first real OrbStack run, and the
+  trigger-eval runner; sandbox green on tree `a0628e56`, skeptic `PASS`. Evidence
+  in `feature_list.json`.
 
 ### What's In Progress
 
@@ -43,10 +51,13 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 1. `issue-189-unix-socket-followups`: reproducing tests first for the two
    unix-socket rollback notes in `src/infrastructure/server/httpListener.ts`, then
    the fix.
-2. `agent-harness-followups`: the non-blocking notes of the harness review.
-3. `cron-test-midnight-boundary`: `test/cronScheduler.test.ts:819` fails when the
+2. `cron-test-midnight-boundary`: `test/cronScheduler.test.ts:819` fails when the
    unit suite crosses 23:59 UTC; reproduce first, then an injected clock or a
    schedule that cannot be under 60 s away.
+3. `postgres-lifecycle-race-flake`: `test/postgres-queue-lifecycle-races.test.ts`
+   ("serializes set-based batch admission after obliterate") failed once on
+   PostgreSQL 16.x in CI run 43336453775, attempt 1, and passed on the rerun;
+   reproduce first with a stress loop against PostgreSQL 16.
 4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
    `node` in the Bun-only OrbStack Machines.
 5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
@@ -55,6 +66,8 @@ overview: [docs/agents/README.md](docs/agents/README.md).
    directory); test first, then `!dist/benchmark/**`.
 7. `docs-mcp-tool-count-drift`: three docs-site sources and one internal page
    still say 75 MCP tools; the server registers 79.
+8. `machine-gate-real-rerun`: run `machine-gate.sh` on real OrbStack again; the
+   cleanup, delete-retry and time-bound fixes have run against fakes only.
 
 ## Blockers / Risks
 
@@ -64,6 +77,17 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   request merged by one.
 - The release gates are long: `bun run test:sandbox` took 9.12 min of wall time on
   the last green run, and the SDK sandbox and both OrbStack Machines come on top.
+- `harness-production-grade`: `CLAUDE.md` and `AGENTS.md` are 71 and 52 bytes under
+  the 12,288-byte budget after the CI rule; the next rule added to them needs more
+  non-rule prose moved out first. `scripts/ci-watch.sh` was checked against real
+  past runs and a fake `gh`, but has not yet watched a run from queued to finished,
+  nor one waiting for the `npm` environment approval (that status is handled from
+  GitHub's documentation, not from an observed run). The Machine gate fixes
+  (detached cleanup, repeated delete, 15-minute bounds) are proven with a fake
+  OrbStack only; the real run predates them.
+- `--isolate-network` does not isolate an OrbStack Machine from sibling Machines,
+  the Mac's LAN address or the internet (measured on OrbStack 2.2.5). Only the
+  sandbox containers run tests without a network.
 
 ## Decisions Made
 
@@ -79,6 +103,73 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — harness-production-grade
+
+- Objective: make the harness hold in production (`harness-production-grade`,
+  branch `harness-production-grade`, started on `3e08f75b`, rebased onto
+  `2e1bf4a7`). Status `done`; lands in the commit that adds this entry.
+- CI is part of done: the Definition of Done and End of Session of `CLAUDE.md` and
+  `AGENTS.md` (12,217 and 12,236 of 12,288 bytes; the room came from non-rule
+  prose only) and the contract's invariant lists; "After the push: watch CI" in
+  `bunqueue-running-gates` with `scripts/ci-watch.sh` (exit 0 green, 1 failed,
+  3 green only after a rerun, 4 no verdict); release verification and the npm
+  `workflow_dispatch` run in `bunqueue-releasing` and `docs/agents/release.md`.
+- Decision: `ci-watch.sh` calls a run flaky only on proof, a job that failed in
+  an earlier attempt of the same commit and passed in the latest. It does not
+  guess from one attempt or from green sibling matrix legs: the Python 3.9 job
+  that failed on three pushes in a row (runs 43291604726, 43301509664 and
+  43324514568) was one red leg among green ones and was not a flake.
+- New skill `bunqueue-working-autonomously` (explicit request only; Codex implicit
+  invocation off; adds no authorization), its evaluations and its symlink; routed
+  from `bunqueue-dev` and `docs/agents/README.md`.
+- Follow-ups (`agent-harness-followups`, now `done`): `./init.sh` Git detection
+  by `git rev-parse --show-prefix` and `./init.sh --workspace`; the fast contract
+  in `./init.sh` (8 to 10 s, was about 32 s; the Machine lifecycle and worker tests stay in the unit
+  suite); the multi-line `COPY` reader; the double-backtick inline-code stripper;
+  the `done` evidence heuristic; the branch-name suffix convention, in
+  `docs/agents/README.md` and `bunqueue-working-sessions` because the routing pages
+  have no bytes for it. New item `postgres-lifecycle-race-flake`.
+- Reproduced first: under bash 3.2, with the old `pwd -P` comparison, the
+  differently cased path test of `test/agent-harness-init.test.ts` fails (4 pass /
+  1 fail); with the new detection it passes.
+- Machine gate, after its first real run (`3e08f75b`, OrbStack 2.2.5, exit 3 in
+  24 min 41 s; unit 11871 / 6 fail / 399 skip in both Machines, tcp 69/69 and
+  553/553, embedded 43/43 and 349/349, tinyfs 9 / 0; interrupts during create,
+  provisioning and steps all 130 with nothing left): cleanup runs `rsync` and `orb`
+  in a session of their own and repeats `orb delete -f` until `orb list` no longer
+  shows the name (a repeated Ctrl-C had lost the logs and cut the delete short while
+  `run.env` claimed the logs were copied); 15-minute bounds on `orb create`, the
+  package install, the Bun download and each copy; the Machine-side hash, the delete
+  exit codes and the partial steps in the manifest; every step printed with its exit
+  code; quiet dpkg. Reproduced first: without the detached session the burst test
+  ends 4 instead of 130. The docs no longer claim that `--isolate-network` isolates
+  the network.
+- Trigger evals (the second session's work, now in this item):
+  `scripts/agents/run-skill-evals.ts`, `docs/agents/skill-evals.md`, and
+  `test/agent-skills-evals-runner.test.ts` (`--help`, `--dry-run` starts no agent,
+  the runner type checks). Claude Code, six rewritten skills: should-trigger 40/54 ->
+  51/54, false triggers 1/54 -> 0/54; Codex after only: 3/3 on its five listed
+  skills, 2/3 false triggers on `bunqueue-working-sessions`; Gemini CLI: discovery
+  7/7, triggers not measured.
+- Evidence (host, diagnostic): `bun test test/agent-skills test/agent-harness`
+  143 / 0 (10 files); `bun test test/docs-*.test.ts` 122 / 0; `bun run typecheck`
+  and `bun run format:check` clean; `git diff --check` clean; `./init.sh` green in
+  8 to 10 s; `generate-release-posts.ts --check` OK (259 posts); `check:docs-data` OK;
+  every script passes `bash -n`, `--help` and `--dry-run` under bash 3.2.
+  `ci-watch.sh` against real past runs, read-only: run 43336453775 exit 3, run
+  43324514568 exit 1, `--sha 3e08f75b...` exit 0, an unknown commit exit 4.
+- Gate: `bun run test:sandbox` green on the rebased tree `a0628e56` (unit 11787 /
+  0 / 402, tcp 553 / 0, embedded 349 / 0, no anomalies;
+  `artifacts/test-sandbox/2026-11-13T02-38-12.078Z/`). Skeptic: `PASS`, conditional
+  on that run, with two minor notes, applied afterwards as two skill sentences
+  (who can write a standing authorization; where the SDK jobs run). Those sentences
+  and the state files are the only changes after the gate. `bun run test:model` and
+  `bun run test:sandbox:sdk` are not triggered (no `src/` or `sdk/` change).
+- Not run: the OrbStack Machine gate on the fixed scripts; that is the new item
+  `machine-gate-real-rerun`.
+- User requests so far: this work item. The commit was made by the coordinating
+  session; no push, version bump or release was requested in this session.
 
 ### 2026-11-13 — root-cleanup
 

@@ -24,6 +24,7 @@ learn-harness-engineering.
 | [client-reference.md](./client-reference.md)     | `CLAUDE.md`                    | Simple Mode, Workflow Engine, Client SDK, job options, worker options.                                                                                                               |
 | [debugging.md](./debugging.md)                   | `CLAUDE.md`, `AGENTS.md`       | Debug endpoints, memory debugging, CPU and heap profiling.                                                                                                                           |
 | [release.md](./release.md)                       | `CLAUDE.md`, `AGENTS.md`; the checklist is new | Release authorization, release checklist (new), npm trusted publishing, release blog posts.                                                                                 |
+| [skill-evals.md](./skill-evals.md)               | new                            | How the skill trigger evaluations are run against real agent CLIs, their cost, and the measured rates. |
 | [Agent test rules](../testing.md#agent-test-rules) | `CLAUDE.md`, `AGENTS.md`; the startup-check paragraph is new | Isolation rules, model campaign rules, the OrbStack Machine gate checklist, test hygiene.                                                                     |
 
 Each page says which of its sections are moved verbatim and which text is new. The reference pages are summaries for agents. The engineering reference
@@ -43,7 +44,7 @@ One object per work item in `features[]`:
 | `description`  | What the item delivers, including its acceptance criteria or checklist.                                  |
 | `dependencies` | Ids that must be `done` first.                                                                           |
 | `status`       | `not-started`, `in-progress`, `blocked` or `done`.                                                       |
-| `evidence`     | Required for `done`: commands run, exact totals, artifact paths, commit, skeptic verdict.               |
+| `evidence`     | Required for `done`: commands run, exact totals, artifact paths, commit, skeptic verdict, and after a push the CI run. The contract rejects `done` evidence that names no command, or neither an artifact path nor a commit or tree hash. |
 | `issue`        | Optional GitHub issue number (`null` when there is none).                                                |
 | `branch`       | Required for `in-progress`: the branch that owns the item, written without any account/user prefix (`tls-sighup-reload`, not `<user>/tls-sighup-reload`). At most one `in-progress` item per branch. |
 
@@ -53,6 +54,10 @@ Many sessions work at once, each in its own worktree and branch, and all of them
 merge into `main`. The state files are shared, so they are written to merge
 cleanly, and their conflicts have one fixed resolution:
 
+- Branch names: committed files carry the branch without its account prefix, so two
+  people's branches can share a name, and the one-item-per-branch check then reads
+  them as one branch. The convention is `<topic>`, plus a short unique suffix
+  (`tls-sighup-reload-k7`) whenever another contributor may pick the same topic.
 - `feature_list.json`: a session edits only its own item's object and inserts a new
   item at its id-sorted position (the contract checks the order), so two sessions
   rarely touch adjacent lines. On a rebase conflict keep both items; ids stay
@@ -71,24 +76,34 @@ cleanly, and their conflicts have one fixed resolution:
 fails when `bun --version` differs from `BUN_VERSION` in
 `.github/workflows/ci.yml`; then runs `bun install --frozen-lockfile --ignore-scripts`,
 `bun run typecheck`, `bun run format:check`, `git diff --check` and
-`git diff --cached --check`, and `bun test test/agent-harness test/agent-skills`
-(the harness and the [skills](#skills) contracts), and prints the work items in
-progress, blocked or ready, the agent skills and the next steps. It stops at the
-first failure (`set -euo pipefail`). Where there is no Git
-checkout rooted at the repository (a sanitized OrbStack Machine snapshot has no
-`.git`) it skips the git steps with a notice instead of failing. It writes ignored
-output only: `node_modules` from `bun install`, and `sdk/typescript/dist`, `dist`
-and `docs/node_modules` from the `typecheck:prepare` step. `./init.sh --full` also
-runs `bun run test:sandbox`. It is not a commit gate (`bun run test:sandbox` is),
-but a green run is part of the Definition of Done; it replaces no gate in
-[testing.md](../testing.md).
+`git diff --cached --check`, and the fast harness and [skills](#skills) contracts
+(`bun test test/agent-harness` plus the skills tests listed in the script, in
+parallel), and prints the work items in progress, blocked or ready, the agent skills
+and the next steps. It stops at the first failure (`set -euo pipefail`) and takes about
+10 s. The Machine lifecycle and worker contracts
+(`test/agent-skills-machine-lifecycle.test.ts` and
+`test/agent-skills-machine-worker.test.ts`, about 50 s of real process trees, settle
+windows and time bounds) are left to the unit suite, which
+`bun run test:sandbox` runs; `test/agent-harness-init.test.ts` fails when a contract
+test is neither run by `init.sh` nor on that short list.
+
+It asks Git whether the directory is the root of a checkout (`git rev-parse
+--show-prefix` is empty), which also holds for a worktree, whose `.git` is a file, and
+for a path typed in another case on a case-insensitive volume. Where it is not (a
+sanitized OrbStack Machine snapshot has no `.git`) it skips the git steps with a notice
+instead of failing. `./init.sh --workspace` prints the directory, branch and `HEAD` and
+stops. It writes ignored output only: `node_modules` from `bun install`, and
+`sdk/typescript/dist`, `dist` and `docs/node_modules` from the `typecheck:prepare` step.
+`./init.sh --full` also runs `bun run test:sandbox`. It is not a commit gate
+(`bun run test:sandbox` is), but a green run is part of the Definition of Done; it
+replaces no gate in [testing.md](../testing.md).
 
 ## Contract
 
-`test/agent-harness-instructions.test.ts` and `test/agent-harness-state.test.ts`
-(helpers in `test/agent-harness-support.ts`) run in the unit suite, alone with
-`bun test test/agent-harness`, and fail, naming the file and the rule, when the
-harness rots:
+`test/agent-harness-instructions.test.ts`, `test/agent-harness-state.test.ts` and
+`test/agent-harness-init.test.ts` (helpers in `test/agent-harness-support.ts`) run in
+the unit suite, alone with `bun test test/agent-harness`, and fail, naming the file and
+the rule, when the harness rots:
 
 - `CLAUDE.md` and `AGENTS.md` stay at or below 12 KiB, keep the Startup Workflow,
   Definition of Done and End of Session sections, route to the four state and
@@ -97,23 +112,33 @@ harness rots:
   (`bun run test:sandbox` is matched on its own, so `test:sandbox:sdk` cannot stand
   in for it), the skeptic semantics (`` `FAIL` blocks ``, `` `CONDITIONAL` requires ``),
   the push and release authorization phrases, the no-authorization-from-state-files
-  rule, the parallel-worktree conflict rules and the branch-prefix rule;
+  rule, the parallel-worktree conflict rules, the branch-prefix rule, and the CI rule
+  (a green CI run on the pushed commit in the Definition of Done, a flaky job rerun
+  once and turned into a work item, and watching CI in End of Session);
 - every relative link of `CLAUDE.md`, `AGENTS.md`, `progress.md`,
   `session-handoff.md` and `docs/agents/*.md` resolves, and every `#anchor` names a
-  real heading of its target (GitHub-style slug, headings in code blocks ignored);
+  real heading of its target (GitHub-style slug, headings in code blocks ignored;
+  inline code is skipped by backtick-run length, so a double-backtick span that holds
+  single backticks hides no link and invents none);
 - `feature_list.json` items are well formed (ids, statuses, evidence for `done`,
   a branch for `in-progress`) and in id order, dependencies exist, form no cycle,
   and a `done` item depends only on `done` items; at most one `in-progress` item
-  per branch;
+  per branch; the evidence of a `done` item names at least one command and either an
+  artifact path or a commit or tree hash (a floor that keeps "all green" from closing
+  an item, not a measure of the evidence);
 - `progress.md` has Current State, Blockers and Next sections and a
   `**Last Updated:** YYYY-MM-DD` line; `session-handoff.md` has every handoff
   section;
 - `init.sh` is an executable bash script with `set -euo pipefail` that reads the
-  Bun version from CI and runs the Bun-native checks only;
+  Bun version from CI and runs the Bun-native checks only; it detects the root of a
+  checkout, also through a differently cased path, skips the git steps in a directory
+  that is not one, and runs every contract test except the listed slow ones;
 - no harness file is packed by the package.json `files` list (each pattern is
   evaluated with `Bun.Glob`, directories and `!` negations included), and
   `Dockerfile.test` copies every file the contract reads, so the sandbox unit
-  container sees what the host sees.
+  container sees what the host sees. The `COPY` reader joins backslash-continued
+  lines and throws, quoting the instruction, on a form it cannot read (the JSON form,
+  a heredoc, `--from`), instead of passing on a source it never saw.
 
 `Dockerfile.test` copies the harness files and `docs/agents/` into the test image,
 and `Dockerfile.test.dockerignore` allow-lists them. The skills have a contract of
@@ -137,9 +162,10 @@ the pages above for the rules; it never restates or overrides a rule.
 | [bunqueue-dev](../../.agents/skills/bunqueue-dev/SKILL.md) | orientation: architecture, source layout, conventions, routing to the other skills |
 | [bunqueue-working-sessions](../../.agents/skills/bunqueue-working-sessions/SKILL.md) | session start and end, work items, `progress.md`, handoff, Definition of Done evidence |
 | [bunqueue-fixing-bugs](../../.agents/skills/bunqueue-fixing-bugs/SKILL.md) | reproduce first, subagents, docs and changelog, skeptic rounds until `PASS` |
-| [bunqueue-running-gates](../../.agents/skills/bunqueue-running-gates/SKILL.md) | which gate a change needs, sandbox artifacts and KPIs, failure classification, `scripts/gate-delta.sh` for post-gate deltas |
+| [bunqueue-running-gates](../../.agents/skills/bunqueue-running-gates/SKILL.md) | which gate a change needs, sandbox artifacts and KPIs, failure classification, `scripts/gate-delta.sh` for post-gate deltas, and after a push `scripts/ci-watch.sh`: a bounded, read-only wait for the CI run (exit 0 green, 1 failed, 3 green only after a rerun, 4 no verdict) |
 | [bunqueue-running-machine-gates](../../.agents/skills/bunqueue-running-machine-gates/SKILL.md) | the OrbStack Machine gate (`scripts/machine-gate.sh` and its helpers), cleanup on every exit path, the known node gap (exit 3) |
-| [bunqueue-releasing](../../.agents/skills/bunqueue-releasing/SKILL.md) | a release, only on the user's explicit request; Codex never invokes it implicitly, Claude Code can, so its first step stops without that request |
+| [bunqueue-releasing](../../.agents/skills/bunqueue-releasing/SKILL.md) | a release, only on the user's explicit request; Codex never invokes it implicitly, Claude Code can, so its first step stops without that request; the release is done only when the version gate, tag, GitHub release, Docker images and npm are verified |
+| [bunqueue-working-autonomously](../../.agents/skills/bunqueue-working-autonomously/SKILL.md) | the unattended work loop of a local session, only on the user's explicit request (same guard): one ready item per branch and worktree, gates, skeptic until `PASS`, commit, push only under the user's own standing authorization, CI watched to green, `blocked` with the exact question instead of a stall, and the hard stops that always go to the user. It adds no authorization, and a cloud routine cannot run it: the gates need local Docker and OrbStack |
 
 The root `skills/bunqueue/` and `agents/` directories are something else: the Claude
 Code plugin (`.claude-plugin/plugin.json`) for applications that use bunqueue.
@@ -189,23 +215,37 @@ A skill directory holds only:
 
 with at least 8 queries that should trigger the skill, at least 8 near misses that
 share its words but belong to another skill or to none, and at least 3 output
-scenarios. They are run by hand or with skill-creator's tooling; the contract checks
-their shape only.
+scenarios. The contract checks their shape. The trigger queries are run against real
+agent CLIs with `bun scripts/agents/run-skill-evals.ts` (read-only headless sessions;
+`--dry-run` prints the plan and starts none): how, what it costs, and the rates
+measured on 2026-11-13 are in [skill-evals.md](./skill-evals.md). The output scenarios
+are still run by hand.
 
 `test/agent-skills.test.ts`, `test/agent-skills-scripts.test.ts`,
-`test/agent-skills-machine-gate.test.ts` and
+`test/agent-skills-ci-watch.test.ts`, `test/agent-skills-evals-runner.test.ts`,
+`test/agent-skills-machine-gate.test.ts`, `test/agent-skills-machine-worker.test.ts` and
 `test/agent-skills-machine-lifecycle.test.ts` (helpers in `test/agent-skills-support.ts` and
 `test/agent-skills-fakes.ts`; `bun test test/agent-skills`) run in the unit suite and
 fail, naming the skill and the rule, when a skill rots: the layout and the symlinks,
 the frontmatter, name and single-line description rules, every link resolving inside
 the repository (anchors included), every bundled file linked, the evals shape, the
-Codex invocation rule, strict-mode scripts of at most 300 lines whose `--help`, usage
+Codex invocation rule (and, for a skill Codex may not invoke implicitly, the guard its
+first step opens with), strict-mode scripts of at most 300 lines whose `--help`, usage
 error and `--dry-run` behave (the dry run with every side-effecting command replaced by
 a recorder that must stay empty), the post-gate delta on listed paths and, where Git
 is installed, on a real repository with a rename, the Machine gate's verdicts on
 fixture logs and its list of known failures, its cleanup with a fake OrbStack (an
 interrupt during `orb create` leaves no Machine and no worker, a create that appears
 too late is reported as not deleted, an existing Machine name is never touched, a
-failing `orb list` is a failure, only the gate's own live workers are signalled), no skill file in the npm package, and every skill file and link
+failing `orb list` is a failure, only the gate's own live workers are signalled, a burst
+of SIGINT to the gate's process group during cleanup still copies the logs and deletes
+every Machine, a failed `orb delete` is retried and its exit codes recorded), one worker
+against a fake Machine (every step printed with its exit code, the Machine-side content
+hash, the time bound on `orb create` and on the copy), the trigger-eval runner's `--help`
+and `--dry-run` (no agent session, no report; the runner type checks), the
+CI watcher's verdicts against a fake `gh` that answers from GitHub-shaped fixtures (green,
+failed with its jobs, green only after a rerun, cancelled, waiting for an approval, no
+run, a timeout, a failing `gh`; only `gh run list` and `gh run view` are ever called),
+no skill file in the npm package, and every skill file and link
 target in the sandbox test image (`Dockerfile.test` copies `.agents/` and
 `.claude/skills/`, symlinks kept as symlinks).

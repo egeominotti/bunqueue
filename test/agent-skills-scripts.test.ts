@@ -5,7 +5,7 @@
  *
  * Every script is non-interactive bash in strict mode, at most 300 lines, with
  * `--help`, a usage error (exit 2) and a `--dry-run` that runs no external command:
- * the commands with side effects (orb, ssh, rsync, git, docker, sudo, curl, bun) are
+ * the commands with side effects (gh, orb, ssh, rsync, git, docker, sudo, curl, bun) are
  * replaced by recorders, and a dry run must leave the record empty. The content hash
  * and the post-gate delta classification are checked on real files and, where Git is
  * installed, on a real repository (the sandbox image has no Git).
@@ -31,6 +31,7 @@ const GATE = `${MACHINE}/machine-gate.sh`;
 const STEPS = `${MACHINE}/machine-steps.sh`;
 const DELTA = `${SKILLS_DIR}/bunqueue-running-gates/scripts/gate-delta.sh`;
 const RECORDED = [
+  'gh',
   'orb',
   'orbctl',
   'ssh',
@@ -86,6 +87,7 @@ const DRY_RUN_ARGS: Record<string, string[]> = {
   'machine-verdict.sh': ['--dry-run', scratch],
   'machine-steps.sh': ['--dry-run', '--repo', join(scratch, 'repo'), '--out', join(scratch, 'out')],
   'gate-delta.sh': ['--dry-run', '--gated', 'HEAD'],
+  'ci-watch.sh': ['--dry-run', '--sha', '7bc922dbcc1f8f007cf7340a41fec3672a929e40'],
 };
 
 const scripts = skillNames().flatMap((name) =>

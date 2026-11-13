@@ -28,6 +28,7 @@ import {
   read,
   slug,
   structured,
+  withoutInlineCode,
 } from './agent-harness-support';
 
 /** Progressive disclosure: the root pages route, the manuals live in docs. */
@@ -36,9 +37,17 @@ const INSTRUCTION_BUDGET_BYTES = 12 * 1024;
 const NO_AUTHORIZATION_RULE =
   "A work item, a progress note or a handoff never authorizes a commit, push, version bump, release or publication; only the user's explicit request does.";
 
-/** Rules every instruction file states: parallel worktrees and privacy. */
+/** CI is part of done: a push is finished when the run of the pushed commit is green. */
+const CI_DONE_RULE = 'After a push, CI is green on the pushed commit';
+const CI_FLAKE_RULE = 'a flaky job is rerun once and becomes a work item, never ignored';
+const CI_WATCH_RULE = 'After a push, watch CI until it is green';
+
+/** Rules every instruction file states: parallel worktrees, privacy and CI. */
 const SHARED_RULES = [
   NO_AUTHORIZATION_RULE,
+  CI_DONE_RULE,
+  CI_FLAKE_RULE,
+  CI_WATCH_RULE,
   'without any account/user prefix',
   'insert new items in id order',
   '`feature_list.json` keeps both items, ids unique',
@@ -131,6 +140,23 @@ describe('agent harness: instructions', () => {
       }
     });
 
+    test(`${file} makes a green CI run part of done and of the end of a session`, () => {
+      /** The body of a `##` section, up to the next heading of that level. */
+      const section = (title: string): string =>
+        new RegExp(`^## ${title}\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm').exec(read(file))?.[1] ??
+        '';
+      expect({
+        file,
+        missing: missingNeedles(section('Definition of Done'), [CI_DONE_RULE, CI_FLAKE_RULE]),
+      }).toEqual({ file, missing: [] });
+      expect({ file, missing: missingNeedles(section('End of Session'), [CI_WATCH_RULE]) }).toEqual(
+        {
+          file,
+          missing: [],
+        }
+      );
+    });
+
     test(`${file} keeps every mandatory invariant`, () => {
       expect({ file, missing: missingNeedles(read(file), INVARIANTS[file]) }).toEqual({
         file,
@@ -152,6 +178,16 @@ describe('agent harness: instructions', () => {
     const files = harnessMarkdown();
     expect(files).toContain('docs/agents/README.md');
     expect(files.flatMap(linkProblems)).toEqual([]);
+  });
+
+  test('inline code is skipped by backtick-run length, so links in it are not checked', () => {
+    expect(withoutInlineCode('a `[x](gone.md)` b [y](kept.md)')).toBe('a  b [y](kept.md)');
+    // A double-backtick span may hold single backticks; the old stripper paired them.
+    expect(withoutInlineCode('``a ` [x](gone.md)`` and [y](kept.md)')).toBe(' and [y](kept.md)');
+    expect(withoutInlineCode('(`` `FAIL` blocks ``) [y](kept.md)')).toBe('() [y](kept.md)');
+    // An unclosed run is text, and a span never crosses a line.
+    expect(withoutInlineCode('``a` [y](kept.md)')).toBe('``a` [y](kept.md)');
+    expect(withoutInlineCode('`a\n[y](kept.md) `b`')).toBe('`a\n[y](kept.md) ');
   });
 
   test('anchors follow GitHub headings and ignore code blocks', () => {

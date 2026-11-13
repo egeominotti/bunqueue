@@ -5,7 +5,9 @@
 # machine-cleanup.sh's job, on every exit path. Compatible with macOS bash 3.2.
 set -euo pipefail
 
-readonly POLL_SECONDS=30
+# The two environment variables exist only so that tests can shorten the waits.
+readonly POLL_SECONDS=${BUNQUEUE_MACHINE_POLL_SECONDS:-30}
+readonly BOUND_SECONDS=${BUNQUEUE_MACHINE_BOUND_SECONDS:-900}
 readonly TIMEOUT_SECONDS=10800
 readonly UNREACHABLE_SECONDS=600
 
@@ -20,9 +22,13 @@ mount or a forwarded agent) after refusing a name that already exists, records i
 STATE-DIR/created before the create starts, checks `orb info` for isolation, waits
 for SSH (120 s), proves the isolation inside, installs packages and the pinned Bun,
 copies the snapshot and the gate scripts with rsync over SSH (agent and port
-forwarding off), compares content hashes, starts machine-steps.sh detached and polls
-it: every 30 s, at most 180 min, and at most 10 min unreachable. On an infrastructure
-problem it writes the reason to RUN-DIR/N/INFRA and exits 4.
+forwarding off), compares content hashes (the Machine's goes to
+RUN-DIR/N/content-hash.txt), starts machine-steps.sh detached and polls it: every
+30 s, at most 180 min, and at most 10 min unreachable, printing every step that
+started or finished, with its exit code, on stderr. `orb create`, the package
+install, the Bun download and each rsync are stopped after 15 min each. Every logged
+command ends its log with `(exit N)`: orb and rsync print nothing off a terminal. On
+an infrastructure problem it writes the reason to RUN-DIR/N/INFRA and exits 4.
 
 Options:
   --dry-run    Print every command; create, copy and write nothing
@@ -85,13 +91,36 @@ show() {
   done
   printf '\n'
 }
-# run OUT CMD...: dry run prints CMD; otherwise logs it and appends its output to OUT.
+# run OUT CMD...: dry run prints CMD; otherwise logs it, appends its output and its
+# exit code to OUT, and stops it after BOUND_SECONDS (status 124).
 run() {
-  local out=$1
+  local out=$1 pid dog rc=0
   shift
   if [ "$dry_run" -eq 1 ]; then show "$@" && return 0; fi
   show "$@" >>"$host_log"
-  "$@" >>"$out" 2>&1
+  rm -f "$mdir/timed-out"
+  "$@" >>"$out" 2>&1 </dev/null &
+  pid=$!
+  # The watchdog holds no pipe of the caller and takes its sleep with it when stopped.
+  (
+    trap 'kill "$nap" 2>/dev/null; exit 0' TERM
+    sleep "$BOUND_SECONDS" &
+    nap=$!
+    wait "$nap" && : >"$mdir/timed-out" && kill -TERM "$pid" || exit 0
+    sleep 5 &
+    nap=$!
+    wait "$nap" && kill -KILL "$pid"
+  ) >/dev/null 2>&1 &
+  dog=$!
+  wait "$pid" || rc=$?
+  kill -TERM "$dog" 2>/dev/null || true
+  wait "$dog" 2>/dev/null || true
+  if [ -e "$mdir/timed-out" ]; then
+    rm -f "$mdir/timed-out"
+    echo "(stopped after ${BOUND_SECONDS}s)" >>"$out" && return 124
+  fi
+  echo "(exit $rc)" >>"$out"
+  return "$rc"
 }
 remote() {
   local out=$1
@@ -125,6 +154,9 @@ fi
 rc=0
 run "$mdir/create.log" orb create --isolated --isolate-network --arch "$arch" --cpus 4 --memory 16G \
   --disk 32G "$distro" "$name" || rc=$?
+# A create that was stopped can still finish in the daemon: its marker stays, so that
+# cleanup waits for the Machine and deletes it.
+[ "$rc" != 124 ] || infra "orb create did not finish within ${BOUND_SECONDS}s"
 [ "$dry_run" -eq 1 ] || rm -f "$state_dir/creating.$name"
 [ "$rc" = 0 ] || infra "orb create failed (exit $rc, see create.log)"
 
@@ -160,17 +192,21 @@ remote "$mdir/isolation.txt" 'for p in /Users /mnt/mac /var/run/docker.sock; do'
   'if [ -e "$p" ]; then echo "present: $p"; exit 1; fi; done;' \
   'if [ -n "${SSH_AUTH_SOCK:-}" ]; then echo "SSH_AUTH_SOCK is set"; exit 1; fi;' \
   'echo "isolated: no /Users, /mnt/mac, docker.sock or SSH agent"' || infra 'isolation check failed (see isolation.txt)'
+# Dpkg::Use-Pty=0: without it dpkg draws its "Reading database" progress into the log.
 remote "$mdir/apt.log" 'sudo -n apt-get update -qq && sudo -n env DEBIAN_FRONTEND=noninteractive' \
-  'apt-get install -y -qq --no-install-recommends ca-certificates curl jq openssl procps rsync unzip' ||
-  infra 'apt-get install failed (see apt.log)'
+  'apt-get install -y -qq -o Dpkg::Use-Pty=0 --no-install-recommends' \
+  'ca-certificates curl jq openssl procps rsync unzip' || infra 'apt-get install failed or timed out (see apt.log)'
 remote "$mdir/bun-install.log" "curl -fsSL https://bun.sh/install | bash -s bun-v$bun_version" \
-  "&& test \"\$(\$HOME/.bun/bin/bun --version)\" = $bun_version" || infra "Bun $bun_version did not install"
-run "$mdir/rsync.log" rsync -a --delete -e "ssh $ssh_opts" "$snapshot/" "$name@orb:bunqueue/" || infra 'snapshot copy failed'
+  "&& test \"\$(\$HOME/.bun/bin/bun --version)\" = $bun_version" ||
+  infra "Bun $bun_version did not install (see bun-install.log)"
+run "$mdir/rsync.log" rsync -a --delete -e "ssh $ssh_opts" "$snapshot/" "$name@orb:bunqueue/" ||
+  infra 'snapshot copy failed or timed out (see rsync.log)'
 run "$mdir/rsync.log" rsync -a -e "ssh $ssh_opts" "$script_dir/machine-steps.sh" \
-  "$script_dir/../assets/known-node-gap.txt" "$name@orb:gate/" || infra 'script copy failed'
+  "$script_dir/../assets/known-node-gap.txt" "$name@orb:gate/" || infra 'script copy failed (see rsync.log)'
 if [ "$dry_run" -eq 1 ]; then show ssh $ssh_opts "$name@orb" 'bash gate/machine-steps.sh --content-hash bunqueue'; else
   hash=$(ssh $ssh_opts "$name@orb" 'bash gate/machine-steps.sh --content-hash bunqueue' 2>>"$host_log") ||
     infra 'remote content hash failed'
+  printf '%s\n' "$hash" >"$mdir/content-hash.txt"
   [ "$hash" = "$content_hash" ] || infra "content hash differs: host $content_hash, Machine $hash"
 fi
 remote "$host_log" "nohup bash gate/machine-steps.sh --repo bunqueue --out gate-out --steps $steps" \
@@ -182,12 +218,22 @@ if [ "$dry_run" -eq 1 ]; then
     "at most $((UNREACHABLE_SECONDS / 60)) min unreachable"
   exit 0
 fi
-waited=0 unreachable=0 last=''
+waited=0 unreachable=0 seen=0
+# Prints every progress line not printed yet: each step's start, and its end with the
+# exit code.
+show_progress() {
+  local new
+  new=$(ssh $ssh_opts "$name@orb" "tail -n +$((seen + 1)) gate-out/progress.log 2>/dev/null" 2>/dev/null || true)
+  [ -n "$new" ] || return 0
+  printf '%s\n' "$new" | sed "s/^/[$name] /" >&2
+  seen=$((seen + $(printf '%s\n' "$new" | wc -l)))
+}
 while :; do
   # A pid file, not pgrep -f: the polling shell's own command line names the script.
   state=$(ssh $ssh_opts "$name@orb" 'if [ -e gate-out/DONE ]; then echo done;' \
     'elif kill -0 "$(cat gate-runner.pid 2>/dev/null)" 2>/dev/null; then echo running; else echo dead; fi' \
     2>>"$host_log" || echo unreachable)
+  show_progress
   case "$state" in
     done) exit 0 ;;
     dead) infra 'machine-steps.sh exited without DONE (see gate-runner.log)' ;;
@@ -196,7 +242,5 @@ while :; do
   esac
   [ "$unreachable" -lt "$UNREACHABLE_SECONDS" ] || infra "Machine unreachable over SSH for $((UNREACHABLE_SECONDS / 60)) min"
   [ "$waited" -lt "$TIMEOUT_SECONDS" ] || infra "no result after $((TIMEOUT_SECONDS / 60)) min"
-  now=$(ssh $ssh_opts "$name@orb" 'tail -n 1 gate-out/progress.log 2>/dev/null' 2>/dev/null || true)
-  [ "$now" = "$last" ] || { say "[$name] $now" && last=$now; }
   sleep "$POLL_SECONDS" && waited=$((waited + POLL_SECONDS))
 done

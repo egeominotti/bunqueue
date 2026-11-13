@@ -15,8 +15,8 @@
       "name": "Agent harness: non-blocking review notes",
       "description": "Minor notes from the agent-harness skeptic review: init.sh compares pwd -P with git rev-parse --show-toplevel, so a differently-cased path on case-insensitive APFS skips the git checks with only a notice (check that git rev-parse --show-prefix is empty instead); CLAUDE.md and AGENTS.md are within ~200 bytes of the 12 KiB budget; the contract's Dockerfile.test COPY parser reads single-line COPY only (fails closed); the inline-code stripper in the link check can mis-pair double-backtick spans; a done item is only checked for non-empty evidence; branch names without the account prefix can collide across users in the one-item-per-branch check.",
       "dependencies": ["agent-harness"],
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "2026-11-13, base 3e08f75b: delivered by the harness-production-grade item in the same change-set. init.sh asks Git for an empty --show-prefix instead of comparing pwd -P with --show-toplevel (test/agent-harness-init.test.ts: under bash 3.2 the differently cased path test fails with the old comparison, 4 pass / 1 fail, and passes with the new one); the Dockerfile.test COPY reader joins backslash-continued lines and throws on a form it cannot read; the inline-code stripper of the link check pairs backtick runs by length; a done item's evidence must name a command and either an artifact path or a commit or tree hash, which every existing done item already did; the branch-name convention (a short unique suffix when two people may pick the same topic) is in docs/agents/README.md and the bunqueue-working-sessions skill, because the routing pages have no bytes for it; CLAUDE.md and AGENTS.md are at 12,217 and 12,236 of 12,288 bytes after the CI rule, by tightening non-rule prose. Host: bun test test/agent-harness 35 / 0. This item has no gate of its own: bun run test:sandbox (green on tree a0628e56, artifacts/test-sandbox/2026-11-13T02-38-12.078Z/), the skeptic PASS and the commit are those of harness-production-grade.",
       "issue": null
     },
     {
@@ -65,6 +65,15 @@
       "issue": null
     },
     {
+      "id": "harness-production-grade",
+      "name": "Harness: CI is part of done, the autonomous work loop, follow-ups",
+      "description": "(1) CI is part of done: the Definition of Done and End of Session of CLAUDE.md and AGENTS.md require a green CI run on the pushed commit (pinned in the contract's invariants, within the 12 KiB budget); bunqueue-running-gates gains \"After the push: watch CI\" and scripts/ci-watch.sh (bounded, read-only; exit 0 green, 1 failed, 3 green only after a rerun, 4 no verdict) with contract tests against a fake gh; bunqueue-releasing and docs/agents/release.md say a release is done only when the version gate, tag, GitHub release, Docker images and npm are verified, npm through the workflow_dispatch run whose approval is the user's. (2) New skill bunqueue-working-autonomously: the unattended loop of a local session, on the user's explicit request only, adding no authorization. (3) The agent-harness-followups notes: init.sh Git detection through a differently cased path, a fast init.sh (the Machine lifecycle contract stays in the unit suite), the multi-line COPY reader, the double-backtick inline-code stripper, the done-evidence heuristic, the branch-name suffix convention. (4) The flaky PostgreSQL 16 test recorded as postgres-lifecycle-race-flake. (5) Skill polish: the Machine gate's exit after an interrupt during orb create, the releasing guard pinned by the contract. (6) The OrbStack Machine gate after its first real run: cleanup that survives a repeated Ctrl-C (rsync and orb in a session of their own, orb delete repeated until orb list no longer shows the name, a truthful cleanup note and the delete exit codes), 15-minute bounds on orb create, the package install, the Bun download and each copy, the Machine-side content hash and the partial steps in the manifest, every step printed with its exit code, and the correction of the --isolate-network claim in the docs. (7) The trigger-eval runner scripts/agents/run-skill-evals.ts and docs/agents/skill-evals.md, with a contract test for --help and --dry-run.",
+      "dependencies": ["agent-harness", "agent-skills"],
+      "status": "done",
+      "evidence": "2026-11-13, base 2e1bf4a7; lands in the commit that adds this entry; agent-harness-followups is closed by this item. bun run test:sandbox green on the rebased tree a0628e56: unit 11787 pass / 0 fail / 402 skip, tcp 553 / 0, embedded 349 / 0, no anomalies (artifacts/test-sandbox/2026-11-13T02-38-12.078Z/); the harness and skills contract tests run inside the unit container. The only changes after that run are two skill sentences (bunqueue-working-autonomously: who can write a standing authorization; bunqueue-running-gates: where the SDK jobs run) and the state files. Host: bun test test/agent-skills test/agent-harness 143 pass / 0 fail (10 files); bun test test/docs-*.test.ts 122 / 0; bun run typecheck and bun run format:check clean; git diff --check and git diff --cached --check clean; ./init.sh green in 8 s (about 32 s before); generate-release-posts.ts --check OK (259 posts); check:docs-data OK; every script under .agents/skills passes bash -n, --help and --dry-run under bash 3.2.57. Reproduced first: with the old pwd -P comparison the differently cased path test of test/agent-harness-init.test.ts fails under bash 3.2 (4 pass / 1 fail); with rsync and orb left in the gate's process group the burst test of test/agent-skills-machine-lifecycle.test.ts ends 4 instead of 130. ci-watch.sh against real past runs, read-only: run 43336453775 (green after a rerun) exit 3, run 43324514568 (Python 3.9) exit 1, --sha of 3e08f75b exit 0, an unknown commit exit 4; it has not yet watched a live run from queued to finished, nor a run waiting for the npm environment approval. Real OrbStack run of the pre-fix machine-gate.sh on 3e08f75b (OrbStack 2.2.5, canonical run real4-canonical, manifest kept in the session scratchpad, outside the repository): exit 3 in 24 min 41 s; in both Machines unit 11871 pass / 399 skip / 6 fail, tcp 69/69 suites and 553/553, embedded 43/43 and 349/349, tinyfs 9 / 0; SIGTERM and SIGINT during the create, the provisioning and the steps ended 130 with nothing left. The Machine fixes made after that run (detached cleanup, repeated delete, 15-minute bounds, manifest fields, progress) ran against fakes only; the real rerun is owed and is the work item machine-gate-real-rerun. Trigger evals (docs/agents/skill-evals.md, one run per query): Claude Code, six rewritten skills, should-trigger 40/54 -> 51/54, false triggers 1/54 -> 0/54; Codex after only, 3/3 on the five skills it lists, 2/3 false triggers on bunqueue-working-sessions; Gemini CLI discovery 7/7, triggers not measured (no authentication). CLAUDE.md 12,217 and AGENTS.md 12,236 of 12,288 bytes. Skeptic: PASS, conditional on the sandbox run above, with two minor notes, both applied as the two skill sentences. bun run test:model and bun run test:sandbox:sdk not triggered (no src/ or sdk/ change).",
+      "issue": null
+    },
+    {
       "id": "issue-189-tls-reload",
       "name": "Reload the TLS certificate on SIGHUP without a restart",
       "description": "Issue 189: a renewed certificate on disk was only served after a restart, and SIGHUP killed the process. With TLS configured, SIGHUP re-reads TLS_CERT_FILE/TLS_KEY_FILE, validates the pair and moves the TCP and HTTP listeners to it all-or-nothing, keeping open connections on their certificate and rolling back on failure.",
@@ -83,9 +92,27 @@
       "issue": 189
     },
     {
+      "id": "machine-gate-real-rerun",
+      "name": "Rerun the Machine gate on real OrbStack after the cleanup and time-bound fixes",
+      "description": "The fixes made to the bunqueue-running-machine-gates scripts after their first real OrbStack run (rsync and orb in a session of their own during cleanup, orb delete repeated until orb list no longer shows the name, the truthful cleanup note and delete exit codes, the 15-minute bounds on orb create, the package install, the Bun download and each copy, the Machine-side content hash and the partial steps in the manifest, every step printed with its exit code, quiet dpkg) have run against a fake OrbStack only. Run machine-gate.sh on real OrbStack on the current tree: the canonical run (expected exit 3), a repeated Ctrl-C (SIGINT to the process group) during cleanup, and an interrupt during orb create; record the manifests and correct the skill's table of what is proven on real OrbStack and what only with fakes. Any defect found gets a reproducing test with the fake first.",
+      "dependencies": ["harness-production-grade"],
+      "status": "not-started",
+      "evidence": "",
+      "issue": null
+    },
+    {
       "id": "npm-files-benchmark-negation",
       "name": "bun pm pack ignores the !dist/benchmark negation of package.json files",
       "description": "package.json files lists dist/**/*.js, dist/**/*.d.ts and the negations !dist/bunqueue and !dist/benchmark. npm 11.20.0 honors !dist/benchmark, but bun pm pack 1.4.4 (what CI packs with) still packs dist/benchmark/*.js and *.d.ts when that directory exists (root-cleanup evidence: 1,750 files with a probe dist/benchmark/, 1,748 without; with \"!dist/benchmark/**\" added to files Bun packs 0 of them). It is latent, not live: tsconfig.build.json excludes src/benchmark/**, so build:lib never emits dist/benchmark and CI's tarball is correct today. test/agent-harness-state.test.ts models files with npm semantics (publishedByFiles), so it does not see the difference. Write a test that packs with bun pm pack --dry-run after creating a probe file under dist/benchmark and fails today, then add the !dist/benchmark/** negation (or drop the dead negations) and keep the published list byte-identical for a normal build.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "",
+      "issue": null
+    },
+    {
+      "id": "postgres-lifecycle-race-flake",
+      "name": "PostgreSQL lifecycle race test flaked on PostgreSQL 16",
+      "description": "test/postgres-queue-lifecycle-races.test.ts, \"serializes set-based batch admission after obliterate\", failed once (the assertion at line 80) in the PostgreSQL 16.x job of CI run 43336453775, attempt 1 (498 pass / 1 fail), on the docs-only commit 7bc922db; it passed on the rerun (attempt 2) and, in the same attempt, on PostgreSQL 15.x, 17.x and 18.6. Reproduce first: a stress loop of that test against PostgreSQL 16 (bun run test:postgres with the file, repeated) that keeps the failing output. Then fix the test's timing assumption or the race it found, without weakening what it asserts.",
       "dependencies": [],
       "status": "not-started",
       "evidence": "",

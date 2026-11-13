@@ -1,0 +1,9 @@
+# Codex skill metadata. The autonomous loop commits, and pushes when the user allowed
+# it, without asking at each step, so Codex never loads this skill on its own: the user
+# names it ($bunqueue-working-autonomously) or asks for autonomous work explicitly.
+interface:
+  display_name: 'bunqueue: autonomous work loop'
+  short_description: 'Work through the bunqueue work items unattended, on request'
+  default_prompt: 'Use $bunqueue-working-autonomously to work through the ready bunqueue work items.'
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,74 @@
+{
+  "skill_name": "bunqueue-working-autonomously",
+  "trigger_queries": [
+    { "query": "work autonomously through the bunqueue work items until nothing is ready, commit and push each one after the gates", "should_trigger": true },
+    { "query": "I'm going to bed. keep going on feature_list.json without me, one item after the other", "should_trigger": true },
+    { "query": "/loop pick the next ready bunqueue item, do it, gate it, push it, repeat", "should_trigger": true },
+    { "query": "run the autonomous loop on this repo; you may commit but do not push", "should_trigger": true },
+    { "query": "how do I start bunqueue's unattended work loop, and can it run as a cloud routine?", "should_trigger": true },
+    { "query": "continue the autonomous loop from where the last session stopped, same authorizations as written in my instructions", "should_trigger": true },
+    { "query": "don't ask me anything for the next few hours: work the backlog, and park whatever needs my decision", "should_trigger": true },
+    { "query": "the autonomous session got a skeptic CONDITIONAL that needs my call. what should it have done instead of waiting?", "should_trigger": true },
+    { "query": "take all the not-started items in order and finish as many as you can on your own, each on its own branch", "should_trigger": true },
+    { "query": "start a session and claim the cron-test-midnight-boundary item", "should_trigger": false, "note": "one supervised item: bunqueue-working-sessions" },
+    { "query": "fix the PostgreSQL batch admission race, I'll review the diff before you commit", "should_trigger": false, "note": "a supervised bug fix: bunqueue-fixing-bugs" },
+    { "query": "release 2.9.23 on your own while I'm away", "should_trigger": false, "note": "a release is a hard stop of the loop: bunqueue-releasing, on an explicit request for each step" },
+    { "query": "watch the CI run of the commit I just pushed and tell me if it's green", "should_trigger": false, "note": "bunqueue-running-gates" },
+    { "query": "schedule a nightly cloud agent that runs bun test on bunqueue", "should_trigger": false, "note": "a cloud routine, not the local loop" },
+    { "query": "how does a Worker with autorun: false start processing?", "should_trigger": false, "note": "library usage that mentions automatic behavior" },
+    { "query": "make the stall detector retry jobs automatically", "should_trigger": false, "note": "a product feature" },
+    { "query": "run the sandbox in a loop until the flaky test shows up", "should_trigger": false, "note": "a stress loop for one test: bunqueue-running-gates or bunqueue-fixing-bugs" },
+    { "query": "which work items are ready right now?", "should_trigger": false, "note": "a status question: bunqueue-working-sessions" }
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Work autonomously through the ready work items. You may commit. I have not said anything about pushing.",
+      "expected_output": "The agent confirms the request and its scope (commits yes, push not authorized), picks the first ready item whose dependencies are done and that needs no explicit user request, creates a branch and worktree from origin/main, runs ./init.sh, claims the item, does the work with the matching skill, runs the gates, takes the skeptic to PASS, commits with the changelog, and stops at the commit: no push. It records the request, the evidence and the stop in progress.md and feature_list.json.",
+      "assertions": [
+        "The item picked has every dependency done and is not a release or another item that needs the user's explicit request",
+        "The work happens on its own branch in its own worktree",
+        "No commit is made before the gates passed and the skeptic verdict was PASS",
+        "Nothing is pushed, and the report says the loop stopped at the commit because no push authorization was given",
+        "The Session Log records which user requests exist"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Autonomous loop, commits and pushes to main are authorized. The skeptic returns CONDITIONAL: the fix changes a default that existing users may rely on, and it asks whether that is acceptable.",
+      "expected_output": "The agent fixes what it can and invokes the skeptic again; the remaining condition is a compatibility decision that only the user can make, so it does not commit or push that item. It sets the item blocked, writes the exact question under Blockers in progress.md with the options, the branch, the tree hash and what is staged, leaves that worktree in place, and moves to the next ready item on a new branch and worktree.",
+      "assertions": [
+        "The item with the CONDITIONAL verdict is neither committed nor pushed",
+        "The item's status is blocked and the exact question is under Blockers in progress.md",
+        "The agent does not decide the compatibility question itself and does not weaken a test",
+        "The loop continues with another ready item in a new worktree instead of waiting"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Autonomous loop with standing push authorization. After the push of the second item, ci-watch.sh exits 1: the PostgreSQL 16.x job failed on a docs-only commit.",
+      "expected_output": "The agent does not pick a new item while main is red. It reads the failed job with gh run view --log-failed, sees a race assertion in a test the commit does not touch, reruns the failed jobs once with gh run rerun --failed and watches again. On exit 3 it records the flake as a new not-started work item with the test, the job, the run id and attempt and a reproduce-first description, records the CI run in the evidence, and only then continues. Had the rerun failed again, it would treat it as a regression and fix it first or stop and report.",
+      "assertions": [
+        "No new item is started while the CI run is red",
+        "The failed log is read before the rerun",
+        "The run is rerun at most once",
+        "The flake becomes a not-started work item that asks for a reproducing test; it is not ignored",
+        "The CI run id and verdict are in the evidence"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Autonomous loop. The only ready items left are release-2.9.23 and ci-python39-runner-pin, whose description says dropping Python 3.9 is a release-compatibility decision for the user.",
+      "expected_output": "The agent picks neither: a release is a hard stop that needs the user's explicit request, and the other item says it needs the user's decision. It ends the loop, leaves ./init.sh green, and reports what was done, what is blocked and the decisions it needs.",
+      "assertions": [
+        "No version bump, tag, release or publication step is started",
+        "The item that needs the user's decision is not started on a guess",
+        "The loop ends with a report that names the decisions needed"
+      ],
+      "files": []
+    }
+  ]
+}

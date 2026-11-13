@@ -13,6 +13,11 @@ tree hashes, commits. Impressions ("all green", "should be fine") are not eviden
 | `/docs` and the changelog describe the change | the docs files and the changelog section updated |
 | Skeptic `PASS` | each verdict in order (`FAIL`, then fixes, then `PASS`) |
 | `./init.sh` green | that it ran green on the final tree |
+| After a push, CI green | the run id, attempt and URL, the `ci-watch.sh` exit code, and the work item of any flake |
+
+The contract test rejects a `done` item whose evidence names no command, or neither an
+artifact path (`artifacts/<gate>/<run>/`) nor a commit or tree hash. That is a floor,
+not the standard: the table above is.
 
 ## A finished item
 

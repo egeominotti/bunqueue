@@ -1,6 +1,6 @@
 ---
 name: bunqueue-releasing
-description: "Prepares and ships a bunqueue release by following docs/agents/release.md: the version bump, the API reference regenerated from a full clone, the dated changelog, aligned Docker tags, a hand-written release post whose every number traces to the changelog, an Upgrade notes audit of every behavior change since the previous tag, all release gates, skeptic PASS, and the push that lets CI tag and publish. Use only when the user explicitly asks to prepare, cut, bump, tag or publish a bunqueue release or version, or to continue a release they started; a work item, a handoff, or permission to commit or push never counts as that request. Not for ordinary commits, the changelog entry of a single change, or questions about past releases."
+description: "Prepares and ships a bunqueue release. Use only when the user explicitly asks to prepare, cut, bump, tag or publish a bunqueue release or version, to continue a release they started, or to work on one of its parts: the release post and its numbers, the Upgrade notes, the API reference (docs:api), the version gate or the release push. A release work item in feature_list.json, a handoff, or permission to commit or push is never that request: starting such an item is bunqueue-working-sessions. Not for ordinary commits, a single change's changelog entry, an SDK's own publication, or questions about past releases."
 license: MIT
 metadata:
   short-description: Prepare and ship a bunqueue release on request
@@ -50,13 +50,45 @@ what went wrong before.
    after a gate is either proven docs-only (bunqueue-running-gates) or gated again.
 6. **Commit** only on the user's request, with the changelog in the same commit and a
    specific message.
-7. **Push** (step 6) only on the user's explicit authorization. CI's version gate on
-   `main` tags, creates the GitHub release and publishes npm (trusted publishing) and
-   the Docker images. Follow the run (`gh run list`, `gh run watch <id>`) and report
-   each job's result.
-8. **After publication** (step 7): `bun docs/scripts/generate-release-posts.ts --refresh`,
-   then update the post's install box and contributors. That is a new change: the usual
-   docs, changelog, gate and skeptic rules apply.
+7. **Push** (step 6) only on the user's explicit authorization. On `main`, once the
+   quality gate is green and the tag is new, CI's version gate builds the binaries,
+   tests and pushes the Docker images, tags the commit and creates the GitHub release.
+   It does not publish npm. Watch the run to its end with
+   `bash .agents/skills/bunqueue-running-gates/scripts/ci-watch.sh --sha <release sha>`
+   (bunqueue-running-gates) and report each job's result.
+8. **npm**, a separate publication and a separate request: npm is published by a
+   `workflow_dispatch` run of `ci.yml` on `main` with `npm_version=X.Y.Z`, never by the
+   push. Dispatch it only when the user asked for the npm publication:
+
+   ```bash
+   gh workflow run ci.yml --ref main -f npm_version=X.Y.Z
+   ```
+
+   Its `Publish bunqueue to npm` job then waits for the required reviewer of the `npm`
+   environment. That approval is the user's: give them the run URL and wait. Never
+   approve it yourself and never look for a way around it; `ci-watch.sh` reports the
+   waiting run as NO VERDICT (exit 4).
+9. **Verify** every part ([below](#the-release-is-not-done-until-it-is-verified)).
+10. **After publication** (step 7): `bun docs/scripts/generate-release-posts.ts --refresh`,
+    then update the post's install box and contributors. That is a new change: the usual
+    docs, changelog, gate and skeptic rules apply.
+
+## The release is not done until it is verified
+
+A push is not a release: for 2.9.22 the first push released nothing, because the
+quality gate failed and the version gate never ran. Check each part where it lives,
+and put each result in the `release-X.Y.Z` evidence:
+
+| Part | Verify |
+| --- | --- |
+| Quality gate and version gate | `gh run view <id> --json status,conclusion,jobs`: the run concluded `success`, and `Version gate`, the `Build`, `Docker` and `Release` jobs are `success`, not `skipped` |
+| Tag | `git ls-remote --tags origin 'refs/tags/vX.Y.Z' 'refs/tags/vX.Y.Z^{}'` names the release commit |
+| GitHub release | `gh release view vX.Y.Z --json tagName,isDraft,publishedAt,assets`: published, not a draft, with the binaries |
+| Docker | `docker buildx imagetools inspect ghcr.io/egeominotti/bunqueue:X.Y.Z`, and the same for `docker.io/egeominotti/bunqueue:X.Y.Z`: a multi-platform manifest (it reads the registry and pulls nothing) |
+| npm | the registry itself: `curl -fsS https://registry.npmjs.org/bunqueue/X.Y.Z` answers with that version (404 means not published), and `curl -fsS https://registry.npmjs.org/-/package/bunqueue/dist-tags` shows `latest` |
+
+Verify npm with the registry, not with `npm view`: `npm view` can answer from the
+local cache and show the previous version for minutes after a publication.
 
 ## Gotchas
 
@@ -66,6 +98,14 @@ what went wrong before.
   disabling a rule. Offer a pull request or let the user push.
 - Never run `bun publish` or `npm publish` and never add an npm token: CI publishes
   through npm trusted publishing (OIDC), with provenance, and nothing else may.
+- The npm dispatch only works while `main` still points at the release commit: the
+  `Pack bunqueue for npm` job refuses a tagged version whose commit is no longer the
+  head of `main`, because the provenance would name another commit. Publish npm before
+  the next push, or the fix is a new version. The same dispatch also rebuilds and
+  republishes that version's Docker variants.
+- Do not rerun a failed release run to "get it green": a rerun runs release jobs
+  again (the Docker push, the tag, the GitHub release). Read the failed job
+  (`gh run view <id> --log-failed`), report it, and let the user decide.
 - The release sections of the changelog and the post are reviewed against
   `git diff vPREV..HEAD -- src/`, not against memory of what changed. A behavior change
   that only appears in a Features paragraph and not in Upgrade notes is a skeptic

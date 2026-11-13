@@ -58,7 +58,10 @@ orb info -f json "bunqueue-ci-$run_id"   # isolated: true, isolate_network: true
                                          # forward_ssh_agent: false, no mounts
 ```
 
-Never add `--mount` or `--forward-ssh-agent`.
+Never add `--mount` or `--forward-ssh-agent`. `--isolated` removes the macOS filesystem
+and integrations. `--isolate-network` blocks `host.orb.internal` and the gateway only:
+the Machine still reaches the internet, the other Machines and the Mac's LAN address
+(measured on OrbStack 2.2.5), so it is not an offline environment.
 
 ## 3. Prepare each Machine
 
@@ -133,7 +136,10 @@ orb list -q | grep -- "-$run_id" || echo 'no Machine of this run is left'
 ```
 
 An `orb create` interrupted on the host can still finish in the OrbStack daemon:
-check `orb list` again for a minute before concluding that nothing is left.
+check `orb list` again for a minute before concluding that nothing is left. `orb list`
+decides, not the exit code of `orb delete`: the CLI has exited non-zero (a panic) after
+the Machine was gone, and a Ctrl-C can stop it before the Machine is. Repeat the delete
+until the name is no longer listed, and do not press Ctrl-C again while it runs.
 
 ## Manifest fields
 
@@ -141,6 +147,8 @@ check `orb list` again for a minute before concluding that nothing is left.
 | --- | --- | --- |
 | Verdict | the classification of every Machine | the one line the evidence quotes |
 | Tree, archive sha256, content hash | host | proves which bytes ran; the Machine's hash must equal the host's |
+| Content hash in the Machine | `content-hash.txt`, computed inside the Machine after the copy | the other half of that comparison |
+| Machines, `orb delete -f` exit codes | `cleanup=`, `cleanup_note=` and `delete_exit=` in `run.env` | whether `orb list` shows none of them, which logs were copied back, and every delete attempt's exit code |
 | Scope | the `--distros` and `--steps` used | a subset is diagnostic, not release evidence |
 | Created with | the fixed `orb create` flags | isolation is part of the evidence |
 | Not in the snapshot | `git status` on the host | unstaged or untracked work that was not tested |
@@ -148,4 +156,4 @@ check `orb list` again for a minute before concluding that nothing is left.
 | cgroup cpu.max, memory.max, swap | `/sys/fs/cgroup` | effective limits after OrbStack's clamping |
 | Bun, node | `bun --version --revision`, `command -v node` | the pinned toolchain; `node: absent` explains the known gap |
 | Time zone | `TZ`, `/etc/localtime` | differs from the sandbox's UTC |
-| Steps table | `steps.tsv`, the step logs | exit code, seconds and exact totals per step |
+| Steps table | `steps.tsv`, the step logs | exit code, seconds and exact totals per step; an interrupted run shows the steps recorded before it stopped |

@@ -85,6 +85,41 @@ export function anchors(markdown: string): Set<string> {
   return result;
 }
 
+/**
+ * The text without its inline code spans. A span opens with a run of N backticks and
+ * closes at the next run of exactly N on the same line (CommonMark), so a
+ * double-backtick span may hold single backticks; an unclosed run stays as text.
+ */
+export function withoutInlineCode(markdown: string): string {
+  let out = '';
+  let index = 0;
+  const run = (from: number): number => {
+    let length = 0;
+    while (markdown[from + length] === '`') length++;
+    return length;
+  };
+  while (index < markdown.length) {
+    if (markdown[index] !== '`') {
+      out += markdown[index++];
+      continue;
+    }
+    const open = run(index);
+    let cursor = index + open;
+    let close = -1;
+    while (cursor < markdown.length && markdown[cursor] !== '\n') {
+      const length = run(cursor);
+      if (length === open) {
+        close = cursor;
+        break;
+      }
+      cursor += Math.max(length, 1);
+    }
+    if (close === -1) out += markdown.slice(index, index + open);
+    index = close === -1 ? index + open : close + open;
+  }
+  return out;
+}
+
 export interface RelativeLink {
   target: string;
   /** Repository-relative path of the target (the file itself for `#anchor`). */
@@ -94,7 +129,7 @@ export interface RelativeLink {
 
 /** Relative markdown links outside code (no URL), resolved from `file`. */
 export function relativeLinks(file: string): RelativeLink[] {
-  const text = withoutFences(read(file)).replace(/`[^`\n]*`/g, '');
+  const text = withoutInlineCode(withoutFences(read(file)));
   const links: RelativeLink[] = [];
   for (const match of text.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
     const target = match[1]!;
@@ -147,13 +182,45 @@ export function publishedByFiles(patterns: readonly string[], path: string): boo
   return published;
 }
 
-/** Build-context sources of every single-line `COPY` instruction of a Dockerfile. */
+/** Dockerfile instructions: comments dropped, backslash-continued lines joined. */
+export function dockerInstructions(dockerfile: string): string[] {
+  const instructions: string[] = [];
+  let pending = '';
+  for (const raw of dockerfile.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const continued = line.endsWith('\\');
+    pending += `${continued ? line.slice(0, -1).trim() : line} `;
+    if (continued) continue;
+    instructions.push(pending.trim());
+    pending = '';
+  }
+  if (pending.trim()) instructions.push(pending.trim());
+  return instructions;
+}
+
+/**
+ * Build-context sources of every `COPY` instruction of a Dockerfile, single-line or
+ * continued with backslashes. The JSON form, a heredoc and `--from` (another stage,
+ * not the build context) are not parsed: they throw, so the contract fails with the
+ * instruction instead of passing on a source it never saw.
+ */
 export function copySources(dockerfile: string): string[] {
   const sources: string[] = [];
-  for (const line of dockerfile.split(/\r?\n/)) {
-    const args = /^\s*COPY\s+(.+)$/i.exec(line)?.[1]?.split(/\s+/);
-    if (!args) continue;
+  for (const instruction of dockerInstructions(dockerfile)) {
+    const rest = /^COPY\s+(.+)$/i.exec(instruction)?.[1];
+    if (rest === undefined) continue;
+    const args = rest.split(/\s+/);
     const paths = args.filter((arg) => !arg.startsWith('--'));
+    const unsupported =
+      paths[0]?.startsWith('[') ||
+      rest.includes('<<') ||
+      args.some((arg) => arg.startsWith('--from'));
+    if (unsupported || paths.length < 2) {
+      throw new Error(
+        `Dockerfile COPY the harness contract cannot read (use the shell form, "COPY [--chown=...] <source>... <destination>", from the build context): ${instruction}`
+      );
+    }
     sources.push(...paths.slice(0, -1).map((source) => source.replace(/^\.\//, '')));
   }
   return sources.map((source) => source.replace(/\/$/, ''));
@@ -178,6 +245,29 @@ export interface WorkItem {
 }
 
 export const STATUSES = ['not-started', 'in-progress', 'blocked', 'done'];
+
+const EVIDENCE_COMMAND = /\bbun (?:run [\w:.-]+|test\b|check\b|fmt\b)|\.\/init\.sh\b/;
+const EVIDENCE_ARTIFACT = /\bartifacts\/[\w.-]+\/[\w./-]+/;
+/** A commit or tree hash: 7-64 hex characters with a digit and a letter (not a count). */
+const EVIDENCE_HASH = /\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])[0-9a-f]{7,64}\b/;
+
+/**
+ * What the evidence of a `done` item lacks. A light heuristic, not a proof: it names at
+ * least one command, and either an artifact path or a commit or tree hash, so "all
+ * green" alone never closes an item.
+ */
+export function evidenceProblems(evidence: string): string[] {
+  const problems: string[] = [];
+  if (!EVIDENCE_COMMAND.test(evidence)) {
+    problems.push('names no command (for example `bun run test:sandbox`, `bun test <file>`)');
+  }
+  if (!EVIDENCE_ARTIFACT.test(evidence) && !EVIDENCE_HASH.test(evidence)) {
+    problems.push(
+      'names neither an artifact path (artifacts/<gate>/<run>/) nor a commit or tree hash'
+    );
+  }
+  return problems;
+}
 
 export function workItems(): WorkItem[] {
   const parsed = JSON.parse(read('feature_list.json')) as { features?: unknown };

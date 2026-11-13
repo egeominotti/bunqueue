@@ -1,6 +1,6 @@
 ---
 name: bunqueue-dev
-description: "Orients work inside the bunqueue repository, the Bun job queue with SQLite persistence and TCP and embedded modes: architecture and request flow, the source layout, the Workflow Engine files, code conventions, and which bunqueue skill or reference page covers a task. Use when starting, planning or reviewing any change to bunqueue source, tests, docs or SDKs, when asked how bunqueue works internally, or when unsure which repository procedure applies. Routes bug fixes to bunqueue-fixing-bugs, test gates to bunqueue-running-gates, OrbStack Machine runs to bunqueue-running-machine-gates, releases to bunqueue-releasing, and session start or handoff to bunqueue-working-sessions. Not for applications that use bunqueue as a library; the plugin skill named bunqueue covers those."
+description: "Orientation map of the bunqueue repository for contributors. Use when asked how bunqueue works internally or where code lives (request flow of PUSH, PULL and ACK, shards, lock order, embedded versus TCP mode, Workflow Engine files), when planning or reviewing a feature or a refactor of the source, or when unsure which bunqueue skill or reference page covers a task. Load it before searching the source. Skip it for a bug fix, a gate, a Machine run, a release or a session: load the bunqueue-* skill that owns the task instead. Not for applications that use bunqueue as a library."
 license: MIT
 metadata:
   short-description: Orientation and routing for bunqueue contributors
@@ -20,9 +20,10 @@ procedure lives.
 | --- | --- |
 | Start, resume, track or hand off a session; edit `feature_list.json` or `progress.md` | bunqueue-working-sessions ([skill](../bunqueue-working-sessions/SKILL.md)) |
 | A bug, regression or failing behavior to fix | bunqueue-fixing-bugs ([skill](../bunqueue-fixing-bugs/SKILL.md)) |
-| Which gates to run, reading sandbox artifacts, a failing gate, a post-gate change | bunqueue-running-gates ([skill](../bunqueue-running-gates/SKILL.md)) |
+| Which gates to run, reading sandbox artifacts, a failing gate, a post-gate change, watching CI after a push | bunqueue-running-gates ([skill](../bunqueue-running-gates/SKILL.md)) |
 | Ubuntu and Debian OrbStack Machine evidence | bunqueue-running-machine-gates ([skill](../bunqueue-running-machine-gates/SKILL.md)) |
 | A release the user explicitly asked for | bunqueue-releasing ([skill](../bunqueue-releasing/SKILL.md)) |
+| Working through the work items unattended, when the user explicitly asked for it | bunqueue-working-autonomously ([skill](../bunqueue-working-autonomously/SKILL.md)) |
 | Architecture, env vars, TCP commands, CLI, schema | [docs/agents/project-reference.md](../../../docs/agents/project-reference.md) |
 | Simple Mode, Workflow Engine, Client SDK options | [docs/agents/client-reference.md](../../../docs/agents/client-reference.md) |
 | Debug endpoints, CPU and heap profiling | [docs/agents/debugging.md](../../../docs/agents/debugging.md) |

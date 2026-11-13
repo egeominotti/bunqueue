@@ -207,6 +207,31 @@ describe('Machine gate: verdicts', () => {
     });
   }
 
+  test('an unfinished Machine shows its recorded steps; the manifest shows hash and delete codes', () => {
+    const run = join(scratch, 'verdict-partial');
+    const machine = join(run, 'bunqueue-m0-t');
+    writeMachine(machine, { install: 0, typecheck: 1 }, {});
+    rmSync(join(machine, 'DONE'));
+    writeFileSync(join(machine, 'content-hash.txt'), 'abc123\n');
+    writeFileSync(
+      join(run, 'run.env'),
+      `run_id=t\n${CANONICAL}cleanup=deleted\ndelete_exit=bunqueue-m0-t:2,0\ninterrupted=yes\nmachines=bunqueue-m0-t\n`
+    );
+    const result = runBash(VERDICT, [run]);
+    expect(result.code).toBe(130);
+    for (const needle of [
+      '(no DONE); steps recorded before it stopped: install(exit 0) typecheck(exit 1)',
+      '| typecheck | 1 | 1 |',
+      '| Content hash in the Machine | abc123 |',
+      'exit codes per Machine, one per attempt: bunqueue-m0-t:2,0',
+    ]) {
+      expect({ needle, present: result.stdout.includes(needle) }).toEqual({
+        needle,
+        present: true,
+      });
+    }
+  });
+
   test('a real failure outranks a Machine left behind', () => {
     expect(
       verdict(

@@ -71,7 +71,18 @@ work item in [`feature_list.json`](../../feature_list.json) (for example
    fresh Ubuntu 24.04 and Debian 13 OrbStack Machines of
    [docs/testing.md](../testing.md#orbstack-machine-isolation), and a skeptic `PASS`.
 6. Push to `main` only with the user's explicit authorization; CI's version gate
-   tags, releases and publishes ([Publishing](#publishing)).
+   tags, releases and publishes ([Publishing](#publishing)). Then verify, because
+   the release is not done until every part is: watch the push run to its end
+   (`ci-watch.sh` of the `bunqueue-running-gates` skill) and check that the quality
+   gate and the version gate passed (a failed quality gate skips the version gate and
+   releases nothing), that the tag names the release commit, that the GitHub release
+   is published, and that the Docker images exist. npm is a second run: a
+   `workflow_dispatch` of `ci.yml` on `main` with `npm_version` set to the version,
+   started only on the user's request, whose publish job waits for the required
+   reviewer of the `npm` environment. That approval is the user's. Verify npm with
+   the registry (`https://registry.npmjs.org/bunqueue/X.Y.Z`), not with `npm view`,
+   which can answer from its cache. The commands are in the
+   [`bunqueue-releasing` skill](../../.agents/skills/bunqueue-releasing/SKILL.md#the-release-is-not-done-until-it-is-verified).
 7. After publication, run `bun docs/scripts/generate-release-posts.ts --refresh` and
    update the post's install box and contributors.
 

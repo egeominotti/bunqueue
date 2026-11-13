@@ -1,22 +1,20 @@
 # bunqueue
 
 High-performance job queue server for Bun: SQLite persistence, cron jobs, priorities,
-DLQ, S3 backups. Routing page for Claude Code: the mandatory rules and the work loop
-are here, reference material in the linked pages. `AGENTS.md` has the same rules
-for Codex.
+DLQ, S3 backups. Routing page for Claude Code: the mandatory rules and the work loop,
+with the reference in the linked pages. `AGENTS.md` has the same rules for Codex.
 
 ## Startup Workflow
 
 1. Confirm the worktree and branch: `pwd`, `git branch --show-current`.
 2. Read this file completely, then only the pages your task needs
    ([Where things live](#where-things-live)).
-3. Run `./init.sh`, the startup check: CI's Bun version, frozen lockfile,
-   `bun check`, `bun fmt`, `git diff --check`, harness contract. It is not a commit
-   gate (`bun run test:sandbox` is), but a green `./init.sh` is part of the
-   Definition of Done.
+3. Run `./init.sh`, the startup check (`--help` lists its steps). It is not a commit
+   gate (`bun run test:sandbox` is), but a green run is part of the Definition of
+   Done.
 4. Read `feature_list.json` (work items) and `progress.md` (Current State, newest
    Session Log entry), then `git log --oneline -5`.
-5. If the baseline fails, repair it first before adding scope; if you cannot,
+5. If the baseline fails, repair it before adding scope; if you cannot,
    record it under Blockers in `progress.md`.
 
 ## Working Rules
@@ -29,7 +27,7 @@ for Codex.
   one first (kebab-case `id`, `issue` when known).
 - **Stay in scope**: change only what the item needs; record unrelated findings
   as new `not-started` items instead of fixing them.
-- **Parallel worktrees** (each session has its own branch, all merge into `main`):
+- **Parallel worktrees** (one branch per session, all merged into `main`):
   edit only your own item (insert new items in id order) and your own lines of the
   `progress.md` Current State, and prepend Session Log entries. On a rebase
   conflict: `feature_list.json` keeps both items, ids unique; `**Last Updated:**`
@@ -73,9 +71,9 @@ through `bun check` in the SDK workflow once the SDK it imports is built.
 **MANDATORY — after ANY code modification, run `bun run test:sandbox` before
 committing.** It builds the worktree once and runs ALL THREE required suites
 concurrently in separate disposable containers: `bun test --parallel=4` (unit),
-`bun scripts/tcp/run-all-tests.ts` (TCP, ~50 suites) and
-`bun scripts/embedded/run-all-tests.ts` (embedded, ~35 suites). Never commit
-without all three passing. No exceptions.
+`bun scripts/tcp/run-all-tests.ts` (TCP) and
+`bun scripts/embedded/run-all-tests.ts` (embedded). Never commit without all three
+passing. No exceptions.
 
 **MANDATORY for core queue semantics — run `bun run test:model` before the
 sandbox** after every change to lifecycle transitions, SQLite/write buffering,
@@ -147,6 +145,8 @@ A work item is `done` only when all of these hold and its `evidence` in
 - [ ] The skeptic verdict is `PASS` (`CONDITIONAL` only with the user's explicit
       confirmation).
 - [ ] `./init.sh` is green, so the next session can restart from it.
+- [ ] After a push, CI is green on the pushed commit; a flaky job is rerun once and
+      becomes a work item, never ignored.
 
 ## End of Session
 
@@ -158,6 +158,7 @@ A work item is `done` only when all of these hold and its `evidence` in
 4. Record every unresolved risk, blocker and gate you could not run.
 5. Leave `./init.sh` green and the worktree clean enough to restart from.
 6. Commit only through the gates (next section).
+7. After a push, watch CI until it is green (bunqueue-running-gates).
 
 ## Commits, pushes and releases
 
@@ -186,7 +187,7 @@ drafted with `bun docs/scripts/generate-release-posts.ts`:
 | Need | Read |
 | --- | --- |
 | Work items, state, handoff, startup check | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
-| The harness and its contract test | [docs/agents/README.md](docs/agents/README.md) |
+| The harness and its contract | [docs/agents/README.md](docs/agents/README.md) |
 | Procedures (Agent Skills) | [.agents/skills/](.agents/skills/) |
 | Writing or running tests | [docs/testing.md](docs/testing.md) |
 | Architecture, env vars, TCP commands, CLI, schema | [docs/agents/project-reference.md](docs/agents/project-reference.md) |

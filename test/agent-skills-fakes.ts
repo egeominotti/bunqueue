@@ -3,7 +3,9 @@
  * (`test/agent-skills-machine-gate.test.ts`, docs/agents/README.md#skills): bun-style
  * logs, finished Machine directories, a fake OrbStack (`orb`) whose daemon can finish
  * a create after its CLI is killed, fake `git`, `ssh`, `rsync` and `uname`, and a
- * portable process table to prove that no worker outlives the gate.
+ * portable process table to prove that no worker outlives the gate. And, for
+ * `test/agent-skills-ci-watch.test.ts`, a fake GitHub CLI (`gh`) that answers from
+ * JSON fixtures.
  */
 
 import {
@@ -117,7 +119,12 @@ esac\n`
   );
   // Files in the state directory switch behaviours: `list-slow` keeps writing after the
   // first names (a reader that stops early breaks the pipe), `list-fail-from` holds the
-  // number of the first `orb list` call that fails.
+  // number of the first `orb list` call that fails, `delete-fails` the number of
+  // `orb delete` calls that fail without deleting, and `signal-prone` makes `orb delete`
+  // and `rsync` take a second and die on SIGINT or SIGTERM even where the caller ignores
+  // them, as the real commands do (they install their own handlers); `rsync-ok` lets the
+  // copy back succeed.
+  const prone = `[ ! -e "${orb}/signal-prone" ] || perl -e '$SIG{INT} = $SIG{TERM} = "DEFAULT"; select(undef, undef, undef, 1)' || exit 130\n`;
   script(
     join(fakes, 'orb'),
     `state="${orb}"
@@ -137,11 +144,17 @@ case "$1" in
       sleep ${createSleep}
     else touch "$state/machines/$name" "$state/started-$name"; fi ;;
   delete) shift; [ "$1" = -f ] && shift
+    ${prone.trim()}
+    left=$(cat "$state/delete-fails" 2>/dev/null || echo 0)
+    if [ "$left" -gt 0 ]; then echo $((left - 1)) > "$state/delete-fails"; echo 'orb: delete failed' >&2; exit 1; fi
     for name; do rm -f "$state/machines/$name"; echo "$name" >> "$state/deleted"; done ;;
 esac\n`
   );
   script(join(fakes, 'ssh'), 'for last; do :; done\n[ "$last" = true ] && exit 0\nexit 1\n');
-  script(join(fakes, 'rsync'), 'exit 1\n');
+  script(
+    join(fakes, 'rsync'),
+    `${prone}[ -e "${orb}/rsync-ok" ] || exit 1\nfor last; do :; done\necho copied > "$last/copied-back"\n`
+  );
   const list = (path: string) => (existsSync(path) ? readdirSync(path).sort() : []);
   return {
     gate: join(repo, MACHINE_SKILL, 'scripts/machine-gate.sh'),
@@ -201,4 +214,63 @@ export function descendants(pid: number): number[] {
 export function running(pid: number): boolean {
   const entry = processTable().get(pid);
   return entry !== undefined && !entry[1].startsWith('Z');
+}
+
+export interface GhBed {
+  /** PATH with the fake `gh` first, and a short pause between the script's polls. */
+  env: Record<string, string>;
+  /** Writes one fixture, named as the fake looks it up. */
+  fixture: (name: string, value: unknown) => void;
+  /** Every `gh` invocation so far, one per entry. */
+  calls: () => string[];
+}
+
+/**
+ * A fake `gh` in `dir`. It answers `run list` (`list-<sha>.json`) and `run view`
+ * (`run-<id>.json`, `run-<id>.poll-<n>.json` for the n-th poll, `run-<id>-attempt-<n>.json`)
+ * from fixtures shaped like GitHub's, through the `--jq` expression the caller sends
+ * (evaluated by the real `jq`), fails while a file named `outage` exists, and records
+ * every call.
+ */
+export function ghBed(dir: string): GhBed {
+  const state = join(dir, 'state');
+  mkdirSync(state, { recursive: true });
+  script(
+    join(dir, 'gh'),
+    `state="${state}"
+echo "$*" >> "$state/calls"
+[ ! -e "$state/outage" ] || { echo 'gh: simulated outage' >&2; exit 1; }
+[ "$1" = run ] || exit 64
+verb=$2; shift 2
+id='' attempt='' expr='' commit=''
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --attempt) attempt=$2; shift 2 ;;
+    --jq) expr=$2; shift 2 ;;
+    --commit) commit=$2; shift 2 ;;
+    --json | --repo | --workflow | --limit) shift 2 ;;
+    *) id=$1; shift ;;
+  esac
+done
+case "$verb" in
+  list) file="$state/list-$commit.json" ;;
+  view)
+    if [ -n "$attempt" ]; then file="$state/run-$id-attempt-$attempt.json"; else
+      poll=$(($(cat "$state/polls-$id" 2>/dev/null || echo 0) + 1)); echo $poll > "$state/polls-$id"
+      file="$state/run-$id.json"
+      [ ! -e "$state/run-$id.poll-$poll.json" ] || file="$state/run-$id.poll-$poll.json"
+    fi ;;
+  *) exit 64 ;;
+esac
+[ -e "$file" ] || { echo "gh: no fixture $file" >&2; exit 1; }
+exec jq -r "$expr" "$file"\n`
+  );
+  return {
+    env: { PATH: `${dir}:${process.env.PATH}`, BUNQUEUE_CI_WATCH_PAUSE_SECONDS: '0.05' },
+    fixture: (name, value) => writeFileSync(join(state, name), JSON.stringify(value)),
+    calls: () =>
+      existsSync(join(state, 'calls'))
+        ? readFileSync(join(state, 'calls'), 'utf8').trim().split('\n')
+        : [],
+  };
 }

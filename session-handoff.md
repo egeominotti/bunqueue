@@ -34,6 +34,7 @@ Record only what actually ran. A gate that was not run is a blocker, not a pass.
 | Whitespace                  | `git diff --check`                          |                                  |                                            |
 | Release Machines            | Ubuntu 24.04 + Debian 13 OrbStack Machines  |                                  | per [docs/testing.md](docs/testing.md)     |
 | Review                      | `skeptic` agent                             | PASS / CONDITIONAL / FAIL        | before commit and before push              |
+| CI after a push             | `ci-watch.sh --sha <sha>`                   | exit code, run id, attempt       | a flake's work item; red is a blocker      |
 
 ## Files Changed
 
