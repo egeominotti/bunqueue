@@ -202,6 +202,26 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   `backup-s3.md`, `workers-management.md`; changelog `[Unreleased]` Testing.
 - Gates: `bun run test:sandbox` green on tree `4ab265ea` (unit 11750 / 0 / 402,
   tcp 553 / 0, embedded 349 / 0); all three items `done`.
+### 2026-11-13 — postgres-completion-prune-plan
+
+- Branch `postgres-completion-prune-plan`, base `2f1ad824`; done.
+- Root cause: the plan, not an index. With statistics that do not cover the
+  namespace, every scan is estimated at one row, so the candidate `SELECT` and the
+  `DELETE` recheck of `prunePostgresCompletionTombstoneBatch` ran nested-loop anti
+  joins that rescan the namespace's jobs per completion and per dependency, under
+  the completion-retention advisory lock (10.2-11.0 s each on 619 completions on
+  PostgreSQL 16.16, 17.12 and 18.6).
+- Fix: the unchanged `SELECT` runs under `SET LOCAL enable_nestloop = off` (reset
+  right after it); the `DELETE` recheck uses per-row `OFFSET 0` subplans. Same
+  rows pruned (identical candidate lists and deleted sets on every dataset), same
+  timings with good statistics. Numbers in the item's evidence.
+- Test: `test/postgres-completion-prune-plan.test.ts` failed before the fix on all
+  three versions (12.9-17.3 s against a 2 s bound) and passes after it (~15 ms).
+- New item `postgres-completion-read-model-plan`: `loadPostgresCompletionResults`
+  has the same stale-statistics problem (quadratic, 1.6 s on 4,834 completions).
+- Gates: `bun run test:sandbox` green on tree `c2e0759a` (unit 11734 / 0 / 403,
+  tcp 553 / 0, embedded 349 / 0); skeptic CONDITIONAL only on that gate. CI's
+  PostgreSQL 16, 17 and 18.6 legs run the new test.
 
 ### 2026-11-13 — drop-postgres-15
 

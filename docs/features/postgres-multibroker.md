@@ -882,6 +882,22 @@ health; a later broker startup also repairs durable backlog left by a shutdown o
 configuration reduction. Every batch rechecks live dependency consumers after
 its ordered identity locks, so pinned proofs remain outside the bound.
 
+Each batch runs under the namespace's `completion-retention` advisory lock, so
+its plan must not depend on table statistics. A namespace the statistics do not
+cover yet (new, or grown since the last `ANALYZE`) is estimated at about one
+row; with nested loops the candidate scan then rescanned the namespace's jobs
+once per completion and per dependency (10.4 s on 290 completions in CI) while the
+other brokers' sweeps failed with `lock_timeout`. The candidate `SELECT`, which
+reads the whole namespace anyway, is therefore planned with
+`SET LOCAL enable_nestloop = off` (hash or merge anti-joins, the same plan good
+statistics produce) and reset with `SET LOCAL enable_nestloop TO DEFAULT` before
+anything else in the transaction; the `DELETE` recheck of at most 1,000 IDs keeps
+each condition a per-row `OFFSET 0` subplan, so every probe uses the full
+primary-key or `bunqueue_dependencies_dependency_idx` key. Neither changes which
+tombstones are removed, and no index or migration is involved.
+`test/postgres-completion-prune-plan.test.ts` analyzes the tables before seeding
+a namespace and bounds the prune (about 15 ms; 12.9-17.3 s before the fix).
+
 Lease renewal increments `lease_renewals`, updates the payload heartbeat, and
 transfers both `lease_broker_id` and `lease_broker_session_id` to the broker
 session that received the heartbeat. A heartbeat batch locks the broker session

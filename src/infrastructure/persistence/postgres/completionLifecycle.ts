@@ -94,6 +94,12 @@ async function prunePostgresCompletionTombstoneBatch(
     await tx`
       SELECT pg_advisory_xact_lock(hashtextextended(${lockName}, 0))
     `;
+    // A namespace the statistics do not cover yet (new, or grown since the last ANALYZE) is
+    // estimated at about one row, and a nested-loop plan then rescans the namespace once per
+    // completion and per dependency while the retention lock is held (cubic work). This scan
+    // reads the whole namespace anyway, so only this statement is planned without nested
+    // loops: hash or merge anti-joins stay linear, and match the plan chosen with good statistics.
+    await tx`SET LOCAL enable_nestloop = off`;
     const candidates = await tx<{ job_id: string }[]>`
       SELECT completion.job_id
       FROM bunqueue_completions AS completion
@@ -116,9 +122,13 @@ async function prunePostgresCompletionTombstoneBatch(
       OFFSET ${ctx.config.maxCompletedJobs}
       LIMIT ${COMPLETION_PRUNE_BATCH_SIZE}
     `;
+    await tx`SET LOCAL enable_nestloop TO DEFAULT`;
     const ids = candidates.map((row) => jobId(row.job_id));
     if (ids.length === 0) return { selected: 0, removed: 0 };
     await lockPostgresDependencyCompletions(tx, ctx, ids);
+    // The same conditions, re-checked for at most one batch of IDs. Written as joins they can
+    // get the same cubic plan; OFFSET 0 keeps each check a per-row subplan instead, so every
+    // probe uses its whole key (primary key or dependency index) whatever the estimate.
     const removed = await tx<{ job_id: string; queue: string }[]>`
       DELETE FROM bunqueue_completions AS completion
       WHERE completion.namespace = ${ctx.config.namespace}
@@ -127,15 +137,21 @@ async function prunePostgresCompletionTombstoneBatch(
           SELECT 1 FROM bunqueue_jobs AS retained
           WHERE retained.namespace = completion.namespace
             AND retained.id = completion.job_id
+          OFFSET 0
         )
         AND NOT EXISTS (
           SELECT 1
           FROM bunqueue_dependencies AS dependency
-          JOIN bunqueue_jobs AS consumer
-            ON consumer.namespace = dependency.namespace AND consumer.id = dependency.job_id
           WHERE dependency.namespace = completion.namespace
             AND dependency.dependency_id = completion.job_id
-            AND consumer.state = ANY(${tx.array([...LIVE_CONSUMER_STATES], 'TEXT')})
+            AND EXISTS (
+              SELECT 1 FROM bunqueue_jobs AS consumer
+              WHERE consumer.namespace = dependency.namespace
+                AND consumer.id = dependency.job_id
+                AND consumer.state = ANY(${tx.array([...LIVE_CONSUMER_STATES], 'TEXT')})
+              OFFSET 0
+            )
+          OFFSET 0
         )
       RETURNING completion.job_id, completion.queue
     `;

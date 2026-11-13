@@ -416,6 +416,18 @@ head:
   previous mode is still applied. The bind of the new certificate stays strict:
   such a failure still rolls the reload back. Both warning paths are now covered
   by `test/repro-issue-189-unix-socket-restore.test.ts`.
+- **PostgreSQL: the completion-retention prune no longer takes seconds on a
+  namespace the table statistics do not cover yet.** With a new namespace, or
+  one that grew since the last `ANALYZE`, PostgreSQL estimated about one row and
+  chose nested loops that rescanned the namespace's jobs once per completion and
+  per dependency: 10.4 s on 290 completions in CI, 12.9-17.3 s on 619 locally
+  (PostgreSQL 16-18), all while holding the namespace's retention lock, so the
+  other brokers' 60 s sweeps failed with `lock_timeout` and a broker with a sweep
+  in flight was slow to shut down. The candidate query now runs without nested
+  loops (the plan good statistics already gave) and the per-batch recheck probes
+  each row by its full key: about 15 ms for the same data, unchanged timings with
+  good statistics. The same tombstones are pruned; there is no schema change.
+  Covered by `test/postgres-completion-prune-plan.test.ts`.
 
 ## [2.9.22] - 2026-11-13
 
