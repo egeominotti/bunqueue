@@ -71,9 +71,7 @@ head:
   process trees, waits for a create the OrbStack daemon may still finish (and
   reports one that never appeared as not deleted), copies the logs back and
   deletes every Machine the run created; a Machine whose name already exists is
-  never touched. It reports the known gap of the Bun-only
-  Machines (six version-gate tests that need `node`, matched by file and title,
-  that pass again with a node-to-Bun shim) as exit 3, a real failure as exit 1, an
+  never touched. It reports a real failure as exit 1, an
   infrastructure failure or a Machine left behind as exit 4, a step subset or a
   `--keep` run as diagnostic (exit 5) and an interrupt as exit 130, or 4 when a
   Machine could not be deleted. The
@@ -155,9 +153,9 @@ head:
   was not measured, because the CLI on the measuring machine had no
   authentication.
 - **The OrbStack Machine gate after its first real run** (`machine-gate.sh` on
-  `3e08f75b`, OrbStack 2.2.5: exit 3 in 24 min 41 s; in both Machines unit
-  11871 pass / 6 fail / 399 skip, tcp 69/69 suites and 553/553 assertions, embedded
-  43/43 and 349/349, tinyfs 9 / 0; SIGTERM and SIGINT during the create, the
+  `3e08f75b`, OrbStack 2.2.5: exit 3, the node gap retired below, in 24 min
+  41 s; in both Machines unit 11871 pass / 6 fail / 399 skip, tcp 69/69 suites
+  and 553/553 assertions, embedded 43/43 and 349/349, tinyfs 9 / 0; SIGTERM and SIGINT during the create, the
   provisioning and the steps all ended 130 with nothing left). The run found
   defects the fake OrbStack could not show, now fixed with tests. A repeated
   Ctrl-C during cleanup killed `rsync` and the `orb` CLI although the cleanup
@@ -179,6 +177,21 @@ head:
   a listener in a sibling Machine and the Mac's LAN address are reachable, and so
   is the internet. The docs, the skill and its manual procedure now say exactly
   that; tests that need no network run in the sandbox containers.
+- **The CI-script tests pass in a Bun-only Machine, and the Machine gate has no
+  known gap any more.** `test/repro-docker-version-gate-errors.test.ts` and
+  `test/repro-release-source-commit.test.ts` run CI's version-gate bash, which
+  calls `node -p`; in the OrbStack Machines, which have Bun and no Node, six of
+  their tests failed with `node: command not found` (and three negative tests
+  passed only because the step died at that first command). Each file now links
+  a `node` to the running Bun first on the spawned bash's `PATH`, the shim the
+  `oven/bun` image ships, so the gate logic runs everywhere and the assertions
+  are unchanged; `test/repro-ci-script-tests-without-node.test.ts` runs both
+  files with `node` absent and failed on the same six tests before the fix.
+  `machine-gate.sh` no longer reruns them with a shim: `assets/known-node-gap.txt`,
+  the `gap-asis` and `gap-shim` steps and `machine-steps.sh --gap-file` are gone,
+  any unit failure is a real failure (exit 1), and exit 3 is retired and never
+  returned (`--classify` reads an older exit-3 run as 1). Nothing in the package
+  or the runtime changes.
 - The four flaky tests seen on 2026-11-12 and 2026-11-13, two in the sandbox and
   two in CI, are tracked as work items in `feature_list.json`:
   `cron-test-midnight-boundary`, `postgres-lifecycle-race-flake`,

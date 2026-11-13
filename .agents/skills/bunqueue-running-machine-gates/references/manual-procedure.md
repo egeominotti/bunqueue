@@ -12,7 +12,7 @@ The commands and their rationale are also in
 - [3. Prepare each Machine](#3-prepare-each-machine)
 - [4. Copy the snapshot](#4-copy-the-snapshot)
 - [5. Run the steps](#5-run-the-steps)
-- [6. The known gap check](#6-the-known-gap-check)
+- [6. No known gap check](#6-no-known-gap-check)
 - [7. Copy back, record, delete](#7-copy-back-record-delete)
 - [Manifest fields](#manifest-fields)
 
@@ -109,18 +109,12 @@ sudo umount /mnt/bunqueue-tinyfs
 Run long steps detached (`nohup ... &` with a pid file) and poll, so a dropped SSH
 session does not kill a 10-minute suite.
 
-## 6. The known gap check
+## 6. No known gap check
 
-Only when the unit step failed:
-
-```bash
-bun test test/repro-docker-version-gate-errors.test.ts test/repro-release-source-commit.test.ts
-mkdir -p ~/.bun-node-fallback-bin && ln -sf "$(command -v bun)" ~/.bun-node-fallback-bin/node
-PATH="$PATH:$HOME/.bun-node-fallback-bin" \
-  bun test test/repro-docker-version-gate-errors.test.ts test/repro-release-source-commit.test.ts
-```
-
-The canonical unit run itself never gets the shim.
+Until 2026-11-13 a failed unit step was followed by a rerun of the two version-gate
+test files with and without a node->bun shim (the known node gap, exit 3). Those files
+now link their own `node` to Bun, so there is nothing to rerun: a unit failure is a
+real failure. Never install a `node` shim in the Machine for the canonical run.
 
 ## 7. Copy back, record, delete
 
@@ -154,6 +148,6 @@ until the name is no longer listed, and do not press Ctrl-C again while it runs.
 | Not in the snapshot | `git status` on the host | unstaged or untracked work that was not tested |
 | OS, arch, kernel | `/etc/os-release`, `uname` | distro and native-architecture evidence |
 | cgroup cpu.max, memory.max, swap | `/sys/fs/cgroup` | effective limits after OrbStack's clamping |
-| Bun, node | `bun --version --revision`, `command -v node` | the pinned toolchain; `node: absent` explains the known gap |
+| Bun, node | `bun --version --revision`, `command -v node` | the pinned toolchain; `node: absent` is expected, the Machines are Bun-only |
 | Time zone | `TZ`, `/etc/localtime` | differs from the sandbox's UTC |
 | Steps table | `steps.tsv`, the step logs | exit code, seconds and exact totals per step; an interrupted run shows the steps recorded before it stopped |

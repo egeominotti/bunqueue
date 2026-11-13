@@ -163,7 +163,7 @@ the pages above for the rules; it never restates or overrides a rule.
 | [bunqueue-working-sessions](../../.agents/skills/bunqueue-working-sessions/SKILL.md) | session start and end, work items, `progress.md`, handoff, Definition of Done evidence |
 | [bunqueue-fixing-bugs](../../.agents/skills/bunqueue-fixing-bugs/SKILL.md) | reproduce first, subagents, docs and changelog, skeptic rounds until `PASS` |
 | [bunqueue-running-gates](../../.agents/skills/bunqueue-running-gates/SKILL.md) | which gate a change needs, sandbox artifacts and KPIs, failure classification, `scripts/gate-delta.sh` for post-gate deltas, and after a push `scripts/ci-watch.sh`: a bounded, read-only wait for the CI run (exit 0 green, 1 failed, 3 green only after a rerun, 4 no verdict) |
-| [bunqueue-running-machine-gates](../../.agents/skills/bunqueue-running-machine-gates/SKILL.md) | the OrbStack Machine gate (`scripts/machine-gate.sh` and its helpers), cleanup on every exit path, the known node gap (exit 3) |
+| [bunqueue-running-machine-gates](../../.agents/skills/bunqueue-running-machine-gates/SKILL.md) | the OrbStack Machine gate (`scripts/machine-gate.sh` and its helpers), cleanup on every exit path; Bun-only Machines with no exception (exit 3, the former known node gap, is retired) |
 | [bunqueue-releasing](../../.agents/skills/bunqueue-releasing/SKILL.md) | a release, only on the user's explicit request; Codex never invokes it implicitly, Claude Code can, so its first step stops without that request; the release is done only when the version gate, tag, GitHub release, Docker images and npm are verified |
 | [bunqueue-working-autonomously](../../.agents/skills/bunqueue-working-autonomously/SKILL.md) | the unattended work loop of a local session, only on the user's explicit request (same guard): one ready item per branch and worktree, gates, skeptic until `PASS`, commit, push only under the user's own standing authorization, CI watched to green, `blocked` with the exact question instead of a stall, and the hard stops that always go to the user. It adds no authorization, and a cloud routine cannot run it: the gates need local Docker and OrbStack |
 
@@ -234,7 +234,7 @@ first step opens with), strict-mode scripts of at most 300 lines whose `--help`,
 error and `--dry-run` behave (the dry run with every side-effecting command replaced by
 a recorder that must stay empty), the post-gate delta on listed paths and, where Git
 is installed, on a real repository with a rename, the Machine gate's verdicts on
-fixture logs and its list of known failures, its cleanup with a fake OrbStack (an
+fixture logs (a unit failure, the former node gap included, is a real failure), its cleanup with a fake OrbStack (an
 interrupt during `orb create` leaves no Machine and no worker, a create that appears
 too late is reported as not deleted, an existing Machine name is never touched, a
 failing `orb list` is a failure, only the gate's own live workers are signalled, a burst

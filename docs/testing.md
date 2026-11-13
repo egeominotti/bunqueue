@@ -479,17 +479,25 @@ with a fake Machine. A run with a step
 subset or `--keep` is diagnostic (exit 5), never release evidence, and `--dry-run`
 prints every command and creates nothing.
 
-The Machines are Bun-only: there is no `node` on `PATH`. Two unit test files,
-`test/repro-docker-version-gate-errors.test.ts` (2 tests) and
-`test/repro-release-source-commit.test.ts` (4 tests), run the version-gate step of
-`.github/workflows/ci.yml`, whose first command is `node -p`, so in a Machine they
-fail with `node: command not found`; the sandbox image (Bun's `node` fallback) and
-GitHub's runners (real Node) pass them. The canonical unit run installs no shim and
-records those six failures; the two files are then rerun as they are and with a
-node-to-Bun shim appended to `PATH`, the way the `oven/bun` image provides one, and
-must pass with it. `machine-gate.sh` performs these reruns itself and reports this
-known environment gap (exit 3) apart from a real failure (exit 1); it matches the
-failures by file and test title.
+The Machines are Bun-only: there is no `node` on `PATH`, and the gate installs no
+shim. `test/repro-docker-version-gate-errors.test.ts` and
+`test/repro-release-source-commit.test.ts` run the version-gate step of
+`.github/workflows/ci.yml` under bash, and that step calls `node -p` to read
+`package.json`. Until 2026-11-13 six of their tests failed in a Machine with
+`node: command not found`, and `machine-gate.sh` reported this known environment
+gap as exit 3 after rerunning the two files with a node-to-Bun shim. Each file now
+symlinks `node` to the running Bun (`process.execPath`) in the temporary directory
+it already puts first on the spawned bash's `PATH`, which is the shim the `oven/bun`
+image ships, so the gate logic runs the same way in a Machine, in the sandbox and
+on GitHub's runners, and what the tests assert is unchanged. Unlike the
+`issue-93` end-to-end case above, which needs a real Node because it tests Node's
+module resolution, these steps only use `node` to read JSON, which Bun does
+identically. `test/repro-ci-script-tests-without-node.test.ts` runs both files with
+`node` absent from `PATH` (a `node` that exits 127 first on `PATH`, because a
+directory cannot be removed portably when it also holds `bash`); it failed with
+the same six tests before the fix. The Machine gate therefore has no exception:
+exit 3 is retired and never returned, and any unit failure is a real failure
+(exit 1). A test that later needs `node` in a CI script gets the same link.
 
 `--isolated` removes macOS filesystem and integration access.
 `--isolate-network` is narrower than its name. Measured on OrbStack 2.2.5 on

@@ -15,11 +15,8 @@ steps.tsv, the step logs, environment.txt, DONE or INFRA), prints the manifest i
 Markdown on stdout and exits with the verdict; machine-gate.sh writes that output to
 manifest.md, and `machine-gate.sh --classify <run-dir>` is this call.
 
-A Machine passes when every requested step exited 0. Its unit failure is the known
-environment gap only when the failed tests are exactly the file and title pairs of
-../assets/known-node-gap.txt, the log shows `node: command not found` and no
-unhandled error, the as-is rerun (gap-asis) fails on the same pairs and the
-node->bun shim rerun (gap-shim) passes. Anything else is a real failure.
+A Machine passes when every requested step exited 0; any other exit, the unit suite's
+included, is a real failure.
 
 Release evidence needs: Ubuntu 24.04 among the distros (Debian 13 too for a
 release), every step, and every Machine deleted. A passing run with a step subset, no
@@ -35,11 +32,11 @@ Exit codes:
        an INFRA marker or no Machine at all (a real failure outranks those)
   130  the run was interrupted and every Machine deleted: no evidence
   1    a real failure in at least one Machine
-  5    diagnostic: passed (or only the known gap) but not evidence
-  3    evidence; only the known environment gap failed
+  5    diagnostic: passed but not evidence
   0    evidence; every step passed in every Machine (release evidence needs both
        ubuntu:24.04 and debian:13; ubuntu:24.04 alone is evidence for a candidate)
   2    usage error
+  3    retired (it was the known node gap, now fixed in the tests); never returned
 EOF
 }
 
@@ -59,11 +56,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$dir" ] || usage_error 'a run directory is required'
-gap_file="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/assets/known-node-gap.txt"
-[ -f "$gap_file" ] || { printf 'machine-verdict.sh: missing %s\n' "$gap_file" >&2 && exit 4; }
 [ -d "$dir" ] || { printf 'machine-verdict.sh: no run directory %s\n' "$dir" >&2 && exit 4; }
 if [ "$dry_run" -eq 1 ]; then
-  echo "machine-verdict.sh: dry run; would read $dir/run.env, $gap_file and, per Machine,"
+  echo "machine-verdict.sh: dry run; would read $dir/run.env and, per Machine,"
   echo '  steps.tsv, DONE, INFRA, environment.txt and the step logs; classifies nothing'
   exit 0
 fi
@@ -75,44 +70,9 @@ kv() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -n 1 || true; }
 env_line() { sed -n "s/^$2: //p" "$1/environment.txt" 2>/dev/null | head -n 1 || true; }
 step_field() { awk -F '\t' -v s="$2" -v c="$3" '$1 == s { print $c; exit }' "$1/steps.tsv" 2>/dev/null || true; }
 count_word() { sed -n -E "s/^ *([0-9]+) $2s?\$/\1/p" "$1" 2>/dev/null | tail -n 1 || true; }
-# "<file> <title>" for every (fail) line, attributed to the file header bun printed
-# before it; the recap after "N tests failed:" repeats titles without files.
-failed_pairs() {
-  awk '/^[0-9]+ tests? failed:$/ { exit }
-    /^[^[:space:]][^:]*\.(test|spec)\.[cm]?[jt]sx?:$/ { file = substr($0, 1, length($0) - 1); next }
-    /^\(fail\) / { t = substr($0, 8); sub(/ \[[0-9.]+(ms|s)\]$/, "", t); print (file == "" ? "?" : file) " " t }' \
-    "$1" 2>/dev/null | LC_ALL=C sort -u || true
-}
-known_pairs() { sed -n 's/^test //p' "$gap_file" | LC_ALL=C sort -u; }
-
-# gap_reason DIR: why the unit failure is (status 0) or is not (status 1) the known gap.
-gap_reason() {
-  local dir=$1 log="$1/unit.log" expected n fails errors
-  expected=$(known_pairs)
-  n=$(printf '%s\n' "$expected" | grep -c .)
-  grep -Eq '^Ran [0-9]+ tests? across' "$log" 2>/dev/null ||
-    { echo 'the unit run did not finish (no "Ran N tests" summary)' && return 1; }
-  fails=$(count_word "$log" fail)
-  [ "${fails:-0}" = "$n" ] || { echo "${fails:-0} unit failures, the known gap has $n" && return 1; }
-  errors=$(count_word "$log" error)
-  [ "${errors:-0}" = 0 ] || { echo "$errors unhandled errors" && return 1; }
-  if grep -q '^# Unhandled error between tests' "$log"; then echo 'an unhandled error between tests' && return 1; fi
-  if [ "$(failed_pairs "$log")" != "$expected" ]; then
-    echo "the failing tests are not the known gap: $(failed_pairs "$log" | grep -vxF "$expected" | head -n 3 | tr '\n' ';')"
-    return 1
-  fi
-  grep -q 'node: command not found' "$log" || { echo 'no "node: command not found" in the unit log' && return 1; }
-  [ -n "$(step_field "$dir" gap-asis 2)" ] || { echo 'the gap files were not rerun' && return 1; }
-  [ "$(step_field "$dir" gap-asis 2)" != 0 ] || { echo 'the gap files pass without the shim: not the known gap' && return 1; }
-  [ "$(failed_pairs "$dir/gap-asis.log")" = "$expected" ] || { echo 'the as-is rerun failed differently' && return 1; }
-  [ "$(step_field "$dir" gap-shim 2)" = 0 ] && [ "$(count_word "$dir/gap-shim.log" fail)" = 0 ] ||
-    { echo 'the gap files still fail with the node->bun shim' && return 1; }
-  echo "exactly the $n known node-dependent unit tests failed (node: command not found); they pass with a node->bun shim"
-}
-
-# classify_machine DIR STEPS: prints "<pass|known-gap|fail|infra><TAB><reason>".
+# classify_machine DIR STEPS: prints "<pass|fail|infra><TAB><reason>".
 classify_machine() {
-  local dir=$1 wanted=$2 step rc bad='' reason
+  local dir=$1 wanted=$2 step rc bad=''
   if [ -f "$dir/INFRA" ]; then printf 'infra\t%s\n' "$(head -n 1 "$dir/INFRA")" && return; fi
   [ -f "$dir/steps.tsv" ] ||
     { printf 'fail\tthe Machine run did not finish (no steps.tsv was copied back)\n' && return; }
@@ -122,19 +82,17 @@ classify_machine() {
   fi
   for step in install build-client $(printf '%s' "$wanted" | tr ',' ' '); do
     rc=$(step_field "$dir" "$step" 2)
-    if [ -z "$rc" ]; then bad="$bad $step(missing)"; elif [ "$rc" != 0 ] && [ "$step" != unit ]; then bad="$bad $step(exit $rc)"; fi
+    if [ -z "$rc" ]; then bad="$bad $step(missing)"; elif [ "$rc" != 0 ]; then bad="$bad $step(exit $rc)"; fi
   done
   [ -z "$bad" ] || { printf 'fail\tfailed:%s\n' "$bad" && return; }
-  rc=$(step_field "$dir" unit 2)
-  if [ -z "$rc" ] || [ "$rc" = 0 ]; then printf 'pass\tevery step passed\n' && return; fi
-  if reason=$(gap_reason "$dir"); then printf 'known-gap\t%s\n' "$reason"; else printf 'fail\tunit: %s\n' "$reason"; fi
+  printf 'pass\tevery step passed\n'
 }
 
 step_totals() {
   local log="$1/$2.log"
   [ -f "$log" ] || { echo '-' && return; }
   case "$2" in
-    unit | tinyfs | gap-asis | gap-shim)
+    unit | tinyfs)
       printf '%s pass / %s fail / %s skip; %s' "$(count_word "$log" pass)" "$(count_word "$log" fail)" \
         "$(count_word "$log" skip | grep . || echo 0)" "$(grep -E '^Ran [0-9]+ tests? across' "$log" | tail -n 1 | sed -E 's/ \[.*//')"
       ;;
@@ -194,7 +152,6 @@ for m in $(machine_dirs "$dir"); do
   case "$verdict" in
     fail) worst=1 ;;
     infra) [ "$worst" = 1 ] || worst=4 ;;
-    known-gap) [ "$worst" != 0 ] || worst=3 ;;
   esac
   body="$body$(machine_section "$m" "$verdict" "$reason")
 "
@@ -218,13 +175,12 @@ esac
 if [ "$(kv "$env_file" interrupted)" = yes ]; then
   # Interrupted: nothing is claimed, but a Machine left behind still has to surface.
   if [ "$uncleaned" = 1 ]; then worst=4; else worst=130; fi
-elif [ -n "$evidence" ] && { [ "$worst" = 0 ] || [ "$worst" = 3 ]; }; then
+elif [ -n "$evidence" ] && [ "$worst" = 0 ]; then
   worst=5
 fi
 case "$worst" in
   0) label='PASS' ;;
   1) label='FAIL' ;;
-  3) label='KNOWN ENVIRONMENT GAP (the canonical result for Bun-only Machines)' ;;
   5) label="DIAGNOSTIC: not release evidence ($evidence)" ;;
   130) label='INTERRUPTED: no evidence' ;;
   *)
@@ -245,14 +201,5 @@ cat <<EOF
 - \`orb delete -f\` exit codes per Machine, one per attempt: $(kv "$env_file" delete_exit | grep . || echo 'not recorded')
 - Started / finished (UTC): $(kv "$env_file" started) / $(kv "$env_file" finished)
 $body
-EOF
-[ "$worst" != 3 ] || cat <<'EOF'
-## Known environment gap
-
-The Machines are Bun-only. The tests listed in the skill's `assets/known-node-gap.txt`
-run CI's version-gate step, which calls `node -p`, so they exit 127 there and pass in
-the sandbox (oven/bun ships a node->bun fallback) and on GitHub (real Node). Verdict 3
-means exactly those tests failed, with `node: command not found`, and passed again with
-a node->bun shim appended to PATH; every other step passed.
 EOF
 exit "$worst"

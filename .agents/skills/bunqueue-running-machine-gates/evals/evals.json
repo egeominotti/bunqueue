@@ -4,7 +4,7 @@
     { "query": "run the OrbStack machine gate for the 2.9.23 candidate", "should_trigger": true },
     { "query": "we need the Ubuntu 24.04 and Debian 13 evidence for the release, can you do it?", "should_trigger": true },
     { "query": "validate the staged tree on a clean linux host, not docker", "should_trigger": true },
-    { "query": "machine-gate.sh exited 3, is that ok for the release?", "should_trigger": true },
+    { "query": "an old machine manifest says exit 3, is that still ok for the release?", "should_trigger": true },
     { "query": "the debian machine unit suite has 6 failures with 'node: command not found', is that a bug?", "should_trigger": true },
     { "query": "orb create keeps failing with 'disk limit' when I start the release machines", "should_trigger": true },
     { "query": "read artifacts/machines/20261112T204914Z/manifest.md and summarize it for the evidence", "should_trigger": true },
@@ -24,7 +24,7 @@
     {
       "id": 1,
       "prompt": "Run the Machine gate for the staged release candidate.",
-      "expected_output": "The agent checks git diff --check and git diff --cached --check, records git write-tree, runs machine-gate.sh --dry-run --tree <hash>, then runs it for real in the background, waits for the exit code, reads manifest.md, and reports the verdict (0, 3 or other), exact per-step totals, the run directory and that both Machines were deleted.",
+      "expected_output": "The agent checks git diff --check and git diff --cached --check, records git write-tree, runs machine-gate.sh --dry-run --tree <hash>, then runs it for real in the background, waits for the exit code, reads manifest.md, and reports the verdict (0 or other), exact per-step totals, the run directory and that both Machines were deleted.",
       "assertions": [
         "A dry run precedes the real run",
         "The real run names an explicit tree hash",
@@ -36,21 +36,22 @@
     },
     {
       "id": 2,
-      "prompt": "machine-gate.sh exited 3. The manifest lists 6 unit failures on both Ubuntu and Debian. Is the release blocked?",
-      "expected_output": "Exit 3 is the known environment gap: the 6 tests in the two version-gate files fail only because the Bun-only Machines have no node; they passed again with the node->bun shim and every other step passed. It is the canonical Machine result and not a blocker by itself, provided the sandbox gate also passed; the agent quotes the gap reruns from the manifest.",
+      "prompt": "machine-gate.sh exited 1: on Debian, 6 unit tests in the two version-gate files failed with 'node: command not found'. Is that the known gap, and is the release blocked?",
+      "expected_output": "There is no known gap any more: exit 3 is retired, because the two version-gate files link their own node to Bun and pass in a Bun-only Machine. The failure is real: the agent reads unit.log in the run directory, checks whether a change removed that link or added a new node dependency, reproduces it on the host with node absent from PATH (test/repro-ci-script-tests-without-node.test.ts), and fixes the test instead of installing a shim in the Machine; the release does not proceed on this evidence.",
       "assertions": [
-        "Exit 3 is explained as the known node gap, not a product failure",
-        "The shim rerun result is cited as the proof",
+        "The known node gap and exit 3 are described as retired, not as an accepted result",
+        "The failure is reproduced with node absent from PATH",
+        "The fix goes into the test, never a node shim in the Machine or the gate",
         "The answer notes the Machines never replace bun run test:sandbox"
       ],
       "files": []
     },
     {
       "id": 3,
-      "prompt": "machine-gate.sh exited 1: the Debian unit step had 7 failures, 6 of them the known node ones.",
-      "expected_output": "A real failure: the seventh test is not explained by the gap. The agent reads the Debian unit.log for that test, checks whether it reproduces on Ubuntu and in the sandbox, and treats it as an environment difference or a bug (bunqueue-fixing-bugs) only after a focused reproduction; the release does not proceed on this evidence.",
+      "prompt": "machine-gate.sh exited 1: the Debian unit step had 1 failure, a test that passes in the sandbox.",
+      "expected_output": "A real failure: no unit failure is waved through as a known gap. The agent reads the Debian unit.log for that test, checks whether it reproduces on Ubuntu and in the sandbox, and treats it as an environment difference or a bug (bunqueue-fixing-bugs) only after a focused reproduction; the release does not proceed on this evidence.",
       "assertions": [
-        "The extra failure is treated as a real failure, not waved through with the gap",
+        "The failure is treated as a real failure, not waved through as a known gap",
         "The agent inspects the failing test's log in the run directory",
         "No release step proceeds on this Machine evidence"
       ],

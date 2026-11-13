@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, rm, chmod } from 'node:fs/promises';
+import { mkdtemp, rm, chmod, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -29,6 +29,9 @@ async function gate(gitExit: number, npmVersion = '') {
     const mockGit = join(directory, 'git');
     await Bun.write(mockGit, MOCK_GIT);
     await chmod(mockGit, 0o755);
+    // The version gate calls `node -p`. A `node` link to this Bun, the shim oven/bun
+    // ships, first on PATH runs it the same way everywhere, Bun-only hosts included.
+    await symlink(process.execPath, join(directory, 'node'));
     const output = join(directory, 'output');
     await Bun.write(output, '');
     const child = Bun.spawn(['bash', '-c', script], {

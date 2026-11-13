@@ -24,19 +24,13 @@ import { SKILLS_DIR } from './agent-skills-support';
 export const MACHINE_SKILL = `${SKILLS_DIR}/bunqueue-running-machine-gates`;
 export const ALL_STEPS = ['unit', 'tcp', 'embedded', 'typecheck', 'format', 'tinyfs'];
 
-/** `[file, title]` pairs of the known gap (assets/known-node-gap.txt). */
-export function knownGap(): [string, string][] {
-  const text = readFileSync(join(ROOT, MACHINE_SKILL, 'assets/known-node-gap.txt'), 'utf8');
-  return [...text.matchAll(/^test (\S+) (.+)$/gm)].map((match) => [match[1]!, match[2]!]);
-}
-
 /** A bun test log: each file's header, its `(fail)` lines, the recap, the summary. */
 export function bunLog(failed: readonly [string, string][], passed: number, extra = ''): string {
   const lines: string[] = [];
   for (const file of [...new Set(failed.map(([file]) => file))]) {
     lines.push('', `${file}:`, '(pass) a passing neighbour [0.10ms]');
     for (const [, title] of failed.filter(([owner]) => owner === file)) {
-      lines.push('error: bash: line 2: node: command not found', `(fail) ${title} [1.22ms]`);
+      lines.push('error: expect(received).toBe(expected)', `(fail) ${title} [1.22ms]`);
     }
   }
   if (failed.length)

@@ -202,7 +202,7 @@ remote "$mdir/bun-install.log" "curl -fsSL https://bun.sh/install | bash -s bun-
 run "$mdir/rsync.log" rsync -a --delete -e "ssh $ssh_opts" "$snapshot/" "$name@orb:bunqueue/" ||
   infra 'snapshot copy failed or timed out (see rsync.log)'
 run "$mdir/rsync.log" rsync -a -e "ssh $ssh_opts" "$script_dir/machine-steps.sh" \
-  "$script_dir/../assets/known-node-gap.txt" "$name@orb:gate/" || infra 'script copy failed (see rsync.log)'
+  "$name@orb:gate/" || infra 'script copy failed (see rsync.log)'
 if [ "$dry_run" -eq 1 ]; then show ssh $ssh_opts "$name@orb" 'bash gate/machine-steps.sh --content-hash bunqueue'; else
   hash=$(ssh $ssh_opts "$name@orb" 'bash gate/machine-steps.sh --content-hash bunqueue' 2>>"$host_log") ||
     infra 'remote content hash failed'
@@ -210,7 +210,7 @@ if [ "$dry_run" -eq 1 ]; then show ssh $ssh_opts "$name@orb" 'bash gate/machine-
   [ "$hash" = "$content_hash" ] || infra "content hash differs: host $content_hash, Machine $hash"
 fi
 remote "$host_log" "nohup bash gate/machine-steps.sh --repo bunqueue --out gate-out --steps $steps" \
-  "--gap-file gate/known-node-gap.txt --bun-version $bun_version >gate-runner.log 2>&1 </dev/null &" \
+  "--bun-version $bun_version >gate-runner.log 2>&1 </dev/null &" \
   'echo $! >gate-runner.pid' || infra 'could not start machine-steps.sh'
 
 if [ "$dry_run" -eq 1 ]; then

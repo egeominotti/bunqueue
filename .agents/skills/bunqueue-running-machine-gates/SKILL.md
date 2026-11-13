@@ -1,6 +1,6 @@
 ---
 name: bunqueue-running-machine-gates
-description: "Runs the bunqueue OrbStack Machine gate with scripts/machine-gate.sh. Use when a candidate or release needs its Linux validation on Ubuntu 24.04 or Debian 13 Machines, when asked to validate on OrbStack, orb create or a clean Linux host rather than Docker, when machine-gate.sh exits non-zero or reports the known node gap, when copying a snapshot of the tree into an isolated Machine, or when reading or rerunning a manifest under artifacts/machines. Not a replacement for bun run test:sandbox, and not for Docker sandbox failures (bunqueue-running-gates)."
+description: "Runs the bunqueue OrbStack Machine gate with scripts/machine-gate.sh. Use when a candidate or release needs its Linux validation on Ubuntu 24.04 or Debian 13 Machines, when asked to validate on OrbStack, orb create or a clean Linux host rather than Docker, when machine-gate.sh exits non-zero or an older manifest shows the retired exit 3, when copying a snapshot of the tree into an isolated Machine, or when reading or rerunning a manifest under artifacts/machines. Not a replacement for bun run test:sandbox, and not for Docker sandbox failures (bunqueue-running-gates)."
 license: MIT
 metadata:
   short-description: OrbStack Ubuntu and Debian Machine gate for bunqueue
@@ -61,12 +61,12 @@ delete them yourself with `orb delete -f <name>`.
 | Exit | Verdict | What it means |
 | --- | --- | --- |
 | 0 | PASS | evidence: every step passed in every Machine. Release evidence only with both Ubuntu 24.04 and Debian 13; with Ubuntu 24.04 alone, evidence for a candidate (the manifest's Scope line says which) |
-| 3 | KNOWN ENVIRONMENT GAP | evidence with the same scope rule, the canonical result today: every step passed except exactly the known node-dependent unit tests, which pass with a node->bun shim |
-| 5 | DIAGNOSTIC | passed (or only the known gap), but not evidence: a step subset, no Ubuntu 24.04 Machine, or `--keep` |
+| 5 | DIAGNOSTIC | passed, but not evidence: a step subset, no Ubuntu 24.04 Machine, or `--keep` |
 | 1 | FAIL | a real failure: read the step log the manifest names; classify as in bunqueue-running-gates |
 | 4 | INFRASTRUCTURE FAILURE | no evidence (OrbStack, whitespace, secret scan, an existing Machine name, creation, isolation, SSH, copy, hash mismatch, timeout), or a Machine not deleted, an interrupted create that never appeared, or no recorded cleanup: that outranks an interrupt |
 | 130 | INTERRUPTED | SIGTERM or SIGINT, and every Machine was deleted: nothing is claimed. If cleanup could not delete everything the exit is 4 |
 | 2 | usage error | fix the options |
+| 3 | retired | never returned since 2026-11-13: it was the known node gap ([below](#node-in-the-machines)); an older manifest that says 3 stays valid for its tree, and `--classify` now reads that run as 1 |
 
 `--classify <run-dir>` (the same as `machine-verdict.sh <run-dir>`) re-reads a run
 directory, prints its manifest and exits with the code the run ended with, without
@@ -100,33 +100,28 @@ So an interrupt during `orb create` does not return at once: the gate waits the 
 window, then exits 130 only when every Machine the run started creating is confirmed
 deleted. In every other case the exit is 4, with the names to check.
 
-## The known environment gap
+## Node in the Machines
 
-The Machines carry Bun and no Node. `test/repro-docker-version-gate-errors.test.ts`
-(2 tests) and `test/repro-release-source-commit.test.ts` (4 tests) run CI's
-version-gate bash, whose first line is `node -p "require('./package.json').version"`,
-so they fail with `node: command not found` there; the sandbox image (a node->bun
-fallback) and GitHub's runners (real Node) pass them. The canonical run installs no
-shim. When the unit suite fails, `machine-steps.sh` reruns exactly those two files as
-they are and again with a node->bun shim appended to PATH, the way `oven/bun` does,
-and the verdict is 3 only when:
-
-- the unit failures are exactly the file and title pairs in
-  [assets/known-node-gap.txt](assets/known-node-gap.txt), with
-  `node: command not found` and no unhandled error;
-- the as-is rerun fails on the same pairs and the shim rerun passes;
-- every other step passed.
-
-Any other combination is a real failure (exit 1). If a run ever exits 0, the gap is
-gone; update the asset list and this section in the same change.
+The Machines carry Bun and no Node, and the gate installs no node->bun shim.
+`test/repro-docker-version-gate-errors.test.ts` and
+`test/repro-release-source-commit.test.ts` run CI's version-gate bash, which calls
+`node -p`; until 2026-11-13 six of their tests failed there with
+`node: command not found`, and the gate reported that known gap as exit 3 after
+rerunning them with a shim. Each file now links a `node` to the running Bun
+(`process.execPath`) first on the PATH of the bash it spawns, so they pass in a
+Bun-only Machine as they do in the sandbox and in CI, and
+`test/repro-ci-script-tests-without-node.test.ts` runs both with `node` absent.
+The gate therefore has no exception: any unit failure is a real failure (exit 1).
+If `node: command not found` ever appears in a Machine's unit log again, a test
+started depending on Node: fix that test the same way, never the gate.
 
 ## Evidence
 
 ```text
-OrbStack Machines (machine-gate.sh exit 3, artifacts/machines/<run-id>/manifest.md) on
+OrbStack Machines (machine-gate.sh exit 0, artifacts/machines/<run-id>/manifest.md) on
 staged tree <hash>: Ubuntu 24.04 and Debian 13, arm64, Bun <version>: unit
-<n> pass / 6 fail (the known node gap; 22 / 0 with the shim) / <n> skip, tcp <n>/<n>,
-embedded <n>/<n>, typecheck and format clean, tinyfs <n> / 0; Machines deleted.
+<n> pass / 0 fail / <n> skip, tcp <n>/<n>, embedded <n>/<n>, typecheck and format
+clean, tinyfs <n> / 0; Machines deleted.
 ```
 
 Doing it by hand, and what each manifest field means:
@@ -137,10 +132,10 @@ on `3e08f75b`, before the changes of that day's review):
 
 | Proven on real OrbStack | Proven with fakes only |
 | --- | --- |
-| The canonical run: exit 3 in 24 min 41 s; in both Machines unit 11871 pass / 6 fail / 399 skip, tcp 69/69 suites and 553/553, embedded 43/43 and 349/349, tinyfs 9 / 0 | A create that appears after the settle window (exit 4, not deleted) |
+| The canonical run: exit 3 (the node gap, since retired) in 24 min 41 s; in both Machines unit 11871 pass / 6 fail / 399 skip, tcp 69/69 suites and 553/553, embedded 43/43 and 349/349, tinyfs 9 / 0 | A create that appears after the settle window (exit 4, not deleted) |
 | SIGTERM and SIGINT during `orb create`, during provisioning and during the steps: exit 130, no Machine and no process left | A failing or slow `orb list` |
 | A step subset and `--keep`: exit 5; an existing Machine name: exit 4, the Machine untouched | The rule that only children of the gate are signalled |
-| The gap: six node-dependent tests fail, 22 / 0 with the shim | Exit 0 and exit 1 (no real log ended that way), and the other infrastructure failures |
+| The gap: six node-dependent tests failed, 22 / 0 with the shim; the fix in the tests is proven on the host with `node` absent, not yet on OrbStack | Exit 0 and exit 1 (no real log ended that way), and the other infrastructure failures |
 | | The 15-minute bounds, the repeated delete and the detached cleanup: written after the real run, which showed the need; not yet rerun on OrbStack |
 | | An `amd64` host |
 

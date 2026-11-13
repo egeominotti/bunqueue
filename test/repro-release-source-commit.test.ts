@@ -9,7 +9,7 @@
  * action created the tag at main's HEAD at the end of a ~20-minute pipeline.
  */
 import { describe, expect, test } from 'bun:test';
-import { chmod, mkdtemp, rm } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -56,6 +56,9 @@ async function run(script: string, env: Record<string, string>, stubs: Record<st
       await Bun.write(join(directory, name), body);
       await chmod(join(directory, name), 0o755);
     }
+    // The version gate calls `node -p`. A `node` link to this Bun, the shim oven/bun
+    // ships, first on PATH runs it the same way everywhere, Bun-only hosts included.
+    await symlink(process.execPath, join(directory, 'node'));
     const output = join(directory, 'output');
     const log = join(directory, 'calls');
     await Bun.write(output, '');

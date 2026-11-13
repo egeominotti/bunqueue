@@ -43,16 +43,15 @@ Options:
 Exit codes:
   0    evidence: every step passed in every Machine. Release evidence only with both
        ubuntu:24.04 and debian:13; with ubuntu:24.04 alone, evidence for a candidate
-  1    a real failure: a step failed and the known environment gap does not explain it
+  1    a real failure: a step failed (the unit suite included)
   2    usage error
-  3    evidence, as for 0, with only the known environment gap: the unit suite failed on
-       exactly the tests in ../assets/known-node-gap.txt (`node: command not found` in
-       a Bun-only Machine), they pass with a node->bun shim, every other step passed
+  3    retired, never returned: it was the known node gap of the Bun-only Machines,
+       which the tests now close themselves (a run that exited 3 reclassifies as 1)
   4    precondition or infrastructure failure (no OrbStack, whitespace errors, secret
        scan, an existing Machine name, creation, isolation, SSH, copy, hash mismatch,
        timeout, a Machine not deleted or no recorded cleanup); nothing is claimed
-  5    diagnostic: passed (or only the known gap) but not evidence: a step subset,
-       no Ubuntu 24.04 Machine, or --keep
+  5    diagnostic: passed but not evidence: a step subset, no Ubuntu 24.04 Machine,
+       or --keep
   130  interrupted (SIGINT or SIGTERM) and every Machine deleted; 4 if one was not
 EOF
 }
@@ -73,7 +72,6 @@ need_value() { [ "$2" -ge 2 ] || usage_error "$1 needs a value"; }
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$script_dir/../../../.." && pwd)
-gap_file="$script_dir/../assets/known-node-gap.txt"
 
 tree='' distros=$CANONICAL_DISTROS steps=$ALL_STEPS run_id='' keep=0 dry_run=0
 classify_dir='' allowed='.env.example'
@@ -108,7 +106,6 @@ done
 for path in $allowed; do
   case "$path" in /* | *..*) usage_error "--allow-file takes a repository-relative path: $path" ;; esac
 done
-[ -f "$gap_file" ] || die 4 "missing $gap_file"
 [ -z "$classify_dir" ] || exec bash "$script_dir/machine-verdict.sh" "$classify_dir"
 
 case "$(uname -m)" in
@@ -151,7 +148,7 @@ if [ "$dry_run" -eq 1 ]; then
   extra=''
   [ "$keep" -eq 0 ] || extra=--keep
   bash "$script_dir/machine-cleanup.sh" --dry-run --run-dir "$run_dir" --state-dir "$state_dir" $extra
-  echo "# then machine-verdict.sh writes manifest.md; exit 0 pass, 1 fail, 3 known gap, 4 infra, 5 diagnostic"
+  echo "# then machine-verdict.sh writes manifest.md; exit 0 pass, 1 fail, 4 infra, 5 diagnostic"
   exit 0
 fi
 

@@ -72,6 +72,11 @@ overview: [docs/agents/README.md](docs/agents/README.md).
    change is uncommitted and `bun run test:sandbox`, `bun run test:sandbox:sdk`
    and the skeptic are still to run. The next Python SDK release must carry the
    break.
+4. `ci-script-tests-bun-only-machines` (in progress, PARTIAL): the two CI-script
+   test files link their own `node` to Bun and pass with `node` absent; the
+   Machine gate's known-gap machinery (exit 3) is removed. Next: `bun run
+   test:sandbox`, skeptic, commit.
+5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
 6. `npm-files-benchmark-negation`: `bun pm pack` ignores the `!dist/benchmark`
    negation of `package.json` `files` (latent: the library build never emits that
    directory); test first, then `!dist/benchmark/**`.
@@ -99,6 +104,11 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   not from an observed run). The Machine gate fixes
   (detached cleanup, repeated delete, 15-minute bounds) are proven with a fake
   OrbStack only; the real run predates them.
+- `ci-script-tests-bun-only-machines`: the fix is proven on the macOS host with
+  `node` absent from `PATH`, not yet in a real OrbStack Machine; the next
+  `machine-gate-real-rerun` should exit 0, and any unit failure there is now a real
+  failure (exit 3 is retired). On hosts with a real Node (CI) these two files now run
+  the gate's `node -p` calls with Bun too; CI's own version-gate job still uses Node.
 - `--isolate-network` does not isolate an OrbStack Machine from sibling Machines,
   the Mac's LAN address or the internet (measured on OrbStack 2.2.5). Only the
   sandbox containers run tests without a network.
@@ -196,6 +206,28 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Host checks: `bun test test/repro-issue-189*` 16 / 0, `bun run typecheck`,
   `bun run format:check`, `git diff --check`, `./init.sh` green. Not run:
   `bun run test:sandbox`, skeptic.
+### 2026-11-13 — ci-script-tests-bun-only-machines
+
+- Item `ci-script-tests-bun-only-machines` (branch of the same name, base
+  `bfa290c7`), `in-progress`, evidence `PARTIAL`; staged, not committed.
+- Reproduced on the host with `node` absent from `PATH` (`PATH=<bun link>:/usr/bin:/bin`):
+  the two files 16 pass / 6 fail, the six former known-gap titles, `node: command
+  not found`; three negative tests in them passed only because the step died at
+  `node -p`. Fix in the tests only: each file symlinks `node` to `process.execPath`
+  in the temporary directory it already prepends to the spawned bash's `PATH`.
+  After: 22 / 0 with and without `node`. New regression test
+  `test/repro-ci-script-tests-without-node.test.ts` (node shadowed by an exit-127
+  stub): failed before the fix (nested run 16 / 6), passes after.
+- Removed the Machine gate's known-gap machinery, which nothing else used:
+  `assets/known-node-gap.txt`, the `gap-asis`/`gap-shim` reruns and `--gap-file` of
+  `machine-steps.sh`, the gap classification and exit 3 of `machine-verdict.sh`
+  (exit 3 documented as retired; `--classify` reads an older exit-3 run as 1),
+  the worker's copy of the asset; SKILL.md, manual procedure, evals, the fixture
+  tests, `docs/testing.md`, `docs/agents/README.md` and the changelog updated.
+  `docs/agents/skill-evals.md` keeps its historical measurement unchanged.
+- Host checks: `bun test test/agent-skills test/agent-harness` 136 / 0, typecheck
+  and format clean, `git diff --check` clean, `./init.sh` green. Not run: `bun run
+  test:sandbox` (left to the parent session), skeptic, a real Machine run.
 
 ### 2026-11-13 — ci-flakes-record
 
