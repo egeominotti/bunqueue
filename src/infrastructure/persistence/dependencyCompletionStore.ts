@@ -97,12 +97,6 @@ export class DependencyCompletionStore {
     }));
   }
 
-  pin(jobIds: Iterable<JobId>): void {
-    this.db.transaction(() => {
-      for (const jobId of jobIds) this.pinOne.run(jobId);
-    })();
-  }
-
   unpin(jobIds: Iterable<JobId>, retentionLimit: number): DependencyCompletionRecord[] {
     return this.db.transaction(() => {
       for (const jobId of jobIds) this.unpinOne.run(jobId);

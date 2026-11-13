@@ -118,5 +118,3 @@ export type Command =
   | Protocol.HelloCommand
   | Protocol.SubscribeEventsCommand
   | Protocol.UnsubscribeEventsCommand;
-
-export type CommandType = Command['cmd'];

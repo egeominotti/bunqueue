@@ -13,8 +13,6 @@
  * the `drain` handler.
  */
 
-import type { Socket } from 'bun';
-
 /** Minimal write surface a socket must expose for the queue. */
 interface WritableSocket {
   write(data: Uint8Array): number;
@@ -138,15 +136,4 @@ export class SocketWriteQueue {
     this.offset = 0;
     this.queuedBytes = 0;
   }
-}
-
-/**
- * Convenience: write through a socket whose `data` carries a `writeQueue`.
- * Keeps call sites in tcp.ts terse and consistent.
- */
-export function queuedWrite<T extends { writeQueue: SocketWriteQueue }>(
-  socket: Socket<T>,
-  data: Uint8Array
-): void {
-  socket.data.writeQueue.write(socket, data);
 }

@@ -168,7 +168,7 @@ class Logger {
   debug/info/warn/error(message: string, data?: Record<string, unknown>): void
 }
 function createLogger(component: string): Logger
-// singletons: serverLog, tcpLog, httpLog, wsLog, cronLog, statsLog, storageLog, queueLog, webhookLog, backupLog
+// singletons: serverLog, tcpLog, httpLog, cronLog, statsLog, storageLog, queueLog, webhookLog, backupLog
 ```
 
 `src/shared/version.ts`: `export const VERSION = pkg.version`.

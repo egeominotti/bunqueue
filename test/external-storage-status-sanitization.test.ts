@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { getSharedManager, shutdownManager } from '../src/client/manager';
-import { buildStatsRefresh } from '../src/infrastructure/cloud/statsRefresh';
 import { collectSnapshot } from '../src/infrastructure/cloud/snapshotCollector';
 import { EmbeddedBackend } from '../src/mcp/adapter';
 
@@ -34,7 +33,6 @@ describe('external storage-status sanitization', () => {
     const manager = managerWithStorage({ diskFull: false, error: rawDiagnostic, since: 123 });
 
     const mcp = await embedded.getStorageStatus();
-    const refresh = buildStatsRefresh(manager);
     const snapshot = await collectSnapshot({
       queueManager: manager,
       instanceId: 'storage-boundary',
@@ -45,7 +43,7 @@ describe('external storage-status sanitization', () => {
     });
     embedded.shutdown();
 
-    for (const value of [mcp, refresh.storage, snapshot.storage]) {
+    for (const value of [mcp, snapshot.storage]) {
       expect(value).toMatchObject({ diskFull: false, error: 'Internal server error' });
       expect(JSON.stringify(value)).not.toContain('42501');
       expect(JSON.stringify(value)).not.toContain('db.internal');
@@ -60,10 +58,6 @@ describe('external storage-status sanitization', () => {
     const manager = managerWithStorage(diskFull);
 
     expect(await embedded.getStorageStatus()).toEqual({
-      diskFull: true,
-      error: 'database or disk is full',
-    });
-    expect(buildStatsRefresh(manager).storage).toEqual({
       diskFull: true,
       error: 'database or disk is full',
     });

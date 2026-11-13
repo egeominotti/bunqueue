@@ -190,12 +190,6 @@ function cleanupPurgedEntries(
   cleanupTerminalEntries(queue, entries, terminalJobIds, ctx);
 }
 
-/** Configure DLQ for a queue */
-export function configureDlq(queue: string, ctx: DlqContext, config: Partial<DlqConfig>): void {
-  const idx = shardIndex(queue);
-  ctx.shards[idx].setDlqConfig(queue, config);
-}
-
 /** Get DLQ configuration */
 export function getDlqConfig(queue: string, ctx: DlqContext): DlqConfig {
   const idx = shardIndex(queue);

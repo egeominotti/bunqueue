@@ -77,13 +77,6 @@ export class SseHandler {
     }, 30000);
   }
 
-  /** @deprecated Use startBroadcasts() instead */
-  startHeartbeat(): void {
-    this.heartbeatTimer ??= setInterval(() => {
-      this.sendHeartbeat();
-    }, SSE_HEARTBEAT_MS);
-  }
-
   /** Stop all timers */
   private stopTimers(): void {
     this.queueCountsScheduler?.stop();

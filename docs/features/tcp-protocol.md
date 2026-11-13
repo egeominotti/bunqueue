@@ -117,7 +117,6 @@ export class SocketWriteQueue {
   get hasPending(): boolean;
   clear(): void;
 }
-export function queuedWrite<T extends { writeQueue: SocketWriteQueue }>(socket, data): void;
 ```
 
 `serialization.ts` exports `serializeJob`/`serializeJobs` (BigInt id → string, `Record<string,unknown>`), `bigIntReplacer`, and `jsonStringify`. These produce **JSON-safe** shapes used by the JSON/HTTP layer; the binary TCP path relies on `msgpackr` (which encodes `bigint` natively) and does not call these.

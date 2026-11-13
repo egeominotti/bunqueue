@@ -158,12 +158,6 @@ export abstract class SqliteRecords extends SqliteFlows {
     return this.dependencyCompletionStore.load();
   }
 
-  pinDependencyCompletions(jobIds: Iterable<JobId>): void {
-    this.safeWrite(() => {
-      this.dependencyCompletionStore.pin(jobIds);
-    });
-  }
-
   unpinDependencyCompletions(
     jobIds: Iterable<JobId>,
     retentionLimit: number

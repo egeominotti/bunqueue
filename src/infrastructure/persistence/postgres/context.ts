@@ -35,10 +35,6 @@ export async function runPostgresPostCommitMaintenance(
   await operation();
 }
 
-export function databaseNowSql(): string {
-  return 'floor(extract(epoch from clock_timestamp()) * 1000)::bigint';
-}
-
 export async function databaseNow(tx: SQL | TransactionSQL): Promise<number> {
   const [row] = await tx<{ now: number | string | bigint }[]>`
     SELECT floor(extract(epoch from clock_timestamp()) * 1000)::bigint AS now

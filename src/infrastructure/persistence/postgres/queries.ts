@@ -1,5 +1,5 @@
 import type { DlqEntry } from '../../../domain/types/dlq';
-import type { Job, JobId } from '../../../domain/types/job';
+import type { JobId } from '../../../domain/types/job';
 import { jobId } from '../../../domain/types/job';
 import { decodePostgresJob, decodePostgresValue, numeric } from './codec';
 import type { PostgresContext } from './context';
@@ -196,8 +196,4 @@ export async function latestPostgresEventId(ctx: PostgresContext): Promise<numbe
     SELECT MAX(id) AS id FROM bunqueue_events WHERE namespace = ${ctx.config.namespace}
   `;
   return numeric(row.id) ?? 0;
-}
-
-export function jobsOnly(rows: readonly PostgresStoredJob[]): Job[] {
-  return rows.map((row) => row.job);
 }

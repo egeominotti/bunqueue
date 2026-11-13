@@ -306,7 +306,7 @@ the `executed: false` refusal, all worded as the server words them), three
 columns keyed by the variable that turns each feature on
 (`BUNQUEUE_MCP_TOOLSETS`, `BUNQUEUE_MCP_CONFIRM`, `BUNQUEUE_MCP_DECISION_*`) and
 the supported decision models (Jev, Clef, Clef-flash, Kev 9B, Laya,
-DiffusionGemma Jev, with where each one runs). Its figures (75 tools, 11
+DiffusionGemma Jev, with where each one runs). Its figures (79 tools, 11
 toolsets, 1,300 to 4,600 tokens instead of about 16,000, nine guarded tools)
 come from `guide/mcp.mdx`; update both together. Its styles live in
 `styles/home-agents.css`, whose selectors include `.home-agents` so the
@@ -328,7 +328,7 @@ at every width (on phones one spine on the left ends in a branch into each mode
 card); its styles are in `styles/mcp-architecture.css` (global, every class name
 starts with `mcpd`). `HttpHandlerFlow.astro` shows a handled job as four numbered
 steps with chips in the job-state palette (waiting, active, completed, failed).
-Their figures (75 tools, 3 prompts, 5 resources, port 6789, the HTTP methods,
+Their figures (79 tools, 3 prompts, 5 resources, port 6789, the HTTP methods,
 which methods send a body, `timeoutMs`) come from `guide/mcp.mdx` and
 `src/mcp/httpHandler.ts`; update them together. Inline code inside these
 figures is styled with `.<root>.not-content :not(pre) > code`, because

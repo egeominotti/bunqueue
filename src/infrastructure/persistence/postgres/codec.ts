@@ -1,6 +1,6 @@
 import { type DlqEntry, type DlqRetryState, setDlqRetryState } from '../../../domain/types/dlq';
 import { Buffer } from 'node:buffer';
-import type { Job, JobId } from '../../../domain/types/job';
+import type { Job } from '../../../domain/types/job';
 import { jobId } from '../../../domain/types/job';
 import { pack, unpack } from '../sqliteSerializer';
 import type {
@@ -122,8 +122,4 @@ export function postgresStateForJob(
 
 export function eventPayload(input: EventPayload): Uint8Array {
   return encodePostgresValue(input);
-}
-
-export function asJobId(value: string): JobId {
-  return jobId(value);
 }

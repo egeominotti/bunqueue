@@ -25,7 +25,7 @@
  *      are left WITHOUT an outcome on purpose, so a resume can still reach them.
  */
 
-import type { Execution, StepRecord } from './types';
+import type { StepRecord } from './types';
 import type { Workflow } from './workflow';
 import { findStepDef } from './runner';
 
@@ -163,9 +163,4 @@ export function owesOutcome(wf: Workflow, name: string, record?: StepRecord): bo
   // exists to discharge "exactly one outcome per eligible step, never zero"
   // (`test/repro-workflow-abandon-vanished.test.ts`).
   return record?.compensation !== undefined || record?.compensatable === true;
-}
-
-/** Is the pivot committed, making the whole run ineligible for rollback? */
-export function isCommitted(exec: Execution): boolean {
-  return exec.committedAt !== undefined;
 }

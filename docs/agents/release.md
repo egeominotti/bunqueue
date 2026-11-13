@@ -101,6 +101,10 @@ What the root tarball contains is decided only by the `files` allow-list of
 `LICENSE` and `DISCLAIMER.md`, plus `package.json` itself). There is no
 `.npmignore`: with a `files` list neither `bun pm pack` nor `npm pack` applies
 one at the package root, so the one that existed changed nothing and was removed.
+A directory negation in `files` needs the `/**` form (`!dist/benchmark/**`):
+`bun pm pack` 1.4.4, which CI packs with, ignores a bare `!dist/benchmark` that npm
+honors; `test/package-files-pack.test.ts` packs the real `files` list with probe
+files under `dist/benchmark/` to keep the two tools in agreement.
 
 ## Release blog posts
 

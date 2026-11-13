@@ -249,6 +249,41 @@ head:
   and the `bunqueue-assistant` agent now state the current MCP tool count (79
   primary tools). `.dockerignore` stays, with a header saying which build uses
   it. Nothing in the package or the runtime changes.
+- The site components (`AiAgentWorkflow`, `McpArchitecture`) and two Open Graph
+  covers (`og/integrations.png`, `og/use-cases.png`, regenerated with
+  `docs/scripts/generate-og.ts`) said 75 MCP tools; they now say 79, the primary
+  tools the server registers. `test/docs-mcp-tool-count.test.ts` derives that
+  figure from the tool policy and checks every "N tools" claim in the README, the
+  guides, the feature docs, the components, the covers, the plugin skill and the
+  agent profile.
+
+### Internal
+
+- `package.json` `files` excludes `dist/benchmark/` with `!dist/benchmark/**`:
+  `bun pm pack` 1.4.4, which CI packs with, ignored the bare `!dist/benchmark`
+  that npm honors. No benchmark is built today, so the published package does not
+  change because of this; `test/package-files-pack.test.ts` packs the real list
+  with probe files to keep it that way.
+- Dead code removed, with no change in behavior or public API: ten barrel
+  `index.ts` files nothing imports (`client/worker`, `client/queue`,
+  `client/queue/operations`, `domain/queue`, `domain/types`,
+  `infrastructure/server`, `infrastructure/server/handlers`,
+  `infrastructure/scheduler`, `application/operations`, `shared`), the unwired
+  cloud builders `statsRefresh.ts` and `statsUpdate.ts`, the pre-adapter
+  `collectCrons` / `collectWorkerDetails` / `collectJobArtifacts` snapshot
+  variants, the dependency-completion pin path superseded in 2.8.56
+  (`pinReferencedCompletions` and the storage `pin` it called), the deprecated
+  `SseHandler.startHeartbeat()` (`startBroadcasts()` starts the same timer), and
+  a few unused helpers (`isCommitted`, `CommandType`,
+  `deletePostgresQueueCompletions`, `asJobId`, `jobsOnly`, `databaseNowSql`,
+  `queuedWrite`, `configureDlq`, `wsLog`, `LockQueueEntry`). None of them was
+  reachable from a package export, either as a module or as a public member of a
+  type that an export returns; the npm package loses the 24 compiled files of the
+  removed modules (1,724 files instead of 1,748). Also removed: the three
+  `scripts/demo-batch-notify*.ts` demos of the February 2026 batch-wakeup fix
+  (measured by `scripts/bench-tcp-batch-notify.ts` and covered by
+  `test/bug-batch-notify-single-waiter.test.ts`) and the unused `elysia`
+  devDependency (its example was deleted in January 2026).
 
 ### Testing
 

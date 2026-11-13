@@ -62,7 +62,7 @@
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "!dist/bunqueue",
-    "!dist/benchmark",
+    "!dist/benchmark/**",
     "README.md",
     "LICENSE",
     "DISCLAIMER.md"
@@ -164,7 +164,6 @@
     "@types/bun": "^1.4.0",
     "ai": "^7.0.38",
     "bullmq": "^5.79.3",
-    "elysia": "^1.4.25",
     "fast-check": "^4.9.0",
     "ioredis": "^5.11.1",
     "typedoc": "^0.28.20",

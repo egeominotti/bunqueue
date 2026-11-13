@@ -233,7 +233,7 @@ Coordination in the agent itself is single-threaded JS event-loop based:
 
 - `CollectSnapshotParams.includeHeavy` is declared and always passed `true`, but `collectSnapshot` never reads it — the "light every 15s / heavy every 90s" file-header comment is aspirational; **every snapshot is full** (`snapshotCollector.ts:2-6`, `types/collector.ts:38-49`, callers `cloudAgent.ts:145-155`, `cloudAgent.ts:191-201`, `cloudAgent.ts:259-269`).
 - There is no live 15s `stats_update` WS push: the agent only sends HTTP snapshots and WS command results (the unused `statsUpdateTimer` field was removed).
-- `buildStatsRefresh` (`statsRefresh.ts`) and `buildStatsUpdate` (`statsUpdate.ts`) are exported but not referenced anywhere in `src`; the `stats:refresh` command uses the selected adapter source. Treat both files as legacy/unwired.
+- The `stats:refresh` command answers from the selected adapter source (`commands/queues.ts`); the unwired `statsRefresh.ts` and `statsUpdate.ts` builders, and the `collectCrons` / `collectWorkerDetails` / `collectJobArtifacts` variants of `snapshot/collector.ts` that read the `QueueManager` directly, were removed because nothing called them.
 - Post-command immediate-snapshot trigger is commented out — the dashboard is expected to refresh via WS command results, not via an HTTP re-push (`cloudAgent.ts:100-103`).
 
 ## Configuration

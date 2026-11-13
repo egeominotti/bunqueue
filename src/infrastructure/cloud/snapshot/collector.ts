@@ -1,5 +1,4 @@
 import { arch, cpus, hostname, platform } from 'os';
-import type { QueueManager } from '../../../application/queueManager';
 import type { CloudSnapshot } from '../types';
 import type { CollectSnapshotParams } from '../types/collector';
 import type { CloudSnapshotSource } from '../queueAdapter/types';
@@ -25,10 +24,6 @@ export function resolveRedaction(params: CollectSnapshotParams): {
 }
 
 /** Map cron definitions to their snapshot shape. */
-export function collectCrons(queueManager: QueueManager): CloudSnapshot['crons'] {
-  return mapSnapshotCrons(queueManager.listCrons());
-}
-
 export function mapSnapshotCrons(crons: CloudSnapshotSource['crons']): CloudSnapshot['crons'] {
   return crons.map((cron) => ({
     name: cron.name,
@@ -72,41 +67,7 @@ export function enrichFailedJobDurations(
   }
 }
 
-/** Collect worker registry details and derived health fields. */
-export function collectWorkerDetails(
-  queueManager: QueueManager,
-  now: number
-): CloudSnapshot['workerDetails'] {
-  const workerTimeoutMs = 30_000;
-  return queueManager.workerManager.list().map((worker) => {
-    const totalJobs = worker.processedJobs + worker.failedJobs;
-    return {
-      id: worker.id,
-      name: worker.name,
-      queues: worker.queues,
-      concurrency: worker.concurrency,
-      hostname: worker.hostname,
-      pid: worker.pid,
-      registeredAt: worker.registeredAt,
-      lastSeen: worker.lastSeen,
-      activeJobs: worker.activeJobs,
-      processedJobs: worker.processedJobs,
-      failedJobs: worker.failedJobs,
-      currentJob: worker.currentJob,
-      uptime: now - worker.registeredAt,
-      status:
-        now - worker.lastSeen > workerTimeoutMs
-          ? ('stalled' as const)
-          : worker.activeJobs > 0
-            ? ('active' as const)
-            : ('idle' as const),
-      errorRate: totalJobs > 0 ? +(worker.failedJobs / totalJobs).toFixed(4) : 0,
-      utilization:
-        worker.concurrency > 0 ? +(worker.activeJobs / worker.concurrency).toFixed(4) : 0,
-    };
-  });
-}
-
+/** Map worker registry details and derived health fields to their snapshot shape. */
 export function mapSnapshotWorkers(
   workers: CloudSnapshotSource['workers'],
   now: number
@@ -141,30 +102,7 @@ export function mapSnapshotWorkers(
   });
 }
 
-/** Collect results, logs, and active locks for the snapshot. */
-export function collectJobArtifacts(
-  queueManager: QueueManager
-): Pick<CloudSnapshot, 'jobResults' | 'jobLogEntries' | 'activeLocks'> {
-  const jobResults: Record<string, unknown> = {};
-  for (const [id, value] of queueManager.getAllJobResults()) jobResults[id] = value;
-
-  const jobLogEntries: CloudSnapshot['jobLogEntries'] = {};
-  for (const [id, logs] of queueManager.getAllJobLogs()) jobLogEntries[id] = logs;
-
-  const activeLocks = [...queueManager.getAllJobLocks().values()].map((lock) => ({
-    jobId: String(lock.jobId),
-    owner: lock.owner,
-    token: lock.token,
-    createdAt: lock.createdAt,
-    expiresAt: lock.expiresAt,
-    lastRenewalAt: lock.lastRenewalAt,
-    renewalCount: lock.renewalCount,
-    ttl: lock.ttl,
-  }));
-
-  return { jobResults, jobLogEntries, activeLocks };
-}
-
+/** Map results, logs, and active locks to their snapshot shape. */
 export function mapSnapshotJobArtifacts(
   source: CloudSnapshotSource
 ): Pick<CloudSnapshot, 'jobResults' | 'jobLogEntries' | 'activeLocks'> {

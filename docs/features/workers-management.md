@@ -299,7 +299,7 @@ before releasing the runtime/transport, including the embedded path.
 
 The TCP and HTTP servers call `QueueManager.unregisterWorkersByClientId` when a
 connection closes (`src/infrastructure/server/tcp/connections.ts:87-103`, `server/http.ts:237-243`,
-`server/sseHandler.ts:255-260`), which delegates to
+`server/sseHandler.ts:248-253`), which delegates to
 `unregisterByClientId(clientId)` — removing every worker registered over that
 connection and emitting `worker:disconnected` per removal
 (`workerManager.ts:76-87`). Because pooled clients get a fresh server-side

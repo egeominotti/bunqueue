@@ -177,21 +177,6 @@ export function commitRemovedCompletion(
 }
 
 /**
- * Protect recent proofs when a newly accepted parent waits on another
- * dependency. SQLite is updated first so RAM never advertises a stronger
- * durability guarantee than the database.
- */
-export function pinReferencedCompletions(
-  dependencyIds: Iterable<JobId>,
-  ctx: Pick<DependencyCompletionContext, 'storage' | 'depCompletions'>
-): void {
-  const ids = [...new Set(dependencyIds)].filter((id) => ctx.depCompletions?.has(id) ?? false);
-  if (ids.length === 0) return;
-  ctx.storage?.pinDependencyCompletions(ids);
-  for (const id of ids) ctx.depCompletions?.pin(id);
-}
-
-/**
  * Unpin candidates only after every shard has released its reverse edge.
  * Storage returns the complete retained set because pruning can also evict
  * older recent entries; hydrating from it keeps both RAM tiers exact.

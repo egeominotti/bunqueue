@@ -53,6 +53,9 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 - `issue-189-unix-socket-followups` (branch `issue-189-unix-socket-followups`):
   reproducing test, fix, docs and changelog in the worktree, not committed;
   `bun run test:sandbox` and the skeptic are still to run.
+- `dead-code-sweep` (branch `small-followups`; `npm-files-benchmark-negation` and
+  `docs-mcp-tool-count-drift` are folded into it and marked done): implemented and
+  staged, not committed; `bun run test:sandbox` and a skeptic `PASS` are still owed.
 
 ### What's Next
 
@@ -84,11 +87,10 @@ overview: [docs/agents/README.md](docs/agents/README.md).
    Machine gate's known-gap machinery (exit 3) is removed. Next: `bun run
    test:sandbox`, skeptic, commit.
 5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
-6. `npm-files-benchmark-negation`: `bun pm pack` ignores the `!dist/benchmark`
-   negation of `package.json` `files` (latent: the library build never emits that
-   directory); test first, then `!dist/benchmark/**`.
-7. `docs-mcp-tool-count-drift`: three docs-site sources and one internal page
-   still say 75 MCP tools; the server registers 79.
+6. `dead-code-sweep` on `small-followups` (with the two folded follow-ups): the
+   sandbox gate, a skeptic `PASS` and the commit are owed.
+7. `deprecated-public-apis-next-major`: the deprecated public APIs kept for
+   compatibility, to decide on before a major version.
 8. `machine-gate-real-rerun`: run `machine-gate.sh` on real OrbStack again; the
    cleanup, delete-retry and time-bound fixes have run against fakes only.
 9. `postgres-sigkill-hook-timeout-flake`: in `test/postgres-public-api-extreme.test.ts`
@@ -264,6 +266,37 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Host checks (diagnostic): fixed test 50 / 50 under the same load, whole file
   `--rerun-each 5` 20 / 0, typecheck and format:check clean, `git diff --check`
   clean, `./init.sh` green. Not run: `bun run test:sandbox`, skeptic.
+### 2026-11-13 — dead-code-sweep (with two small follow-ups)
+
+- Branch `small-followups`, base `bfa290c7`, staged with `git add -A`, not
+  committed. The owner asked to remove useless and deprecated things without any
+  business-logic or public-API change: deprecated public APIs are listed in the
+  new `not-started` item `deprecated-public-apis-next-major`, not removed.
+- `npm-files-benchmark-negation`: `!dist/benchmark/**` in `package.json` `files`;
+  `test/package-files-pack.test.ts` failed before (Bun packed 3 probe files under
+  `dist/benchmark/`) and passes after.
+- `docs-mcp-tool-count-drift`: 75 -> 79 in the two components, `og-covers.ts` and
+  `documentation-tooling.md`; `og/integrations.png` and `og/use-cases.png`
+  regenerated (the generator reproduces the committed covers byte for byte from the
+  old text, so only those two changed); `test/docs-mcp-tool-count.test.ts` derives
+  79 from `TOOL_POLICIES`.
+- `dead-code-sweep`: 12 unreachable `src/` modules, 17 unused functions, methods
+  and types, 3 demo scripts and the `elysia` devDependency removed; the evidence
+  and the full list are in the item.
+- Skeptic round 1: `FAIL` on one item: `Shard.queueState` is public through
+  `QueueManager.getShards()`. Restored byte for byte with `getStateMap()` and its
+  test, and listed in `deprecated-public-apis-next-major`. A TypeScript-checker walk
+  of the public type surface found no other removed member reachable.
+- Host checks: typecheck, format, docs data, release posts, client parity,
+  `git diff --check` and `./init.sh` green; the touched areas 607 / 0; docs and
+  harness tests 192 / 0; `bun run test:model` 12 / 0 (triggered: dependency-completion
+  and DLQ files changed, by deleting unused code only); the full unit suite on the
+  macOS host 11,933 pass / 388 skip / 1 fail, `test/mcp-doctor.test.ts` failing at
+  its own setup because macOS `bun:sqlite` keeps `-wal`/`-shm` files after close
+  (unrelated, reproduced outside the repository).
+- Owed: `bun run test:sandbox`, the PostgreSQL suite (only unused exports removed
+  from four PostgreSQL modules), the skeptic, the commit. Not run: the Astro build
+  of the docs site.
 
 ### 2026-11-13 — ci-flakes-record
 

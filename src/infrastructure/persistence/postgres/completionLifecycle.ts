@@ -81,20 +81,6 @@ export async function retirePostgresCompletionGenerations(
   return rows.map((row) => row.job_id);
 }
 
-/** Delete queue-owned completion-only rows inside an already serialized obliterate. */
-export async function deletePostgresQueueCompletions(
-  tx: TransactionSQL,
-  ctx: PostgresContext,
-  queue: string
-): Promise<JobId[]> {
-  const rows = await tx<{ job_id: string }[]>`
-    DELETE FROM bunqueue_completions
-    WHERE namespace = ${ctx.config.namespace} AND queue = ${queue}
-    RETURNING job_id
-  `;
-  return rows.map((row) => jobId(row.job_id));
-}
-
 interface CompletionPruneBatch {
   readonly selected: number;
   readonly removed: number;
