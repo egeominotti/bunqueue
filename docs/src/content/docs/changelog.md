@@ -208,6 +208,19 @@ head:
   pins the clock with `setSystemTime()` at noon and at 23:59:30 local time and
   asserts the exact next midnight, which is stricter than the old lower bound.
   The scheduler was correct; nothing in the runtime changes.
+- `test/repro-wait-hold-routing.test.ts` ("100 waits without QueueEvents on a
+  4-connection pool learn of completion at once") no longer fails under CPU load
+  (`wait-hold-routing-flake`). It required the Worker's `completed` event for all
+  100 jobs to have fired the moment the last `waitUntilFinished` resolved, but the
+  broker wakes a held wait while it applies the worker's `ACKB`, and the Worker
+  emits `completed` only after the `ACKB` reply reaches it, so the wait can win.
+  On the host under 18 extra busy CPU loops, the unchanged test failed 2 times in
+  40 runs (received 90), and a diagnostic copy found the event count short in
+  3 of 40 runs: in every run all 100 events arrived, the missing ones about
+  0.1 ms after the last wait. The test now waits up to 5 s for all 100 events
+  before asserting that there are 100 and that the p90 wait delay stays under
+  400 ms; under the same load it passed 50 of 50 runs. No completion notification
+  is lost; nothing in the runtime changes.
 
 ### Documentation
 

@@ -248,6 +248,21 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   changelog `[Unreleased]` Testing.
 - Host checks (diagnostic): the file `--rerun-each 20` 980 / 0, TZ=UTC
   `--rerun-each 5` 245 / 0, typecheck and format:check clean, `git diff --check`
+### 2026-11-13 — wait-hold-routing-flake
+
+- Test only (branch `wait-hold-routing-flake`, base `bfa290c7`, staged, not
+  committed). Cause: the test asserted 100 Worker `completed` events the moment the
+  last `waitUntilFinished` resolved, but the broker wakes a held `WaitJob` while it
+  applies the worker's `ACKB` and the Worker emits `completed` only after the
+  `ACKB` reply arrives, so the waits can win by one or two ACK batches of 10.
+- Reproduction on the host: unchanged test 1 / 30 failed at ambient load, 2 / 40
+  with 18 extra busy loops (received 90). A diagnostic copy found the count short
+  in 3 / 40 runs and all 100 events in 40 / 40, about 0.1 ms late: nothing is lost.
+- Fix: wait up to 5 s for all 100 events, then the same assertions (100 events,
+  p90 under 400 ms). Docs: `docs/features/client-queue-sdk.md`, changelog
+  `[Unreleased]` Testing.
+- Host checks (diagnostic): fixed test 50 / 50 under the same load, whole file
+  `--rerun-each 5` 20 / 0, typecheck and format:check clean, `git diff --check`
   clean, `./init.sh` green. Not run: `bun run test:sandbox`, skeptic.
 
 ### 2026-11-13 — ci-flakes-record

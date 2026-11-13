@@ -564,7 +564,13 @@ zero.
     consecutive-timeout reconnect (see [Client Transport](./client-transport.md)).
     A reply before the hold ended is followed by an unref'd pause until its end,
     so a broker answering early cannot turn the loop into a busy one. TTLs above
-    600000 ms are honoured by further holds.
+    600000 ms are honoured by further holds. A held wait is not ordered after the
+    Worker's own `completed` event: the broker wakes the hold while it applies the
+    worker's `ACKB`, and the Worker emits `completed` only once the `ACKB` reply
+    reaches it on its own connection, so a wait can resolve first (under CPU load
+    the events of the last batch or two of 10 acks were seen arriving just after
+    the last wait; `test/repro-wait-hold-routing.test.ts` waits for them with a
+    deadline). Neither notification is lost.
   - **Read budget and safety net** (`job-wait/readScheduler.ts`): every
     background read (the safety net, the `BROKER_READS` schedule, the re-reads
     after a re-subscription, the read at the deadline) goes through a token

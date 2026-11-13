@@ -69,7 +69,13 @@ test('100 waits without QueueEvents on a 4-connection pool learn of completion a
   );
 
   // The worker reports a completion slightly after the broker records it, so a wait
-  // can resolve first: such a delay counts as 0.
+  // can resolve first: such a delay counts as 0. The broker can answer WaitJob before
+  // the worker's ACKB, so the last waits can resolve before the worker has read its ACKB
+  // reply: under CPU load the events of the last ACK batch or two (10 jobs each)
+  // arrived just after the last wait. Every event must still arrive, so wait for all
+  // 100 with a deadline before asserting.
+  const eventsDeadline = performance.now() + 5_000;
+  while (completedAt.size < 100 && performance.now() < eventsDeadline) await Bun.sleep(5);
   const delays = resolved
     .map(({ id, at }) => Math.max(0, at - (completedAt.get(id) ?? at)))
     .sort((a, b) => a - b);
