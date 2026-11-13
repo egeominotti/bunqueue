@@ -66,6 +66,12 @@ previews. `scripts/agents/bounded-command.ts` and `skill-eval-process.ts` supply
 bounded owned-process execution, while `skill-eval-agents.ts` handles CLI events
 and canonical skill identity.
 
+The shared supervisor installs cancellation handlers before spawning a command.
+The child can run before `spawn()` returns, so registering handlers afterward
+leaves a startup window where SIGTERM terminates the supervisor without cleaning
+the detached group. Cancellation during launch is retained until the child PID
+is available, then follows the same bounded termination path as later signals.
+
 Skill evaluations stop before scheduling subscription sessions if discovery is
 invalid. Session timeouts terminate the owned CLI tree even if SIGTERM is ignored.
 SIGTERM/SIGINT cancels scheduling and active children, records interruption, and

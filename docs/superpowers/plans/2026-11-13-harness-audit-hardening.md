@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox syntax for tracking.
 
-**Goal:** Fix every reproduced harness audit defect, integrate the pending PostgreSQL guard and Machine logging repairs, commit and push the validated candidate.
+**Goal:** Fix every reproduced harness audit defect, integrate the pending PostgreSQL guard and Machine logging repairs, commit and push the validated candidate, then merge into main as explicitly requested in the follow-up.
 
 **Architecture:** Preserve the current Bun/TypeScript and Bash 3.2 harness. Enforce honest verdicts, bounded owned-process cleanup and accurate skill source attribution at existing boundaries. Keep product scheduling and public APIs unchanged.
 
@@ -76,6 +76,7 @@
 - [x] Record evidence; prove any state-only delta and rerun its readers. Get whole-branch skeptic PASS.
 - [ ] Commit with the changelog, specific message and recorded evidence; inspect outgoing commit(s), get pre-push skeptic PASS, then push without force.
 - [ ] Watch CI to green; if branch protection rejects a direct main push, preserve the commit on a feature branch and use the normal PR path. Never change protection rules.
+- [ ] After the CI cancellation follow-up passes its gates and PR CI, review and merge PR #190 through the normal protected-main path; watch the main CI run and align the original clean main checkout without discarding changes.
 
 ## Execution ledger
 
@@ -86,3 +87,5 @@
 - Product sandbox, fresh Ubuntu and SDK sandbox passed on frozen tree `22a1f4960893ff27aa4b4922c2160d2078d3c458`; complete counts, artifacts and the transient TCP memory observation are recorded in `feature_list.json` and `progress.md`.
 - State-only delta proved (exit3), readers404/0, final startup179/0/type/format green; whole-branch skeptic PASS on state tree `db30ef625ed8ff27516a2894b64ed042617b4c33`. Review this final recorded-state delta before committing.
 - Local commit and actual push remain; the connected GitHub account reports no repository write permission. Never claim push or CI success without evidence.
+- Follow-up: user explicitly requested account `egeominotti`, then fixes, commit, push and merge on main. Account switched, commit `9b69dcba` pushed, draft PR #190 opened. CI run `43519834491` found a reproduced cancellation startup race; fix, new gates and integration remain pending. No version bump or publication authorized.
+- 2026-11-14: startup fix passed sandbox (11916unit/553TCP/349embedded) and fresh Ubuntu (12047unit/553TCP/349embedded/9tinyfs), no failures, on frozen tree `2ec6b76dce8441415a0a6a0125a724c07d2b3d3e`. Full evidence in the state files. Final state-only readers/review, follow-up commit/push, PR CI and authorized squash merge/main CI remain.

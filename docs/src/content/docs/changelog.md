@@ -496,6 +496,14 @@ head:
 
 ### Bug fixes
 
+- **Harness command cancellation covers child startup.** A command can start
+  before `spawn()` returns. SIGTERM in that window previously terminated the
+  supervisor before its signal handlers were registered, leaving the detached
+  command running. The shared CI, evaluation and Machine command supervisor
+  registers cancellation before launch and cleans the owned group once its PID
+  is available. A deterministic startup regression covers the race first found
+  by the CI watcher cancellation test on Linux.
+
 - **`Worker.close()` no longer emits its own `ClientClosedError` from a heartbeat
   still in flight.** The worker-registration `Heartbeat` and the job-lease
   `JobHeartbeat` are fire-and-forget; a rejected one is emitted as `error`
