@@ -30,11 +30,11 @@
     },
     {
       "id": "ci-python39-runner-pin",
-      "name": "Revisit the Python 3.9 SDK runner pin",
-      "description": "The SDK workflow's Python 3.9 job runs on ubuntu-24.04 because ubuntu-latest (Ubuntu 26.04) has no setup-python 3.9 build. Python 3.9 has been end-of-life since October 2025 and the ubuntu-24.04 image will be retired: decide when to drop 3.9 from the supported SDK runtimes (a release-compatibility decision for the user) or move the job to a container image that still ships it.",
+      "name": "Drop Python 3.9 from the Python SDK and remove the runner pin",
+      "description": "The SDK workflow's Python 3.9 job ran on ubuntu-24.04 because ubuntu-latest (Ubuntu 26.04) has no setup-python 3.9 build. Python 3.9 has been end-of-life since October 2025 and the ubuntu-24.04 image will be retired. The user decided to drop Python 3.9: requires-python becomes >=3.10 in sdk/python/pyproject.toml (a breaking change the next Python SDK release must carry; the SDK version is not bumped here), the matrix tests Python 3.10 and 3.13 on ubuntu-latest, the python_version markers of the test and mutation extras go, and test/sdk-python-matrix.test.ts replaces test/repro-ci-python39-runner.test.ts.",
       "dependencies": [],
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "2026-11-13, base bfa290c7; lands in the commit that adds this entry. Owner decision: drop Python 3.9. bun run test:sandbox green on tree 2831885 (unit 11791 / 0 / 402, tcp 553 / 0, embedded 349 / 0, no anomalies; agent-skills worktree artifacts/test-sandbox/2026-11-13T11-03-43.405Z/); bun run test:sandbox:sdk green on tree 85290c7, which differs only by the corrected PyPI sentences in the two changelogs and the state files (typescript 881 / 0, python 219 / 0, php 105 / 0, go 114 / 0 / 1, rust 92 / 0 / 1, elixir 145 / 0 / 1; artifacts/test-sandbox-sdk/2026-11-13T11-13-20.277Z/). Host: test/sdk-python-matrix.test.ts 6 / 0 (fails 2 of 6 against the old matrix), the six sdk.yml/pyproject readers 38 / 0, Python SDK pytest 121, integration 9 / 9, e2e 174 / 174 on CPython 3.13. Skeptic: CONDITIONAL (wrong PyPI claim: PyPI has only 0.1.5), corrected, then PASS on the final delta. Python 3.10 itself first runs in CI after the push; ci-watch.sh verdict to be recorded.",
       "issue": null
     },
     {
@@ -122,6 +122,15 @@
       "id": "postgres-sigkill-hook-timeout-flake",
       "name": "PostgreSQL SIGKILL recovery test: a hook timed out once on PostgreSQL 17",
       "description": "test/postgres-public-api-extreme.test.ts failed once in the PostgreSQL 17.x Integration Tests job of CI run 43355036181, attempt 1, on commit e1cbfc99 (499 pass / 1 fail): after \"PostgreSQL 17 extreme public API concurrency > recovers an active public Worker job after its broker is SIGKILLed\" passed (45.3 s), bun printed \"killed 1 dangling process\" and \"(fail) (unnamed) [5000.37ms]: a beforeEach/afterEach hook timed out\"; the file's afterEach is the only per-test hook. The job passed on the rerun (attempt 2). Not the same file or cause as postgres-lifecycle-race-flake. Reproduce first (a stress loop of that test against PostgreSQL 17), then give the hook a bounded wait for the killed broker or a longer hook timeout, without weakening what the test asserts.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "",
+      "issue": null
+    },
+    {
+      "id": "python-sdk-pypi-publication-gap",
+      "name": "Python SDK: PyPI has only 0.1.5",
+      "description": "The repository says bunqueue-client 0.2.1 was published to PyPI by hand (2.9.13 changelog entry and release post), but PyPI lists only 0.1.5 (checked 2026-11-13 via /pypi/bunqueue-client/json). Decide with the owner whether to publish (publication is the owner's explicit decision; it goes through the SDK release workflow, never from a local machine) and correct the record either way.",
       "dependencies": [],
       "status": "not-started",
       "evidence": "",

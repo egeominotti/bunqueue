@@ -61,7 +61,7 @@ test('scheduled SDK mutation campaigns cover every official client with pinned e
   expect(typescriptPackage).not.toContain('test:mutation');
   expect(workflow.jobs.typescript).toBeUndefined();
   expect(await Bun.file(`${root}/sdk/typescript/stryker.config.mjs`).exists()).toBe(false);
-  expect(pythonProject).toContain('"mutmut==3.6.0;');
+  expect(pythonProject).toContain('"mutmut==3.6.0"');
   expect(pythonProject).toContain('"bunqueue/flow_commit.py"');
   expect(text).toContain('score < 97.0');
   expect(phpMutation).toContain('"src/Flow"');

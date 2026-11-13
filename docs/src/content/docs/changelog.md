@@ -20,8 +20,29 @@ head:
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- **The Python SDK (`bunqueue-client`) now requires Python 3.10 or later.** This
+  is a breaking change for Python 3.9 users, and the next Python SDK release
+  must carry it; the SDK's version number is not changed here. Python 3.9 has
+  been end-of-life since October 2025, and GitHub's current runner image
+  (Ubuntu 26.04) has no Python 3.9 build to test it on. The `bunqueue-client`
+  releases already on PyPI (today 0.1.5) are unchanged and remain installable on
+  Python 3.9: they declare `requires-python >=3.9`, so `pip` on Python 3.9 will
+  not pick a later release. The server, the wire protocol
+  and the other SDKs are not affected.
+
 ### Tooling
 
+- The SDK workflow's Python matrix tests Python 3.10 and 3.13, both on
+  `ubuntu-latest`; the Python 3.9 leg and its `ubuntu-24.04` pin are gone. The
+  Hypothesis flow-planner properties now run on both legs: the `test` and
+  `mutation` extras install pytest 9.0.3 and mutmut 3.6.0 without a
+  `python_version` marker. `test/sdk-python-matrix.test.ts` replaces
+  `test/repro-ci-python39-runner.test.ts` and keeps the matrix and the package
+  metadata together: every leg names its runner image, the oldest leg is the
+  lower bound of `requires-python` in `sdk/python/pyproject.toml`, the newest
+  leg runs on `ubuntu-latest`, and no classifier names an older Python.
 - Agent Skills for contributors in `.agents/skills/`, the cross-client location
   that Codex, Gemini CLI, Cursor and Copilot read, with one relative symlink per
   skill in `.claude/skills/` for Claude Code (on Windows, clone with

@@ -1,7 +1,7 @@
 # Python SDK invariants
 
 This file defines the contracts that must remain true for the synchronous
-Python 3.9+ TCP SDK. The Bun server owns scheduling and persistence; Python
+Python 3.10+ TCP SDK. The Bun server owns scheduling and persistence; Python
 must preserve the wire contract and lifecycle semantics.
 
 ## Transport, framing, and authentication
@@ -216,8 +216,7 @@ Hypothesis reproduction blob, temporarily apply its
 preserve the minimized example as a deterministic regression, then remove the
 temporary decorator.
 
-Mutation is a final gate and requires Python 3.10+ because mutmut 3 does;
-runtime support remains Python 3.9. `pyproject.toml` limits mutation to the two
+Mutation is a final gate. `pyproject.toml` limits mutation to the two
 pure planner modules plus the pure snapshot validator in `flow_commit.py` and
 selects only no-broker planner/commit tests:
 

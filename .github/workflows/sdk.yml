@@ -156,12 +156,12 @@ jobs:
     services: *postgres-service
     strategy:
       fail-fast: false
-      # ubuntu-latest moved to Ubuntu 26.04, for which actions/setup-python has no
-      # Python 3.9 build, so the oldest supported runtime is pinned to ubuntu-24.04.
+      # The oldest supported runtime (requires-python in sdk/python/pyproject.toml)
+      # and the newest. Every leg names its runner image.
       matrix:
         include:
-          - python: '3.9'
-            os: ubuntu-24.04
+          - python: '3.10'
+            os: ubuntu-latest
           - python: '3.13'
             os: ubuntu-latest
     steps:
@@ -180,11 +180,7 @@ jobs:
           python -m venv .venv
           .venv/bin/pip install --quiet build hatchling
           .venv/bin/pip install --quiet -e '.[test]'
-      # pytest 9.0.3 (the CVE-2025-71176 fix) requires Python 3.10+, so the
-      # test extra installs no pytest on 3.9. The standalone runners below
-      # still exercise the Python 3.9 runtime.
       - name: Flow planner properties (Hypothesis)
-        if: matrix.python != '3.9'
         working-directory: sdk/python
         run: .venv/bin/python -m pytest tests/test_flow_plan_property.py -q
       - name: Integration + e2e

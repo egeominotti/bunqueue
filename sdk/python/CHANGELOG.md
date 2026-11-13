@@ -5,6 +5,21 @@ All notable changes to `bunqueue-client` (Python SDK) are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** the minimum supported Python is now 3.10 (`requires-python =
+  ">=3.10"`; the Python 3.9 classifier is gone). Python 3.9 has been
+  end-of-life since October 2025 and GitHub's current runner image has no
+  Python 3.9 build. The next SDK release must carry this entry and a version
+  that signals the break. The releases already on PyPI (today 0.1.5)
+  are unchanged: they declare `>=3.9`, so `pip` on Python 3.9 will not pick a
+  later release.
+- The `test` and `mutation` extras install pytest 9.0.3 and mutmut 3.6.0
+  unconditionally; the `python_version >= '3.10'` markers are gone. CI runs
+  the Hypothesis flow-planner properties on every Python leg (3.10 and 3.13).
+
 ## [0.2.1] - 2026-10-09
 
 Compatibility: every option value that worked in 0.2.0 keeps its 0.2.0

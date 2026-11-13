@@ -7,8 +7,8 @@ FlowProducer behavior.
 ## Scope and compatibility
 
 - Keep changes inside this SDK unless the user explicitly expands scope.
-- Preserve Python 3.9 runtime compatibility: use `typing.Optional`,
-  `typing.Union`, and compatible syntax instead of newer-only language forms.
+- Preserve Python 3.10 runtime compatibility (`requires-python = ">=3.10"`):
+  no syntax or standard-library API that needs Python 3.11 or later.
 - `msgpack` remains the only runtime dependency. pytest, Hypothesis, and mutmut
   are optional development extras.
 - Keep every source/test file at or below 250 lines and give it one role.
@@ -55,8 +55,7 @@ Run pure deterministic flow checks while iterating:
 
 Replay the same Hypothesis seed or its printed `@reproduce_failure` blob. Run
 mutation once at the final gate against only the pure planners and snapshot
-validator; it must not start a broker. mutmut requires Python 3.10+, while the
-runtime package must continue installing on 3.9:
+validator; it must not start a broker:
 
 ```bash
 .venv/bin/mutmut run

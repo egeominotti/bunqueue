@@ -90,7 +90,7 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[test,mutation]'
   tests/test_flow_plan_contract.py tests/test_flow_plan_wire_contract.py \
   tests/test_flow_commit.py \
   --hypothesis-seed=20260730
-.venv/bin/mutmut run                       # final gate; Python 3.10+
+.venv/bin/mutmut run                       # final gate
 .venv/bin/python tests/test_integration.py   # smoke (9) — also pytest-compatible
 .venv/bin/python -m pytest tests/test_worker_pull_errors.py \
   tests/test_worker_wire_errors.py \

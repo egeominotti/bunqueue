@@ -60,7 +60,11 @@ overview: [docs/agents/README.md](docs/agents/README.md).
    reproduce first with a stress loop against PostgreSQL 16.
 4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
    `node` in the Bun-only OrbStack Machines.
-5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
+5. `ci-python39-runner-pin` (in progress, branch `drop-python-39`): the Python
+   SDK's minimum is now Python 3.10 and the `ubuntu-24.04` pin is gone; the
+   change is uncommitted and `bun run test:sandbox`, `bun run test:sandbox:sdk`
+   and the skeptic are still to run. The next Python SDK release must carry the
+   break.
 6. `npm-files-benchmark-negation`: `bun pm pack` ignores the `!dist/benchmark`
    negation of `package.json` `files` (latent: the library build never emits that
    directory); test first, then `!dist/benchmark/**`.
@@ -106,6 +110,35 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — ci-python39-runner-pin
+
+- Branch `drop-python-39`, base `bfa290c7`, uncommitted. The user decided to drop
+  Python 3.9 from the Python SDK. `sdk/python/pyproject.toml` declares
+  `requires-python >=3.10`, loses the 3.9 classifier and the `python_version`
+  markers of the `test` and `mutation` extras; the SDK version stays 0.2.1.
+- `.github/workflows/sdk.yml`: Python legs 3.10 and 3.13, both on
+  `ubuntu-latest`; the Hypothesis step runs on both. The public
+  `actions/python-versions` manifest has Ubuntu 26.04 x64 builds for 3.10.22 and
+  3.13.18 and none for 3.9.
+- `test/sdk-python-matrix.test.ts` replaces
+  `test/repro-ci-python39-runner.test.ts`: the oldest leg is read from
+  `requires-python`, every leg names its runner, the newest is on
+  `ubuntu-latest`.
+- Docs: root `README.md`, the site's SDK guide, `docs/features/polyglot-sdks.md`,
+  the SDK's `README.md`, `AGENTS.md`, `CLAUDE.md`, `INVARIANTS.md` and
+  `CHANGELOG.md`, and the changelog's `[Unreleased]` Upgrade notes.
+- Host checks are in the item's evidence (`PARTIAL`). Not run:
+  `bun run test:sandbox`, `bun run test:sandbox:sdk`, skeptic, CI.
+- Risks: Python 3.10 was not run locally, so CI's 3.10 leg is its first run.
+  Python 3.10 itself reached end-of-life in October 2026; the same runner
+  problem will return when an image drops its build. The next Python SDK
+  release must carry the break.
+- Left as is: `from __future__ import annotations` and `typing.Optional` /
+  `typing.Union` in the SDK (valid on 3.10+, removing them is a refactor), and
+  the historical mentions of Python 3.9 in released changelog sections, release
+  posts, `bunqueue-running-gates`, `test/agent-skills-ci-watch.test.ts` and an
+  eval prompt of `bunqueue-working-autonomously`.
 
 ### 2026-11-13 — ci-flakes-record
 
