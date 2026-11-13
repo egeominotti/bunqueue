@@ -4,7 +4,6 @@
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { CronScheduler } from '../src/infrastructure/scheduler/cronScheduler';
-import type { CronJob } from '../src/domain/types/cron';
 import {
   validateCronExpression,
   getNextCronRun,
@@ -200,34 +199,5 @@ describe('CronScheduler', () => {
     expect(job?.data).toEqual({ key: 'value' });
   });
 
-  test('should return stats', () => {
-    scheduler.add({
-      name: 'job1',
-      queue: 'test',
-      data: {},
-      schedule: '* * * * *',
-    });
-
-    const stats = scheduler.getStats();
-    expect(stats.total).toBe(1);
-    expect(stats.pending).toBe(1);
-  });
-
-  test('should load cron jobs', () => {
-    scheduler.load([
-      {
-        name: 'loaded1',
-        queue: 'test',
-        data: {},
-        schedule: '* * * * *',
-        repeatEvery: null,
-        priority: 0,
-        nextRun: Date.now() + 60000,
-        executions: 0,
-        maxLimit: null,
-      } as CronJob,
-    ]);
-
-    expect(scheduler.list().length).toBe(1);
-  });
+  // getStats() and load(): cronScheduler.test.ts.
 });

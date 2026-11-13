@@ -13,52 +13,8 @@ describe('Issue #31 - Parent result in chained jobs', () => {
     shutdownManager();
   });
 
-  test('addChain: child can fetch parent result via getParentResult()', async () => {
-    const flow = new FlowProducer({ embedded: true });
-    const queue = new Queue('chain-parent-result', { embedded: true });
-    queue.obliterate();
-
-    const parentResults: Array<{ step: number; parentResult: unknown }> = [];
-    let resolve: () => void;
-    const done = new Promise<void>((r) => (resolve = r));
-
-    const worker = new Worker(
-      'chain-parent-result',
-      async (job) => {
-        const data = job.data as { step: number; __flowParentId?: string };
-        if (data.__flowParentId) {
-          const parentResult = flow.getParentResult(data.__flowParentId);
-          parentResults.push({ step: data.step, parentResult });
-        }
-        if (data.step === 2) resolve!();
-        return { value: data.step * 10 };
-      },
-      { embedded: true, concurrency: 1 }
-    );
-
-    await flow.addChain([
-      { name: 'step-0', queueName: 'chain-parent-result', data: { step: 0 } },
-      { name: 'step-1', queueName: 'chain-parent-result', data: { step: 1 } },
-      { name: 'step-2', queueName: 'chain-parent-result', data: { step: 2 } },
-    ]);
-
-    await done;
-    // Give time for final ack
-    await Bun.sleep(50);
-
-    expect(parentResults).toHaveLength(2);
-    // Step 1 should have step 0's result
-    expect(parentResults[0].step).toBe(1);
-    expect(parentResults[0].parentResult).toEqual({ value: 0 });
-    // Step 2 should have step 1's result
-    expect(parentResults[1].step).toBe(2);
-    expect(parentResults[1].parentResult).toEqual({ value: 10 });
-
-    await worker.close();
-    flow.close();
-    queue.close();
-  });
-
+  // A single chain reading its parent's result on the first call, and a parent
+  // reading all children values: flow-advanced.test.ts.
   test('addChain: many concurrent chains - parent results always available', async () => {
     const flow = new FlowProducer({ embedded: true });
     const queue = new Queue('chain-stress', { embedded: true });
@@ -123,71 +79,6 @@ describe('Issue #31 - Parent result in chained jobs', () => {
       console.log('Failures:', failures);
     }
     expect(failures).toHaveLength(0);
-
-    await worker.close();
-    flow.close();
-    queue.close();
-  });
-
-  test('add() with children: parent can fetch children values via getChildrenValues()', async () => {
-    const flow = new FlowProducer({ embedded: true });
-    const queue = new Queue('flow-children-vals', { embedded: true });
-    queue.obliterate();
-
-    let parentChildrenValues: Record<string, unknown> | null = null;
-    let resolve: () => void;
-    const done = new Promise<void>((r) => (resolve = r));
-
-    const childrenProcessed = { count: 0 };
-
-    const worker = new Worker(
-      'flow-children-vals',
-      async (job) => {
-        const data = job.data as { role: string; value: number };
-
-        if (data.role === 'parent') {
-          // Parent should wait for children, then get their values
-          // Retry fetching children values with timeout
-          let values: Record<string, unknown> = {};
-          for (let attempt = 0; attempt < 50; attempt++) {
-            values = await queue.getChildrenValues(job.id);
-            if (Object.keys(values).length === 2) break;
-            await Bun.sleep(50);
-          }
-          parentChildrenValues = values;
-          resolve!();
-          return { summary: 'done' };
-        }
-
-        // Child job
-        childrenProcessed.count++;
-        return { childValue: data.value * 10 };
-      },
-      { embedded: true, concurrency: 3 }
-    );
-
-    await flow.add({
-      name: 'parent',
-      queueName: 'flow-children-vals',
-      data: { role: 'parent', value: 0 },
-      children: [
-        { name: 'child-a', queueName: 'flow-children-vals', data: { role: 'child', value: 1 } },
-        { name: 'child-b', queueName: 'flow-children-vals', data: { role: 'child', value: 2 } },
-      ],
-    });
-
-    await done;
-    await Bun.sleep(100);
-
-    expect(childrenProcessed.count).toBe(2);
-    expect(parentChildrenValues).not.toBeNull();
-    // Should have 2 children results
-    const keys = Object.keys(parentChildrenValues!);
-    expect(keys.length).toBe(2);
-    // Values should be the children's return values
-    const vals = Object.values(parentChildrenValues!);
-    const childValues = vals.map((v: any) => v.childValue).sort();
-    expect(childValues).toEqual([10, 20]);
 
     await worker.close();
     flow.close();
@@ -276,52 +167,6 @@ describe('Issue #31 - Parent result in chained jobs', () => {
     // So parents may process before children, getting empty results.
     // This assertion documents the expected behavior:
     expect(fullResults.length).toBe(FLOW_COUNT);
-
-    await worker.close();
-    flow.close();
-    queue.close();
-  });
-
-  test('addChain: result available immediately after parent completes', async () => {
-    /**
-     * Tests that when a parent job completes in a chain,
-     * its result is immediately available to the next job.
-     * This tests the synchronous LRU + SQLite storage path.
-     */
-    const flow = new FlowProducer({ embedded: true });
-    const queue = new Queue('chain-immediate', { embedded: true });
-    queue.obliterate();
-
-    let resultAvailable = false;
-    let resolve: () => void;
-    const done = new Promise<void>((r) => (resolve = r));
-
-    const worker = new Worker(
-      'chain-immediate',
-      async (job) => {
-        const data = job.data as { step: number; __flowParentId?: string };
-
-        if (data.step === 1 && data.__flowParentId) {
-          // Check result is available IMMEDIATELY (no retries)
-          const result = flow.getParentResult(data.__flowParentId);
-          resultAvailable = result !== undefined;
-          resolve!();
-        }
-
-        return { step: data.step, computed: data.step * 42 };
-      },
-      { embedded: true, concurrency: 1 }
-    );
-
-    await flow.addChain([
-      { name: 'first', queueName: 'chain-immediate', data: { step: 0 } },
-      { name: 'second', queueName: 'chain-immediate', data: { step: 1 } },
-    ]);
-
-    await done;
-    await Bun.sleep(50);
-
-    expect(resultAvailable).toBe(true);
 
     await worker.close();
     flow.close();

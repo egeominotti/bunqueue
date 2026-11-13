@@ -118,31 +118,14 @@ describe('Bug: addBulk/PUSHB ignores the durable flag (batch jobs always go thro
     }
   });
 
-  test('BASELINE: a single durable push is on disk immediately (bypasses write buffer)', () => {
-    const job = newJob(1);
-    storage.insertJob(job, true); // durable single push
-
-    // Visible to a separate connection before any flush — this is the durable contract.
-    expect(readStateFromDisk(dbPath, job.id)).toBe('waiting');
-  });
-
+  // The durable single push and the durable batch insert are both checked by the
+  // PROOF OF ASYMMETRY test below.
   test('CONTROL: a non-durable single push is buffered (NOT on disk before flush)', () => {
     const job = newJob(2);
     storage.insertJob(job); // non-durable -> buffered
 
     // Confirms the buffered window really exists with this flush config.
     expect(readStateFromDisk(dbPath, job.id)).toBeNull();
-  });
-
-  test('STORAGE CONTRACT: a durable batch insert is on disk immediately', () => {
-    const job = newJob(3);
-
-    // The fix makes insertJobsBatch honor a durable flag (bypass the buffer),
-    // matching the single durable insert. RED pre-fix: insertJobsBatch took no
-    // durable param and always buffered.
-    storage.insertJobsBatch([job], true);
-
-    expect(readStateFromDisk(dbPath, job.id)).toBe('waiting');
   });
 
   test('STORAGE CONTRACT: a non-durable batch insert is still buffered (buffer not defeated)', () => {

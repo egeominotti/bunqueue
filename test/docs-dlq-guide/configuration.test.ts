@@ -158,7 +158,16 @@ for (const mode of MODES) {
       });
       const job = await queue.add('job', {}, { attempts: 1, durable: true });
       await waitForState(queue, job.id, 'failed', 20_000);
-      expect((await queue.getDlqAsync({ expired: true })).length).toBeGreaterThanOrEqual(0);
+      // The harness starts a fresh broker, whose first maintenance run is 60 s away:
+      // the entry is still there and is reported as expired once its 50 ms pass.
+      await waitUntil(
+        async () =>
+          (await queue.getDlqAsync({ expired: true })).some(
+            (item) =>
+              item.job.id === job.id && item.expiresAt !== null && item.expiresAt <= Date.now()
+          ),
+        'the entry to be reported as expired'
+      );
 
       // Maintenance runs every 60s by default; give it one full cycle.
       await waitUntil(

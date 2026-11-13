@@ -13,7 +13,6 @@ import { join } from 'node:path';
 import { QueueManager } from '../src/application/queueManager';
 import { calculateBackoff } from '../src/domain/job/state';
 import type { Job } from '../src/domain/types/job';
-import { validateBackoffField } from '../src/infrastructure/server/protocol/validation';
 
 const backoff = { type: 'exponential', delay: 1_000, maxDelay: 5_000 } as const;
 
@@ -55,13 +54,5 @@ describe('backoff.maxDelay', () => {
     expect(restored?.backoffConfig?.maxDelay).toBe(5_000);
   });
 
-  test('the server validates maxDelay instead of accepting any value', () => {
-    expect(validateBackoffField(backoff)).toBeNull();
-    expect(
-      validateBackoffField({ type: 'exponential', delay: 1_000, maxDelay: -1 })
-    ).not.toBeNull();
-    expect(
-      validateBackoffField({ type: 'exponential', delay: 1_000, maxDelay: 'soon' })
-    ).not.toBeNull();
-  });
+  // Server validation of maxDelay: backoff-max-delay-paths.test.ts.
 });

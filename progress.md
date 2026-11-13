@@ -96,6 +96,15 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 9. `postgres-sigkill-hook-timeout-flake`: in `test/postgres-public-api-extreme.test.ts`
    a hook timed out after the SIGKILL recovery test on PostgreSQL 17.x (CI run
    43355036181, attempt 1; green on the rerun); reproduce first with a stress loop.
+10. `postgres-tests-never-run`: four PostgreSQL regression files skip without
+    `BUNQUEUE_TEST_POSTGRES_URL` and are outside `scripts/test-postgres.ts`'s
+    `test/postgres-*.test.ts` selection, so they never run; rename or widen.
+11. `sandboxed-worker-missing-cases`: three SandboxedWorker cases (draining
+    `stop()`, unique wrapper names, `on()`/`once()` chaining) lost with the
+    commented-out files `test-suite-pruning` deleted; write them as live tests.
+12. `test-suite-speedups`: fixed sleeps on the 5 s stall sweep and the 60 s DLQ
+    maintenance in the slowest unit files (estimated 150 s of unit wall time);
+    needs a stall/DLQ configuration seam in `getSharedManager()`.
 
 ## Blockers / Risks
 
@@ -297,6 +306,29 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Owed: `bun run test:sandbox`, the PostgreSQL suite (only unused exports removed
   from four PostgreSQL modules), the skeptic, the commit. Not run: the Astro build
   of the docs site.
+### 2026-11-13 — test-suite-pruning
+
+- Owner request: delete useless tests (`test-suite-pruning`, branch
+  `test-suite-pruning`, base `bfa290c7`, staged, not committed; status
+  `in-progress`). Every deletion re-verified against a covering test on the same
+  code path with equal or stronger assertions; nothing in `src/` changes.
+- Deleted 8 files: the 5 SandboxedWorker files that were entirely inside `/* */`
+  (they transpile to nothing), `test/bug-unregister-worker-field.test.ts`,
+  `test/repro-delayed-error-zero-max-delay.test.ts`, `test/client-pipelining.test.ts`
+  (embedded only under the preload; its 500-distinct-ids check moved into
+  `test/server-pipelining.test.ts`). Removed 49 tests from 21 files (46 duplicates,
+  2 JavaScript-semantics tests, 1 `expect(true)`); the no-op `length >= 0` in
+  `test/docs-dlq-guide/configuration.test.ts` now waits for the entry to be
+  reported expired. Kept, with reasons, in the item evidence and the report:
+  the `validateConfig` tests of `s3Backup-bugs`, the size-mismatch restore test,
+  the WAL write-lock test, the concurrent-chain and flow-race tests, the
+  writer-exclusion RWLock test.
+- New items: `postgres-tests-never-run`, `sandboxed-worker-missing-cases`,
+  `test-suite-speedups`.
+- Host checks: affected + covering files 743 / 0 before, 684 / 0 after; harness,
+  skills and docs tests 190 / 0; typecheck, format check, `git diff --check`,
+  `./init.sh` green. Blockers before `done`: `bun run test:sandbox`, the skeptic
+  verdict and the commit have not run.
 
 ### 2026-11-13 — ci-flakes-record
 

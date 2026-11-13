@@ -18,7 +18,6 @@ import { describe, test, expect } from 'bun:test';
 import {
   WriteBuffer,
   type BatchInsertManager,
-  type WriteBufferErrorCallback,
 } from '../src/infrastructure/persistence/sqliteBatch';
 import { SqliteStorage } from '../src/infrastructure/persistence/sqlite';
 import type { Job, JobId } from '../src/domain/types/job';
@@ -64,38 +63,8 @@ function mockJob(id: number): Job {
 }
 
 describe('WriteBuffer critical-loss handling at SqliteStorage', () => {
-  test('WriteBuffer.onCriticalError is honored when supplied (sanity)', () => {
-    let capturedJobs: Job[] = [];
-
-    const alwaysFailingBatch = {
-      insertJobsBatch: () => {
-        throw new Error('Persistent DB failure');
-      },
-    } as unknown as BatchInsertManager;
-
-    const onError: WriteBufferErrorCallback = () => {};
-
-    const buffer = new WriteBuffer(alwaysFailingBatch, 100, 10000, onError, (jobs) => {
-      capturedJobs = jobs;
-    });
-
-    buffer.add(mockJob(1));
-    buffer.add(mockJob(2));
-    buffer.add(mockJob(3));
-
-    for (let i = 0; i < 11; i++) {
-      try {
-        buffer.flush();
-      } catch {
-        // expected
-      }
-    }
-    buffer.stop();
-
-    expect(capturedJobs.length).toBe(3);
-    expect(capturedJobs.map((j) => Number(j.id)).sort()).toEqual([1, 2, 3]);
-  });
-
+  // WriteBuffer itself reporting every buffered job after the last retry is in
+  // bug-writebuffer-swap-dataloss.test.ts.
   test('SqliteStorage exposes critical-loss records when WriteBuffer drops jobs', () => {
     // Spin up a real SqliteStorage, then inject a failing BatchInsertManager
     // into its WriteBuffer to force the loss path.

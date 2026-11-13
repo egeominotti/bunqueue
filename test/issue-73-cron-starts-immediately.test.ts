@@ -58,56 +58,8 @@ describe('Issue #73: Cron starts immediately', () => {
   });
 
   // -----------------------------------------------------------------
-  // Bug 1: load() with past nextRun and skipMissedOnRestart=false
-  //         should NOT fire immediately — but it does
-  // -----------------------------------------------------------------
-  test('load() with past nextRun should NOT fire immediately (fix #73)', async () => {
-    const pastTime = Date.now() - 120_000; // 2 minutes ago
-
-    scheduler.load([
-      makeCronJob({
-        name: 'every-minute',
-        queue: 'tasks',
-        schedule: '* * * * *',
-        nextRun: pastTime,
-        // skipMissedOnRestart defaults to true — missed crons are skipped
-        executions: 5,
-      }),
-    ]);
-
-    // With default skipMissedOnRestart=true, nextRun is recalculated to future
-    await tickScheduler(scheduler);
-
-    expect(pushedJobs.length).toBe(0);
-  });
-
-  // -----------------------------------------------------------------
-  // Bug 2: load() with past nextRun when job ran longer than interval
-  //         Simulates: cron every 1 min, job took 3 min, app restarted
-  // -----------------------------------------------------------------
-  test('load() after restart with long-running job should NOT fire immediately (fix #73)', async () => {
-    const pastTime = Date.now() - 180_000; // 3 minutes ago
-
-    scheduler.load([
-      makeCronJob({
-        name: 'slow-job-cron',
-        queue: 'tasks',
-        repeatEvery: 60_000, // every 60 seconds
-        schedule: null,
-        nextRun: pastTime, // was due 3 minutes ago while job was still running
-        // skipMissedOnRestart defaults to true
-        executions: 10,
-      }),
-    ]);
-
-    // With default skipMissedOnRestart=true, nextRun is recalculated to future
-    await tickScheduler(scheduler);
-
-    expect(pushedJobs.length).toBe(0);
-  });
-
-  // -----------------------------------------------------------------
-  // Verify: skipMissedOnRestart=true correctly prevents firing (existing behavior)
+  // Verify: skipMissedOnRestart=true correctly prevents firing (existing behavior).
+  // The interval-based variant is in issue-61-cron-missed.test.ts.
   // -----------------------------------------------------------------
   test('load() with skipMissedOnRestart=true correctly skips past nextRun', async () => {
     const pastTime = Date.now() - 120_000;
@@ -181,28 +133,5 @@ describe('Issue #73: Cron starts immediately', () => {
     expect(pushedJobs[0].queue).toBe('tasks');
   });
 
-  // -----------------------------------------------------------------
-  // Bug 4: load() should preserve executions count across restart
-  // -----------------------------------------------------------------
-  test('load() then add() (upsert) preserves executions count', async () => {
-    scheduler.load([
-      makeCronJob({
-        name: 'counted-cron',
-        queue: 'tasks',
-        schedule: '* * * * *',
-        nextRun: Date.now() + 60_000,
-        executions: 42,
-      }),
-    ]);
-
-    // upsert same cron
-    const cron = scheduler.add({
-      name: 'counted-cron',
-      queue: 'tasks',
-      data: {},
-      schedule: '* * * * *',
-    });
-
-    expect(cron.executions).toBe(42);
-  });
+  // load() then add() preserving the executions count: issue-65-skipMissedOnRestart.test.ts.
 });

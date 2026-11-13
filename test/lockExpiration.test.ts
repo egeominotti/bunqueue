@@ -2,7 +2,9 @@
  * Lock Expiration Tests
  * Tests for the lock manager's expired lock detection and handling.
  * Covers: lock lifecycle, expiration requeue, max stalls to DLQ,
- * orphan cleanup, and batch expiration processing.
+ * batch expiration processing, and stall events. Token checks, release on
+ * ack/fail and re-pulling a requeued job are in lockManager.test.ts and
+ * lock-race-conditions.test.ts.
  */
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
@@ -74,34 +76,6 @@ describe('Lock Expiration', () => {
       expect(lockInfo!.renewalCount).toBe(1);
       expect(lockInfo!.expiresAt).toBeGreaterThan(Date.now() + 50_000);
     });
-
-    test('lock is released on ack', async () => {
-      await qm.push('tasks', { data: { msg: 'ackable' } });
-      const { job, token } = await pullWithLock('tasks', 60_000);
-
-      expect(job).not.toBeNull();
-
-      // Ack with token
-      await qm.ack(job!.id, { done: true }, token!);
-
-      // Lock should be gone
-      const lockInfo = qm.getLockInfo(job!.id);
-      expect(lockInfo).toBeNull();
-    });
-
-    test('lock is released on fail', async () => {
-      await qm.push('tasks', { data: { msg: 'failable' }, maxAttempts: 3 });
-      const { job, token } = await pullWithLock('tasks', 60_000);
-
-      expect(job).not.toBeNull();
-
-      // Fail with token
-      await qm.fail(job!.id, 'test error', token!);
-
-      // Lock should be gone
-      const lockInfo = qm.getLockInfo(job!.id);
-      expect(lockInfo).toBeNull();
-    });
   });
 
   describe('expired lock triggers job requeue', () => {
@@ -144,36 +118,6 @@ describe('Lock Expiration', () => {
       // Job state should confirm it's requeued (already verified above)
       // Note: shard running counters may not reflect requeued jobs from lock expiration,
       // so we verify via job state query rather than aggregate stats.
-    }, 15_000);
-
-    test('requeued job can be pulled again', async () => {
-      await qm.push('tasks', { data: { msg: 'retry-me' }, maxAttempts: 5 });
-      const { job: job1 } = await pullWithLock('tasks', 50);
-
-      expect(job1).not.toBeNull();
-
-      // Wait for lock to expire and background check to run
-      await new Promise((r) => setTimeout(r, 6_000));
-
-      // Job should be requeued, try pulling it again
-      // It may have a backoff delay, so we might need to wait a bit more
-      // or pull with timeout. Let's try direct pull first.
-      let job2 = await qm.pull('tasks', 0);
-      if (!job2) {
-        // Job might be delayed due to backoff; wait and try again
-        await new Promise((r) => setTimeout(r, 3_000));
-        job2 = await qm.pull('tasks', 0);
-      }
-
-      // The job should eventually be pullable (same id, incremented attempts)
-      if (job2) {
-        expect(job2.id).toBe(job1!.id);
-        expect(job2.attempts).toBeGreaterThan(0);
-      } else {
-        // Verify it's at least in a requeued state (delayed due to backoff)
-        const state = await qm.getJobState(job1!.id);
-        expect(['waiting', 'delayed']).toContain(state);
-      }
     }, 15_000);
 
     test('expired lock increments stallCount', async () => {
@@ -229,64 +173,6 @@ describe('Lock Expiration', () => {
       expect(stats.active).toBe(0);
       expect(stats.dlq).toBeGreaterThanOrEqual(1);
     }, 15_000);
-
-    test('job survives stall when under maxStalls threshold', async () => {
-      const queue = 'survive-stall';
-
-      // maxStalls = 3, so a single stall should requeue, not DLQ
-      const idx = shardIndex(queue);
-      qm.getShards()[idx].setStallConfig(queue, { maxStalls: 3 });
-
-      await qm.push(queue, { data: { msg: 'survives' }, maxAttempts: 10 });
-      const { job } = await pullWithLock(queue, 50);
-
-      expect(job).not.toBeNull();
-
-      // Wait for lock to expire and be processed
-      await new Promise((r) => setTimeout(r, 6_000));
-
-      // Job should NOT be in DLQ - should be requeued
-      const state = await qm.getJobState(job!.id);
-      expect(['waiting', 'delayed']).toContain(state);
-
-      // DLQ should be empty for this queue
-      const dlqEntries = qm.getDlq(queue);
-      expect(dlqEntries.length).toBe(0);
-    }, 15_000);
-  });
-
-  describe('lock cleanup', () => {
-    test('expired lock entry is cleaned up after processing', async () => {
-      await qm.push('cleanup-test', { data: { msg: 'cleanup' } });
-      const { job, token } = await pullWithLock('cleanup-test', 50);
-
-      expect(job).not.toBeNull();
-      expect(token).not.toBeNull();
-
-      // Lock exists
-      expect(qm.getLockInfo(job!.id)).not.toBeNull();
-
-      // Wait for expiration and processing
-      await new Promise((r) => setTimeout(r, 6_000));
-
-      // Lock should be removed
-      expect(qm.getLockInfo(job!.id)).toBeNull();
-    }, 15_000);
-
-    test('lock is cleaned for orphan (job not in processing)', async () => {
-      // Push and pull with lock
-      await qm.push('orphan-test', { data: { msg: 'orphan' } });
-      const { job, token } = await pullWithLock('orphan-test', 50);
-
-      expect(job).not.toBeNull();
-
-      // Ack the job (removes from processing but we'll manually test orphan scenario)
-      // First, ack without the lock check to simulate the job completing
-      await qm.ack(job!.id, { done: true }, token!);
-
-      // Lock was already released by ack, verify it's clean
-      expect(qm.getLockInfo(job!.id)).toBeNull();
-    });
   });
 
   describe('multiple expired locks', () => {
@@ -417,89 +303,5 @@ describe('Lock Expiration', () => {
       );
       expect(failedEvent).toBeDefined();
     }, 15_000);
-  });
-
-  describe('edge cases', () => {
-    test('verify lock returns false for expired lock', async () => {
-      await qm.push('verify-test', { data: { msg: 'expired' } });
-      const { job, token } = await pullWithLock('verify-test', 50);
-
-      expect(job).not.toBeNull();
-      expect(token).not.toBeNull();
-      expect(qm.verifyLock(job!.id, token!)).toBe(true);
-
-      // Wait for lock to expire (just the TTL, not the background check)
-      await new Promise((r) => setTimeout(r, 100));
-
-      // Lock should be expired but entry may still exist until background check
-      expect(qm.verifyLock(job!.id, token!)).toBe(false);
-    });
-
-    test('renew returns false for expired lock', async () => {
-      await qm.push('renew-test', { data: { msg: 'expired-renew' } });
-      const { job, token } = await pullWithLock('renew-test', 50);
-
-      expect(job).not.toBeNull();
-
-      // Wait for lock to expire
-      await new Promise((r) => setTimeout(r, 100));
-
-      // Renew should fail
-      const renewed = qm.renewJobLock(job!.id, token!, 60_000);
-      expect(renewed).toBe(false);
-    });
-
-    test('ack with invalid token throws', async () => {
-      await qm.push('invalid-token', { data: { msg: 'bad-token' } });
-      const { job } = await pullWithLock('invalid-token', 60_000);
-
-      expect(job).not.toBeNull();
-
-      // Try ack with wrong token
-      await expect(qm.ack(job!.id, { done: true }, 'wrong-token')).rejects.toThrow(
-        /Invalid or expired lock token/
-      );
-    });
-
-    test('fail with invalid token throws', async () => {
-      await qm.push('invalid-token-fail', { data: { msg: 'bad-token' }, maxAttempts: 3 });
-      const { job } = await pullWithLock('invalid-token-fail', 60_000);
-
-      expect(job).not.toBeNull();
-
-      // Try fail with wrong token
-      await expect(qm.fail(job!.id, 'error', 'wrong-token')).rejects.toThrow(
-        /Invalid or expired lock token/
-      );
-    });
-
-    test('pulling from empty queue with lock returns null', async () => {
-      const { job, token } = await pullWithLock('empty-queue', 60_000);
-      expect(job).toBeNull();
-      expect(token).toBeNull();
-    });
-
-    test('getLockInfo returns null for non-locked job', async () => {
-      await qm.push('no-lock', { data: { msg: 'no-lock' } });
-      const job = await qm.pull('no-lock');
-
-      expect(job).not.toBeNull();
-
-      // Pulled without lock, so no lock info
-      const lockInfo = qm.getLockInfo(job!.id);
-      expect(lockInfo).toBeNull();
-    });
-
-    test('creating a lock on already locked job returns null', async () => {
-      await qm.push('double-lock', { data: { msg: 'double' } });
-      const { job, token } = await pullWithLock('double-lock', 60_000);
-
-      expect(job).not.toBeNull();
-      expect(token).not.toBeNull();
-
-      // Try to create another lock on the same job
-      const secondToken = qm.createLock(job!.id, 'another-worker', 60_000);
-      expect(secondToken).toBeNull();
-    });
   });
 });

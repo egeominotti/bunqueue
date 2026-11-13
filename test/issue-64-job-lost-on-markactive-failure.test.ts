@@ -139,34 +139,4 @@ describe('Issue #64 follow-up: job lost when markActive fails', () => {
     const state = await manager.getJobState(job.id);
     expect(state).toBe('active');
   });
-
-  it('safety net: if moveToProcessing fails completely, job is requeued', async () => {
-    cleanup();
-    manager = new QueueManager({ dataPath: DB_PATH });
-
-    const queue = 'test-requeue-safety';
-
-    const job = await manager.push(queue, { name: 'test', data: {} });
-    expect(manager.getQueueJobCounts(queue).waiting).toBe(1);
-
-    // Monkey-patch the entire storage to throw on any method call
-    // This simulates a catastrophic failure beyond just markActive
-    const storage = (manager as unknown as { storage: object }).storage;
-    const originalMarkActive = (storage as { markActive: Function }).markActive;
-
-    // Override markActive to throw AND also make broadcast throw
-    // to test the outer safety net in pullJob
-    (storage as { markActive: Function }).markActive = () => {
-      throw new Error('catastrophic disk failure');
-    };
-
-    // The inner try/catch in moveToProcessing catches markActive errors,
-    // so the pull should succeed even with the storage error
-    const pulled = await manager.pull(queue, 0);
-
-    (storage as { markActive: Function }).markActive = originalMarkActive;
-
-    expect(pulled).not.toBeNull();
-    expect(pulled!.id).toBe(job.id);
-  });
 });

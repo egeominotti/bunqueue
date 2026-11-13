@@ -31,15 +31,7 @@ describe('Lock Race Conditions', () => {
     expect(qm.verifyLock(job!.id, token!)).toBe(true);
   });
 
-  // 2. ACK with correct lock token succeeds
-  test('ack with correct lock token succeeds', async () => {
-    await qm.push('ack-correct', { data: { v: 1 } });
-    const { job, token } = await qm.pullWithLock('ack-correct', 'w1', 0, 60_000);
-    await qm.ack(job!.id, { done: true }, token!);
-    expect(qm.getLockInfo(job!.id)).toBeNull();
-    expect(await qm.getJobState(job!.id)).toBe('completed');
-  });
-
+  // 2. ACK with correct lock token: lockManager.test.ts
   // 3. ACK with wrong lock token fails
   test('ack with wrong lock token throws ownership error', async () => {
     await qm.push('ack-wrong', { data: { v: 1 } });
@@ -150,24 +142,8 @@ describe('Lock Race Conditions', () => {
     expect(await qm.getJobState(job!.id)).toBe('active');
   });
 
-  // 10. Lock expiration with stall detection interaction
-  test('lock expiration sends to DLQ when maxStalls reached', async () => {
-    const queue = 'stall-lock-dlq';
-    const idx = shardIndex(queue);
-    qm.getShards()[idx].setStallConfig(queue, { maxStalls: 1 });
-
-    await qm.push(queue, { data: { v: 1 }, maxAttempts: 10 });
-    const { job } = await qm.pullWithLock(queue, 'w1', 0, 50);
-    const jobId = job!.id;
-
-    await Bun.sleep(6_500);
-
-    expect(await qm.getJobState(jobId)).toBe('failed');
-    const dlq = qm.getDlq(queue);
-    expect(dlq.find((e) => e.id === jobId)).toBeDefined();
-    expect(qm.getLockInfo(jobId)).toBeNull();
-  }, 15_000);
-
+  // 10. Lock expiration with stall detection interaction (the DLQ side is in
+  // lockExpiration.test.ts)
   test('lock expiration requeues when under maxStalls threshold', async () => {
     const queue = 'stall-under';
     const idx = shardIndex(queue);

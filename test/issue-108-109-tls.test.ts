@@ -206,11 +206,8 @@ describe('#109 TLS client must authenticate the server certificate', () => {
     await expect(connect(true)).rejects.toThrow(/TLS verification failed/);
   });
 
-  test('rejectUnauthorized:false stays encryption-only (accepts self-signed)', async () => {
-    const { cleanup } = await connect({ rejectUnauthorized: false });
-    cleanup();
-    expect(true).toBe(true);
-  });
+  // rejectUnauthorized:false accepting a self-signed server: the SDK round trips
+  // over TLS in tls.test.ts.
 
   // Regression: because a registered `handshake` handler makes Bun fire `open`
   // BEFORE the TLS handshake, the connect timeout must stay armed until we

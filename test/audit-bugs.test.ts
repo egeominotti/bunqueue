@@ -22,23 +22,7 @@ describe('Audit Bugs - Batch Ack Repeat & Throughput', () => {
   // ============ Repeat scheduling in batch ack ============
 
   describe('ackJobBatch should schedule repeat jobs (batch > 4)', () => {
-    test('single ackJob schedules repeat job correctly', async () => {
-      // Baseline: single ack with repeat config works
-      await qm.push('repeat-q', {
-        data: { msg: 'repeating' },
-        repeat: { every: 1000, limit: 3 },
-      });
-      const pulled = await qm.pull('repeat-q');
-      expect(pulled).not.toBeNull();
-
-      await qm.ack(pulled!.id);
-
-      const stats = qm.getStats();
-      expect(stats.completed).toBe(1);
-      // The repeat mechanism should have requeued a new job
-      expect(stats.waiting + stats.delayed).toBeGreaterThanOrEqual(1);
-    });
-
+    // The single-ack baseline is in ack-operations.test.ts ('ackJob with repeat').
     test('ackJobBatch (>4 jobs) schedules repeat jobs', async () => {
       // Bug: batches > 4 use finalizeBatchAck which skips onRepeat
       const ids: JobId[] = [];

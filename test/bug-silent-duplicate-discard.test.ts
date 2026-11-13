@@ -6,7 +6,7 @@
  * Scenario 1 (NO locks): ack after stall re-queue → BUG: no recovery path
  * Scenario 2 (WITH locks, no re-pull): ack with T1 → Issue #33 handles it
  * Scenario 3 (WITH locks + re-pull): T1 is replaced by T2 → stale outcome rejected
- * Scenario 4: stall detection confirms re-queue works
+ * Scenario 1 also confirms that stall detection re-queues the job.
  */
 
 import { describe, test, expect, afterEach } from 'bun:test';
@@ -188,27 +188,5 @@ describe('Stall re-queue ack handling', () => {
     const finalLoc = (manager as any).jobIndex.get(jobId);
     expect(finalLoc?.type).toBe('completed');
     expect(manager.getResult(jobId)).toEqual({ generation: 2 });
-  }, 10000);
-
-  /**
-   * Scenario 4: Verify stall detection actually fires and re-queues.
-   */
-  test('stall detection fires and re-queues correctly', async () => {
-    manager = new QueueManager({ stallCheckMs: 150 });
-    const queueName = `stall-verify-${Date.now()}`;
-
-    const shard = (manager as any).shards[shardIndex(queueName)];
-    shard.setStallConfig(queueName, {
-      enabled: true,
-      stallInterval: 200,
-      maxStalls: 5,
-      gracePeriod: 50,
-    });
-
-    await manager.push(queueName, { data: { task: 'test' } });
-    const pulled = await manager.pull(queueName);
-    expect(pulled).not.toBeNull();
-
-    expect(await waitForLocationType(manager, pulled!.id, 'queue')).toBe('queue');
   }, 10000);
 });

@@ -285,23 +285,7 @@ describe('CRITICAL BUG 3: Non-atomic restore', () => {
     tempFiles = [];
   });
 
-  test('restore uses atomic write (temp file + rename)', async () => {
-    // Backup the original
-    const c = cfg({ databasePath: dbPath });
-    const backup = await performBackup(c, client);
-    expect(backup.success).toBe(true);
-
-    // Restore to the SAME path
-    const result = await restoreBackup(backup.key!, c, client);
-    expect(result.success).toBe(true);
-
-    // The restored DB should be valid
-    const db = new Database(dbPath);
-    const row = db.query('SELECT data FROM original WHERE id = 1').get() as { data: string };
-    db.close();
-    expect(row.data).toBe('must-survive');
-  });
-
+  // A restore over an existing database is in repro-s3-backup-production.test.ts.
   test('original database survives if restore write fails', async () => {
     // Backup first
     const c = cfg({ databasePath: dbPath });

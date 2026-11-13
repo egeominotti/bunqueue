@@ -221,6 +221,41 @@ head:
   before asserting that there are 100 and that the p90 wait delay stays under
   400 ms; under the same load it passed 50 of 50 runs. No completion notification
   is lost; nothing in the runtime changes.
+- Redundant and never-executed tests removed; nothing in `src/` changes. Each
+  removal was checked against a test that runs the same code path with the same
+  or stronger assertions.
+  - Five SandboxedWorker files that had been entirely commented out since March
+    2026 and so never ran: `test/sandboxedWorker.test.ts`,
+    `test/sandboxed-worker-advanced.test.ts`, `test/sandboxed-worker-flow.test.ts`,
+    `test/sandboxedWorkerIssue24.test.ts` and
+    `test/issue39-sandboxed-graceful-stop.test.ts`. The three cases they had that
+    no live test covers (`stop()` draining active jobs, unique wrapper file
+    names, `on()`/`once()` chaining) are the work item
+    `sandboxed-worker-missing-cases`.
+  - `test/bug-unregister-worker-field.test.ts` (covered by
+    `test/server-handlers-advanced.test.ts`),
+    `test/repro-delayed-error-zero-max-delay.test.ts` (covered by
+    `test/delayed-error-backoff-e2e.test.ts`) and `test/client-pipelining.test.ts`.
+    The test preload sets `BUNQUEUE_EMBEDDED=1`, so that file never reached TCP;
+    `test/server-pipelining.test.ts` and `test/protocol-reqid.test.ts` cover it,
+    and its one extra check, 500 parallel adds returning 500 distinct ids, is now a
+    test in `test/server-pipelining.test.ts`.
+  - 46 individual tests that repeated another test in the same or a sibling
+    file: lock expiry and lock tokens (`test/lockExpiration.test.ts`,
+    `test/lock-race-conditions.test.ts`), cron restarts and stats, S3 backup
+    configuration, cleanup and restore, the write buffer, flow parent results,
+    batch ack repeat, `customId` deduplication, TLS without verification, and
+    `backoff.maxDelay` validation. Three tests that checked only JavaScript
+    semantics or asserted `expect(true)` are removed as well.
+  - `test/docs-dlq-guide/configuration.test.ts` asserted that a list length was
+    at least 0. It now waits until the entry is reported as expired before it
+    waits for DLQ maintenance to purge it.
+- New work items from the same audit: `postgres-tests-never-run` (four
+  PostgreSQL regression files skip unless `BUNQUEUE_TEST_POSTGRES_URL` is set,
+  but the PostgreSQL runner selects only `test/postgres-*.test.ts`, so they never
+  run) and `test-suite-speedups` (fixed sleeps on the 5 s stall sweep and the
+  60 s DLQ maintenance in the slowest files, an estimated 150 s of unit wall
+  time).
 
 ### Documentation
 

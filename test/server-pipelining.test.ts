@@ -62,6 +62,15 @@ describe('Server Pipelining', () => {
     }
   });
 
+  it('should return 500 distinct job ids for 500 parallel adds', async () => {
+    const promises = Array.from({ length: 500 }, (_, i) => queue.add(`unique-${i}`, { index: i }));
+
+    const results = await Promise.all(promises);
+
+    expect(results.length).toBe(500);
+    expect(new Set(results.map((r) => r.id)).size).toBe(500);
+  });
+
   it('should handle mixed command types in parallel', async () => {
     // Push some jobs first
     await queue.add('setup-job', { data: 'setup' });

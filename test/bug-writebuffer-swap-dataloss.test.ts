@@ -66,47 +66,8 @@ function createMockJob(id: number): Job {
 }
 
 describe('WriteBuffer Data Loss Bugs', () => {
-  /**
-   * BUG 1: stopGracefully() timeout silently loses jobs.
-   *
-   * When flush takes longer than the timeout, stopGracefully() resolves
-   * with -1 and sets stopped=true. The buffered jobs are silently lost
-   * with no callback or way to recover them.
-   *
-   * Expected behavior: When timeout occurs, lost jobs should be reported
-   * via a callback so the caller can take recovery action (e.g., re-queue,
-   * log to DLQ, etc.)
-   */
-  test('stopGracefully should report lost jobs when flush fails', async () => {
-    const mockBatchManager = {
-      insertJobsBatch: () => {
-        throw new Error('Simulated DB error during graceful shutdown');
-      },
-    } as unknown as BatchInsertManager;
-
-    const lostJobs: Job[] = [];
-    const onError: WriteBufferErrorCallback = () => {};
-    const onCriticalError: CriticalErrorCallback = (jobs) => {
-      lostJobs.push(...jobs);
-    };
-
-    const buffer = new WriteBuffer(mockBatchManager, 100, 60000, onError, onCriticalError);
-
-    // Add 5 jobs
-    for (let i = 0; i < 5; i++) {
-      buffer.add(createMockJob(i));
-    }
-
-    expect(buffer.pendingCount).toBe(5);
-
-    // stopGracefully will try to flush, which will fail
-    const result = await buffer.stopGracefully(5000);
-
-    // FIX: When flush fails during graceful shutdown, lost jobs should be
-    // reported via onCriticalError so the caller can take recovery action.
-    expect(result).toBe(0); // flush failed, returns 0
-    expect(lostJobs.length).toBe(5);
-  });
+  // BUG 1 (stopGracefully() silently loses jobs when the flush fails) is checked,
+  // with the exact lost ids, by the BUG 5 test at the end of this file.
 
   /**
    * BUG 2: stop() silently drops jobs when flush fails.

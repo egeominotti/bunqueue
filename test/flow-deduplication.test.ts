@@ -94,39 +94,7 @@ describe('Flow + Deduplication - Embedded', () => {
     queue.close();
   }, 15000);
 
-  test('a standalone custom-ID job cannot be silently reparented', async () => {
-    const flow = new FlowProducer({ embedded: true });
-    const queue = new Queue('flow-dedup-existing', { embedded: true });
-    queue.obliterate();
-
-    // Add a standalone job with a custom ID
-    const standaloneJob = await queue.add(
-      'standalone',
-      { role: 'standalone' },
-      { jobId: 'shared-custom-id' }
-    );
-
-    // Add a flow where a child uses the same custom ID
-    await expect(
-      flow.add({
-        name: 'parent',
-        queueName: 'flow-dedup-existing',
-        data: { role: 'parent' },
-        children: [
-          {
-            name: 'child',
-            queueName: 'flow-dedup-existing',
-            data: { role: 'child' },
-            opts: { jobId: 'shared-custom-id' },
-          },
-        ],
-      })
-    ).rejects.toThrow('already exists');
-    expect((await queue.getJob(standaloneJob.id))?.data).toEqual({ role: 'standalone' });
-
-    await flow.close();
-    queue.close();
-  }, 15000);
+  // A standalone custom-ID job reused as a flow child: repro-flow-producer-production-safety.test.ts.
 
   test('re-adding a parent custom ID rejects instead of orphaning new children', async () => {
     const flow = new FlowProducer({ embedded: true });

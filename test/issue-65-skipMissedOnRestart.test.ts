@@ -275,51 +275,5 @@ describe('Issue #65: skipMissedOnRestart in add() path', () => {
     scheduler.stop();
   });
 
-  // Integration test: full restart cycle via add() path
-  it('full restart simulation: load() -> add() should not lose state', async () => {
-    const pushedJobs: Array<{ queue: string }> = [];
-    const persisted: Array<{ name: string; executions: number; nextRun: number }> = [];
-    const scheduler = new CronScheduler();
-
-    scheduler.setPushCallback(async (queue) => {
-      pushedJobs.push({ queue });
-    });
-    scheduler.setPersistCallback((name, executions, nextRun) => {
-      persisted.push({ name, executions, nextRun });
-    });
-
-    // Step 1: Server starts, loads cron from DB (was due 2 hours ago)
-    scheduler.load([
-      makeCronJob({
-        name: 'restart-test',
-        queue: 'jobs',
-        nextRun: Date.now() - 7200_000,
-        schedule: '0 * * * *',
-        skipMissedOnRestart: true,
-        executions: 200,
-      }),
-    ]);
-
-    // Step 2: App initializes and calls upsertJobScheduler -> add()
-    scheduler.add({
-      name: 'restart-test',
-      queue: 'jobs',
-      data: {},
-      schedule: '0 * * * *',
-      skipMissedOnRestart: true,
-    });
-
-    // Step 3: tick should NOT fire (nextRun is in the future after skipMissedOnRestart)
-    await tickScheduler(scheduler);
-
-    // No jobs should have been pushed (missed runs were skipped)
-    expect(pushedJobs.length).toBe(0);
-
-    // Executions count should be preserved
-    const cron = scheduler.get('restart-test');
-    expect(cron?.executions).toBe(200);
-    expect(cron?.nextRun).toBeGreaterThan(Date.now());
-
-    scheduler.stop();
-  });
+  // The full restart cycle (load() of an overdue cron, then add()) is in issue-65-tcp-mode.test.ts.
 });

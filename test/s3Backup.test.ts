@@ -185,12 +185,7 @@ describe('performBackup', () => {
     expect(meta.compressed).toBe(true);
   });
 
-  test('fails when database file missing', async () => {
-    const result = await performBackup(cfg({ databasePath: '/nonexistent/path.db' }), client);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Database file not found');
-  });
-
+  // A missing database file: s3-backup-concurrent.test.ts.
   test('uses configured prefix', async () => {
     const result = await performBackup(cfg({ databasePath: dbPath, prefix: 'custom/' }), client);
     expect(result.success).toBe(true);
@@ -341,18 +336,7 @@ describe('cleanupOldBackups', () => {
     expect(await listBackups(c, client)).toHaveLength(3);
   });
 
-  test('deletes oldest backups exceeding retention', async () => {
-    const c = cfg({ databasePath: dbPath, retention: 2 });
-    for (let i = 0; i < 4; i++) {
-      await performBackup(c, client);
-      await Bun.sleep(5);
-    }
-
-    expect(await listBackups(c, client)).toHaveLength(4);
-    await cleanupOldBackups(c, client);
-    expect(await listBackups(c, client)).toHaveLength(2);
-  });
-
+  // Deleting the oldest backups beyond retention: s3-backup-concurrent.test.ts.
   test('deletes metadata alongside backups', async () => {
     const c = cfg({ databasePath: dbPath, retention: 1 });
     await performBackup(c, client);
@@ -366,35 +350,12 @@ describe('cleanupOldBackups', () => {
 });
 
 describe('S3BackupManager', () => {
-  test('getStatus returns correct info', () => {
-    const m = new S3BackupManager({
-      enabled: true,
-      accessKeyId: 'k',
-      secretAccessKey: 's',
-      bucket: 'b',
-      databasePath: '/tmp/test.db',
-    });
-
-    const s = m.getStatus();
-    expect(s.enabled).toBe(true);
-    expect(s.bucket).toBe('b');
-    expect(s.intervalMs).toBe(DEFAULTS.intervalMs);
-    expect(s.retention).toBe(DEFAULTS.retention);
-    expect(s.isRunning).toBe(false);
-  });
-
+  // getStatus() defaults and start() while disabled: s3-backup-concurrent.test.ts.
   test('validate detects invalid config', () => {
     const m = new S3BackupManager({ accessKeyId: '', databasePath: '/tmp/t.db' });
     const r = m.validate();
     expect(r.valid).toBe(false);
     expect(r.errors.length).toBeGreaterThan(0);
-  });
-
-  test('start does nothing when disabled', () => {
-    const m = new S3BackupManager({ enabled: false, databasePath: '/tmp/t.db' });
-    m.start();
-    expect(m.getStatus().isRunning).toBe(false);
-    m.stop();
   });
 
   test('stop is safe when never started', () => {
