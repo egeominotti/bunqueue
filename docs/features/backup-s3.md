@@ -228,7 +228,11 @@ Restore then:
    A gzip payload without metadata is rejected because it cannot be
    authenticated.
 4. Checks the `SQLite format 3` header, writes a unique temporary candidate,
-   and runs `PRAGMA integrity_check`.
+   and runs `PRAGMA integrity_check`. The header check is the only step that
+   refuses an empty payload: SQLite opens a zero-byte file as a valid empty
+   database and the integrity check answers `ok`, and an empty current-format
+   payload can carry metadata that matches it
+   (`test/s3-restore-header-guard.test.ts`).
 5. If the original main database exists and has a WAL or rollback journal, opens
    it read/write without creating it, reads its schema to recover any hot journal,
    and runs `PRAGMA wal_checkpoint(TRUNCATE)`. A busy or incomplete checkpoint,

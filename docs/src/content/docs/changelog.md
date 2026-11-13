@@ -237,6 +237,35 @@ head:
   before asserting that there are 100 and that the p90 wait delay stays under
   400 ms; under the same load it passed 50 of 50 runs. No completion notification
   is lost; nothing in the runtime changes.
+- Tests for three behaviours that no test failed without
+  (`sandboxed-worker-missing-cases`, `s3-restore-header-guard-test`,
+  `mcp-unregister-worker-adapter-test`); nothing in `src/` changes. Each test was
+  shown to fail with the behaviour removed from a scratch copy of the source.
+  - `test/sandboxed-graceful-stop.test.ts` (issue #39), with real Bun Worker
+    threads: `SandboxedWorker.stop()` stays pending while one or three jobs run,
+    then resolves with every result stored, and pulls no job while it drains,
+    not even into a thread that finished its job during the drain. The processor
+    holds each job until the test opens a gate file, so no fixed sleep decides an
+    outcome.
+  - `test/sandboxed-wrapper-names-chaining.test.ts` (issue #24): ten simultaneous
+    `createWrapperScript` calls, and calls in the same millisecond (the clock is
+    frozen), get distinct wrapper files; two SandboxedWorkers on one queue started
+    in the same millisecond keep separate wrappers, so stopping one leaves the
+    other's file and the other keeps processing; `on()` and `once()` return the
+    worker for every event overload, and a chained `once()` listener runs once.
+  - `test/s3-restore-header-guard.test.ts`: SQLite opens a zero-byte file as a
+    valid empty database and `PRAGMA integrity_check` answers `ok`, so the
+    `SQLite format 3` header check is the only step that refuses an empty backup
+    object. Without it, restoring an empty legacy payload, or an empty
+    current-format one whose metadata matches it, reported success and replaced
+    the live database with an empty file. The test requires the header refusal,
+    the live rows intact and no candidate file left, plus a real restore as a
+    control.
+  - `test/mcp-tcp-unregister-worker.test.ts`: the MCP TCP adapter's
+    `unregisterWorker` against a real broker on a dynamic port. The command on
+    the wire carries `workerId` (the broker reads no `id`), the worker is gone
+    from `listWorkers`, a second unregister reports `false`, and other workers
+    stay registered.
 - Redundant and never-executed tests removed; nothing in `src/` changes. Each
   removal was checked against a test that runs the same code path with the same
   or stronger assertions.
@@ -245,9 +274,9 @@ head:
     `test/sandboxed-worker-advanced.test.ts`, `test/sandboxed-worker-flow.test.ts`,
     `test/sandboxedWorkerIssue24.test.ts` and
     `test/issue39-sandboxed-graceful-stop.test.ts`. The three cases they had that
-    no live test covers (`stop()` draining active jobs, unique wrapper file
-    names, `on()`/`once()` chaining) are the work item
-    `sandboxed-worker-missing-cases`.
+    no live test covered (`stop()` draining active jobs, unique wrapper file
+    names, `on()`/`once()` chaining) are live tests again, against real Bun
+    Workers (`sandboxed-worker-missing-cases`, below).
   - `test/bug-unregister-worker-field.test.ts` (covered by
     `test/server-handlers-advanced.test.ts`),
     `test/repro-delayed-error-zero-max-delay.test.ts` (covered by

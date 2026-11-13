@@ -103,9 +103,6 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 10. `postgres-tests-never-run`: four PostgreSQL regression files skip without
     `BUNQUEUE_TEST_POSTGRES_URL` and are outside `scripts/test-postgres.ts`'s
     `test/postgres-*.test.ts` selection, so they never run; rename or widen.
-11. `sandboxed-worker-missing-cases`: three SandboxedWorker cases (draining
-    `stop()`, unique wrapper names, `on()`/`once()` chaining) lost with the
-    commented-out files `test-suite-pruning` deleted; write them as live tests.
 12. `test-suite-speedups`: fixed sleeps on the 5 s stall sweep and the 60 s DLQ
     maintenance in the slowest unit files (estimated 150 s of unit wall time);
     needs a stall/DLQ configuration seam in `getSharedManager()`.
@@ -185,6 +182,26 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   (unit 11738 / 0 / 402, tcp 553 / 0, embedded 349 / 0); item `done`.
 - New item `postgres-runner-guard-destructuring`: the guard does not see a
   destructured `BUNQUEUE_TEST_POSTGRES_URL` read.
+### 2026-11-13 — sandboxed-worker-missing-cases (+ two test gaps)
+
+- Branch `test-coverage-gaps`, base `2f1ad824`; working tree only, nothing
+  committed, staged with `git add -A`. No `src/` change: no test exposed a bug.
+- Added `test/sandboxed-graceful-stop.test.ts` (issue #39) and
+  `test/sandboxed-wrapper-names-chaining.test.ts` (issue #24), with real Bun
+  Workers: a gate file decides when a job may finish, and `Date.now` is frozen
+  for the same-millisecond cases. They are stable on Bun 1.4.4 on the host (30 of
+  30 sequential runs, 10 of 10 with `--parallel=4` and the sandboxed neighbours,
+  10 of 10 under 8 busy CPU loops), so no test had to fall back to the pool seam.
+- New items `s3-restore-header-guard-test` (`test/s3-restore-header-guard.test.ts`:
+  the header check is the only refusal of an empty payload, which SQLite opens
+  as a valid empty database) and `mcp-unregister-worker-adapter-test`
+  (`test/mcp-tcp-unregister-worker.test.ts`, real broker, wire command recorded).
+  Both ship in this change and are `done` with it.
+- Mutation proofs (scratch worktree of `2f1ad824`, one mutant at a time) and the
+  host checks are in the item's evidence. Docs: `docs/features/client-worker-sdk.md`,
+  `backup-s3.md`, `workers-management.md`; changelog `[Unreleased]` Testing.
+- Gates: `bun run test:sandbox` green on tree `4ab265ea` (unit 11750 / 0 / 402,
+  tcp 553 / 0, embedded 349 / 0); all three items `done`.
 
 ### 2026-11-13 — drop-postgres-15
 

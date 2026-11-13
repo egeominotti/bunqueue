@@ -477,7 +477,15 @@ Lifecycle (`lifecycle.ts`):
   threads (skipped by `stop(true)`, which also cuts short a graceful teardown in
   progress), clear the heartbeat and per-job timers, terminate the threads and
   delete the wrapper. Concurrent stops await the same run, and `start()` waits for
-  a teardown in progress before it begins.
+  a teardown in progress before it begins. `running` turns false before the drain,
+  so a thread that finishes its job during the drain takes no new one: the waiting
+  jobs stay waiting (issue #39, `test/sandboxed-graceful-stop.test.ts`, real threads).
+- **One wrapper per start.** `createWrapperScript` names the file
+  `worker-<queue>-<Date.now()>-<8 random base-36 chars>.ts` in
+  `$TMPDIR/bunqueue-workers/`, so workers started in the same millisecond on one
+  queue never share a file and one worker's stop never deletes another's wrapper
+  (issue #24, `test/sandboxed-wrapper-names-chaining.test.ts`, which also pins that
+  `on()` and `once()` return the worker).
 - **A user stop wins.** A lifecycle epoch moves on every `start()` and `stop()`.
   An idle stop (`idleStop()`, or `stopAndWatch()` with `autoStart`), an idle-watch
   check and a `start()` capture the epoch and abandon once it moves. A `stop()`

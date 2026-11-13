@@ -165,6 +165,11 @@ filtered live view.
 - `bunqueue worker register <name> --queues|-q a,b,c` → `RegisterWorker`
 - `bunqueue worker unregister <workerId>` → `UnregisterWorker`
 
+The MCP `unregister_worker` tool in TCP mode sends the same command with the id
+in `workerId` (`src/mcp/backend/tcp/services.ts`); the broker reads no `id` field,
+so a command naming it `id` would answer "Worker not found" and leave the worker
+registered (`test/mcp-tcp-unregister-worker.test.ts`).
+
 ### Dashboard events emitted
 
 `worker:connected` and `worker:disconnected` are emitted by the `QueueManager`
