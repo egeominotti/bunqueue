@@ -50,23 +50,18 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
-- Nothing in progress on `main`; see the `in-progress` entries of
-  `feature_list.json` for other sessions.
+- `postgres-runner-guard-destructuring` and `machine-gate-interrupt-log-gaps`:
+  implemented, skeptic CONDITIONAL only on the sandbox gate, not yet on `main`
+  (their worktrees hold the staged change).
 
 ### What's Next
 
-2. `cpu-intensive-blocking-test-flake`: the non-yielding-handler test in
-   `test/docs-worker-guide/cpu-intensive.test.ts` passes or fails on a race with
-   the pull; make it observe real recovery.
-1. `worker-close-register-error`: the heartbeat `ClientClosedError` defect, in
-   `registerWithServer()` (context `worker-register`); reproduce first.
-3. `postgres-completion-read-model-plan`: `loadPostgresCompletionResults` has the
-   prune's stale-statistics plan problem (quadratic, 1.6 s on 4,834 completions).
-4. `postgres-runner-guard-destructuring`: the runner-coverage guard misses a
-   destructured `BUNQUEUE_TEST_POSTGRES_URL` read.
-5. `machine-gate-interrupt-log-gaps`: empty `create.log` after a SIGTERM during
-   `orb create`, and two dry-run output flaws.
-7. Owner decisions only: `worker-force-close-unreachable-broker`,
+1. Land `postgres-runner-guard-destructuring` and `machine-gate-interrupt-log-gaps`
+   after a green `bun run test:sandbox` each.
+2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
+   probe on PostgreSQL 16 and 17 with stale statistics.
+3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
+   see its evidence), `worker-force-close-unreachable-broker`,
    `deprecated-public-apis-next-major`, `python-sdk-pypi-publication-gap`.
 
 ## Blockers / Risks
@@ -112,6 +107,17 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — second batch
+
+- On `main`: `worker-close-register-error`, `cpu-intensive-blocking-test-flake`,
+  `split-oversized-test-files`, each with its own green sandbox and skeptic.
+- Deferred: `postgres-completion-read-model-plan` (no shape found that fixes stale
+  statistics without slowing the good-statistics case; numbers in its evidence).
+- Not landed yet: `postgres-runner-guard-destructuring`,
+  `machine-gate-interrupt-log-gaps` (sandbox gate still owed).
+- Several background shells on the host exited 144 during the session; the
+  machine-gate scripts were reviewed and do not signal outside their tree.
 
 ### 2026-11-13 — worker-close-register-error
 

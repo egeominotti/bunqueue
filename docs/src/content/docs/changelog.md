@@ -435,6 +435,8 @@ head:
 
 ### Internal
 
+- Work-item state: the PostgreSQL completion read-model plan fix is deferred with
+  its measurements, and the prune recheck's state-index probe is a new item.
 - The OrbStack Machine gate (`bunqueue-running-machine-gates` skill) ran again on real
   OrbStack after its cleanup fixes: the canonical Ubuntu 24.04 and Debian 13 run
   passed, and SIGTERM or SIGINT at every stage deleted every Machine and left a

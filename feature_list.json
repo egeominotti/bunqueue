@@ -189,6 +189,15 @@
       "description": "Found on 2026-11-13 while fixing postgres-completion-prune-plan. loadPostgresCompletionResults (src/infrastructure/persistence/postgres/completionQueries.ts, used by the read-model snapshots in readModels.ts and store.loadResults) joins bunqueue_dependencies to bunqueue_jobs in its pinned CTE and anti-joins the completions against it. With table statistics that do not cover the namespace (analyzed before it had rows), every scan is estimated at one row and the nested loops become quadratic: on disposable PostgreSQL 16.16, 4,834 completions, 4,000 dependencies and 2,333 jobs took 1,641 and 1,732 ms against 5.9 ms after ANALYZE (619 completions: 29 ms against 1.2 ms). Reproduce first (the same stale-statistics seeding as test/postgres-completion-prune-plan.test.ts), then fix the plan without changing which completions are returned or their pinned flag; measure before and after with good and stale statistics.",
       "dependencies": [],
       "status": "not-started",
+      "evidence": "Deferred 2026-11-13 after two attempts, measured on Docker PostgreSQL 16.16, 17.12 and 18.6. A window/GROUP BY rewrite cut stale-statistics reads from ~1 s to 10-12 ms but reads every live job, so with good statistics a namespace with a large backlog went from 1.8-2.4 ms to 206-259 ms (skeptic FAIL); assertPostgresSnapshotBudget (snapshotBudget.ts) also carries the old query and keeps the read path at ~1.2 s on stale statistics. A primary-key probe prototype (bun run test:postgres not rerun; scripts and numbers kept out of the repo) gave identical rows in 300/300 random cases and 3-15 ms on stale statistics, but is 2-3x slower (+5-6 ms) on small namespaces with good statistics and still ~70 ms on PostgreSQL 17 stale. Options: accept that trade-off; run the completion query and the budget check in their own transaction with planner settings; or leave it, since autovacuum's ANALYZE fixes the plan. Needs an owner decision on the trade-off.",
+      "issue": null
+    },
+    {
+      "id": "postgres-completion-recheck-state-index",
+      "name": "Keep the prune DELETE recheck on the jobs primary key under stale statistics",
+      "description": "Found 2026-11-13 while working on postgres-completion-read-model-plan: the consumer-state check inside the per-row recheck of prunePostgresCompletionTombstoneBatch (completionLifecycle.ts) was planned on PostgreSQL 16 and 17 with stale statistics as a namespace-only scan of bunqueue_jobs_state_idx: 560 and 842 ms for 4,000 probes, 27 ms on 18.6. Batches are capped at 1,000 ids, so it is bounded, not the cubic plan already fixed. Reproduce on 16 and 17 first.",
+      "dependencies": [],
+      "status": "not-started",
       "evidence": "",
       "issue": null
     },
