@@ -736,6 +736,15 @@ Crashed threads (`thread.ts`, `recovery.ts`):
   error (seen in a PostgreSQL stress run). Any other heartbeat failure, and a
   `ClientClosedError` while the Worker is running (its pool closed from outside, for
   example), is emitted as before. `test/repro-worker-close-heartbeat-error.test.ts`.
+- **RegisterWorker in flight at close** (`runtime/execution.ts` `registerWithServer`):
+  `RegisterWorker` is sent fire-and-forget from `run()` and again after a reconnect,
+  and a rejection is emitted as `error` with `context` `worker-register`. One still
+  in flight when `close()` ends the Worker's pool (a close right after construction
+  or a reconnect) is rejected with `ClientClosedError`; the same
+  `isOwnCloseRejection` rule as the heartbeats drops it once `close()` has started.
+  Any other register failure (a command timeout, a server error), and a
+  `ClientClosedError` while the Worker is running, is emitted as before.
+  `test/repro-worker-close-register-error.test.ts`.
 - **Ownership and waiting-children transitions:** processor and sandboxed `Job` objects route `removeDeduplicationKey` through the owner-aware manager/wire operation and route `moveToWaitingChildren` through the real broker transition in both modes. A stale deduplication owner returns `false`; moving a non-active job returns `false` or a broker error rather than silently changing unrelated state.
 - **Job mutation handlers** (`processorHandlers.ts`) are state-aware: `retry`
   dispatches by job state (failed → `retryDlq`, active → `moveActiveToWait`,

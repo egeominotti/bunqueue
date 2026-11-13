@@ -452,6 +452,17 @@ head:
   heartbeat failure, a command timeout for example, and a `ClientClosedError` while
   the Worker is still running are emitted as before. Covered by
   `test/repro-worker-close-heartbeat-error.test.ts`.
+- **`Worker.close()` no longer emits its own `ClientClosedError` from a
+  `RegisterWorker` still in flight.** The Worker registers itself fire-and-forget
+  (at `run()` and after a reconnect) and emits a rejection as `error` (`context`
+  `worker-register`). A `close()` right after construction or a reconnect ended the
+  Worker's own connection pool while `RegisterWorker` was unanswered, and its
+  `ClientClosedError` was emitted after the caller had asked for the shutdown; a
+  Worker without an `error` listener turned it into an unhandled error. The same
+  rule as for the heartbeats now drops a `RegisterWorker` `ClientClosedError` once
+  `close()` has started. Every other register failure, and a `ClientClosedError`
+  while the Worker is still running, are emitted as before. Covered by
+  `test/repro-worker-close-register-error.test.ts`.
 - **A TLS reload rollback on the HTTP unix socket now restores the socket's mode
   even when restoring its owner fails** (#189 follow-up). When the bind of a new
   certificate failed and the listener rebound the previous one, a `chown` failure

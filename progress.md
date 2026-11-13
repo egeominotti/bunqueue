@@ -55,8 +55,6 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Next
 
-1. `worker-close-register-error`: the heartbeat `ClientClosedError` defect, in
-   `registerWithServer()` (context `worker-register`); reproduce first.
 2. `cpu-intensive-blocking-test-flake`: the non-yielding-handler test in
    `test/docs-worker-guide/cpu-intensive.test.ts` passes or fails on a race with
    the pull; make it observe real recovery.
@@ -113,6 +111,21 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — worker-close-register-error
+
+- Item: `worker-close-register-error` (done), branch
+  `worker-close-register-error`, base `154d6fc5`.
+- Reproduction: `test/repro-worker-close-register-error.test.ts` (fake broker
+  holding `RegisterWorker`). Unchanged code: 2 pass / 2 fail
+  (`worker-register: ClientClosedError` emitted after `close()`, and the
+  no-listener case). Fix: the `RegisterWorker` `.catch` in `registerWithServer()`
+  drops `isOwnCloseRejection(error)`, the heartbeat rule. After: 4 / 0,
+  `--rerun-each 10` 40 / 0; the running-Worker guard test fails against the mutant
+  without `(_closing || closed)` (3 / 1).
+- Docs: `docs/features/client-worker-sdk.md`, changelog `[Unreleased]` Bug fixes.
+- Gates: `bun run test:sandbox` green on tree `c92b8cf5` (unit 11777 / 0 / 403,
+  tcp 553 / 0, embedded 349 / 0); skeptic CONDITIONAL only on that gate.
 
 ### 2026-11-13 — integration of six items
 

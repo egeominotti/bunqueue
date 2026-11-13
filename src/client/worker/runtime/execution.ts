@@ -181,6 +181,7 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
         this.registered = true;
       })
       .catch((errorValue: unknown) => {
+        if (this.isOwnCloseRejection(errorValue)) return;
         const error = errorValue instanceof Error ? errorValue : new Error(String(errorValue));
         this.emit('error', Object.assign(error, { context: 'worker-register' }));
       });
@@ -216,8 +217,9 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
   }
 
   /**
-   * A heartbeat still in flight when close() ends the Worker's own pool rejects with
-   * ClientClosedError. Once close() has started, such a rejection is not an `error`:
+   * A heartbeat or RegisterWorker still in flight when close() ends the Worker's own
+   * pool rejects with ClientClosedError. Once close() has started, such a rejection is
+   * not an `error`:
    * the caller asked for that shutdown (without a listener it was an unhandled
    * error). Any other failure, or a ClientClosedError while running, still is.
    */
