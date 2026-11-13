@@ -13,6 +13,8 @@ export interface HeartbeatDeps {
   readonly tcp: TcpConnection | null;
   readonly useLocks: boolean;
   readonly emitter: EventEmitter;
+  /** True for a failure that is not reported (the Worker's own close rejecting it). */
+  readonly isExpectedFailure?: (error: unknown) => boolean;
 }
 
 /**
@@ -52,6 +54,7 @@ export async function sendHeartbeat(deps: HeartbeatDeps): Promise<void> {
       }
     }
   } catch (err) {
+    if (deps.isExpectedFailure?.(err)) return;
     const error = err instanceof Error ? err : new Error(String(err));
     deps.emitter.emit('error', Object.assign(error, { context: 'heartbeat' }));
   }

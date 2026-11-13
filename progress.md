@@ -113,8 +113,10 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 10. `postgres-completion-prune-plan`: the completion-retention candidate query takes
     about 10 s on about 300 rows of a fresh namespace while it holds its advisory
     lock; found while reproducing item 9.
-11. `worker-close-heartbeat-error` and `worker-force-close-unreachable-broker`: two
-    client findings from the same stress runs.
+11. `worker-force-close-unreachable-broker` stays `not-started`: measured, but a
+    bounded forced close needs an owner decision (Blockers / Risks).
+12. `worker-close-register-error`: the same `ClientClosedError` defect in
+    `registerWithServer()` (context `worker-register`), found while fixing item 11.
 
 ## Blockers / Risks
 
@@ -146,6 +148,13 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   `test/support/postgres-public-api-harness.ts` (`postgres-public-api-flow`,
   `postgres-public-api-queue-worker`) still use Bun's 5 s default for the same
   teardown hooks.
+- `worker-force-close-unreachable-broker` needs an owner decision: is a bounded
+  forced close allowed to drop the final ACK flush to an unreachable broker? Ship
+  only in a minor or major with an upgrade note. A 5 s grace while the pool has no
+  connected client bounded `close(true)` (10.1 s to 5.1 s for a killed broker with a
+  10 s `commandTimeout`), but a broker that restarts and stays down longer than 5 s
+  then loses the queued ACK flush, so completed jobs may run again (skeptic round 2,
+  CONDITIONAL). The code was removed from `worker-close-fixes`.
 - `--isolate-network` does not isolate an OrbStack Machine from sibling Machines,
   the Mac's LAN address or the internet (measured on OrbStack 2.2.5). Only the
   sandbox containers run tests without a network.
@@ -222,6 +231,29 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Gates: `bun run test:sandbox` green on tree `c2e0759a` (unit 11734 / 0 / 403,
   tcp 553 / 0, embedded 349 / 0); skeptic CONDITIONAL only on that gate. CI's
   PostgreSQL 16, 17 and 18.6 legs run the new test.
+### 2026-11-13 — worker-close-fixes
+
+- Item: `worker-close-heartbeat-error` (done), branch `worker-close-fixes`,
+  base `2f1ad824`. `worker-force-close-unreachable-broker`
+  was worked on in the same session and then removed from the change-set.
+- Heartbeat: a `Heartbeat` or `JobHeartbeat` in flight when `close()` ends the
+  Worker's own pool rejected with `ClientClosedError` and was emitted as `error`
+  (unhandled without a listener). It is now dropped once `close()` has started;
+  other heartbeat failures, and a `ClientClosedError` while the Worker runs, still
+  surface. Before 1 / 3 fail, after 5 / 0, 50 / 0 over 10 reruns
+  (`test/repro-worker-close-heartbeat-error.test.ts`). Skeptic round 1: PASS;
+  round 3 CONDITIONAL, addressed (fake broker trimmed, running-Worker test proven
+  against a mutant without the closing condition, docs wording).
+- Forced close: `UnregisterWorker` (and any release or ACK flush) waits the
+  `commandTimeout` after the broker was killed (10.1 s, 40.7 s for an ACK flush,
+  with a 10 s timeout). Two bounded variants were tried; skeptic round 1 failed an
+  unconditional 5 s grace (it cut a live slow broker), round 2 was CONDITIONAL on a
+  grace armed only while disconnected (a broker restart longer than 5 s loses the
+  queued ACK flush). Removed; the numbers and the open question are in the item's
+  evidence and under Blockers / Risks.
+- Gates: `bun run test:sandbox` green on tree `d1f6710f` (unit 11739 / 0 / 402,
+  tcp 553 / 0, embedded 349 / 0); skeptic round 4 CONDITIONAL only on that gate.
+  Next: `worker-close-register-error`.
 
 ### 2026-11-13 — drop-postgres-15
 

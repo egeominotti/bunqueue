@@ -1,6 +1,7 @@
 import { hostname } from 'os';
 import { processingTimeoutDelay } from '../../../domain/job/timeoutRule';
 import { safeInterval, safeTimeout, type SafeTimer } from '../../../shared/timers';
+import { isClientClosedError } from '../../tcp/errors';
 import { getSharedManager } from '../../manager';
 import { BatchExecution } from '../batchExecution';
 import { processJob } from '../processor';
@@ -207,10 +208,21 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
           failed: this.failedCount,
         })
         .catch((errorValue: unknown) => {
+          if (this.isOwnCloseRejection(errorValue)) return;
           const error = errorValue instanceof Error ? errorValue : new Error(String(errorValue));
           this.emit('error', Object.assign(error, { context: 'worker-heartbeat' }));
         });
     }, this.opts.heartbeatInterval);
+  }
+
+  /**
+   * A heartbeat still in flight when close() ends the Worker's own pool rejects with
+   * ClientClosedError. Once close() has started, such a rejection is not an `error`:
+   * the caller asked for that shutdown (without a listener it was an unhandled
+   * error). Any other failure, or a ClientClosedError while running, still is.
+   */
+  protected isOwnCloseRejection(error: unknown): boolean {
+    return (this._closing || this.closed) && isClientClosedError(error);
   }
 
   protected getHeartbeatDeps(): HeartbeatDeps {
@@ -220,6 +232,7 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
       tcp: this.tcp,
       useLocks: this.opts.useLocks,
       emitter: this,
+      isExpectedFailure: (error) => this.isOwnCloseRejection(error),
     };
   }
 

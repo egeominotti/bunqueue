@@ -405,6 +405,18 @@ head:
 
 ### Bug fixes
 
+- **`Worker.close()` no longer emits its own `ClientClosedError` from a heartbeat
+  still in flight.** The worker-registration `Heartbeat` and the job-lease
+  `JobHeartbeat` are fire-and-forget; a rejected one is emitted as `error`
+  (`context` `worker-heartbeat` or `heartbeat`). `close()` stopped both timers,
+  but a heartbeat already sent was rejected with `ClientClosedError` when the close
+  ended the Worker's own connection pool, and was emitted after the caller had
+  asked for the shutdown; a Worker without an `error` listener turned it into an
+  unhandled error (seen once in 36 runs of a PostgreSQL stress test). A heartbeat
+  `ClientClosedError` is now dropped once `close()` has started. Every other
+  heartbeat failure, a command timeout for example, and a `ClientClosedError` while
+  the Worker is still running are emitted as before. Covered by
+  `test/repro-worker-close-heartbeat-error.test.ts`.
 - **A TLS reload rollback on the HTTP unix socket now restores the socket's mode
   even when restoring its owner fails** (#189 follow-up). When the bind of a new
   certificate failed and the listener rebound the previous one, a `chown` failure

@@ -611,7 +611,7 @@ Crashed threads (`thread.ts`, `recovery.ts`):
   `startJob` in `runtime/execution.ts`.
 - **Lock-based ownership** (`useLocks`, default true): each pulled job gets a
   `token`; heartbeats renew the lock for **all** `pulledJobIds` (active and
-  buffered) so buffered jobs don't expire (`workerHeartbeat.ts:24`). Lock TTL =
+  buffered) so buffered jobs don't expire (`workerHeartbeat.ts:26`). Lock TTL =
   `lockDuration` (default 30000), propagated to the server via `lockTtl` on
   pull (`workerPull.ts:79`). Manual pulls expose the same broker token on the
   returned `ManualJob`; manual processing reuses the tracked value when its
@@ -725,6 +725,17 @@ Crashed threads (`thread.ts`, `recovery.ts`):
   so a processor may still return later; that late outcome is abandoned before
   any broker command or event. The unfinished job remains recoverable through
   disconnect handling or server lock/stall expiry.
+- **Heartbeats in flight at close** (`runtime/execution.ts`
+  `isOwnCloseRejection`): both heartbeats are fire-and-forget, and a rejected one is
+  emitted as `error` with `context` `worker-heartbeat` (`Heartbeat`) or `heartbeat`
+  (`JobHeartbeat`/`JobHeartbeatB`). `close()` clears both timers, but a heartbeat
+  already in flight is rejected with `ClientClosedError` when the close ends the
+  Worker's pool. A heartbeat `ClientClosedError` that arrives once `close()` has
+  started (whatever closed the client) is dropped: the caller asked for the
+  shutdown, and a Worker without an `error` listener turned it into an unhandled
+  error (seen in a PostgreSQL stress run). Any other heartbeat failure, and a
+  `ClientClosedError` while the Worker is running (its pool closed from outside, for
+  example), is emitted as before. `test/repro-worker-close-heartbeat-error.test.ts`.
 - **Ownership and waiting-children transitions:** processor and sandboxed `Job` objects route `removeDeduplicationKey` through the owner-aware manager/wire operation and route `moveToWaitingChildren` through the real broker transition in both modes. A stale deduplication owner returns `false`; moving a non-active job returns `false` or a broker error rather than silently changing unrelated state.
 - **Job mutation handlers** (`processorHandlers.ts`) are state-aware: `retry`
   dispatches by job state (failed → `retryDlq`, active → `moveActiveToWait`,

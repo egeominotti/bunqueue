@@ -16,7 +16,8 @@ export class ClientClosedError extends Error {
 
 Object.defineProperty(ClientClosedError.prototype, CLIENT_CLOSED_BRAND, { value: true });
 
-function isClientClosedError(reason: unknown): boolean {
+/** True for a ClientClosedError of any bunqueue copy loaded in this process. */
+export function isClientClosedError(reason: unknown): boolean {
   if (reason instanceof ClientClosedError) return true;
   return (
     typeof reason === 'object' &&
