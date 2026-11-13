@@ -174,7 +174,7 @@ That is a complete, working queue. The [Quick Start](/guide/quickstart/) walks t
 ## Why bunqueue?
 
 - **Zero external infrastructure.** Add `dataPath` for one-file SQLite persistence, or omit it for memory-only queues. No Redis, no separate broker, and only one runtime dependency.
-- **Multi-broker when needed.** PostgreSQL 15–18 coordinates independent standalone servers with transactional claims and fenced leases; 18.6 is recommended.
+- **Multi-broker when needed.** PostgreSQL 16–18 coordinates independent standalone servers with transactional claims and fenced leases; 18.6 is recommended.
 - **Native Bun.** Local persistence uses `bun:sqlite`; PostgreSQL uses Bun's built-in `SQL` client directly, with no ORM or third-party database driver.
 - **Familiar API.** If you know BullMQ, you already know most of bunqueue.
 - **Production features.** Retries with backoff (automatic waiting between retry attempts), a dead letter queue (a holding area for jobs that keep failing), cron scheduling, rate limiting, stall detection, and S3 backups.

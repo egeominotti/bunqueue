@@ -15,8 +15,8 @@ export const covers: readonly Cover[] = [
     l1: 'One file.',
     l2pre: 'Many ',
     l2: 'brokers.',
-    sub: 'Memory or one-file SQLite. PostgreSQL 15–18 when you scale. No Redis.',
-    stats: ['186K on-disk', 'PostgreSQL 15–18', 'MIT'],
+    sub: 'Memory or one-file SQLite. PostgreSQL 16–18 when you scale. No Redis.',
+    stats: ['186K on-disk', 'PostgreSQL 16–18', 'MIT'],
   },
   {
     file: 'og/getting-started',
@@ -52,7 +52,7 @@ export const covers: readonly Cover[] = [
     l2pre: 'many ',
     l2: 'brokers.',
     sub: 'SQLite for one broker. PostgreSQL for an active fleet.',
-    stats: ['TCP :6789', 'PostgreSQL 15–18', 'native TLS'],
+    stats: ['TCP :6789', 'PostgreSQL 16–18', 'native TLS'],
   },
   {
     file: 'og/client-sdk',

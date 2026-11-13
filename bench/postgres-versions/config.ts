@@ -25,7 +25,7 @@ function postgresMemory(name: string, fallback: string): string {
   return value;
 }
 
-export const versions = integerList('BUNQUEUE_PG_BENCH_VERSIONS', [15, 16, 17, 18]);
+export const versions = integerList('BUNQUEUE_PG_BENCH_VERSIONS', [16, 17, 18]);
 export const brokerCounts = integerList('BUNQUEUE_PG_BENCH_BROKERS', [1, 2, 4]);
 export const jobs = positiveInteger('BUNQUEUE_PG_BENCH_JOBS', 10_000);
 export const batchSize = positiveInteger('BUNQUEUE_PG_BENCH_BATCH_SIZE', 100);

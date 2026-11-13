@@ -1,6 +1,6 @@
 ---
 title: 'bunqueue Environment Variables Reference'
-description: Complete environment variable reference for bunqueue, including SQLite and PostgreSQL 15–18 storage, ports, auth, backups, timeouts, and logging.
+description: Complete environment variable reference for bunqueue, including SQLite and PostgreSQL 16–18 storage, ports, auth, backups, timeouts, and logging.
 head:
   - tag: meta
     attrs:
@@ -97,7 +97,8 @@ released as they expire.
 **Storage selection.** An explicit driver wins. Otherwise a PostgreSQL URL
 selects PostgreSQL, a data path selects SQLite, and neither selects memory.
 PostgreSQL and a SQLite data path cannot be combined. PostgreSQL is server-only,
-tested in CI against majors 15, 16, 17, and the pinned/recommended 18.6 release,
+tested in CI against majors 16, 17, and the pinned/recommended 18.6 release
+(PostgreSQL 15 is no longer tested; the minimum supported version is 16),
 and every active broker sharing a namespace must have a unique broker ID. MySQL
 is not supported. In the repository Compose
 topology, `POSTGRES_PASSWORD` configures the database and

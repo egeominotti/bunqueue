@@ -332,4 +332,4 @@ the component in embedded mode).
 - [Worker management](./workers-management.md)
 - [Configuration](./configuration.md)
 - [Production readiness testing](./production-readiness-testing.md)
-- [PostgreSQL 15–18 Multi-Broker Persistence](./postgres-multibroker.md)
+- [PostgreSQL 16–18 Multi-Broker Persistence](./postgres-multibroker.md)

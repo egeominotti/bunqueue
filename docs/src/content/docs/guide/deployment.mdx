@@ -1,6 +1,6 @@
 ---
-title: 'Deploy bunqueue: SQLite or PostgreSQL 15–18'
-description: Deploy bunqueue with embedded or single-broker SQLite, or a PostgreSQL 15–18 multi-broker topology, including Kubernetes, Docker, health, and backups.
+title: 'Deploy bunqueue: SQLite or PostgreSQL 16–18'
+description: Deploy bunqueue with embedded or single-broker SQLite, or a PostgreSQL 16–18 multi-broker topology, including Kubernetes, Docker, health, and backups.
 head:
   - tag: meta
     attrs:
@@ -17,7 +17,7 @@ import { Aside } from '@astrojs/starlight/components';
 </div>
 
 bunqueue uses one process and memory/SQLite by default. Server mode may instead
-use PostgreSQL 15–18 as the authoritative store for multiple active broker
+use PostgreSQL 16–18 as the authoritative store for multiple active broker
 processes. PostgreSQL 18.6 is the recommended release and is pinned by the
 repository Compose topology. Start by deciding whether the queue is embedded, a
 single SQLite server, or a PostgreSQL-backed broker fleet.
@@ -115,7 +115,7 @@ curl -X POST http://localhost:6790/queues/emails/jobs \
   require PostgreSQL mode.
 </Aside>
 
-## Multiple active brokers: PostgreSQL 15–18
+## Multiple active brokers: PostgreSQL 16–18
 
 Use the repository's pinned Compose topology when one broker is not enough:
 
@@ -128,8 +128,9 @@ POSTGRES_PASSWORD='replace-me' \
 This starts `postgres:18.6-alpine`, `broker-a` on TCP/HTTP `6789`/`6790`, and
 `broker-b` on `7789`/`7790`. Both brokers share one URL and namespace and have
 different IDs. CI runs the complete PostgreSQL integration suite against majors
-15, 16, 17, and the pinned 18.6 release; use 18.6 for new deployments unless a
-provider constraint requires another tested major. Configure the equivalent
+16, 17, and the pinned 18.6 release; use 18.6 for new deployments unless a
+provider constraint requires another tested major. PostgreSQL 15 is no longer
+tested; the minimum supported version is 16. Configure the equivalent
 deployment with:
 
 ```bash
@@ -657,7 +658,7 @@ recommendation. See [PostgreSQL benchmark evidence](/guide/benchmarks/#postgresq
 ## Gotchas
 
 - **SQLite is single-broker.** Horizontal broker scaling requires PostgreSQL
-  15–18 mode; 18.6 is recommended. PostgreSQL/database HA, routing, and backup remain operational
+  16–18 mode; 18.6 is recommended. PostgreSQL/database HA, routing, and backup remain operational
   responsibilities; bunqueue is not a multi-region consensus system.
 - **Two embedded processes, one file, is silent corruption.** See the warning above; always go through the server for multi-process.
 - **Copying the database while the server runs can produce a torn copy.** SQLite runs in WAL mode (writes go to a `.db-wal` sidecar file first). Stop the server, then copy `bunq.db` and `bunq.db-wal` together, or just use the built-in S3 backup, which snapshots safely while live.

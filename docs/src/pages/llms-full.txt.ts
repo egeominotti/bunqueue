@@ -124,7 +124,7 @@ export const GET: APIRoute = async () => {
     '# bunqueue: full documentation\n\n' +
     '> Concatenated full text of the bunqueue documentation for LLM grounding. ' +
     'bunqueue is a high-performance job queue for the Bun runtime, using in-memory storage ' +
-    'by default, optional SQLite (WAL), or PostgreSQL 15-18 for multi-broker deployments, without Redis. ' +
+    'by default, optional SQLite (WAL), or PostgreSQL 16-18 for multi-broker deployments, without Redis. ' +
     'It provides a BullMQ-compatible API and a native MCP server. ' +
     `Canonical site: ${SITE}. Curated index: ${SITE}/llms.txt\n`;
 

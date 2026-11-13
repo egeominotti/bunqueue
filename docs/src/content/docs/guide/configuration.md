@@ -1,6 +1,6 @@
 ---
 title: 'bunqueue.config.ts: Typed Server Configuration File'
-description: 'Centralize every bunqueue server setting in one typed bunqueue.config.ts: ports, auth, SQLite or PostgreSQL 15–18 storage, CORS, backups, and timeouts.'
+description: 'Centralize every bunqueue server setting in one typed bunqueue.config.ts: ports, auth, SQLite or PostgreSQL 16–18 storage, CORS, backups, and timeouts.'
 head:
   - tag: meta
     attrs:
@@ -221,7 +221,8 @@ defineConfig({
 ```
 
 Do not combine `url` with `dataPath`. PostgreSQL support is server-only and is
-validated against PostgreSQL 15, 16, 17, and 18.6; embedded queues continue to
+validated against PostgreSQL 16, 17, and 18.6; PostgreSQL 15 is no longer
+tested and the minimum supported version is 16. Embedded queues continue to
 use memory/SQLite. MySQL is not supported. See
 [Storage backends](/guide/databases/).
 

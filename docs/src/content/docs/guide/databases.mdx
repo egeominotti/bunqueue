@@ -1,6 +1,6 @@
 ---
-title: 'Storage: SQLite or PostgreSQL 15–18'
-description: 'Use memory or one-file SQLite for a zero-infrastructure bunqueue, or PostgreSQL 15–18 for a database-authoritative multi-broker server deployment.'
+title: 'Storage: SQLite or PostgreSQL 16–18'
+description: 'Use memory or one-file SQLite for a zero-infrastructure bunqueue, or PostgreSQL 16–18 for a database-authoritative multi-broker server deployment.'
 head:
   - tag: meta
     attrs:
@@ -17,7 +17,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
   </h1>
   <p class="bq-hero-sub">
     Keep the zero-infrastructure SQLite engine for embedded and single-broker deployments, or opt
-    into PostgreSQL 15–18 when several bunqueue servers must share one authoritative queue.
+    into PostgreSQL 16–18 when several bunqueue servers must share one authoritative queue.
   </p>
 </div>
 
@@ -50,13 +50,18 @@ job-state/lifecycle metrics, and events are coordinated in PostgreSQL rather
 than independent in-memory queues. Here, metrics means job-state and lifecycle
 families; process/connection and registration collectors remain broker-local.
 
-## PostgreSQL 15–18 multi-broker mode
+## PostgreSQL 16–18 multi-broker mode
 
 PostgreSQL is available in **standalone server mode**. Embedded `Queue` and
 `Worker` continue to use memory/SQLite. CI runs the complete integration suite
-against majors 15, 16, 17, and PostgreSQL 18.6. Version 18.6 is recommended for
-new deployments and pinned by the repository Compose topology; the other three
+against majors 16, 17, and PostgreSQL 18.6. Version 18.6 is recommended for
+new deployments and pinned by the repository Compose topology; the other two
 majors remain tested compatibility targets.
+
+PostgreSQL 15 is no longer tested, and the minimum supported version is 16.
+The server does not check the PostgreSQL version, so it does not reject an
+existing PostgreSQL 15 database, but that major has no CI coverage anymore:
+upgrade it to 16 or newer.
 
 The repository Compose file pins the requested PostgreSQL version exactly:
 
@@ -484,11 +489,11 @@ Clients exist for Node.js, Deno, Python, PHP, Go, Rust, Elixir, and Cloudflare W
 | Intermittent uplink plus a persistent local volume | Store-and-forward (Option 2)     |
 | Scale-to-zero instance with no durable local disk  | Direct central server (Option 3) |
 | Many stateless workers, one durable host           | Central TCP server (Option 3)    |
-| Multiple active bunqueue brokers sharing state     | PostgreSQL 15–18 backend         |
+| Multiple active bunqueue brokers sharing state     | PostgreSQL 16–18 backend         |
 
 ## Guarantees and boundaries
 
-| Capability                       | Memory / SQLite                             | PostgreSQL 15–18             |
+| Capability                       | Memory / SQLite                             | PostgreSQL 16–18             |
 | -------------------------------- | ------------------------------------------- | ---------------------------- |
 | Embedded mode                    | Yes                                         | No                           |
 | Standalone server                | Yes                                         | Yes                          |

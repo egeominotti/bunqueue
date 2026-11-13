@@ -1,6 +1,6 @@
 ---
 title: 'Server Mode: SQLite or PostgreSQL over TCP & HTTP'
-description: 'Deploy bunqueue as one SQLite broker or a PostgreSQL 15–18 broker fleet, with TCP/HTTP APIs, token auth, Docker, and graceful shutdown.'
+description: 'Deploy bunqueue as one SQLite broker or a PostgreSQL 16–18 broker fleet, with TCP/HTTP APIs, token auth, Docker, and graceful shutdown.'
 head:
   - tag: meta
     attrs:
@@ -11,7 +11,7 @@ head:
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">server · standalone</span>
   <h1 class="bq-hero-h1 bq-bench-h1">One server API. <em>One or many brokers.</em></h1>
-  <p class="bq-hero-sub">Run bunqueue as a standalone service so multiple apps can share a queue. Keep one memory/SQLite broker, or point several brokers at PostgreSQL 15–18; producers and workers use the same TCP API either way.</p>
+  <p class="bq-hero-sub">Run bunqueue as a standalone service so multiple apps can share a queue. Keep one memory/SQLite broker, or point several brokers at PostgreSQL 16–18; producers and workers use the same TCP API either way.</p>
 </div>
 
 Embedded mode ties the queue to one Bun process. Server mode runs bunqueue standalone: your API adds jobs from one service, workers process them from another, and all six external SDKs join over the wire. Every broker listens on two ports: **6789** (TCP, the fast binary protocol clients use) and **6790** (HTTP, REST API and metrics).
@@ -35,7 +35,7 @@ BUNQUEUE_BROKER_ID=broker-a \
 bunqueue start
 ```
 
-Always select durable storage in production: set a SQLite `--data-path`, or configure `BUNQUEUE_POSTGRES_URL` for the server-only multi-broker backend. Without either, jobs live in memory and are lost on restart. PostgreSQL 15–18 is tested in CI and 18.6 is recommended; see [Storage backends](/guide/databases/).
+Always select durable storage in production: set a SQLite `--data-path`, or configure `BUNQUEUE_POSTGRES_URL` for the server-only multi-broker backend. Without either, jobs live in memory and are lost on restart. PostgreSQL 16–18 is tested in CI and 18.6 is recommended; see [Storage backends](/guide/databases/).
 
 For bounded completed-job history on SQLite, add
 `--completed-retention-ms <age>` (or the equivalent config/environment

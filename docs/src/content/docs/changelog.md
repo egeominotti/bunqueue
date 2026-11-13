@@ -31,6 +31,14 @@ head:
   Python 3.9: they declare `requires-python >=3.9`, so `pip` on Python 3.9 will
   not pick a later release. The server, the wire protocol
   and the other SDKs are not affected.
+- **PostgreSQL 15 is no longer tested; the minimum supported PostgreSQL version
+  is 16.** The supported range is now PostgreSQL 16–18 (18.6 stays pinned and
+  recommended). Nothing in the runtime changes: bunqueue never reads the server
+  version, has no code path that depends on the server major, and does not
+  reject PostgreSQL 15, so an existing PostgreSQL 15 deployment keeps running
+  exactly as before. It is no longer covered by CI, so a regression that only
+  affects PostgreSQL 15 would not be caught: upgrade the database to PostgreSQL
+  16 or newer.
 
 ### Tooling
 
@@ -203,6 +211,21 @@ head:
   and the `bunqueue-assistant` agent now state the current MCP tool count (79
   primary tools). `.dockerignore` stays, with a header saying which build uses
   it. Nothing in the package or the runtime changes.
+
+### Testing
+
+- The PostgreSQL 15 leg of the CI compatibility matrix is removed
+  (`.github/workflows/ci.yml`, job `test-postgres`): the complete
+  `bun run test:postgres` suite now runs against `postgres:18.6-alpine`,
+  `postgres:17-alpine` and `postgres:16-alpine`. The `quality-gate` job still
+  requires `test-postgres` and checks its result, so a failed or cancelled leg
+  of the three remaining ones still blocks the release jobs. The native
+  benchmark runner `bun run bench:postgres:versions` now defaults to majors
+  16, 17 and 18 (`BUNQUEUE_PG_BENCH_VERSIONS` still accepts any list). The
+  README, the guides, the internal reference, the package description and the
+  two social cover images that named the range say PostgreSQL 16–18; the
+  2026-08-26 benchmark reports, which measured PostgreSQL 15.19, and earlier
+  changelog entries are unchanged.
 
 ## [2.9.22] - 2026-11-13
 

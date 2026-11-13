@@ -15,7 +15,7 @@ supplied it. A value 2.9.10 ran with (a form `parseInt` read as meant, a documen
 fallback, an ignored word, a setting of a feature that is off) keeps working, with
 a warning where 2.9.10 ignored it: see [Upgrade compatibility](#upgrade-compatibility-with-2910). Storage
 resolution keeps memory/SQLite as the default and selects the optional
-PostgreSQL 15–18 multi-broker manager only from an explicit driver or URL. It
+PostgreSQL 16–18 multi-broker manager only from an explicit driver or URL. It
 also owns the `bunqueue` executable's top-level dispatch (bare invocation →
 server, anything else → CLI), the structured `Logger`, the package `VERSION`,
 and the Bun-only runtime guards that fail fast under Node.
@@ -673,7 +673,7 @@ setting; only values 2.9.10 misread (`30s` as 30, `1e3` as 1) or could not run w
 - [CLI](./cli.md) — the other entrypoint path; reuses `loadConfigFile`/`resolveServerConfig` and the shared `bootServer`; its client env port and empty flag values follow the same compatibility rules.
 - [Security: TLS, Auth, CORS](./security-tls-auth.md) — consumers of the TLS/auth/CORS resolution.
 - [S3 Backup](./backup-s3.md), [bunqueue Cloud Dashboard Integration](./cloud-integration.md) — consumers of `resolveBackupConfig`/`resolveCloudConfig`.
-- [PostgreSQL 15–18 Multi-Broker Persistence](./postgres-multibroker.md) — consumer
+- [PostgreSQL 16–18 Multi-Broker Persistence](./postgres-multibroker.md) — consumer
   of every resolved PostgreSQL driver, identity, pool, deadline, admission, and
   snapshot-budget field.
 - [Core Queue Engine (QueueManager & Shards)](./core-queue-engine.md) — `bootServer` wiring and the `dataPath` consumer.

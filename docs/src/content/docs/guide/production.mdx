@@ -14,7 +14,7 @@ import { Aside } from '@astrojs/starlight/components';
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · production</span>
   <h1 class="bq-hero-h1 bq-bench-h1">What survives <em>a crash.</em></h1>
-  <p class="bq-hero-sub">Run the default engine as one process plus SQLite, or run multiple brokers against PostgreSQL 15–18. PostgreSQL 18.6 is the pinned and recommended release. This page explains crash behavior, monitoring, and the storage-specific checks before go-live.</p>
+  <p class="bq-hero-sub">Run the default engine as one process plus SQLite, or run multiple brokers against PostgreSQL 16–18. PostgreSQL 18.6 is the pinned and recommended release. This page explains crash behavior, monitoring, and the storage-specific checks before go-live.</p>
 </div>
 
 <div class="bq-wrap bq-section">
@@ -33,7 +33,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 </div>
 
-<Aside title="PostgreSQL 15–18 multi-broker failures">
+<Aside title="PostgreSQL 16–18 multi-broker failures">
   PostgreSQL mutations are transactional and do not use SQLite's 10 ms write buffer. If a broker
   dies mid-job, another broker recovers the database-clock lease and stale ACK/FAIL tokens are
   fenced. Protect the PostgreSQL service with database-native backups/PITR and HA; bunqueue's S3

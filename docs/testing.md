@@ -1165,7 +1165,9 @@ language jobs even when an earlier one failed or was cancelled. A root
 `quality-gate` similarly checks the public-API E2E job plus every other core,
 docs, SDK, and PostgreSQL compatibility result. `test-postgres` is both a
 declared `needs` dependency and an explicitly checked result, so a failed or
-cancelled PostgreSQL 18.6/17/16/15 matrix cannot leave the release DAG green.
+cancelled PostgreSQL 18.6/17/16 matrix cannot leave the release DAG green.
+PostgreSQL 15 left the matrix: it is no longer tested, and 16 is the minimum
+supported version.
 Expiry boundary cases derive timestamps from the PostgreSQL clock so
 host/container clock skew cannot turn lifecycle coverage into a timing-only
 failure. The version gate, binary matrix, container publication, and GitHub release are all
@@ -1310,9 +1312,9 @@ Docker Compose is reserved for functional tests that genuinely need external
 services. Use a unique Compose project name and disposable volumes; never run a
 repository-wide `down -v` against an unrelated project.
 
-### PostgreSQL 15–18 native matrix
+### PostgreSQL 16–18 native matrix
 
-`bun run bench:postgres:versions` compares native PostgreSQL 15 through 18
+`bun run bench:postgres:versions` compares native PostgreSQL 16 through 18
 across one, two, and four independent broker processes. It must not be run in a
 container or VM for documentation figures. By default it submits 10,000 jobs
 per sample with four producers, 16 fixed consumers, batch size 100, one
@@ -1330,7 +1332,7 @@ and verified against their documented SHA-256 hashes.
 
 | Environment variable                 | Default         | Meaning                                    |
 | ------------------------------------ | --------------- | ------------------------------------------ |
-| `BUNQUEUE_PG_BENCH_VERSIONS`         | `15,16,17,18`   | Native PostgreSQL majors                   |
+| `BUNQUEUE_PG_BENCH_VERSIONS`         | `16,17,18`      | Native PostgreSQL majors                   |
 | `BUNQUEUE_PG_BENCH_BROKERS`          | `1,2,4`         | Independent broker processes per database  |
 | `BUNQUEUE_PG_BENCH_JOBS`             | `10000`         | Jobs per fresh sample                      |
 | `BUNQUEUE_PG_BENCH_BATCH_SIZE`       | `100`           | `PUSHB`, `PULLB`, and `ACKB` batch bound   |
@@ -1343,7 +1345,8 @@ and verified against their documented SHA-256 hashes.
 | `BUNQUEUE_PG_BENCH_RUNS`             | `7`             | Fresh measured samples per cell            |
 | `BUNQUEUE_PG_BIN_<major>`            | Homebrew prefix | Override for a native installation prefix  |
 
-The dated reference campaign and its interpretation are in
+The dated reference campaign, which still included PostgreSQL 15, and its
+interpretation are in
 [Native PostgreSQL 15–18 Engineering Benchmark — 2026-08-26](./benchmarks/postgres-versions-2026-08-26.md).
 The PostgreSQL 18 bottleneck, batch, pool, and `work_mem` investigation is in
 [PostgreSQL 18 Multi-Broker Performance Analysis — 2026-08-26](./benchmarks/postgres-performance-analysis-2026-08-26.md).

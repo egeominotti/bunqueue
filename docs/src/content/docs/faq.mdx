@@ -1,6 +1,6 @@
 ---
 title: 'bunqueue FAQ: Bun Job Queue Questions Answered'
-description: 'Common questions about bunqueue answered: SQLite, PostgreSQL 15–18 multi-broker mode, embedded vs server, performance, retries, scaling, backups, and migration.'
+description: 'Common questions about bunqueue answered: SQLite, PostgreSQL 16–18 multi-broker mode, embedded vs server, performance, retries, scaling, backups, and migration.'
 head:
   - tag: meta
     attrs:
@@ -22,7 +22,7 @@ Short answers to the questions people actually ask. Each answer links to the pag
 
 ### What is bunqueue?
 
-bunqueue is a job queue for Bun: you push jobs (units of work, like "send this email") onto a named queue, and workers pull and process them with retries, priorities, and scheduling. It uses memory/SQLite by default and offers an optional PostgreSQL 15–18 server backend for multiple brokers; 18.6 is recommended. Its API is compatible with BullMQ, so migration is mostly an import change. Start with the [quickstart](/guide/quickstart/).
+bunqueue is a job queue for Bun: you push jobs (units of work, like "send this email") onto a named queue, and workers pull and process them with retries, priorities, and scheduling. It uses memory/SQLite by default and offers an optional PostgreSQL 16–18 server backend for multiple brokers; 18.6 is recommended. Its API is compatible with BullMQ, so migration is mostly an import change. Start with the [quickstart](/guide/quickstart/).
 
 ### Why SQLite instead of Redis?
 
@@ -50,7 +50,7 @@ One runtime dependency: `msgpackr` for the MessagePack wire and persistence form
 
 ### What is the difference between embedded and server mode?
 
-Embedded mode (`new Queue('q', { embedded: true })`) runs the queue inside your process with memory/SQLite. Server mode runs `bunqueue start` and clients connect over TCP. A server may use memory/SQLite with one broker or PostgreSQL 15–18 with multiple brokers. Pick one backend per deployment; the same SQLite file must never be opened by two processes at once.
+Embedded mode (`new Queue('q', { embedded: true })`) runs the queue inside your process with memory/SQLite. Server mode runs `bunqueue start` and clients connect over TCP. A server may use memory/SQLite with one broker or PostgreSQL 16–18 with multiple brokers. Pick one backend per deployment; the same SQLite file must never be opened by two processes at once.
 
 ### Where is my data stored?
 
@@ -84,7 +84,7 @@ published performance figures do not apply to that backend.
 
 ### Can I use PostgreSQL or MySQL instead?
 
-PostgreSQL **15–18 is supported in standalone server mode** and allows multiple
+PostgreSQL **16–18 is supported in standalone server mode** and allows multiple
 active bunqueue brokers to share one database/namespace; 18.6 is pinned and
 recommended. SQLite remains the default and the only persistent embedded
 backend. MySQL is not supported. See [storage backends](/guide/databases/) for
@@ -251,11 +251,11 @@ FIFO (first in, first out) is the default for jobs of equal priority, so ordered
 
 Yes. Any number of worker processes can connect over TCP and share queues. With
 SQLite the queue broker stays single while workers multiply. With PostgreSQL
-15–18, both workers and bunqueue broker processes can multiply; 18.6 is recommended.
+16–18, both workers and bunqueue broker processes can multiply; 18.6 is recommended.
 
 ### Does bunqueue support multiple brokers or high availability?
 
-Yes, when server mode uses PostgreSQL 15–18; 18.6 is recommended. Brokers share authoritative rows,
+Yes, when server mode uses PostgreSQL 16–18; 18.6 is recommended. Brokers share authoritative rows,
 leases, limits, cron/worker state, and durable events; a stale broker cannot
 finalize a lease recovered elsewhere. Database availability, routing, backup,
 and failover remain operator responsibilities. SQLite mode deliberately stays

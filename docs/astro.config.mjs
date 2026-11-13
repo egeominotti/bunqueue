@@ -142,7 +142,7 @@ export default defineConfig({
       disable404Route: true,
       title: 'bunqueue',
       description:
-        'High-performance Bun job queue for AI agents. Memory or one-file SQLite, optional PostgreSQL 15–18 multi-broker persistence, DLQ, cron, and MCP.',
+        'High-performance Bun job queue for AI agents. Memory or one-file SQLite, optional PostgreSQL 16–18 multi-broker persistence, DLQ, cron, and MCP.',
       logo: {
         src: './src/assets/logo.svg',
         replacesTitle: false,

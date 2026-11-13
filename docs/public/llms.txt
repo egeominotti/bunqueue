@@ -1,6 +1,6 @@
 # bunqueue
 
-> bunqueue is a high-performance job queue for the Bun runtime, written in TypeScript. It runs in memory or with one-file SQLite persistence by default and supports PostgreSQL 15–18 for active multi-broker fleets. It offers a BullMQ-compatible API and ships a native MCP server so AI agents can control queues directly. `msgpackr` is its only direct runtime dependency.
+> bunqueue is a high-performance job queue for the Bun runtime, written in TypeScript. It runs in memory or with one-file SQLite persistence by default and supports PostgreSQL 16–18 for active multi-broker fleets. It offers a BullMQ-compatible API and ships a native MCP server so AI agents can control queues directly. `msgpackr` is its only direct runtime dependency.
 
 Key facts:
 - Runs embedded (in-process memory or `bun:sqlite`) or as a standalone TCP/HTTP server (MessagePack binary protocol on port 6789, REST/WebSocket/SSE on 6790). Standalone servers may select PostgreSQL for database-authoritative multi-broker coordination.

@@ -150,7 +150,8 @@ lifecycle medians. PostgreSQL 15.19 led the two-broker lifecycle median by 0.7%,
 inside overlapping 95% confidence intervals. Topology had a larger effect than
 server major: two brokers beat one on every version, while four added broker
 availability but introduced enough shared-database contention to trail two on
-this fixed workload.
+this fixed workload. PostgreSQL 15 was part of this campaign; it is no longer
+tested, and the minimum supported version is now 16.
 
 A separate PostgreSQL 18.6 bottleneck campaign found that four brokers with
 batch 250, pool size four, and 250 ms polling raised lifecycle median from 7,478
@@ -280,7 +281,7 @@ bun install
 bun run src/benchmark/million-jobs.bench.ts
 BENCH_N=50000 BENCH_RUNS=21 bun run bench:tcp
 
-# PostgreSQL 15–18, using native installations resolved by the runner
+# PostgreSQL 16–18, using native installations resolved by the runner
 BUNQUEUE_PG_BENCH_POOL_SIZE=12 \
 BUNQUEUE_PG_BENCH_POLL_INTERVAL_MS=25 \
 BUNQUEUE_PG_BENCH_WORK_MEM=4MB \

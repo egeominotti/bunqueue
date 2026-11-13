@@ -1473,7 +1473,7 @@ See [Persistence](./features/persistence.md).
 
 ---
 
-## PostgreSQL 15–18 Schema
+## PostgreSQL 16–18 Schema
 
 Source: `src/infrastructure/persistence/postgres/schema.ts`. This normalized
 schema belongs to the optional server-only multi-broker engine. It is separate
@@ -1482,9 +1482,10 @@ SQLite file. Every tenant-visible primary/unique key includes `namespace`, whose
 default is `default`; all brokers intended to share work must use the same
 namespace.
 
-CI validates this schema on PostgreSQL 15, 16, 17, and the pinned/recommended
-18.6 release. The bunqueue schema version below is independent from the
-PostgreSQL server major.
+CI validates this schema on PostgreSQL 16, 17, and the pinned/recommended
+18.6 release. PostgreSQL 15 is no longer tested; the minimum supported version
+is 16. The bunqueue schema version below is independent from the PostgreSQL
+server major.
 
 Schema initialization runs inside a transaction guarded by a domain-separated
 64-bit `hashtextextended` advisory key. The current
@@ -1778,7 +1779,7 @@ columns. A same-name weaker index is rebuilt transactionally. Existing duplicate
 live keys make initialization fail and roll back without deleting or merging
 rows, preserving a fail-closed operator recovery boundary.
 
-See [PostgreSQL 15–18 Multi-Broker Persistence](./features/postgres-multibroker.md)
+See [PostgreSQL 16–18 Multi-Broker Persistence](./features/postgres-multibroker.md)
 for transaction boundaries, lease fencing, recovery, runtime configuration, and
 the dedicated PostgreSQL validation suite.
 

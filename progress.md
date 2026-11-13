@@ -45,6 +45,11 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 ### What's In Progress
 
 - Nothing recorded here; see the `in-progress` entries of `feature_list.json`.
+- `drop-postgres-15`: the PostgreSQL 15 CI leg is removed and every current
+  support statement says PostgreSQL 16–18 (15 no longer tested, minimum
+  supported 16, runtime unchanged); working tree only, evidence `PARTIAL`. Next:
+  `bun run test:sandbox`, the skeptic, then the commit the user asks for and its
+  CI run.
 
 ### What's Next
 
@@ -110,6 +115,38 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — drop-postgres-15
+
+- Owner decision: remove the PostgreSQL 15 tests (branch `drop-postgres-15`, base
+  `bfa290c7`, rebased onto `547e0cc0`).
+- Facts found: the only PostgreSQL 15 test surface was the `15.x` entry of the
+  `test-postgres` matrix in `.github/workflows/ci.yml`; `quality-gate` needs the
+  matrix job as a whole, so no gate list changes. The tests take the expected
+  version from `BUNQUEUE_TEST_POSTGRES_VERSION_PREFIX` (default `18.6`) and carry
+  no version list. `src/` never reads the server version: no minimum-version
+  check, no branch for a server major, so no runtime code changed and nothing
+  rejects PostgreSQL 15.
+- Changed: the matrix entry; the benchmark runner default
+  (`bench/postgres-versions/config.ts`, now `16,17,18`); every current
+  "PostgreSQL 15–18" statement (README, `package.json` description, `docs/`, the
+  guides, `llms.txt`, `llms-full`, the site description, two regenerated OG
+  covers) to 16–18 with "PostgreSQL 15 is no longer tested; the minimum
+  supported version is 16"; changelog `[Unreleased]` Upgrade note and Testing
+  entry.
+- Left on purpose: the 2026-08-26 and 2026-09-03 benchmark reports, their raw
+  artifacts and the links that quote their titles (they measured 15.19),
+  released changelog entries with the generated 2.9.0 post, and the CI-run
+  provenance comment in `test/postgres-process-port-conflict.test.ts`.
+- Checks on the host: 7 workflows parse; 14 workflow-reading test files 94 pass /
+  0 fail; harness, skills and docs tests 190 pass / 0 fail; typecheck,
+  `format:check`, `git diff --check`, release-post check (259) and `./init.sh`
+  green.
+- Gates: `bun run test:sandbox` green on tree `e7408621` (unit 11787 / 0 / 402,
+  tcp 553 / 0, embedded 349 / 0); skeptic `PASS`. Still open: CI on the pushed
+  commit, the only run of the PostgreSQL 16, 17 and 18.6 legs (no local
+  `bun run test:postgres`). The `package.json` description changes with the
+  next release only; no version bump here.
 
 ### 2026-11-13 — ci-python39-runner-pin
 

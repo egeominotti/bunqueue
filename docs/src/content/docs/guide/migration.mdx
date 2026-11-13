@@ -204,7 +204,7 @@ No extra package, connection, or license is required. The Bun client supports:
 - structural Observable processor results without requiring RxJS.
 
 These features use the same public contract in embedded memory/SQLite and TCP
-server mode. PostgreSQL 15–18 makes group capacity, ordering, pause, limits, and
+server mode. PostgreSQL 16–18 makes group capacity, ordering, pause, limits, and
 manual deadlines authoritative across brokers. BullMQ Pro telemetry and its
 NestJS integration are intentionally outside this compatibility layer; use
 bunqueue's existing metrics/events and framework-neutral Worker lifecycle
@@ -285,7 +285,7 @@ enforced by the broker in both embedded and TCP modes. It defaults to 1,000 ms.
 bunqueue uses in-memory storage when no persistence backend is configured. A
 single broker can opt into SQLite persistence while many workers connect over
 TCP. If the broker tier must scale, standalone servers can instead share a
-PostgreSQL 15–18 database/namespace (18.6 recommended). This is not Redis Cluster and does not copy
+PostgreSQL 16–18 database/namespace (18.6 recommended). This is not Redis Cluster and does not copy
 its topology or Redis-specific semantics; see [storage
 backends](/guide/databases/) and [when BullMQ is the better
 pick](/guide/comparison/#when-to-use-bullmq-instead).
@@ -295,7 +295,7 @@ pick](/guide/comparison/#when-to-use-bullmq-instead).
 - [ ] `bun remove bullmq ioredis`, `bun add bunqueue`
 - [ ] Imports point to `bunqueue/client`
 - [ ] Redis connection config deleted, `embedded: true` + `dataPath` (or `connection`) added
-- [ ] For multi-broker server mode, PostgreSQL 15–18 URL/namespace and unique broker IDs configured
+- [ ] For multi-broker server mode, PostgreSQL 16–18 URL/namespace and unique broker IDs configured
 - [ ] `repeat: { cron }` renamed to `repeat: { pattern }`
 - [ ] `removeOnComplete`/`removeOnFail` objects replaced with booleans
 - [ ] File-path processors converted to inline processor functions
@@ -307,7 +307,7 @@ pick](/guide/comparison/#when-to-use-bullmq-instead).
 - **Persistence is opt-in for embedded mode.** No `dataPath` means in-memory only. Server mode reads `BUNQUEUE_DATA_PATH` or `--data-path`.
 - **One writer per SQLite file.** Do not point two embedded processes or brokers
   at the same file. Multiple clients use one SQLite server; multiple active
-  brokers use PostgreSQL 15–18; 18.6 is recommended.
+  brokers use PostgreSQL 16–18; 18.6 is recommended.
 - **`SandboxedWorker` is experimental.** Prefer inline processors in production.
 
 ## Getting help

@@ -11,7 +11,7 @@ head:
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">architecture · overview</span>
   <h1 class="bq-hero-h1 bq-bench-h1">Inside the bunqueue <em>architecture.</em></h1>
-  <p class="bq-hero-sub">bunqueue has two execution topologies behind one server protocol: a synchronous sharded memory/SQLite engine, and a database-authoritative PostgreSQL 15–18 engine for multiple brokers. This section maps both and identifies which diagrams belong to which path.</p>
+  <p class="bq-hero-sub">bunqueue has two execution topologies behind one server protocol: a synchronous sharded memory/SQLite engine, and a database-authoritative PostgreSQL 16–18 engine for multiple brokers. This section maps both and identifies which diagrams belong to which path.</p>
 </div>
 
 ## System Overview

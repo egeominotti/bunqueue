@@ -1,4 +1,4 @@
-# PostgreSQL 15–18 Multi-Broker Persistence
+# PostgreSQL 16–18 Multi-Broker Persistence
 
 > **Category:** Persistence · **Source:** `src/infrastructure/persistence/postgres.ts`, `src/infrastructure/persistence/postgres/`, `src/application/postgresQueueManager.ts`, `src/application/postgres-queue-manager/`, `src/infrastructure/server/storageAdapter.ts`, `src/infrastructure/server/storageManager.ts`, `src/infrastructure/cloud/queueAdapter/`, `docker-compose.postgres.yml`
 
@@ -6,8 +6,9 @@
 
 The PostgreSQL backend is an optional, database-authoritative server runtime for
 deployments that need more than one bunqueue broker. Every broker connects to the
-same PostgreSQL database and namespace. CI validates majors 15, 16, 17, and the
-pinned/recommended 18.6 release. PostgreSQL transactions, row locks,
+same PostgreSQL database and namespace. CI validates majors 16, 17, and the
+pinned/recommended 18.6 release; the minimum supported version is 16.
+PostgreSQL transactions, row locks,
 advisory locks, lease fencing, and `FOR UPDATE SKIP LOCKED` coordinate job
 admission and delivery so one job generation is owned by at most one live lease.
 
@@ -226,8 +227,12 @@ zero-downtime mixed-version rollout needs explicit compatibility evidence for
 the exact source/target pair.
 
 The primary client/runtime pair is Bun 1.4.0 with its built-in `SQL` API and
-PostgreSQL 18.6; the same integration suite also validates PostgreSQL 15, 16,
-and 17. There is no additional JavaScript PostgreSQL SDK: tagged
+PostgreSQL 18.6; the same integration suite also validates PostgreSQL 16 and
+17. PostgreSQL 15 is no longer tested, and the minimum supported version is 16.
+Nothing in the runtime reads the server version or rejects PostgreSQL 15, and
+the engine has no code path that depends on the server major: an existing
+PostgreSQL 15 deployment keeps running exactly as before, without CI coverage.
+There is no additional JavaScript PostgreSQL SDK: tagged
 templates, binary protocol, prepared statements, connection pooling,
 transaction-reserved connections, and the dedicated reconnecting LISTEN
 connection come from Bun itself. Queue mutations remain set-based when one SQL
@@ -1355,7 +1360,7 @@ fail closed after best-effort pipe cancellation; an incomplete capture can never
 be reported as an authoritative zero-failure result.
 
 The primary tests assert PostgreSQL reports version `18.6`; the same complete
-suite also runs against the current PostgreSQL 17, 16, and 15 Alpine images, with the
+suite also runs against the current PostgreSQL 17 and 16 Alpine images, with the
 expected major supplied through `BUNQUEUE_TEST_POSTGRES_VERSION_PREFIX`.
 `postgres-public-api-queue-worker.test.ts` and
 `postgres-public-api-flow.test.ts`, and
@@ -1373,7 +1378,7 @@ job before proving survivor recovery. A remote wait plus `GetResult` retains
 the result when `removeOnComplete` deletes the job row, and the
 completion-retention suite repeats the authoritative lookup with a zero-sized
 local result cache. These files are part of the
-normal `test:postgres` command and therefore run in every PostgreSQL 15–18 CI
+normal `test:postgres` command and therefore run in every PostgreSQL 16–18 CI
 matrix entry; they are not an opt-in soak.
 Concurrent brokers claim each job once under both ordinary and 16-consumer
 high-contention campaigns, stale owners are fenced, broker/client shutdown is safe, remotely
@@ -1473,8 +1478,8 @@ then sends `SIGKILL` to a broker holding 24 leases: the three survivors must
 recover and complete all 120 jobs exactly once, while PostgreSQL fencing rejects
 the crashed generation's stale batch ACK. The dedicated GitHub Actions matrix
 runs the complete `test/postgres-*.test.ts` set against
-`postgres:18.6-alpine`, `postgres:17-alpine`, `postgres:16-alpine`, and
-`postgres:15-alpine`.
+`postgres:18.6-alpine`, `postgres:17-alpine`, and `postgres:16-alpine`.
+The `postgres:15-alpine` entry was removed: PostgreSQL 15 is no longer tested.
 
 A separate manual Kubernetes campaign on 2026-08-27 used a fresh kind v0.33.0
 cluster with Kubernetes 1.33.1, four broker Pods built from the sanitized Git
@@ -1755,7 +1760,8 @@ See the complete
 [Native PostgreSQL 15–18 Engineering Benchmark](../benchmarks/postgres-versions-2026-08-26.md)
 for methodology, CV and Student-t CI95, command-tail latency, WAL per job,
 broker fairness, integrity totals, limits, reproduction controls, and the raw
-artifact digest.
+artifact digest. PostgreSQL 15 was part of that campaign and has since left the
+tested matrix; the benchmark runner now defaults to majors 16, 17, and 18.
 
 ### PostgreSQL 18 bottleneck tuning
 

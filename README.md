@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  High-performance job queue for Bun. Memory or one-file SQLite; PostgreSQL 15–18 multi-broker when you scale.<br/>
+  High-performance job queue for Bun. Memory or one-file SQLite; PostgreSQL 16–18 multi-broker when you scale.<br/>
   DLQ, cron, SQLite S3 backups, and native MCP. Built for AI agents and automation. No Redis.
 </p>
 
@@ -131,8 +131,9 @@ POSTGRES_PASSWORD='replace-me' \
 It starts two brokers against one database/namespace. PostgreSQL is server-only;
 embedded mode keeps using memory/SQLite. Supply both Compose values when the
 password changes, percent-encoding reserved characters in the URL only. MySQL
-is not supported. CI validates PostgreSQL 15, 16, 17, and the pinned/recommended
-18.6 release. See the
+is not supported. CI validates PostgreSQL 16, 17, and the pinned/recommended
+18.6 release; PostgreSQL 15 is no longer tested and the minimum supported
+version is 16. See the
 [storage guide](https://bunqueue.dev/guide/databases/).
 
 ### Docker images
@@ -281,7 +282,7 @@ Framework Integrations.
 
 - **Zero external infrastructure by default** — memory by default; one SQLite
   file when local persistence is configured
-- **PostgreSQL 15–18 multi-broker mode** — PostgreSQL 18.6 is recommended;
+- **PostgreSQL 16–18 multi-broker mode** — PostgreSQL 18.6 is recommended;
   database-authoritative claims, fenced
   leases, shared limits, cron, workers, job-state/lifecycle metrics, and failover state
   ([tested three-broker Docker example](https://bunqueue.dev/examples/postgres-multibroker/))
@@ -312,7 +313,7 @@ the queue store. If you already run Redis and BullMQ works for you, keep it.
 | **Setup**        | `bun add bunqueue`                                             | `docker run` or `bunqueue start`                         |
 | **Performance**  | 186K jobs/sec on-disk `addBulk`; 729K internal in-memory batch | SQLite: 159K TCP `PUSHB`; 17K jobs/sec worker drain      |
 | **Best for**     | Single-process apps, CLIs, serverless                          | Multiple workers, separate producer/consumer             |
-| **Scaling**      | Same process only                                              | Multiple clients; multiple brokers with PostgreSQL 15–18 |
+| **Scaling**      | Same process only                                              | Multiple clients; multiple brokers with PostgreSQL 16–18 |
 
 ### Embedded
 
@@ -396,7 +397,7 @@ queries, and fair round-robin claims. Native batches support minimum size,
 timeout, group affinity, and selective `job.setAsFailed(error)`. Processor
 timeouts and explicit cancellation abort the second-argument `AbortSignal`;
 Promise handlers remain cooperative, while structural Observable handlers are
-unsubscribed. These contracts are identical with SQLite and PostgreSQL 15–18.
+unsubscribed. These contracts are identical with SQLite and PostgreSQL 16–18.
 BullMQ Pro telemetry and NestJS integration are intentionally not included.
 
 [Job Groups guide →](https://bunqueue.dev/guide/queue/job-groups/) ·

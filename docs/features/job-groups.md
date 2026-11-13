@@ -254,7 +254,7 @@ workloads, p95 results, method, and qualification.
 
 - [Rate Limiting & Concurrency](./rate-limiting-and-concurrency.md)
 - [Job Lifecycle](./job-lifecycle.md)
-- [PostgreSQL 15–18 Multi-Broker Persistence](./postgres-multibroker.md)
+- [PostgreSQL 16–18 Multi-Broker Persistence](./postgres-multibroker.md)
 - [Wire Protocol Specification](../protocol.md)
 - [Data Model](../data-model.md)
 - [Job Group Scheduling Benchmark](../benchmarks/job-groups-2026-08-31.md)

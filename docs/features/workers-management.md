@@ -49,7 +49,7 @@ Does NOT own (delegated elsewhere):
   Re-registration transfers ownership atomically; owner-fenced heartbeat and
   unregister operations reject a stale broker or connection generation.
   See [Persistence](./persistence.md) and
-  [PostgreSQL 15–18 Multi-Broker Persistence](./postgres-multibroker.md).
+  [PostgreSQL 16–18 Multi-Broker Persistence](./postgres-multibroker.md).
 
 ## Dependencies
 
@@ -376,7 +376,7 @@ in `resolveServerConfig`, so the error is a configuration error printed as one
 - [Rate Limiting & Concurrency Control](./rate-limiting-and-concurrency.md) — concurrency enforcement
 - [Stats, Metrics & Monitoring](./stats-and-monitoring.md) — fleet stats and dashboard surface
 - [TCP Server Command Handlers](./tcp-server-handlers.md) — `Register/Unregister/ListWorkers/Heartbeat` dispatch
-- [PostgreSQL 15–18 Multi-Broker Persistence](./postgres-multibroker.md) — shared
+- [PostgreSQL 16–18 Multi-Broker Persistence](./postgres-multibroker.md) — shared
   worker rows, cross-broker heartbeat ownership, and cleanup.
 - [HTTP / REST / SSE / WebSocket API](./http-api.md) — `/workers` routes and disconnect cleanup
 - [CLI](./cli.md) — `bunqueue worker …` subcommands
