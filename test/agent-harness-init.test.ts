@@ -24,11 +24,17 @@ import { ROOT, read } from './agent-harness-support';
 /**
  * Contract tests `init.sh` leaves to the unit suite (`bun test --parallel=4`, which
  * `bun run test:sandbox` runs): real process trees, settle windows and time bounds,
- * about 50 s.
+ * plus deliberate CLI deadline and cancellation scenarios.
  */
 const SLOW_CONTRACT_TESTS = [
   'test/agent-skills-machine-lifecycle.test.ts',
   'test/agent-skills-machine-worker.test.ts',
+  'test/agent-skills-machine-audit.test.ts',
+  'test/agent-skills-machine-control.test.ts',
+  'test/agent-skills-machine-process.test.ts',
+  'test/agent-skills-tools-audit.test.ts',
+  'test/agent-skills-evals-cancellation.test.ts',
+  'test/agent-skills-ci-cancellation.test.ts',
 ];
 
 const scratch = mkdtempSync(join(tmpdir(), 'bunqueue-harness-init-'));

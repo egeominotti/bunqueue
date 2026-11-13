@@ -11,8 +11,8 @@
 # It writes ignored output: bun install (node_modules) and the typecheck:prepare
 # step of bun run typecheck (sdk/typescript/dist, dist, docs/node_modules).
 # Without a Git checkout (a sanitized Machine snapshot) the git steps are skipped.
-# The slow Machine lifecycle and worker contracts (about 50 s) are left to the unit
-# suite, where bun run test:sandbox runs them with every other contract test.
+# Process-heavy Machine and CLI deadline/cancellation contracts stay in the unit
+# suite; the init contract lists them and verifies full-suite discovery.
 set -euo pipefail
 
 full=0 workspace_only=0
@@ -99,7 +99,8 @@ fi
 step 'Harness and skills contracts (fast set; the unit suite runs every one)'
 bun test test/agent-harness test/agent-skills.test.ts test/agent-skills-scripts.test.ts \
   test/agent-skills-machine-gate.test.ts test/agent-skills-ci-watch.test.ts \
-  test/agent-skills-evals-runner.test.ts --parallel=4
+  test/agent-skills-evals-runner.test.ts test/agent-skills-machine-evidence.test.ts \
+  test/agent-skills-evals-launch-errors.test.ts --parallel=4
 
 if [ "$full" -eq 1 ]; then
   step 'Full gate: bun run test:sandbox'

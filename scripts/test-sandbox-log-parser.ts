@@ -51,7 +51,16 @@ export function parseFiles(log: string): FileMetric[] {
   for (const line of log.split('\n')) {
     if (!line.startsWith('TEST_FILE_RESULT ')) continue;
     try {
-      files.push(JSON.parse(line.slice('TEST_FILE_RESULT '.length)) as FileMetric);
+      const file = JSON.parse(line.slice('TEST_FILE_RESULT '.length)) as FileMetric | null;
+      if (
+        file &&
+        typeof file.file === 'string' &&
+        file.file.length > 0 &&
+        [file.passed, file.failed].every((count) => Number.isSafeInteger(count) && count >= 0) &&
+        Number.isFinite(file.durationMs) &&
+        file.durationMs >= 0
+      )
+        files.push(file);
     } catch {
       // A malformed marker remains visible in the complete suite log.
     }
@@ -62,6 +71,10 @@ export function parseFiles(log: string): FileMetric[] {
 export function parseCount(log: string, label: string): number {
   const matches = [...log.matchAll(new RegExp(`^\\s*(\\d+) ${label}$`, 'gm'))];
   return Number(matches.at(-1)?.[1] ?? 0);
+}
+
+export function parseErrors(log: string): number {
+  return sumMatches(log, /^\s*(\d+) errors?$/gm, 1);
 }
 
 function sumMatches(log: string, pattern: RegExp, group: number): number {

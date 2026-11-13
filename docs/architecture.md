@@ -1,5 +1,8 @@
 # Architecture Overview
 
+Contributor tooling is described in [Agent harness reliability](./features/agent-harness.md),
+including sandbox reporting/cleanup and Machine process/resource ownership helpers.
+
 The optional [`bunqueue/agents`](./features/agent-integrations.md) boundary lives
 in `src/agents/`: a normalized turn consumer, structural Claude adapter, bounded
 progress journal and external-effect helper. It imports no provider or queue/

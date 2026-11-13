@@ -84,8 +84,9 @@ order, dependencies and the one-item-per-branch rule.
 - Two sessions that each add an item at the end of `features[]` conflict on the same
   lines; inserting at the id-sorted position avoids most conflicts.
 - `./init.sh` is the startup check, not a gate: it runs no product suite, and of the
-  harness and skills contracts only the fast ones (the Machine lifecycle and worker
-  tests, about 50 s, run in the unit suite). `./init.sh --full` adds `bun run test:sandbox`, on the
+  harness and skills contracts only the fast ones. Process-heavy Machine and CLI
+  deadline/cancellation tests remain in the unit suite, with their inventory and
+  discovery checked by `test/agent-harness-init.test.ts`. `./init.sh --full` adds `bun run test:sandbox`, on the
   current working tree.
 - `./init.sh --workspace` prints the directory, branch and `HEAD` and stops. A notice
   that the git steps are skipped means the directory is not the root of a checkout: a

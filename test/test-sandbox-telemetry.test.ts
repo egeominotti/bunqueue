@@ -81,7 +81,7 @@ describe('test sandbox telemetry', () => {
     const directory = await mkdtemp(join(tmpdir(), 'bunqueue-report-'));
     directories.push(directory);
     const logPath = join(directory, 'unit.log');
-    await Bun.write(logPath, ' 1 pass\n 0 skip\n 0 fail\n');
+    await Bun.write(logPath, ' 1 pass\n 0 skip\n 0 fail\nRan 1 test across 1 file.\n');
     const samples = [sample('2026-01-01T00:00:00.000Z', 32 * 1024 ** 2)];
     const telemetry = await createSuiteTelemetry({
       suite: 'unit',

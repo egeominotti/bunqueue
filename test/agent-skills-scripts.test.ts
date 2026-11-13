@@ -53,6 +53,9 @@ const faked = { PATH: `${fakes}:${process.env.PATH}` };
 
 /** Arguments that make each script's dry run self-contained; a new script adds its own. */
 const DRY_RUN_ARGS: Record<string, string[]> = {
+  'machine-process.sh': ['--dry-run'],
+  'machine-claims.sh': ['--dry-run'],
+  'machine-evidence.sh': ['--dry-run'],
   'machine-gate.sh': ['--dry-run', '--run-id', 'contract-dry-run'],
   'machine-worker.sh': [
     '--dry-run',
@@ -156,6 +159,10 @@ describe('agent skills: scripts', () => {
     }
     for (const forbidden of ['--mount', '--forward-ssh-agent'])
       expect(run.stdout).not.toContain(forbidden);
+    // No pid exists in a dry run: the plan names the workers instead of printing "()".
+    expect(run.stdout).not.toContain('()');
+    expect(run.stdout).toMatch(/^# stop the workers \(one per Machine/m);
+    expect(run.stdout).toMatch(/^# then machine-verdict\.sh .*130 interrupted/m);
     expect(existsSync(join(ROOT, 'artifacts/machines/contract-dry-run'))).toBe(false);
   });
 });

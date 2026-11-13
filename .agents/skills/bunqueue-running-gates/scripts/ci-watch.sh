@@ -54,14 +54,19 @@ usage_error() {
 need_value() { [ "$2" -ge 2 ] || usage_error "$1 needs a value"; }
 # Exit 1 means "CI failed" and exit 3 "CI is green": a command that fails under
 # set -e must not look like either, so every exit that was not decided becomes 4.
-decided=0
+decided=0 worst=0 known_failed=''
+worse() { # FAILED > NO VERDICT > FLAKY > GREEN
+  case "$worst:$1" in 1:* | 4:3 | 4:0 | 3:0) ;; *) worst=$1 ;; esac
+}
 quit() {
   decided=1
   exit "$1"
 }
 no_verdict() {
   echo "NO VERDICT  $*"
-  quit 4
+  worse 4
+  [ -z "$known_failed" ] || echo "FAILED      $known_failed (already observed; diagnostics unavailable)"
+  quit "$worst"
 }
 is_number() {
   case "$1" in '' | *[!0-9]*) return 1 ;; esac
@@ -114,25 +119,62 @@ if [ "$dry_run" -eq 1 ]; then
   exit 0
 fi
 
-trap '[ "$decided" -eq 1 ] || { echo "NO VERDICT  ci-watch.sh stopped on an internal error (exit $?)" || true; exit 4; }' EXIT
-trap 'no_verdict "interrupted before the run finished"' INT TERM
+active='' capture=''
+stop_active() {
+  if [ -n "$active" ]; then
+    kill -TERM "$active" 2>/dev/null || true
+    wait "$active" 2>/dev/null || true
+    active=''
+  fi
+}
+cleanup() { stop_active; [ -z "$capture" ] || rm -rf "$capture"; }
+interrupt() { trap '' INT TERM; stop_active; no_verdict 'interrupted before the run finished'; }
+trap 'code=$?; cleanup; [ "$decided" -eq 1 ] || { echo "NO VERDICT  ci-watch.sh stopped on an internal error (exit $code)" || true; [ "$worst" -eq 1 ] && exit 1; exit 4; }' EXIT
+trap interrupt INT TERM
 command -v gh >/dev/null 2>&1 || no_verdict 'the gh CLI is not installed (https://cli.github.com)'
+command -v bun >/dev/null 2>&1 || no_verdict 'Bun is required to bound gh commands'
+helper=$(cd "$(dirname "$0")/../../../../scripts/agents" && pwd)/bounded-command.ts
+[ -f "$helper" ] || no_verdict 'the bounded-command.ts helper is unavailable'
+started=$(bun "$helper" --now)
+is_number "$started" || no_verdict 'the clock helper failed'
+until_ms=$((started + timeout * 1000))
+capture=$(mktemp -d "${TMPDIR:-/tmp}/bunqueue-ci-watch.XXXXXX")
+deadline() { no_verdict "no result after ${timeout}s:${pending:-${last_pending:- gh query timed out}}"; }
+# Every gh call, retry pause and history query shares the same wall-clock budget.
+bounded() {
+  local code=0
+  bun "$helper" --until "$until_ms" "$@" >"$capture/reply" &
+  active=$!
+  wait "$active" || code=$?
+  active=''
+  return "$code"
+}
+pause() {
+  local code=0
+  bounded sleep "$PAUSE" || code=$?
+  [ "$code" -ne 124 ] || deadline
+  return "$code"
+}
 
 # One read through gh; the answer is left in $reply. A blip must not end a long watch
 # and an outage must: the third consecutive failure is NO VERDICT.
 reply='' failures=0
 query() {
   if [ -n "$repo" ]; then set -- "$@" --repo "$repo"; fi
-  if reply=$(gh run "$@"); then
+  local code=0
+  bounded gh run "$@" || code=$?
+  reply=$(cat "$capture/reply")
+  if [ "$code" -eq 0 ]; then
     failures=0
     return 0
   fi
+  [ "$code" -ne 124 ] || deadline
   failures=$((failures + 1))
   [ "$failures" -lt 3 ] || no_verdict "gh run $1 failed $failures times in a row (is gh authenticated? gh auth status)"
   return 1
 }
 must_query() {
-  until query "$@"; do sleep "$PAUSE"; done
+  until query "$@"; do pause; done
 }
 
 # Sets $status, $conclusion, $attempt, $head, $url and $name of run $1.
@@ -141,11 +183,18 @@ read_run() {
 $reply
 EOF
   is_number "$attempt" || no_verdict "unexpected answer from gh for run $1: $reply"
+  case "$status:$conclusion" in
+    completed:failure | completed:timed_out | completed:startup_failure)
+      known_failed="$name run $1 (attempt $attempt): $url"
+      worse 1
+      ;;
+  esac
 }
 
 # Wait until every run has finished, or waits for an approval nobody here may give.
-started=$SECONDS ids=$run
+ids=$run
 while :; do
+  last_pending=${pending:-}
   pending=''
   if [ -n "$sha" ]; then
     if query list --commit "$sha" --workflow "$workflow" --limit 20 --json databaseId --jq '.[].databaseId'; then
@@ -169,28 +218,25 @@ while :; do
     fi
   done
   [ -n "$pending" ] || break
-  elapsed=$((SECONDS - started))
-  [ "$elapsed" -lt "$timeout" ] || no_verdict "no result after ${timeout}s:$pending"
+  now=$(bun "$helper" --now)
+  elapsed=$(((now - started) / 1000))
+  [ "$now" -lt "$until_ms" ] || deadline
   say "ci-watch.sh: ${elapsed}s of ${timeout}s:$pending"
-  sleep "$PAUSE"
+  pause
 done
 
-# Prints the failed jobs of attempts $2..$3 of run $1, one per line, with the attempt.
+# Collects history in the parent shell: a long command substitution defers traps.
 failed_jobs() {
   local n=$2
+  job_lines=''
   while [ "$n" -le "$3" ]; do
     must_query view "$1" --attempt "$n" --json jobs --jq "$FAILED_JOBS"
-    [ -z "$reply" ] || printf '%s\n' "$reply" | sed "s/^/    attempt $n: /"
+    if [ -n "$reply" ]; then
+      job_lines="$job_lines$(printf '%s\n' "$reply" | sed "s/^/    attempt $n: /")
+"
+    fi
     n=$((n + 1))
   done
-}
-
-worst=0
-worse() { # FAILED (1) outranks NO VERDICT (4), which outranks FLAKY (3) and GREEN (0)
-  case "$worst:$1" in
-    1:* | 4:3 | 4:0 | 3:0) ;;
-    *) worst=$1 ;;
-  esac
 }
 
 for id in $ids; do
@@ -204,11 +250,8 @@ for id in $ids; do
     worse 4
     continue
   fi
-  # In a substitution a NO VERDICT from gh only ends the subshell: pass it on.
-  earlier=$(failed_jobs "$id" 1 $((attempt - 1))) || {
-    printf '%s\n' "$earlier"
-    quit 4
-  }
+  failed_jobs "$id" 1 $((attempt - 1))
+  earlier=$job_lines
   case "$conclusion" in
     success)
       if [ -z "$earlier" ]; then
@@ -225,7 +268,9 @@ for id in $ids; do
       ;;
     failure | timed_out | startup_failure)
       echo "FAILED      $label"
+      worse 1
       failed_jobs "$id" "$attempt" "$attempt"
+      [ -z "$job_lines" ] || printf '%s' "$job_lines"
       if [ -n "$earlier" ]; then
         printf '%s\n' "$earlier"
         echo "    It failed again on a rerun of the same commit: treat a job that fails in every"

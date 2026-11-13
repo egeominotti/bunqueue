@@ -50,14 +50,22 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
-- `postgres-runner-guard-destructuring` and `machine-gate-interrupt-log-gaps`:
-  implemented, skeptic CONDITIONAL only on the sandbox gate, not yet on `main`
-  (their worktrees hold the staged change).
+- `harness-audit-hardening`: full harness audit repairs on its branch, including
+  the PostgreSQL guard and Machine logging fixes. Product sandbox, fresh native
+  Ubuntu and SDK sandbox passed on tree `22a1f496`; 404 state readers and final
+  startup are green, whole-branch skeptic PASS on state tree `db30ef62`.
+  Commit and push remain. The user explicitly authorized fixes, commit and
+  push; no version bump or publication authorized.
+- `machine-gate-interrupt-log-gaps` and `postgres-runner-guard-destructuring` are
+  integrated into that candidate; their original staged worktrees are preserved.
+  They remain owned while final commit, push and CI evidence are pending.
 
 ### What's Next
 
-1. Land `postgres-runner-guard-destructuring` and `machine-gate-interrupt-log-gaps`
-   after a green `bun run test:sandbox` each.
+1. Finish `harness-audit-hardening`, integrating `postgres-runner-guard-destructuring`
+   and `machine-gate-interrupt-log-gaps`: review the recorded final state delta,
+   commit and push the validated candidate under the user's authorization,
+   then watch CI. The connected GitHub account currently reports no push rights.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -70,11 +78,19 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   directly. The release push (CI's version gate tags, releases and publishes from
   `main`) therefore needs an account with write access to `main`, or a pull
   request merged by one.
+- `harness-audit-hardening`: GitHub reports `kernelvoid99` has `pull=true` and
+  `push=false` on `egeominotti/bunqueue`. Try the authorized Git push after the
+  local commit, since Git may use different credentials; do not change accounts,
+  remotes or protection rules. Push and CI cannot be claimed before they succeed.
+- The green product sandbox reports a TCP peak-memory anomaly: +78.9% against
+  baseline, 209.5 MiB (5.1% of limit), falling to 67.8 MiB at the next two-second
+  sample. No OOM, errors or end-growth signal; this is a transient observation,
+  not evidence of a leak. See `artifacts/harness-hardening/final-sandbox-anomaly-review.json`.
 - The release gates are long: `bun run test:sandbox` took 8.96 min of wall time on
   the last green run (2026-11-13, unit 6.85 min), and the SDK sandbox and both
   OrbStack Machines come on top.
-- `harness-production-grade`: `CLAUDE.md` and `AGENTS.md` are 71 and 52 bytes under
-  the 12,288-byte budget after the CI rule; the next rule added to them needs more
+- `harness-audit-hardening`: `CLAUDE.md` and `AGENTS.md` are 5 and 67 bytes under
+  the 12,288-byte budget after instruction parity; the next rule needs more
   non-rule prose moved out first. `scripts/ci-watch.sh` has watched one live run
   (43355036181: FAILED, then FLAKY after a rerun), but not yet one waiting for the
   `npm` environment approval (that status is handled from GitHub's documentation,
@@ -107,6 +123,100 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — harness audit hardening
+
+- Explicit user request: fix everything found in the harness audit, commit and
+  push. No release or publication authorized. Branch `harness-audit-hardening`,
+  base `edb86af4`, managed worktree `/Users/kernelvoid/.codex/worktrees/b7f5/bunqueue`.
+- Plan: `docs/superpowers/plans/2026-11-13-harness-audit-hardening.md`.
+- Audit: normal contracts 141/0, sandbox telemetry/lifecycle 27/0, startup green;
+  adversarial fake-tool probes found gaps in Machine ownership/cleanup/evidence,
+  sandbox verdict/cleanup/baselines, CI bounds/precedence, skill eval attribution,
+  instruction parity and work-item ownership. Evidence under
+  `artifacts/runner-guard-resume/harness-audit-probes/`.
+- Regression-first repairs cover sandbox verdicts, complete summaries, cleanup
+  and baselines; Machine ownership, late creates, bounded descendant cleanup and
+  copied evidence; CI deadlines/cancellation and eval attribution/launch errors;
+  instruction parity and startup inventory. Focused green: sandbox54/0,
+  Machine62/0 plus7 audit probes, CI/eval50/0; startup179/0 in11s.
+- Frozen executable tree `22a1f4960893ff27aa4b4922c2160d2078d3c458`:
+  `bun run test:sandbox` PASS, unit11912/0/403, TCP553/0, embedded349/0,
+  8.95min; `artifacts/test-sandbox/2026-11-13T21-44-23.117Z/summary.md`.
+  TCP memory anomaly is recorded under Blockers / Risks; other anomalies none.
+- `machine-gate.sh --distros ubuntu:24.04 --tree 22a1f4960893ff27aa4b4922c2160d2078d3c458`
+  PASS, Ubuntu24.04.5 arm64, Bun1.4.4+38afee6c8, effective4CPU/16GiB;
+  unit12043/0/403 (includes131 TypeScript SDK tests absent from sandbox),
+  TCP553/0 (69 suites), embedded349/0 (43 suites), tinyfs9/0, typecheck890+2135
+  and format2336 clean,21m19s. Snapshot hash matched; logs copied and Machine
+  deleted. `artifacts/machines/20261113T215345Z/manifest.md`.
+- `bun run test:sandbox:sdk` PASS, TypeScript882/0/0, Python219/0/0,
+  PHP105/0/0, Go114/0/1, Rust92/0/1, Elixir145/0/1; each SQLite/PostgreSQL
+  conformance18/18,6.26min, no anomalies or surviving processes.
+  `artifacts/test-sandbox-sdk/2026-11-13T22-15-13.834Z/summary.md`.
+- All full logs, totals, telemetry and slow tests reviewed. No engine lifecycle
+  changes; separate `bun run test:model` not triggered, model suites ran in both
+  full unit gates. SDK gate additionally validates shared runner changes.
+- Whole-branch skeptic found two code blockers (exited launcher descendants and
+  lost eval reports after launch rejection); both were reproduced and fixed.
+  Independent follow-up found no remaining confirmed code defect and verified
+  product/Ubuntu/SDK evidence. Whole-branch skeptic PASS on state tree
+  `db30ef625ed8ff27516a2894b64ed042617b4c33`; final recorded-state re-review
+  precedes commit. No remaining confirmed code blocker.
+- Post-gate delta: docs/state only, `gate-delta.sh` exit3; reader tests404/0,
+  30files39.19s, release-posts check259OK and docs data clean. Final `./init.sh`
+  green10s,179/0, typecheck890+2135 and format2336 clean; both whitespace checks
+  clean. Logs: `artifacts/harness-hardening/final-post-gate-tests.log`,
+  `final-post-gate-delta.log`, `final-init.log`.
+- Historical CONDITIONAL-only records remain historical evidence, not invented
+  approvals. The newly integrated changes require a fresh final skeptic PASS.
+- Original worktrees and unrelated work are preserved. No commit made yet;
+  actual Git push follows the local commit, then CI if remote write succeeds.
+
+### 2026-11-13 — resume PostgreSQL runner guard
+
+- Explicit user request: inspect previous work and continue. This covers the fix,
+  tests and review; it does not authorize commits, pushes or a release.
+- Item: `postgres-runner-guard-destructuring`; branch
+  `postgres-runner-guard-resume`, base `edb86af4`. Managed worktree:
+  `/Users/kernelvoid/.codex/worktrees/b7f5/bunqueue`. The original worktree and
+  the Machine-gate worktree remain unchanged.
+- Baseline: `./init.sh` green, 124 contract tests pass, typecheck and format clean.
+- Reproduction repeated: two temporary files outside the PostgreSQL runner's
+  patterns read the URL using destructuring, one through a support helper. The old
+  guard passes 4 / 0; the widened guard reports exactly both files, 4 pass / 1 fail.
+  Fixtures removed. Logs: `artifacts/runner-guard-resume/{before,after}-mutants.log`.
+- Verification on staged tree `8bf049756e2c03c43f996b8f76cedd7f1ea73a84`:
+  - `bun test test/postgres-runner-coverage.test.ts`: 5 pass / 0 fail.
+  - `./init.sh`: green, 124 contract tests pass; typecheck and format clean.
+  - `bun run test:sandbox`: exit 0, unit 11777 / 0 / 403, TCP 553 / 0,
+    embedded 349 / 0, 8.95 min, no resource anomalies. Unit peak RAM 1.57 GiB
+    (39.3%), peak PIDs 403; slowest unit test is the workflow model (35.74 s),
+    slowest integration file the TCP workflow engine (1.74 min).
+    Report: `artifacts/test-sandbox/2026-11-13T20-13-47.754Z/summary.md`.
+  - `machine-gate.sh --distros ubuntu:24.04 --tree 8bf04975`: exit 0,
+    Ubuntu 24.04.5 arm64, Bun 1.4.4+38afee6c8, effective 4 CPUs / 16 GiB;
+    unit 11908 / 0 / 403, TCP 553 / 0 (69 suites), embedded 349 / 0 (43 suites),
+    tinyfs 9 / 0, typecheck 890 + 2120 files and format 2319 files clean.
+    The 131 additional unit tests are from 16 TypeScript SDK files absent from
+    the sandbox image. Report:
+    `artifacts/machines/20261113T202258Z/manifest.md`; 21 min 12 s, Machine deleted,
+    all logs copied. The snapshot content hash matched inside the Machine.
+- Separate `test:model` and SDK sandbox not triggered (test guard/docs/state only);
+  both full unit gates included the model suites. No Debian release gate needed.
+- Independent investigation found no scoped defect. Initial skeptic CONDITIONAL
+  only on the then-pending Machine result and final state; final skeptic PASS on
+  state tree `12270964d9459641e19804c65de9d802a2c30057`. The reviewer independently
+  verified snapshot identity, Machine cleanup and the 131 additional SDK passes,
+  and ran documented-feature coverage (36 pass / 0 fail).
+- Post-gate delta: state-only, `gate-delta.sh` exit 3. Fresh contracts and docs:
+  `bun test --parallel=4 test/agent-harness test/agent-skills test/docs-*.test.ts`
+  260 pass / 0 fail across 21 files; release posts check 259 OK; `check:docs-data`
+  clean; final `./init.sh` green (124 pass / 0 fail, 8 s), typecheck, format and
+  whitespace clean. Logs in `artifacts/runner-guard-resume/`.
+- Integration/CI pending: no commit or push authorized. Item remains in-progress.
+- Next: `machine-gate-interrupt-log-gaps` still needs its sandbox gate; this guard
+  change is staged and validated, awaiting explicit integration authorization.
 
 ### 2026-11-13 — second batch
 

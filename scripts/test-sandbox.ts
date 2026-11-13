@@ -3,6 +3,7 @@
 
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { finished } from 'node:stream/promises';
+import { cleanupTestContainers, removeTestContainer } from './test-sandbox-cleanup';
 import { suitePassed, writeRunReport, writeSuiteArtifacts } from './test-sandbox-report';
 import {
   createSuiteTelemetry,
@@ -82,24 +83,23 @@ function dockerAvailable(): boolean {
 }
 
 function removeContainer(container: string): void {
-  Bun.spawnSync(['docker', 'rm', '--force', container], {
-    cwd: ROOT,
-    stdin: 'ignore',
-    stdout: 'ignore',
-    stderr: 'ignore',
-  });
-  activeContainers.delete(container);
+  removeTestContainer(activeContainers, container, ROOT);
 }
 
 function removeActiveContainers(): void {
-  for (const container of activeContainers) removeContainer(container);
+  cleanupTestContainers(activeContainers, ROOT);
 }
 
 function handleSignal(signal: string): void {
   if (interrupted) return;
   interrupted = true;
   console.error(`\nReceived ${signal}; removing active test containers...`);
-  removeActiveContainers();
+  try {
+    removeActiveContainers();
+  } catch (error) {
+    console.error('Cleanup failed; owned containers remain available for retry', error);
+    process.exit(1);
+  }
   process.exit(130);
 }
 
@@ -191,26 +191,33 @@ async function runSuite(suite: (typeof suites)[number]): Promise<SuiteTelemetry>
   // baseline gate and the SDK gate. They were four separate expressions, and the one on
   // `summary.json` disagreed: it reported `passed: true` for a 0/0/0 run, which is the
   // artifact the handoff process is told to read.
-  const emptyResult = code === 0 && !suitePassed(telemetry);
+  const emptyResult = code === 0 && counted === 0;
   if (emptyResult) {
     telemetry.anomalies.push(
       `no test results parsed: the suite exited 0 with ${counted} tests counted`
     );
   }
 
-  if (code !== 0 || emptyResult) {
+  if (!suitePassed(telemetry)) {
     activeContainers.delete(container);
     console.error(
       emptyResult
         ? `\nSandbox suite reported NO tests: ${suite.name} exited 0 with an empty result.`
-        : `\nSandbox suite failed: ${suite.name} exited with ${code}.`
+        : `\nSandbox suite failed: ${suite.name} exited with ${code}, ${telemetry.tests.failed} reported failures, ${telemetry.tests.errors ?? 0} reported errors, final results complete: ${telemetry.resultsComplete}.`
     );
     console.error(`Complete log: ${LOG_DIR}/${suite.name}.log`);
     console.error(`Failed container retained: ${container}`);
     console.error(`Inspect it with: docker logs ${container}`);
   } else {
-    removeContainer(container);
-    console.log(`Suite passed: ${suite.name}`);
+    try {
+      removeContainer(container);
+      console.log(`Suite passed: ${suite.name}`);
+    } catch (error) {
+      telemetry.exitCode = 1;
+      const message = error instanceof Error ? error.message : String(error);
+      telemetry.anomalies.push(message);
+      console.error(`${message}; retained container: ${container}`);
+    }
   }
   return telemetry;
 }

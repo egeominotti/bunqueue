@@ -9,17 +9,18 @@ readonly SETTLE_SECONDS=${BUNQUEUE_MACHINE_SETTLE_SECONDS:-60}
 readonly COPY_SECONDS=120
 readonly DELETE_SECONDS=120
 readonly DELETE_TRIES=5
+readonly LIST_SECONDS=${BUNQUEUE_MACHINE_CONTROL_SECONDS:-${BUNQUEUE_MACHINE_BOUND_SECONDS:-30}}
 
 usage() {
   cat <<'EOF'
 Usage: machine-cleanup.sh --run-dir DIR --state-dir DIR [--pids "PID ..."]
                           [--parent PID] [--keep] [--dry-run]
 
-1. Stops every worker in --pids with its whole process tree: each process is frozen
-   with SIGSTOP before its children are listed, so nothing forks in between, then
-   gets SIGTERM, and SIGKILL after 5 s. A pid whose parent is not --parent (default:
-   the caller) is skipped: it is not a worker of this run. RUN-DIR/cleanup.log
-   records both lists.
+1. Signals each worker in --pids so its command supervisor owns group cleanup.
+   A control query can defer the worker trap for its 30 s bound; after that bound
+   plus 5 s, an unresponsive worker tree is frozen top-down with SIGSTOP, then
+   gets SIGTERM and SIGKILL after 5 s. A pid whose parent is not --parent (default:
+   the caller) is skipped. RUN-DIR/cleanup.log records both lists.
 2. Waits up to 60 s for Machines whose `orb create` was interrupted
    (STATE-DIR/creating.<name>): the OrbStack daemon can finish a create after its CLI
    is gone. One that has still not appeared may appear later, so the run is then
@@ -78,7 +79,9 @@ done
 ssh_opts='-o BatchMode=yes -o ForwardAgent=no -o ClearAllForwardings=yes -o ForwardX11=no -o ConnectTimeout=20'
 
 if [ "$dry_run" -eq 1 ]; then
-  echo "# stop the workers ($pids) with their process trees: SIGSTOP, SIGTERM, SIGKILL after 5 s"
+  # A dry run has no worker pids (machine-gate.sh starts no worker): name them instead.
+  echo "# stop the workers (${pids:-one per Machine, started by machine-gate.sh}) cooperatively; unresponsive trees:" \
+    "SIGSTOP, SIGTERM, SIGKILL after 5 s"
   echo "# wait up to ${SETTLE_SECONDS}s in orb list for interrupted creates, then for each created Machine:"
   echo "+ rsync -a -e 'ssh $ssh_opts' <name>@orb:gate-out/ $run_dir/<name>/"
   echo "+ rsync -a -e 'ssh $ssh_opts' <name>@orb:gate-runner.log $run_dir/<name>/"
@@ -90,77 +93,10 @@ if [ "$dry_run" -eq 1 ]; then
 fi
 trap '' INT TERM
 
-children() {
-  local target=$1 stat_file stat rest
-  if command -v pgrep >/dev/null 2>&1; then pgrep -P "$target" 2>/dev/null || true && return 0; fi
-  for stat_file in /proc/[0-9]*/stat; do
-    stat=$(cat "$stat_file" 2>/dev/null) || continue
-    rest=${stat##*) }
-    set -- $rest
-    [ "${2:-}" != "$target" ] || { stat_file=${stat_file#/proc/} && echo "${stat_file%/stat}"; }
-  done
-}
-alive() {
-  kill -0 "$1" 2>/dev/null || return 1
-  local state=''
-  if [ -r "/proc/$1/stat" ]; then state=$(sed 's/.*) //' "/proc/$1/stat" 2>/dev/null | cut -d ' ' -f 1)
-  elif command -v ps >/dev/null 2>&1; then state=$(ps -o stat= -p "$1" 2>/dev/null || true)
-  fi
-  case "$state" in Z*) return 1 ;; esac
-}
-# stop_tree PID: freeze the tree top-down, then TERM, CONT, and KILL what survives 5 s.
-stop_tree() {
-  local queue=$1 next p kid all='' left='' tries=0
-  while [ -n "$queue" ]; do
-    next=''
-    for p in $queue; do
-      kill -STOP "$p" 2>/dev/null || continue
-      all="$all $p"
-      for kid in $(children "$p"); do next="$next $kid"; done
-    done
-    queue=$next
-  done
-  [ -n "$all" ] || return 0
-  kill -TERM $all 2>/dev/null || true
-  kill -CONT $all 2>/dev/null || true
-  while [ "$tries" -lt 10 ]; do
-    left=''
-    for p in $all; do if alive "$p"; then left="$left $p"; fi; done
-    [ -n "$left" ] || return 0
-    sleep 0.5 && tries=$((tries + 1))
-  done
-  kill -KILL $left 2>/dev/null || true
-}
-# detached CMD...: run CMD in a session of its own, out of reach of the terminal's
-# signals and of a kill of this process group.
-detach=none
-if command -v setsid >/dev/null 2>&1; then detach=setsid; elif command -v perl >/dev/null 2>&1; then detach=perl; fi
-detached() {
-  case "$detach" in
-    setsid) setsid "$@" ;;
-    perl) perl -MPOSIX -e 'setsid(); exec { $ARGV[0] } @ARGV or exit 127' "$@" ;;
-    *) "$@" ;;
-  esac
-}
-# bounded SECONDS CMD...: run CMD detached, and stop its tree once SECONDS have passed.
-bounded() {
-  local limit=$1 pid rc=0 ticks=0
-  shift
-  detached "$@" </dev/null &
-  pid=$!
-  while alive "$pid"; do
-    [ "$ticks" -lt $((limit * 2)) ] || { stop_tree "$pid" && break; }
-    sleep 0.5 && ticks=$((ticks + 1))
-  done
-  wait "$pid" 2>/dev/null || rc=$?
-  return "$rc"
-}
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/machine-process.sh"
+source "$script_dir/machine-claims.sh"
 
-parent_of() {
-  if [ -r "/proc/$1/stat" ]; then sed 's/.*) //' "/proc/$1/stat" 2>/dev/null | cut -d ' ' -f 2
-  elif command -v ps >/dev/null 2>&1; then ps -o ppid= -p "$1" 2>/dev/null | tr -d ' ' || true
-  fi
-}
 # has_line LIST NAME: whether NAME is one line of LIST (no pipe: a pipe into grep -q can
 # fail with SIGPIPE under pipefail and read as "absent").
 nl='
@@ -177,17 +113,22 @@ for pid in $pids; do
 done
 printf 'workers to stop:%s\nnot workers of this run, left alone:%s\nrsync and orb run detached with: %s\n' \
   "${workers:- none}" "${skipped:- none}" "$detach" >>"$run_dir/cleanup.log"
-for pid in $workers; do stop_tree "$pid"; done
+# A worker waiting on a command substitution may defer its trap until the control
+# query deadline. Let the single supervisor finish before tree escalation.
+for pid in $workers; do stop_owned "$pid" "$((CONTROL_SECONDS + 5))"; done
 
 touch "$state_dir/created"
 created=$(LC_ALL=C sort -u "$state_dir/created")
 inflight=$(cd "$state_dir" && for f in creating.*; do [ ! -e "$f" ] || echo "${f#creating.}"; done)
-waited=0 missing='' problem=''
+settle_deadline=$((SECONDS + SETTLE_SECONDS)) missing='' problem=''
 while [ -n "$inflight" ]; do
-  listed=$(detached orb list -q 2>/dev/null || true) missing=''
+  remaining=$((settle_deadline - SECONDS))
+  [ "$remaining" -gt 0 ] || remaining=1
+  [ "$remaining" -le "$LIST_SECONDS" ] || remaining=$LIST_SECONDS
+  listed=$(bounded "$remaining" orb list -q 2>/dev/null || true) missing=''
   for name in $inflight; do has_line "$listed" "$name" || missing="$missing $name"; done
-  [ -n "$missing" ] && [ "$waited" -lt "$SETTLE_SECONDS" ] || break
-  sleep 1 && waited=$((waited + 1))
+  [ -n "$missing" ] && [ "$SECONDS" -lt "$settle_deadline" ] || break
+  sleep 1
 done
 if [ -n "$missing" ]; then
   problem="the interrupted create of$missing did not appear within ${SETTLE_SECONDS}s and may still: check orb list, then orb delete -f$missing"
@@ -195,7 +136,7 @@ if [ -n "$missing" ]; then
 fi
 
 listed='' existing=''
-if [ -n "$created" ] && ! listed=$(detached orb list -q 2>/dev/null); then
+if [ -n "$created" ] && ! listed=$(bounded "$LIST_SECONDS" orb list -q 2>/dev/null); then
   say 'machine-cleanup.sh: orb list failed; cannot tell which Machines exist'
   listed='' problem="${problem:+$problem; }orb list failed during cleanup: check orb list by hand"
 fi
@@ -203,13 +144,16 @@ for name in $created; do ! has_line "$listed" "$name" || existing="$existing $na
 copied='' uncopied=''
 for name in $existing; do
   mkdir -p "$run_dir/$name"
+  copy_rc=0
   if bounded "$COPY_SECONDS" rsync -a -e "ssh $ssh_opts" "$name@orb:gate-out/" "$run_dir/$name/" \
     >>"$run_dir/$name/copy-back.log" 2>&1; then copied="$copied $name"; else
     uncopied="$uncopied $name"
+    copy_rc=1
     say "machine-cleanup.sh: [$name] no gate-out/ copied back"
   fi
   bounded "$COPY_SECONDS" rsync -a -e "ssh $ssh_opts" "$name@orb:gate-runner.log" "$run_dir/$name/" \
-    >>"$run_dir/$name/copy-back.log" 2>&1 || true
+    >>"$run_dir/$name/copy-back.log" 2>&1 || copy_rc=1
+  [ "$copy_rc" = 0 ] || echo 'copy-back failed or timed out; evidence may be partial (see copy-back.log)' >"$run_dir/$name/COPY_INFRA"
 done
 logs="logs copied from:${copied:- none}; not copied from:${uncopied:- none}"
 
@@ -229,14 +173,14 @@ else
       bounded "$DELETE_SECONDS" orb delete -f "$name" >>"$run_dir/delete.log" 2>&1 || rc=$?
       tries=$((tries + 1)) codes="$codes${codes:+,}$rc"
       echo "orb delete -f $name: exit $rc (attempt $tries)" >>"$run_dir/delete.log"
-      if listed=$(detached orb list -q 2>/dev/null) && ! has_line "$listed" "$name"; then break; fi
+      if listed=$(bounded "$LIST_SECONDS" orb list -q 2>/dev/null) && ! has_line "$listed" "$name"; then break; fi
       [ "$tries" -lt "$DELETE_TRIES" ] || break
       sleep 2
     done
     [ "$codes" = 0 ] || say "machine-cleanup.sh: orb delete -f $name exited $codes"
     deletes="$deletes${deletes:+ }$name:$codes"
   done
-  if listed=$(detached orb list -q 2>/dev/null); then
+  if listed=$(bounded "$LIST_SECONDS" orb list -q 2>/dev/null); then
     for name in $created; do ! has_line "$listed" "$name" || left="$left $name"; done
   else
     left=' (orb list failed)'
@@ -246,6 +190,13 @@ else
   [ -z "$left" ] || say "machine-cleanup.sh: still present:$left"
 fi
 [ -z "$problem" ] || { state=not-deleted && note="NOT DELETED: $problem"; }
+# Claims for untouched names are safe to release; attempted creates remain claimed
+# until a complete cleanup confirms absence. Never release another run's token.
+if [ -f "$state_dir/claims" ]; then
+  for name in $(cat "$state_dir/claims"); do
+    if ! has_line "$created" "$name" || [ "$state" = deleted ]; then release_claim "$name"; fi
+  done
+fi
 [ ! -f "$run_dir/run.env" ] ||
   printf 'cleanup=%s\ncleanup_note=%s\ndelete_exit=%s\n' "$state" "$note" "${deletes:-none}" >>"$run_dir/run.env"
 [ "$state" != not-deleted ] || exit 4

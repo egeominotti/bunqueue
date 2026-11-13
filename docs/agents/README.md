@@ -1,5 +1,10 @@
 # Agent Harness
 
+Gate verdicts, ownership and audit regressions are detailed in
+[Agent harness reliability](../features/agent-harness.md). Shared instruction
+contracts protect preservation, queue invariants, scheduling, pagination/migrations
+and whole-test-tree type checking in both agent clients.
+
 How a coding agent starts, stays in scope, verifies its work and hands it over in
 this repository. Claude Code reads [`CLAUDE.md`](../../CLAUDE.md), Codex reads
 [`AGENTS.md`](../../AGENTS.md); both are short routing pages carrying the same
@@ -80,12 +85,11 @@ fails when `bun --version` differs from `BUN_VERSION` in
 (`bun test test/agent-harness` plus the skills tests listed in the script, in
 parallel), and prints the work items in progress, blocked or ready, the agent skills
 and the next steps. It stops at the first failure (`set -euo pipefail`) and takes about
-10 s. The Machine lifecycle and worker contracts
-(`test/agent-skills-machine-lifecycle.test.ts` and
-`test/agent-skills-machine-worker.test.ts`, about 50 s of real process trees, settle
-windows and time bounds) are left to the unit suite, which
-`bun run test:sandbox` runs; `test/agent-harness-init.test.ts` fails when a contract
-test is neither run by `init.sh` nor on that short list.
+10 s. Fast Machine evidence fixtures run at startup. Process-heavy Machine
+lifecycle, worker, audit and control tests, plus CLI audit/cancellation cases, stay
+in the unit suite run by `bun run test:sandbox`. Their explicit inventory lives in
+`test/agent-harness-init.test.ts`, which fails if a contract is neither run at
+startup nor listed, missing from disk, or excluded from full-suite discovery.
 
 It asks Git whether the directory is the root of a checkout (`git rev-parse
 --show-prefix` is empty), which also holds for a worktree, whose `.git` is a file, and

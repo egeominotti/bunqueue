@@ -9,21 +9,8 @@
 
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-
-type Json = Record<string, unknown>;
-type Env = Record<string, string>;
-interface AgentSpec {
-  /** Lists the skills the agent discovered; `stopAt` ends the process at that output. */
-  discovery: { args?: string[]; env?: Env; stopAt?: RegExp; names: (stdout: string) => string[] };
-  session: (query: string) => string[];
-  env?: Env;
-  /** The skills one JSONL event shows as loaded. */
-  loaded: (event: Json) => string[];
-  /** Skills whose SKILL.md one event opens as a plain file: reported, never scored. */
-  read?: (event: Json) => string[];
-  /** True for the event that ends a complete session. */
-  finished: (event: Json) => boolean;
-}
+import { agentSpecs, events, list, rec, type AgentSpec, type Env } from './skill-eval-agents';
+import { runCommand } from './skill-eval-process';
 type Case = { skill: string; query: string; shouldTrigger: boolean };
 /** An `error` session never reached an answer and is excluded from every rate. */
 type Outcome = Case & { loaded: string[]; read: string[]; status: string; log: string };
@@ -72,72 +59,7 @@ while (argv.length) {
   else fail(`unknown option ${flag}`);
 }
 
-const rec = (value: unknown): Json => (value && typeof value === 'object' ? (value as Json) : {});
-const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
-const flags = (text: string): string[] => text.split(' ');
-/** Every `<skill>/SKILL.md` path in a shell command, a file path or a skills listing. */
-const skillPaths = (text: unknown): string[] =>
-  [...String(text ?? '').matchAll(/(?:^|[/\s'"])([a-z0-9-]+)\/SKILL\.md/g)].map((m) => m[1]!);
-/** The inputs of one tool's calls in a Claude Code `assistant` event. */
-const claudeTool = (event: Json, tool: string): Json[] =>
-  list(rec(event.message).content)
-    .map(rec)
-    .filter((use) => event.type === 'assistant' && use.type === 'tool_use' && use.name === tool)
-    .map((use) => rec(use.input));
-const events = (out: string): Json[] =>
-  out.split('\n').flatMap((line) => {
-    try {
-      return line.startsWith('{') ? [rec(JSON.parse(line))] : [];
-    } catch {
-      return [];
-    }
-  });
-
-const AGENTS: Record<string, AgentSpec> = {
-  // Plan mode and a tool list without Bash, Edit or Write: the session cannot change
-  // the repository and nothing can prompt. Project settings only, no MCP servers. Only
-  // the Skill tool is a trigger: a Read of a SKILL.md may be a search hit, so it is `read`.
-  claude: {
-    discovery: {
-      stopAt: /"subtype":"init".*\n/,
-      names: (out) => events(out).flatMap((event) => list(event.skills).map(String)),
-    },
-    session: (query) => [
-      ...['-p', query, ...flags('--output-format stream-json --verbose --permission-mode plan')],
-      ...flags(`--max-turns ${tuning.maxTurns} --permission-prompts none --strict-mcp-config`),
-      ...flags('--tools Skill,Read,Grep,Glob --setting-sources project --no-session-persistence'),
-    ],
-    env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
-    loaded: (event) => claudeTool(event, 'Skill').map((input) => String(input.skill)),
-    read: (event) => claudeTool(event, 'Read').flatMap((input) => skillPaths(input.file_path)),
-    finished: (event) =>
-      event.type === 'result' && ['success', 'error_max_turns'].includes(String(event.subtype)),
-  },
-  // Codex has no skill tool: it reads SKILL.md with a shell command, which the
-  // read-only sandbox allows. The user config is ignored (it may widen the sandbox).
-  codex: {
-    discovery: { args: ['debug', 'prompt-input', 'x'], names: skillPaths },
-    session: (query) => [
-      ...flags('exec --json --sandbox read-only --ephemeral --ignore-user-config -c'),
-      ...['approval_policy="never"', query],
-    ],
-    loaded: (event) => skillPaths(rec(event.item).command),
-    finished: (event) => event.type === 'turn.completed',
-  },
-  // Read from the gemini-cli 0.62.0 source; no authenticated session has confirmed it.
-  gemini: {
-    discovery: {
-      args: ['skills', 'list'],
-      env: { GEMINI_CLI_TRUST_WORKSPACE: 'true' },
-      names: (out) => [...out.matchAll(/^(\S+) \[Enabled\]/gm)].map((match) => match[1]!),
-    },
-    session: (query) => ['-p', query, ...flags('-o stream-json --approval-mode plan --skip-trust')],
-    loaded: (e) => (e.tool_name === 'activate_skill' ? [String(rec(e.parameters).name)] : []),
-    finished: (event) => event.type === 'result' && event.status !== 'error',
-  },
-};
-
-const spec = AGENTS[opt.agent] ?? fail(`unknown agent ${opt.agent}`);
+const spec = agentSpecs(ROOT, tuning.maxTurns)[opt.agent] ?? fail(`unknown agent ${opt.agent}`);
 const bin = (Bun.env[`SKILL_EVALS_${opt.agent.toUpperCase()}_BIN`] ?? opt.agent).split(/\s+/);
 const known = readdirSync(join(ROOT, SKILLS_DIR))
   .filter((name) => existsSync(join(ROOT, SKILLS_DIR, name, 'SKILL.md')))
@@ -150,23 +72,30 @@ const shell = (arg: string): string =>
 const command = (args: string[]): string => [...bin, ...args].map(shell).join(' ');
 const git = (...args: string[]): string =>
   String(Bun.spawnSync(['git', ...args], { cwd: ROOT }).stdout).trim();
+const cancellation = new AbortController();
+const launchErrors: { command: string; error: string }[] = [];
+let interrupted: 'SIGTERM' | 'SIGINT' | null = null;
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, () => {
+    interrupted ??= signal;
+    cancellation.abort();
+  });
+}
 
 async function spawn(args: string[], env: Env = {}, stopAt?: RegExp) {
-  const started = Date.now();
-  const io = { cwd: ROOT, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' } as const;
-  const proc = Bun.spawn([...bin, ...args], { env: { ...process.env, ...env }, ...io });
-  const timer = setTimeout(() => proc.kill(), tuning.timeout * 1000);
-  const err = new Response(proc.stderr).text();
-  const decoder = new TextDecoder();
-  let out = '';
-  for await (const chunk of proc.stdout) {
-    out += decoder.decode(chunk, { stream: true });
-    if (stopAt?.test(out)) proc.kill();
+  try {
+    return await runCommand([...bin, ...args], {
+      cwd: ROOT,
+      env: { ...process.env, ...env },
+      timeoutMs: tuning.timeout * 1000,
+      stopAt,
+      signal: cancellation.signal,
+    });
+  } catch (error) {
+    const err = String(error);
+    launchErrors.push({ command: command(args), error: err });
+    return { code: 125, out: '', err, timedOut: false, interrupted: cancellation.signal.aborted };
   }
-  const code = await proc.exited;
-  clearTimeout(timer);
-  const timedOut = Date.now() - started >= tuning.timeout * 1000;
-  return { code, out, err: await err, timedOut };
 }
 
 const cases: Case[] = [];
@@ -178,13 +107,13 @@ for (const skill of known) {
   const frontmatter = (await Bun.file(join(dir, 'SKILL.md')).text()).split(/^---$/m)[1] ?? '';
   const text = String(rec(Bun.YAML.parse(frontmatter)).description ?? '');
   descriptions[skill] = { chars: text.length, text };
-  if (!selected.includes(skill)) continue;
   const yaml = Bun.file(join(dir, 'agents/openai.yaml'));
   const policy = (await yaml.exists()) ? rec(rec(Bun.YAML.parse(await yaml.text())).policy) : {};
   if (opt.agent === 'codex' && policy.allow_implicit_invocation === false) {
     explicitOnly.push(skill);
     continue;
   }
+  if (!selected.includes(skill)) continue;
   const queries = list(rec(await Bun.file(join(dir, 'evals/evals.json')).json()).trigger_queries);
   for (const shouldTrigger of [true, false]) {
     const wanted = queries.map(rec).filter((entry) => entry.should_trigger === shouldTrigger);
@@ -212,6 +141,11 @@ const discovery = {
   listed: known.filter((name) => names.includes(name)),
   missing: known.filter((name) => !names.includes(name)),
   explicitOnly,
+  valid:
+    !cancellation.signal.aborted &&
+    !found.timedOut &&
+    (found.code === 0 || !!spec.discovery.stopAt?.test(found.out)) &&
+    known.every((name) => names.includes(name) || explicitOnly.includes(name)),
 };
 console.log(`${opt.agent} ${version}: lists ${discovery.listed.length}/${known.length} skills`);
 console.log(`  not listed: [${discovery.missing}], explicit-only, not run: [${explicitOnly}]`);
@@ -220,7 +154,7 @@ const outcomes: Outcome[] = [];
 let next = 0;
 let errorsInARow = 0;
 async function worker(): Promise<void> {
-  while (next < cases.length && errorsInARow < 5) {
+  while (!cancellation.signal.aborted && next < cases.length && errorsInARow < 5) {
     const index = next++;
     const item = cases[index]!;
     const result = await spawn(spec.session(item.query), spec.env);
@@ -229,7 +163,13 @@ async function worker(): Promise<void> {
       [...new Set(stream.flatMap(pick ?? (() => [])))].filter((name) => known.includes(name));
     const [loaded, read] = [seen(spec.loaded), seen(spec.read)];
     const done = stream.some(spec.finished);
-    const status = done ? 'ok' : result.timedOut ? 'timeout' : 'error';
+    const status = result.interrupted
+      ? 'interrupted'
+      : done
+        ? 'ok'
+        : result.timedOut
+          ? 'timeout'
+          : 'error';
     errorsInARow = status === 'error' ? errorsInARow + 1 : 0;
     const log = `sessions/${String(index + 1).padStart(3, '0')}-${item.skill}.jsonl`;
     await Bun.write(join(outDir, log), result.out + (done ? '' : `\n${result.err}`));
@@ -239,10 +179,12 @@ async function worker(): Promise<void> {
     console.log(`${index + 1}/${cases.length} ${line} [${loaded}] read [${read}]`);
   }
 }
-await Promise.all(Array.from({ length: Math.min(opt.concurrency, cases.length) }, worker));
+if (discovery.valid) {
+  await Promise.all(Array.from({ length: Math.min(opt.concurrency, cases.length) }, worker));
+} else console.error('Stopped: discovery failed; no evaluation sessions started.');
 if (errorsInARow >= 5) console.error('Stopped: five sessions in a row failed. Fix the runner.');
 outcomes.sort((a, b) => a.log.localeCompare(b.log));
-const scored = outcomes.filter((outcome) => outcome.status !== 'error');
+const scored = outcomes.filter((outcome) => !['error', 'interrupted'].includes(outcome.status));
 const fired = (outcome: Outcome, skill = outcome.skill): boolean => outcome.loaded.includes(skill);
 const summary = selected
   .filter((skill) => !explicitOnly.includes(skill))
@@ -282,6 +224,8 @@ const report = {
   descriptions,
   summary,
   outcomes,
+  interrupted,
+  launchErrors,
 };
 await Bun.write(join(outDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log('\nskill | should-trigger hit | should-not fired | read only | instead on a miss');
@@ -297,4 +241,12 @@ for (const o of scored.filter((outcome) => fired(outcome) !== outcome.shouldTrig
 }
 const tree = report.treeChanged ? 'changed (by another process)' : 'unchanged';
 console.log(`\n${outcomes.length} sessions, working tree ${tree}, ${outDir}/report.json`);
-process.exit(errorsInARow >= 5 || discovery.missing.some((n) => !explicitOnly.includes(n)) ? 1 : 0);
+process.exit(
+  interrupted === 'SIGTERM'
+    ? 143
+    : interrupted === 'SIGINT'
+      ? 130
+      : errorsInARow >= 5 || !discovery.valid || launchErrors.length > 0
+        ? 1
+        : 0
+);

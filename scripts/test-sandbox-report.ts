@@ -30,26 +30,51 @@ function delta(current: number, baseline: number): number {
   return baseline === 0 ? 0 : ((current - baseline) / baseline) * 100;
 }
 
-async function readBaseline(path: string | null): Promise<RunReport | null> {
+type BaselineSuite = Pick<
+  SuiteTelemetry,
+  'suite' | 'exitCode' | 'durationMs' | 'resultsComplete'
+> & {
+  tests: Pick<SuiteTelemetry['tests'], 'passed' | 'failed' | 'skipped' | 'errors'>;
+  resources: Pick<SuiteTelemetry['resources'], 'memoryPeakBytes'>;
+};
+
+async function readBaseline(path: string | null): Promise<{ suites: BaselineSuite[] } | null> {
   if (!path) return null;
   try {
-    const parsed = (await Bun.file(path).json()) as RunReport;
+    const parsed = (await Bun.file(path).json()) as { suites?: BaselineSuite[] } | null;
     // Syntactically valid JSON is not enough. A baseline written by an older schema has
     // no `tests` on its suites, and `suitePassed` would dereference it and throw from
     // inside `writeRunReport` AFTER the whole run: the 15 minutes of work would end with
     // no `summary.json` and no `summary.md` at all. An unusable baseline is worth less
     // than the report it would destroy.
     if (!Array.isArray(parsed?.suites)) return null;
-    if (!parsed.suites.every((suite) => suite?.tests && typeof suite.exitCode === 'number')) {
+    if (
+      !parsed.suites.every(
+        (suite) =>
+          typeof suite?.suite === 'string' &&
+          Number.isSafeInteger(suite.exitCode) &&
+          Number.isFinite(suite.durationMs) &&
+          suite.durationMs >= 0 &&
+          suite.tests &&
+          [suite.tests.passed, suite.tests.failed, suite.tests.skipped].every(
+            (value) => Number.isSafeInteger(value) && value >= 0
+          ) &&
+          (suite.tests.errors === undefined ||
+            (Number.isSafeInteger(suite.tests.errors) && suite.tests.errors >= 0)) &&
+          (suite.resultsComplete === undefined || typeof suite.resultsComplete === 'boolean') &&
+          Number.isFinite(suite.resources?.memoryPeakBytes) &&
+          suite.resources.memoryPeakBytes >= 0
+      )
+    ) {
       return null;
     }
-    return parsed;
+    return { suites: parsed.suites };
   } catch {
     return null;
   }
 }
 
-function addBaselineSignals(current: SuiteTelemetry, baseline?: SuiteTelemetry): void {
+function addBaselineSignals(current: SuiteTelemetry, baseline?: BaselineSuite): void {
   // A 0/0/0 run must not become the duration and peak-memory baseline the next run is
   // compared against: it observed nothing, so every later run would look like a
   // regression against nothing.
@@ -219,7 +244,7 @@ export async function writeRunReport(input: {
     mode: input.mode,
     durationMs: input.durationMs,
     passed: input.suites.every(suitePassed),
-    ...(input.baselinePath && { baseline: input.baselinePath }),
+    ...(baseline && input.baselinePath && { baseline: input.baselinePath }),
     suites: input.suites,
   };
   await Promise.all([
@@ -234,33 +259,27 @@ export async function writeRunReport(input: {
   ]);
   return report;
 }
-/**
- * Did this suite actually pass?
- *
- * Exit code alone is not enough. A runner that dies before reporting anything, or whose
- * output never reaches the parser, exits 0 with nothing counted, and that is precisely
- * how a run reported `unit | PASS | 0 / 0 / 0` over 434 of 445 files with every
- * model-based suite missing. An empty result is a failure to observe, not an observation
- * of success.
- *
- * Single source of truth on purpose: the markdown verdict, the JSON `passed` field, the
- * baseline gate and the SDK gate all read this. They were separate predicates, and the
- * one on `summary.json` still said `passed: true` for a 0/0/0 run, which is the artifact
- * CLAUDE.md tells a reviewer to read before handoff. A guard that disagrees with the
- * machine-readable artifact is not a guard.
- */
-export function suitePassed(suite: {
+interface SuiteResult {
   exitCode: number;
-  tests: { passed: number; failed: number; skipped: number };
-}): boolean {
-  if (suite.exitCode !== 0) return false;
-  return suite.tests.passed + suite.tests.failed + suite.tests.skipped > 0;
+  tests: { passed: number; failed: number; skipped: number; errors?: number };
+  resultsComplete?: boolean;
 }
 
-function suiteVerdict(suite: {
-  exitCode: number;
-  tests: { passed: number; failed: number; skipped: number };
-}): string {
-  if (suite.exitCode !== 0) return 'FAIL';
+/** Shared by container retention, JSON/Markdown verdicts, SDKs and baseline selection. */
+export function suitePassed(suite: SuiteResult): boolean {
+  if (suite.exitCode !== 0 || suite.tests.failed !== 0 || suite.resultsComplete === false)
+    return false;
+  if ((suite.tests.errors ?? 0) !== 0) return false;
+  return (
+    [suite.tests.passed, suite.tests.skipped].every(
+      (value) => Number.isSafeInteger(value) && value >= 0
+    ) && suite.tests.passed + suite.tests.skipped > 0
+  );
+}
+
+function suiteVerdict(suite: SuiteResult): string {
+  if (suite.exitCode !== 0 || suite.tests.failed > 0 || (suite.tests.errors ?? 0) > 0)
+    return 'FAIL';
+  if (suite.resultsComplete === false) return 'FAIL (incomplete results)';
   return suitePassed(suite) ? 'PASS' : 'FAIL (no results)';
 }

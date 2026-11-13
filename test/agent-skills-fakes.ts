@@ -39,7 +39,7 @@ export function bunLog(failed: readonly [string, string][], passed: number, extr
       `${failed.length} tests failed:`,
       ...failed.map(([, t]) => `(fail) ${t} [1.22ms]`)
     );
-  const total = passed + failed.length;
+  const total = passed + failed.length + 3;
   return `${lines.join('\n')}\n${extra}\n ${passed} pass\n 3 skip\n ${failed.length} fail\nRan ${total} tests across 9 files. [5.00s]\n`;
 }
 
@@ -94,6 +94,10 @@ export function machineBed(dir: string, createSleep: number, daemonDelay = 1): B
     mkdirSync(path, { recursive: true });
   }
   cpSync(join(ROOT, MACHINE_SKILL), join(repo, MACHINE_SKILL), { recursive: true });
+  mkdirSync(join(repo, 'scripts/agents'), { recursive: true });
+  for (const helper of ['bounded-command.ts', 'skill-eval-process.ts']) {
+    cpSync(join(ROOT, 'scripts/agents', helper), join(repo, 'scripts/agents', helper));
+  }
   writeFileSync(join(snapshot, '.github/workflows/ci.yml'), "env:\n  BUN_VERSION: '1.4.4'\n");
   writeFileSync(join(snapshot, 'README.md'), 'fixture\n');
   const uname = Bun.which('uname') ?? '/usr/bin/uname';
@@ -117,11 +121,19 @@ esac\n`
   // `orb delete` calls that fail without deleting, and `signal-prone` makes `orb delete`
   // and `rsync` take a second and die on SIGINT or SIGTERM even where the caller ignores
   // them, as the real commands do (they install their own handlers); `rsync-ok` lets the
-  // copy back succeed.
+  // copy back succeed. A slow create records its pid in `pid-<name>` and execs its
+  // sleep, so that pid is the one process a stopped create must not leave behind.
+  // Its delayed daemon has a separate session, like real OrbStack's external daemon;
+  // it is not an owned descendant to kill when the create CLI exits.
   const prone = `[ ! -e "${orb}/signal-prone" ] || perl -e '$SIG{INT} = $SIG{TERM} = "DEFAULT"; select(undef, undef, undef, 1)' || exit 130\n`;
   script(
     join(fakes, 'orb'),
     `state="${orb}"
+daemon_create() {
+  bun -e 'import { spawn } from "node:child_process";
+    spawn("sh", ["-c", "sleep \\"$1\\"; touch \\"$2\\"", "daemon", process.argv[1], process.argv[2]],
+      { detached: true, stdio: "ignore" }).unref();' "$2" "$state/machines/$1"
+}
 echo "$*" >> "$state/calls"
 case "$1" in
   list) count=$(($(cat "$state/list-count" 2>/dev/null || echo 0) + 1)); echo $count > "$state/list-count"
@@ -133,9 +145,9 @@ case "$1" in
     printf '{\\n  "record": {\\n    "name": "%s",\\n    "config": {\\n      "isolated": true,\\n      "forward_ssh_agent": false,\\n      "isolate_network": true\\n    }\\n  }\\n}\\n' "$4" ;;
   create) for name; do :; done
     if [ ${createSleep} -gt 0 ]; then
-      ( ( sleep ${daemonDelay}; touch "$state/machines/$name" ) & )
-      touch "$state/started-$name"
-      sleep ${createSleep}
+      daemon_create "$name" ${daemonDelay}
+      echo $$ > "$state/pid-$name"; touch "$state/started-$name"
+      exec sleep ${createSleep}
     else touch "$state/machines/$name" "$state/started-$name"; fi ;;
   delete) shift; [ "$1" = -f ] && shift
     ${prone.trim()}
@@ -154,7 +166,10 @@ esac\n`
     gate: join(repo, MACHINE_SKILL, 'scripts/machine-gate.sh'),
     repo,
     orb,
-    env: { PATH: `${fakes}:${process.env.PATH}` },
+    env: {
+      PATH: `${fakes}:${process.env.PATH}`,
+      BUNQUEUE_MACHINE_CLAIM_ROOT: join(dir, '..', 'claims'),
+    },
     machines: () => list(join(orb, 'machines')),
     calls: () => (existsSync(join(orb, 'calls')) ? readFileSync(join(orb, 'calls'), 'utf8') : ''),
     deleted: () =>

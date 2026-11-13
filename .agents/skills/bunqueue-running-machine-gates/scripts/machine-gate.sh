@@ -129,9 +129,11 @@ checked_bun_version() {
 }
 # worker DISTRO [--dry-run]: machine-worker.sh for one Machine of this run.
 worker() {
-  bash "$script_dir/machine-worker.sh" ${2:-} --distro "$1" --name "$(machine_name "$1")" --arch "$arch" \
+  local distro=$1 mode=${2:-}
+  set -- bash "$script_dir/machine-worker.sh" $mode --distro "$distro" --name "$(machine_name "$distro")" --arch "$arch" \
     --run-dir "$run_dir" --state-dir "$state_dir" --snapshot "$snapshot" \
     --content-hash "$content_hash" --bun-version "$bun_version" --steps "$steps"
+  if [ "$mode" = --dry-run ]; then "$@"; else exec "$@"; fi
 }
 
 if [ "$dry_run" -eq 1 ]; then
@@ -148,13 +150,28 @@ if [ "$dry_run" -eq 1 ]; then
   extra=''
   [ "$keep" -eq 0 ] || extra=--keep
   bash "$script_dir/machine-cleanup.sh" --dry-run --run-dir "$run_dir" --state-dir "$state_dir" $extra
-  echo "# then machine-verdict.sh writes manifest.md; exit 0 pass, 1 fail, 4 infra, 5 diagnostic"
+  echo "# then machine-verdict.sh writes manifest.md; exit 0 pass, 1 fail, 4 infra, 5 diagnostic," \
+    "130 interrupted (every Machine deleted; 4 if one was not)"
   exit 0
 fi
 
 [ "$(uname -s)" = Darwin ] || die 4 'OrbStack Machines need a macOS host'
 for tool in orb ssh rsync git tar bun; do command -v "$tool" >/dev/null 2>&1 || die 4 "$tool is not installed"; done
-orb list -q >/dev/null 2>&1 || die 4 'OrbStack does not answer (orb list failed); start it first'
+source "$script_dir/machine-process.sh"
+# Preflight queries precede run state and the full cleanup traps. Stop every still
+# owned child here, including a query launched just before bounded records its pid.
+on_preflight_signal() {
+  local pid
+  trap '' INT TERM
+  for pid in $(children "$$"); do
+    [ "$(parent_of "$pid")" = "$$" ] || continue
+    stop_owned "$pid"
+    wait "$pid" 2>/dev/null || true
+  done
+  exit 130
+}
+trap on_preflight_signal INT TERM
+bounded "$CONTROL_SECONDS" orb list -q >/dev/null 2>&1 || die 4 'OrbStack does not answer (orb list failed); start it first'
 [ ! -e "$run_dir" ] || die 4 "$run_dir already exists; pick another --run-id"
 git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || die 4 "$repo is not a Git checkout"
 if [ -z "$tree" ]; then tree=$(git -C "$repo" write-tree) || die 4 'git write-tree failed (unmerged index?)'; fi
@@ -163,6 +180,8 @@ if git -C "$repo" rev-parse --verify --quiet HEAD >/dev/null; then
   git -C "$repo" diff --check HEAD "$tree_hash" >&2 || die 4 "git diff --check HEAD $tree_hash reports whitespace errors"
 fi
 
+mkdir -p "$repo/artifacts/machines"
+mkdir "$run_dir" || die 4 "$run_dir already exists; pick another --run-id"
 state_dir=$(mktemp -d "${TMPDIR:-/tmp}/bunqueue-machine-gate.XXXXXX")
 pids='' finished=0 interrupted=0
 finish() {
@@ -216,9 +235,9 @@ bun_version=$(checked_bun_version "$snapshot/.github/workflows/ci.yml")
 content_hash=$(bash "$script_dir/machine-steps.sh" --content-hash "$snapshot")
 outside=$(git -C "$repo" status --porcelain --untracked-files=all | grep -c -E '^(.[MD]|\?\?)' || true)
 
-mkdir -p "$run_dir"
 machines=''
 for distro in $(printf '%s' "$distros" | tr ',' ' '); do machines="$machines${machines:+,}$(machine_name "$distro")"; done
+orb_version=$(bounded "$CONTROL_SECONDS" orb version 2>/dev/null) || die 4 'OrbStack version query failed or timed out'
 {
   echo "run_id=$run_id"
   echo "tree=$tree_hash"
@@ -231,7 +250,7 @@ for distro in $(printf '%s' "$distros" | tr ',' ' '); do machines="$machines${ma
   echo "arch=$arch"
   echo "bun=$bun_version"
   echo "host=$(sw_vers -productName 2>/dev/null || true) $(sw_vers -productVersion 2>/dev/null || true) $(uname -m)"
-  echo "orb=$(orb version 2>/dev/null | head -n 1 | sed 's/^Version: //')"
+  echo "orb=$(printf '%s\n' "$orb_version" | head -n 1 | sed 's/^Version: //')"
   echo "head=$(git -C "$repo" rev-parse --short HEAD 2>/dev/null || echo none)"
   echo "outside=$outside unstaged or untracked working-tree paths (the snapshot is the tree only)"
   echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

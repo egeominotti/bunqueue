@@ -1,5 +1,12 @@
 import { readdir } from 'node:fs/promises';
-import { parseCount, parseFiles, parseSdkCounts, parseTests } from './test-sandbox-log-parser';
+import {
+  parseCount,
+  parseErrors,
+  parseFiles,
+  parseSdkCounts,
+  parseTests,
+} from './test-sandbox-log-parser';
+import { productResultsComplete } from './test-sandbox-results';
 import {
   quiescentAnomalies,
   quiescentResidual,
@@ -43,7 +50,8 @@ export interface SuiteTelemetry {
   durationMs: number;
   exitCode: number;
   oomKilled: boolean;
-  tests: { passed: number; failed: number; skipped: number; cases: TestMetric[] };
+  tests: { passed: number; failed: number; skipped: number; errors?: number; cases: TestMetric[] };
+  resultsComplete?: boolean;
   files: FileMetric[];
   resources: {
     sampleCount: number;
@@ -218,6 +226,15 @@ export async function createSuiteTelemetry(input: {
     sdkCounts?.failed ??
     (parseCount(log, 'fail') || files.reduce((sum, file) => sum + file.failed, 0));
   const skipped = sdkCounts?.skipped ?? parseCount(log, 'skip');
+  const errors = parseErrors(log);
+  const resultsComplete = productResultsComplete(
+    input.suite,
+    log,
+    { passed, failed, skipped },
+    files
+  );
+  if (errors > 0) anomalies.push(`reported test errors: ${errors}`);
+  if (resultsComplete === false) anomalies.push('incomplete or inconsistent final test summary');
   return {
     schemaVersion: 1,
     suite: input.suite,
@@ -228,7 +245,8 @@ export async function createSuiteTelemetry(input: {
     durationMs: Date.parse(input.finishedAt) - Date.parse(input.startedAt),
     exitCode: input.exitCode,
     oomKilled: input.oomKilled,
-    tests: { passed, failed, skipped, cases },
+    tests: { passed, failed, skipped, errors, cases },
+    ...(resultsComplete !== undefined && { resultsComplete }),
     files,
     resources: {
       sampleCount: samples.length,

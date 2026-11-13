@@ -20,6 +20,9 @@ for AI agents.
 For production bases, health checks, and native publication gates, see
 [Docker images](./features/docker-images.md).
 
+For contributor gate verdicts, resource ownership and audit regressions, see
+[Agent harness reliability](./features/agent-harness.md).
+
 For the shared Bun/Node/Deno client build and its blocking compatibility
 checks, see [Canonical client parity](./features/client-runtime-parity.md).
 
