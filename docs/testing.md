@@ -172,6 +172,11 @@ Run benchmarks only on native macOS, never in an OrbStack Machine or container.
 - Remove SQLite `.db`, `-wal`, and `-shm` files created by the test.
 - Avoid timing-only assertions when state can be observed directly. When testing
   delays or long-polling, use generous bounds and deterministic timestamps.
+- Pin the clock with `setSystemTime()` (restored in `finally`) before asserting
+  a calendar-relative value such as the next midnight of a cron schedule, and
+  assert the exact expected timestamp, including the boundary just before it:
+  against the real clock such an assertion fails whenever the suite runs at that
+  boundary (`test/cronScheduler.test.ts` pins noon and 23:59:30 local time).
 - Do not weaken an existing test merely to make a behavior change pass; update
   it only when the intended contract has explicitly changed.
 - Never publish benchmark results from Docker or a VM. Run benchmarks natively,

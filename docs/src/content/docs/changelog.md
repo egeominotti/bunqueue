@@ -197,6 +197,18 @@ head:
   `cron-test-midnight-boundary`, `postgres-lifecycle-race-flake`,
   `postgres-sigkill-hook-timeout-flake` and `wait-hold-routing-flake`.
 
+### Testing
+
+- `test/cronScheduler.test.ts` no longer fails when the unit suite runs at 23:59
+  local time (`cron-test-midnight-boundary`). The test "cron with both schedule
+  and repeatEvery uses schedule for nextRun" read the real clock and required the
+  next midnight of `0 0 * * *` to be more than 60 s away, which is false during
+  the last minute of the day (one sandbox failure at 23:59:13 UTC; with the clock
+  pinned at 23:59:13 and 23:59:30 UTC the old assertion fails both times). It now
+  pins the clock with `setSystemTime()` at noon and at 23:59:30 local time and
+  asserts the exact next midnight, which is stricter than the old lower bound.
+  The scheduler was correct; nothing in the runtime changes.
+
 ### Documentation
 
 - Release metadata refreshed after the 2.9.22 publication

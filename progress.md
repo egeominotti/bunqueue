@@ -61,6 +61,13 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 2. `cron-test-midnight-boundary`: `test/cronScheduler.test.ts:819` fails when the
    unit suite crosses 23:59 UTC; reproduce first, then an injected clock or a
    schedule that cannot be under 60 s away.
+1. `issue-189-unix-socket-followups`: reproducing tests first for the two
+   unix-socket rollback notes in `src/infrastructure/server/httpListener.ts`, then
+   the fix.
+2. `cron-test-midnight-boundary` (in progress on branch
+   `cron-test-midnight-boundary`): reproduced with a pinned clock and fixed in the
+   test (`setSystemTime` at noon and 23:59:30, exact next midnight); next:
+   `bun run test:sandbox`, skeptic.
 3. `postgres-lifecycle-race-flake`: `test/postgres-queue-lifecycle-races.test.ts`
    ("serializes set-based batch admission after obliterate") failed once on
    PostgreSQL 16.x in CI run 43336453775, attempt 1, and passed on the rerun;
@@ -228,6 +235,20 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Host checks: `bun test test/agent-skills test/agent-harness` 136 / 0, typecheck
   and format clean, `git diff --check` clean, `./init.sh` green. Not run: `bun run
   test:sandbox` (left to the parent session), skeptic, a real Machine run.
+### 2026-11-13 — cron-test-midnight-boundary
+
+- Test only (branch `cron-test-midnight-boundary`, base `bfa290c7`, staged, not
+  committed). Cause: "cron with both schedule and repeatEvery uses schedule for
+  nextRun" read the real clock and required the next midnight of `0 0 * * *`
+  (local time) to be more than 60 s away. The unchanged assertion with the clock
+  pinned by `setSystemTime` (TZ=UTC) fails at 23:59:13 and 23:59:30 and passes at
+  noon. The scheduler is correct.
+- Fix: the test pins noon and 23:59:30 local time and asserts the exact next
+  midnight (and not now + `repeatEvery`). Docs: `docs/testing.md` test hygiene,
+  changelog `[Unreleased]` Testing.
+- Host checks (diagnostic): the file `--rerun-each 20` 980 / 0, TZ=UTC
+  `--rerun-each 5` 245 / 0, typecheck and format:check clean, `git diff --check`
+  clean, `./init.sh` green. Not run: `bun run test:sandbox`, skeptic.
 
 ### 2026-11-13 — ci-flakes-record
 

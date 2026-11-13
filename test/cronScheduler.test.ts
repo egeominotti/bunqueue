@@ -13,7 +13,7 @@
  * - Error handling in push and persist callbacks
  */
 
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, setSystemTime } from 'bun:test';
 import { CronScheduler } from '../src/infrastructure/scheduler/cronScheduler';
 import type { CronJob } from '../src/domain/types/cron';
 import type { JobInput } from '../src/domain/types/job';
@@ -803,20 +803,32 @@ describe('CronScheduler Execution Logic', () => {
       expect(scheduler.list()).toEqual([]);
     });
 
-    test('cron with both schedule and repeatEvery uses schedule for nextRun', () => {
-      // When both are provided, schedule takes precedence in add()
-      const cron = scheduler.add({
-        name: 'both',
-        queue: 'q',
-        data: {},
-        schedule: '0 0 * * *', // midnight daily
-        repeatEvery: 1000,
-      });
+    // The clock is injected: against the real clock the next midnight is less than a
+    // minute away whenever the suite runs at 23:59 local time. The 23:59:30 case
+    // pins that boundary; both use local time, as a schedule without timezone does.
+    test.each([
+      ['noon', new Date(2026, 10, 12, 12, 0, 0)],
+      ['23:59:30, just before midnight', new Date(2026, 10, 12, 23, 59, 30)],
+    ])('cron with both schedule and repeatEvery uses schedule for nextRun (%s)', (_, now) => {
+      setSystemTime(now);
+      try {
+        // When both are provided, schedule takes precedence in add()
+        const cron = scheduler.add({
+          name: 'both',
+          queue: 'q',
+          data: {},
+          schedule: '0 0 * * *', // midnight daily
+          repeatEvery: 1000,
+        });
 
-      // nextRun should be based on cron expression (next midnight),
-      // not 1 second from now
-      const oneMinuteFromNow = Date.now() + 60000;
-      expect(cron.nextRun).toBeGreaterThan(oneMinuteFromNow);
+        // nextRun is the next midnight from the cron expression,
+        // not 1 second from now from repeatEvery
+        const nextMidnight = new Date(2026, 10, 13, 0, 0, 0).getTime();
+        expect(cron.nextRun).toBe(nextMidnight);
+        expect(cron.nextRun).not.toBe(now.getTime() + 1000);
+      } finally {
+        setSystemTime();
+      }
     });
 
     test('constructor accepts config without errors', () => {
