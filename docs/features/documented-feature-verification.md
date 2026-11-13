@@ -22,9 +22,9 @@ real broker in both runtimes (embedded manager and a fresh TCP server on an
 ephemeral port), sharing `test/docs-guide-support.ts` and the `CoreE2eHarness`.
 There are no test doubles: workers, flows, restarts, and Bun Worker threads are
 the real implementations. The combined working-tree run covers 652 tests and
-1,944 assertions across 41 files. Including the seven-language tab inventory
+1,944 assertions across 42 files. Including the seven-language tab inventory
 and Queue snippet compiler, the complete documentation contract covers 721
-tests and 2,140 assertions across 43 files.
+tests and 2,140 assertions across 44 files.
 
 | Guide page | Proof |
 | --- | --- |
@@ -39,7 +39,7 @@ tests and 2,140 assertions across 43 files.
 | Job Groups | `docs-queue-guide/job-groups.test.ts` |
 | Queue Groups | `docs-queue-guide/queue-group.test.ts` |
 | Queue: Workers & Metrics | `docs-queue-guide/metrics.test.ts` |
-| Queue: Namespaces & Batching | `docs-queue-guide/advanced-prefix.test.ts`, `docs-queue-guide/advanced-batching.test.ts` |
+| Queue: Namespaces & Batching | `docs-queue-guide/advanced-prefix.test.ts`, `docs-queue-guide/advanced-batching.test.ts`, `docs-queue-guide/advanced-forward.test.ts` |
 | JobOptions Reference | `docs-queue-guide/options.test.ts` |
 | Worker: Overview | `docs-worker-guide/overview.test.ts` |
 | Worker: Concurrency & Batching | `docs-worker-guide/concurrency.test.ts` |

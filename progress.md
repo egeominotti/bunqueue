@@ -66,7 +66,6 @@ overview: [docs/agents/README.md](docs/agents/README.md).
    destructured `BUNQUEUE_TEST_POSTGRES_URL` read.
 5. `machine-gate-interrupt-log-gaps`: empty `create.log` after a SIGTERM during
    `orb create`, and two dry-run output flaws.
-6. `split-oversized-test-files`: five test files over 300 lines.
 7. Owner decisions only: `worker-force-close-unreachable-broker`,
    `deprecated-public-apis-next-major`, `python-sdk-pypi-publication-gap`.
 
@@ -146,6 +145,22 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   passes 20 / 20, 20 / 20 under 18 CPU burners (load 41), whole file 27 / 27 under
   load. `bun run test:sandbox` green on tree `216e7069` (unit 11772 / 0 / 403, tcp
   553 / 0, embedded 349 / 0); skeptic CONDITIONAL only on that gate.
+### 2026-11-13 — split-oversized-test-files
+
+- Branch `split-oversized-test-files`, base `154d6fc5`. The five test files over
+  300 lines are split by concern with no test changed:
+  `workflow-new-features-{retry-parallel,signal-cleanup,observability,nested}`,
+  `client-dlq-dedup-{config,inspect,retry,deduplication,worker}`,
+  `long-running-timeout-{timeouts,liveness}`,
+  `docs-queue-guide/advanced-{batching,forward}` and
+  `lockExpiration{,-events}`; helpers in `test/support/workflow-wait-until.ts`,
+  `client-dlq.ts` and `docs-counting-broker.ts`. The docs traceability table
+  (`docs/features/documented-feature-verification.md`) names
+  `advanced-forward.test.ts`.
+- Proof (host, diagnostic): each original set and its split files give identical
+  sorted test names and statuses (20, 51, 6, 8, 9 passing, 0 fail, 0 skip).
+- Gates: `bun run test:sandbox` green on tree `df2e5338` (unit 11773 / 0 / 403,
+  tcp 553 / 0, embedded 349 / 0); skeptic CONDITIONAL only on that gate.
 
 ### 2026-11-13 — integration of six items
 

@@ -383,6 +383,20 @@ head:
   (`harness.close()` about 10.05 s). Under CPU contention on PostgreSQL 17 the
   unchanged file failed this way in 2 of 36 runs, and the fixed file in 0 of 36.
   No assertion changes.
+- Five test files over the 300-line limit are split by concern, with every test,
+  its name, setup, timeout and assertion unchanged
+  (`split-oversized-test-files`): `test/workflow-new-features.test.ts` into
+  `workflow-new-features-{retry-parallel,signal-cleanup,observability,nested}`,
+  `test/client-dlq-dedup.test.ts` into
+  `client-dlq-dedup-{config,inspect,retry,deduplication,worker}`,
+  `test/long-running-timeout.test.ts` into
+  `long-running-timeout-{timeouts,liveness}`, the store-and-forward half of
+  `test/docs-queue-guide/advanced-batching.test.ts` into `advanced-forward.test.ts`,
+  and the event tests of `test/lockExpiration.test.ts` into
+  `lockExpiration-events.test.ts`. The shared helpers moved unchanged to
+  `test/support/workflow-wait-until.ts`, `test/support/client-dlq.ts` and
+  `test/support/docs-counting-broker.ts`. Each set runs the same test names with
+  the same results as before (20, 51, 6, 8 and 9 passing).
 
 ### Documentation
 

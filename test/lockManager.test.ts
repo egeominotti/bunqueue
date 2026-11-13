@@ -4,8 +4,9 @@
  * Focuses on create/verify/renew/release/getLockInfo operations,
  * batch renewals, token uniqueness, edge cases, and independence of locks.
  *
- * NOTE: Does NOT duplicate tests from lockExpiration.test.ts which covers
- * background expiration processing, requeue on stall, DLQ on max stalls, events.
+ * NOTE: Does NOT duplicate tests from lockExpiration.test.ts and
+ * lockExpiration-events.test.ts, which cover background expiration processing,
+ * requeue on stall, DLQ on max stalls, events.
  */
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
