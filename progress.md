@@ -42,86 +42,33 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   trigger-eval runner; sandbox green on tree `a0628e56`, skeptic `PASS`. Evidence
   in `feature_list.json`.
 
+- Batch of 2026-11-13: `postgres-tests-never-run`, `sandboxed-worker-missing-cases`
+  (+ `s3-restore-header-guard-test`, `mcp-unregister-worker-adapter-test`),
+  `postgres-completion-prune-plan`, `worker-close-heartbeat-error`,
+  `test-suite-speedups` and `machine-gate-real-rerun`; combined sandbox green on
+  tree `b1a66b7a`. Evidence in `feature_list.json`.
+
 ### What's In Progress
 
-- Nothing recorded here; see the `in-progress` entries of `feature_list.json`.
-- `drop-postgres-15`: the PostgreSQL 15 CI leg is removed and every current
-  support statement says PostgreSQL 16–18 (15 no longer tested, minimum
-  supported 16, runtime unchanged); working tree only, evidence `PARTIAL`. Next:
-  `bun run test:sandbox`, the skeptic, then the commit the user asks for and its
-  CI run.
-- `issue-189-unix-socket-followups` (branch `issue-189-unix-socket-followups`):
-  reproducing test, fix, docs and changelog in the worktree, not committed;
-  `bun run test:sandbox` and the skeptic are still to run.
-- `dead-code-sweep` (branch `small-followups`; `npm-files-benchmark-negation` and
-  `docs-mcp-tool-count-drift` are folded into it and marked done): implemented and
-  staged, not committed; `bun run test:sandbox` and a skeptic `PASS` are still owed.
+- Nothing in progress on `main`; see the `in-progress` entries of
+  `feature_list.json` for other sessions.
 
 ### What's Next
 
-1. `issue-189-unix-socket-followups`: run `bun run test:sandbox` on the staged
-   tree, then the skeptic; the test, fix, docs and changelog are written.
-2. `cron-test-midnight-boundary`: `test/cronScheduler.test.ts:819` fails when the
-   unit suite crosses 23:59 UTC; reproduce first, then an injected clock or a
-   schedule that cannot be under 60 s away.
-1. `issue-189-unix-socket-followups`: reproducing tests first for the two
-   unix-socket rollback notes in `src/infrastructure/server/httpListener.ts`, then
-   the fix.
-2. `cron-test-midnight-boundary` (in progress on branch
-   `cron-test-midnight-boundary`): reproduced with a pinned clock and fixed in the
-   test (`setSystemTime` at noon and 23:59:30, exact next midnight); next:
-   `bun run test:sandbox`, skeptic.
-3. `postgres-lifecycle-race-flake`: `test/postgres-queue-lifecycle-races.test.ts`
-   ("serializes set-based batch admission after obliterate") failed once on
-   PostgreSQL 16.x in CI run 43336453775, attempt 1, and passed on the rerun;
-   reproduce first with a stress loop against PostgreSQL 16.
-3. `postgres-lifecycle-race-flake` (in progress on `postgres-flakes`, uncommitted):
-   reproduced and fixed in the test. The assertion depended on the row order of an
-   unordered `getJobs(ids)` read; there is no engine race. Next: `bun run
-   test:sandbox`, the skeptic, commit on request, CI.
-4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
-   `node` in the Bun-only OrbStack Machines.
-5. `ci-python39-runner-pin` (in progress, branch `drop-python-39`): the Python
-   SDK's minimum is now Python 3.10 and the `ubuntu-24.04` pin is gone; the
-   change is uncommitted and `bun run test:sandbox`, `bun run test:sandbox:sdk`
-   and the skeptic are still to run. The next Python SDK release must carry the
-   break.
-4. `ci-script-tests-bun-only-machines` (in progress, PARTIAL): the two CI-script
-   test files link their own `node` to Bun and pass with `node` absent; the
-   Machine gate's known-gap machinery (exit 3) is removed. Next: `bun run
-   test:sandbox`, skeptic, commit.
-5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
-6. `dead-code-sweep` on `small-followups` (with the two folded follow-ups): the
-   sandbox gate, a skeptic `PASS` and the commit are owed.
-7. `deprecated-public-apis-next-major`: the deprecated public APIs kept for
-   compatibility, to decide on before a major version.
-8. `machine-gate-real-rerun`: run `machine-gate.sh` on real OrbStack again; the
-   cleanup, delete-retry and time-bound fixes have run against fakes only.
-9. `postgres-sigkill-hook-timeout-flake`: in `test/postgres-public-api-extreme.test.ts`
-   a hook timed out after the SIGKILL recovery test on PostgreSQL 17.x (CI run
-   43355036181, attempt 1; green on the rerun); reproduce first with a stress loop.
-10. `postgres-tests-never-run`: four PostgreSQL regression files skip without
-    `BUNQUEUE_TEST_POSTGRES_URL` and are outside `scripts/test-postgres.ts`'s
-    `test/postgres-*.test.ts` selection, so they never run; rename or widen.
-12. `test-suite-speedups`: fixed sleeps on the 5 s stall sweep and the 60 s DLQ
-    maintenance in the slowest unit files (estimated 150 s of unit wall time);
-    needs a stall/DLQ configuration seam in `getSharedManager()`.
-11. `sandboxed-worker-missing-cases`: three SandboxedWorker cases (draining
-    `stop()`, unique wrapper names, `on()`/`once()` chaining) lost with the
-    commented-out files `test-suite-pruning` deleted; write them as live tests.
-12. `split-oversized-test-files`: five test files exceed 300 lines (found by the
-    test-suite-speedups skeptic); split them by concern without changing a test.
-9. `postgres-sigkill-hook-timeout-flake` (in progress, same worktree and branch
-   `postgres-flakes`, uncommitted): reproduced (the `afterAll` broker stop, not the
-   afterEach) and fixed with explicit teardown deadlines derived from the harness
-   bounds. Next: as item 3.
-10. `postgres-completion-prune-plan`: the completion-retention candidate query takes
-    about 10 s on about 300 rows of a fresh namespace while it holds its advisory
-    lock; found while reproducing item 9.
-11. `worker-force-close-unreachable-broker` stays `not-started`: measured, but a
-    bounded forced close needs an owner decision (Blockers / Risks).
-12. `worker-close-register-error`: the same `ClientClosedError` defect in
-    `registerWithServer()` (context `worker-register`), found while fixing item 11.
+1. `worker-close-register-error`: the heartbeat `ClientClosedError` defect, in
+   `registerWithServer()` (context `worker-register`); reproduce first.
+2. `cpu-intensive-blocking-test-flake`: the non-yielding-handler test in
+   `test/docs-worker-guide/cpu-intensive.test.ts` passes or fails on a race with
+   the pull; make it observe real recovery.
+3. `postgres-completion-read-model-plan`: `loadPostgresCompletionResults` has the
+   prune's stale-statistics plan problem (quadratic, 1.6 s on 4,834 completions).
+4. `postgres-runner-guard-destructuring`: the runner-coverage guard misses a
+   destructured `BUNQUEUE_TEST_POSTGRES_URL` read.
+5. `machine-gate-interrupt-log-gaps`: empty `create.log` after a SIGTERM during
+   `orb create`, and two dry-run output flaws.
+6. `split-oversized-test-files`: five test files over 300 lines.
+7. Owner decisions only: `worker-force-close-unreachable-broker`,
+   `deprecated-public-apis-next-major`, `python-sdk-pypi-publication-gap`.
 
 ## Blockers / Risks
 
@@ -129,30 +76,18 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   directly. The release push (CI's version gate tags, releases and publishes from
   `main`) therefore needs an account with write access to `main`, or a pull
   request merged by one.
-- The release gates are long: `bun run test:sandbox` took 9.12 min of wall time on
-  the last green run, and the SDK sandbox and both OrbStack Machines come on top.
+- The release gates are long: `bun run test:sandbox` took 8.96 min of wall time on
+  the last green run (2026-11-13, unit 6.85 min), and the SDK sandbox and both
+  OrbStack Machines come on top.
 - `harness-production-grade`: `CLAUDE.md` and `AGENTS.md` are 71 and 52 bytes under
   the 12,288-byte budget after the CI rule; the next rule added to them needs more
   non-rule prose moved out first. `scripts/ci-watch.sh` has watched one live run
   (43355036181: FAILED, then FLAKY after a rerun), but not yet one waiting for the
   `npm` environment approval (that status is handled from GitHub's documentation,
   not from an observed run). The Machine gate fixes
-  (detached cleanup, repeated delete, 15-minute bounds) are proven with a fake
-  OrbStack only; the real run predates them.
-- `ci-script-tests-bun-only-machines`: the fix is proven on the macOS host with
-  `node` absent from `PATH`, not yet in a real OrbStack Machine; the next
-  `machine-gate-real-rerun` should exit 0, and any unit failure there is now a real
-  failure (exit 3 is retired). On hosts with a real Node (CI) these two files now run
-  the gate's `node -p` calls with Bun too; CI's own version-gate job still uses Node.
-- `postgres-flakes`: two work items are `in-progress` in one worktree, but the
-  harness allows one per branch. `postgres-lifecycle-race-flake` records
-  `postgres-flakes`, and `postgres-sigkill-hook-timeout-flake` records the label
-  `postgres-flakes-sigkill` so that `./init.sh` stays green. Split them into two
-  branches or commits, or align the field, before committing. Not run yet:
-  `bun run test:sandbox`, the skeptic, CI. The other two users of
-  `test/support/postgres-public-api-harness.ts` (`postgres-public-api-flow`,
-  `postgres-public-api-queue-worker`) still use Bun's 5 s default for the same
-  teardown hooks.
+  ran on real OrbStack on 2026-11-13 (`machine-gate-real-rerun`: exit 0, every
+  interrupt cleaned up); the delete-retry path, a late create, a failing `orb list`
+  and the 15-minute bounds are still proven with a fake OrbStack only.
 - `worker-force-close-unreachable-broker` needs an owner decision: is a bounded
   forced close allowed to drop the final ACK flush to an unreachable broker? Ship
   only in a minor or major with an upgrade note. A 5 s grace while the pool has no
@@ -179,6 +114,23 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
 
+### 2026-11-13 — integration of six items
+
+- Integrated into `main` (branch `integration-batch`) from their own worktrees:
+  `postgres-tests-never-run`,
+  `sandboxed-worker-missing-cases` (+ `s3-restore-header-guard-test`,
+  `mcp-unregister-worker-adapter-test`), `postgres-completion-prune-plan`,
+  `worker-close-heartbeat-error`, `test-suite-speedups`; each had its own green
+  sandbox and skeptic round. `machine-gate-real-rerun` is `done` from a real
+  OrbStack run (evidence in `feature_list.json`).
+- Not shipped: the bounded forced close (`worker-force-close-unreachable-broker`)
+  needs an owner decision (Blockers / Risks).
+- New items: `machine-gate-interrupt-log-gaps`, `split-oversized-test-files`,
+  `postgres-runner-guard-destructuring`, `postgres-completion-read-model-plan`,
+  `worker-close-register-error`, `cpu-intensive-blocking-test-flake`.
+- Current State rewritten from `feature_list.json`; stale in-progress and blocker
+  lines of already merged items removed.
+
 ### 2026-11-13 — postgres-tests-never-run
 
 - Branch `postgres-tests-never-run`, base `2f1ad824`. Four files read
@@ -196,6 +148,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   (unit 11738 / 0 / 402, tcp 553 / 0, embedded 349 / 0); item `done`.
 - New item `postgres-runner-guard-destructuring`: the guard does not see a
   destructured `BUNQUEUE_TEST_POSTGRES_URL` read.
+
 ### 2026-11-13 — sandboxed-worker-missing-cases (+ two test gaps)
 
 - Branch `test-coverage-gaps`, base `2f1ad824`; working tree only, nothing
@@ -216,6 +169,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   `backup-s3.md`, `workers-management.md`; changelog `[Unreleased]` Testing.
 - Gates: `bun run test:sandbox` green on tree `4ab265ea` (unit 11750 / 0 / 402,
   tcp 553 / 0, embedded 349 / 0); all three items `done`.
+
 ### 2026-11-13 — postgres-completion-prune-plan
 
 - Branch `postgres-completion-prune-plan`, base `2f1ad824`; done.
@@ -236,6 +190,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Gates: `bun run test:sandbox` green on tree `c2e0759a` (unit 11734 / 0 / 403,
   tcp 553 / 0, embedded 349 / 0); skeptic CONDITIONAL only on that gate. CI's
   PostgreSQL 16, 17 and 18.6 legs run the new test.
+
 ### 2026-11-13 — worker-close-fixes
 
 - Item: `worker-close-heartbeat-error` (done), branch `worker-close-fixes`,
@@ -259,6 +214,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Gates: `bun run test:sandbox` green on tree `d1f6710f` (unit 11739 / 0 / 402,
   tcp 553 / 0, embedded 349 / 0); skeptic round 4 CONDITIONAL only on that gate.
   Next: `worker-close-register-error`.
+
 ### 2026-11-13 — test-suite-speedups
 
 - Branch `test-suite-speedups`, base `2f1ad824`. The user asked for the unit job to
@@ -347,6 +303,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   the historical mentions of Python 3.9 in released changelog sections, release
   posts, `bunqueue-running-gates`, `test/agent-skills-ci-watch.test.ts` and an
   eval prompt of `bunqueue-working-autonomously`.
+
 ### 2026-11-13 — issue-189-unix-socket-followups
 
 - Branch `issue-189-unix-socket-followups`, base `bfa290c7`, staged, not committed.
@@ -365,6 +322,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Host checks: `bun test test/repro-issue-189*` 16 / 0, `bun run typecheck`,
   `bun run format:check`, `git diff --check`, `./init.sh` green. Not run:
   `bun run test:sandbox`, skeptic.
+
 ### 2026-11-13 — ci-script-tests-bun-only-machines
 
 - Item `ci-script-tests-bun-only-machines` (branch of the same name, base
@@ -387,6 +345,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Host checks: `bun test test/agent-skills test/agent-harness` 136 / 0, typecheck
   and format clean, `git diff --check` clean, `./init.sh` green. Not run: `bun run
   test:sandbox` (left to the parent session), skeptic, a real Machine run.
+
 ### 2026-11-13 — cron-test-midnight-boundary
 
 - Test only (branch `cron-test-midnight-boundary`, base `bfa290c7`, staged, not
@@ -400,6 +359,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   changelog `[Unreleased]` Testing.
 - Host checks (diagnostic): the file `--rerun-each 20` 980 / 0, TZ=UTC
   `--rerun-each 5` 245 / 0, typecheck and format:check clean, `git diff --check`
+
 ### 2026-11-13 — wait-hold-routing-flake
 
 - Test only (branch `wait-hold-routing-flake`, base `bfa290c7`, staged, not
@@ -416,6 +376,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Host checks (diagnostic): fixed test 50 / 50 under the same load, whole file
   `--rerun-each 5` 20 / 0, typecheck and format:check clean, `git diff --check`
   clean, `./init.sh` green. Not run: `bun run test:sandbox`, skeptic.
+
 ### 2026-11-13 — dead-code-sweep (with two small follow-ups)
 
 - Branch `small-followups`, base `bfa290c7`, staged with `git add -A`, not
@@ -447,6 +408,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - Owed: `bun run test:sandbox`, the PostgreSQL suite (only unused exports removed
   from four PostgreSQL modules), the skeptic, the commit. Not run: the Astro build
   of the docs site.
+
 ### 2026-11-13 — test-suite-pruning
 
 - Owner request: delete useless tests (`test-suite-pruning`, branch
@@ -470,6 +432,7 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   skills and docs tests 190 / 0; typecheck, format check, `git diff --check`,
   `./init.sh` green. Blockers before `done`: `bun run test:sandbox`, the skeptic
   verdict and the commit have not run.
+
 ### 2026-11-13 — postgres-flakes
 
 - Branch `postgres-flakes`, base `bfa290c7`, uncommitted, staged with `git add -A`.
