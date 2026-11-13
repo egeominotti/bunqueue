@@ -45,7 +45,8 @@ bun add bunqueue@latest
 - Removed StrykerJS from the TypeScript SDK — mutation job, config, script,
   dev dependency and the `qs` override it needed. Its dependency graph produced
   every finding the weekly advisory gate reported (`qs` via `typed-rest-client`,
-  then `fast-uri` via `ajv`), none of it reachable from the published client.
+  then `fast-uri` via `ajv`, GHSA-7p8r-x3mc-p8w7), none of it reachable from the
+  published client.
   The planners keep their fast-check coverage and the other five SDKs still run
   mutation. The dev dependency tree drops from 163 packages to 10 with a clean
   `bun audit`.

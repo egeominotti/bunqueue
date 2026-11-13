@@ -170,6 +170,9 @@ Then, in your code:
 - **Job options**: `priority`, `delay`, `attempts`, `backoff` (including the `{ type, delay }` object form), `jobId`, `removeOnComplete`, `removeOnFail`, `repeat`.
 - **`jobId` deduplication**: adding the same `jobId` while that job is still live (waiting, prioritized, delayed, waiting-children or active) returns the existing job instead of creating a duplicate. Once it has completed or reached the DLQ, the ID can be reused for a fresh job.
 - **Events**: `worker.on('completed' | 'failed' | 'progress', ...)` fire with the same signatures.
+- **`QueueEvents` payloads**: `completed` carries `{ jobId, returnvalue }`, `failed` carries `{ jobId, failedReason }` and `progress` carries `{ jobId, data }`; `waiting`, `active`, `stalled`, `delayed`, `removed`, `duplicated`, `waiting-children` and `drained` are emitted under the same names. A `failed` event also fires for an attempt that will be retried, with `terminal: false`. In server mode pass the same `connection` as the Queue (or `embedded: false`): with neither, `QueueEvents` listens to the embedded queue of its own process.
+- **Job schedulers**: `queue.upsertJobScheduler(id, { pattern }, { name, data, opts })` (or `{ every }` for a fixed interval), `getJobScheduler()`, `getJobSchedulers()` and `removeJobScheduler()` keep their BullMQ v5 names. See [Job schedulers](/guide/queue/schedulers/).
+- **Progress and logs**: `job.updateProgress()` and `job.log()` inside the processor, `queue.getJobLogs(jobId)` from outside. It returns `{ logs, count }`, each line prefixed with its level, for example `[info] Fetched 12 orders`. See [Progress, logs, dependencies](/guide/queue/progress/).
 - **Job states**: the full BullMQ v5 state machine, including `prioritized` and `waiting-children`.
 - **Flows**: `FlowProducer.add()`, `addBulk()`, `getFlow()`,
   `queuesOptions`, `failParentOnFailure`, `removeDependencyOnFailure`. The Bun

@@ -2,7 +2,7 @@
 
 This folder is the **internal engineering reference** for bunqueue: a deep, code-accurate description of every subsystem, intended for contributors and operators who need to understand _how the system actually works_.
 
-> **Scope.** This is distinct from the user-facing documentation site that lives under [`src/content/docs/`](./src/content/docs/) (an Astro Starlight site published to the web) and from the release [`changelog`](./src/content/docs/changelog.md). The site teaches _how to use_ bunqueue; this reference explains _how bunqueue is built_. Both must stay in sync with the code (see [Keeping these docs in sync](#keeping-these-docs-in-sync)).
+> **Scope.** This is distinct from the user-facing documentation site that lives under [`src/content/docs/`](./src/content/docs/) (an Astro Starlight site published to the web) and from the release [`changelog`](./src/content/docs/changelog.md), the only copy of the release history (the root [`CHANGELOG.md`](../CHANGELOG.md) is a pointer to it). The site teaches _how to use_ bunqueue; this reference explains _how bunqueue is built_. Both must stay in sync with the code (see [Keeping these docs in sync](#keeping-these-docs-in-sync)).
 
 bunqueue is a high-performance job queue for [Bun](https://bun.sh): the default
 single-process engine uses sharded in-memory priority queues backed by a

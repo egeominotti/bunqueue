@@ -1,6 +1,6 @@
 # Docker images
 
-> **Source:** `Dockerfile`, `Dockerfile.dockerignore`, `.github/workflows/ci.yml`, `scripts/test-docker-image.ts`
+> **Source:** `Dockerfile`, `Dockerfile.dockerignore`, `.dockerignore`, `.github/workflows/ci.yml`, `scripts/test-docker-image.ts`
 
 ## Variants and build inputs
 
@@ -19,6 +19,15 @@ the compiled executable and an empty owned data directory. It never copies the
 builder's Bun runtime, source, manifests, or node_modules. The Dockerfile-specific
 ignore allowlist admits only the Dockerfile, package manifest, lockfile,
 TypeScript config, and source tree.
+
+BuildKit prefers `<Dockerfile>.dockerignore` over the `.dockerignore` at the root
+of the build context, so `Dockerfile`, `Dockerfile.test` and `Dockerfile.sdk-test`
+each build from their own allow-list and never read the root `.dockerignore`.
+That generic deny-list applies only to a build from the repository root whose
+Dockerfile has no ignore file of its own: today
+`examples/postgres-multibroker/client.Dockerfile`, built by that example's
+`compose.yaml` with `context: ../..`. It keeps `node_modules`, `dist`, local
+data, `docs/` and `.github/` out of that context.
 
 All images run as numeric UID/GID `1001:1001`, expose TCP 6789 and HTTP 6790,
 and persist SQLite at `/app/data/bunqueue.db`. Named volumes inherit the data

@@ -72,7 +72,8 @@ A change is complete only when, in the same pull request:
 
 - the internal technical reference under `docs/` (`architecture.md`, `data-model.md`,
   `features/<slug>.md`) reflects it;
-- `docs/src/content/docs/changelog.md` describes it for users.
+- `docs/src/content/docs/changelog.md` describes it for users (the root
+  `CHANGELOG.md` only points to that file; do not add entries there).
 
 ## Pull requests
 

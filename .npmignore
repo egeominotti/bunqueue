@@ -1,8 +1,0 @@
-# Exclude compiled binary (56MB) - users should run via bun or build locally
-dist/bunqueue
-
-# Exclude benchmark files
-dist/benchmark/
-
-# Source maps for benchmarks
-src/benchmark/

@@ -85,6 +85,12 @@ no long-lived npm token. Bun installs, builds and packs the tarball; the npm CLI
 has no OIDC or provenance support. Never run `bun publish` or `npm publish`
 locally, and never reintroduce an `NPM_TOKEN` secret.
 
+What the root tarball contains is decided only by the `files` allow-list of
+`package.json` (the compiled `dist/**/*.js` and `dist/**/*.d.ts`, `README.md`,
+`LICENSE` and `DISCLAIMER.md`, plus `package.json` itself). There is no
+`.npmignore`: with a `files` list neither `bun pm pack` nor `npm pack` applies
+one at the package root, so the one that existed changed nothing and was removed.
+
 ## Release blog posts
 
 Every release gets a professional blog post at

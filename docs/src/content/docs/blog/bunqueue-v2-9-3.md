@@ -70,9 +70,11 @@ bun add bunqueue@latest
   `--completed-retention-ms` server flag. The cleanup tick removes bounded,
   oldest-first SQLite batches while protecting results owned by live
   dependency consumers.
-- Added observable, resumable SQLite startup migrations with per-version
-  markers, durable row/byte checkpoints for legacy payload rewrites, bounded
-  500-row/8 MiB transactions, progress and duration logs, and a fail-fast guard
+- Added observable, resumable SQLite startup migrations
+  ([#119](https://github.com/egeominotti/bunqueue/issues/119): the first boot
+  after a SQLite schema upgrade is no longer silent or all-or-nothing) with
+  per-version markers, durable row/byte checkpoints for legacy payload rewrites,
+  bounded 500-row/8 MiB transactions, progress and duration logs, and a fail-fast guard
   for databases created by newer binaries. TCP and HTTP listeners now bind only
   after migration and recovery complete, so no partially initialized service is
   advertised during a long upgrade. Migration info records go to stderr while
@@ -179,8 +181,9 @@ bun add bunqueue@latest
 - Fixed explicit `undefined` exceptions being mistaken for “no error” by batch
   admission and deferred buffer scopes. Error capture now tracks presence
   separately from the thrown value, preserving JavaScript throw semantics.
-- Fixed completed SQLite rows becoming unreachable after eviction from
-  `maxCompletedJobs`: `clean(..., 'completed')` now pages across cold database
+- Fixed [#118](https://github.com/egeominotti/bunqueue/issues/118), completed
+  SQLite rows becoming unreachable after eviction from `maxCompletedJobs`:
+  `clean(..., 'completed')` now pages across cold database
   history and atomically removes jobs, results, and flow-failure records. This
   prevents unbounded disk growth when a retention policy is used and restores
   exact global/per-queue completed statistics. Trigger side effects are also

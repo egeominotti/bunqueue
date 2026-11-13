@@ -28,6 +28,11 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 - `agent-skills`: six cross-client Agent Skills in `.agents/skills/` with
   Claude Code symlinks, their scripts, evaluations and contract tests; sandbox
   green, skeptic `PASS`. Evidence in `feature_list.json`.
+- `root-cleanup`: the root `CHANGELOG.md` is a pointer to the docs changelog,
+  `MIGRATION_FROM_BULLMQ.md` and `.npmignore` are gone, `.env.example` and the
+  plugin's MCP tool count are corrected, `.dockerignore` is documented; sandbox
+  green on tree `ddcfaf6f`, skeptic `CONDITIONAL` with docs-only notes, applied.
+  Evidence in `feature_list.json`.
 
 ### What's In Progress
 
@@ -45,6 +50,11 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
    `node` in the Bun-only OrbStack Machines.
 5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
+6. `npm-files-benchmark-negation`: `bun pm pack` ignores the `!dist/benchmark`
+   negation of `package.json` `files` (latent: the library build never emits that
+   directory); test first, then `!dist/benchmark/**`.
+7. `docs-mcp-tool-count-drift`: three docs-site sources and one internal page
+   still say 75 MCP tools; the server registers 79.
 
 ## Blockers / Risks
 
@@ -69,6 +79,102 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — root-cleanup
+
+- Objective: the owner asked to remove useless or outdated files from the
+  repository root (`root-cleanup`, branch `root-cleanup`, base `3e08f75b`, its own
+  worktree). Status `done`; staged, not committed.
+- Replaced: `CHANGELOG.md` (257,514 bytes, last touched 2026-09-03, stopped at
+  2.9.4) is now a nine-line pointer to `docs/src/content/docs/changelog.md`,
+  bunqueue.dev/changelog and the GitHub releases page. All 219 `##` sections of
+  the old file exist in the docs changelog (which has 41 more: 2.8.33 to 2.8.55
+  and 2.9.5 to 2.9.22); 203 are identical apart from punctuation, and 16 are a
+  shorter or differently worded account of the same release (`[Unreleased]`,
+  2.8.29 to 2.8.32, 2.8.56 to 2.8.61, 2.9.0 to 2.9.4). No version existed only in
+  the root file, so no section was migrated; at the skeptic's request the three
+  references only the root wording carried moved into the docs changelog: the
+  issue links #118 (completed rows unreachable after eviction) and #119
+  (resumable first boot after a schema upgrade) in 2.9.3, and the `fast-uri`
+  advisory id `GHSA-7p8r-x3mc-p8w7` in 2.8.58, with the two generated release
+  posts regenerated. Nothing reads the root file: no script,
+  test, workflow, docs generator or link (the SDKs link their own
+  `sdk/<language>/CHANGELOG.md`).
+- Deleted: `MIGRATION_FROM_BULLMQ.md` (commit `c421d636`, 2026-02-27, a reply
+  written for one user's own wrapper API; unreferenced) and `.npmignore`.
+  `.npmignore` evidence, in a `git archive` copy built with `bun run build:lib`:
+  `bun pm pack --dry-run --ignore-scripts` and
+  `npm pack --dry-run --ignore-scripts` (Bun 1.4.4, npm 11.20.0) each list the
+  same 1,748 files with and without it, and the two real Bun tarballs are
+  byte-identical (sha256 `203673b03298803ab8da...`). With the compiled
+  `dist/bunqueue` and a probe `dist/benchmark/` present the lists are again
+  identical with and without it, and a `.npmignore` naming `dist/main.js`,
+  `DISCLAIMER.md` and `dist/shared/` removes none of them in either tool: a root
+  `.npmignore` is not applied next to a `files` list.
+- Migration guide: three bullets added to "What stays the same" in
+  `docs/src/content/docs/guide/migration.mdx`, each checked against the code: the
+  `QueueEvents` payloads and its embedded default (`src/client/events.ts`,
+  `src/client/types/events.ts`), the job scheduler methods
+  (`src/client/queue/runtime/scheduling.ts`), and `job.log()` /
+  `queue.getJobLogs()` with its `[level] message` lines
+  (`src/client/queue/operations/management.ts`). Not carried over, because the
+  current docs contradict or do not support it: `SandboxedWorker` as the
+  equivalent of `processorPath` (the guide calls it experimental and
+  thread-based), the memory figures, the event mapping of the user's wrapper,
+  and a `QueueEvents` example without `connection` in a TCP setup.
+- Fixed facts instead of deleting: `.env.example` (header said `bunQ`;
+  `NODE_ENV` has no reader under `src/`; `CORS_ORIGINS` does not exist, the server
+  reads `CORS_ALLOW_ORIGIN`; a pointer to the env-vars guide);
+  `.claude-plugin/plugin.json` (75 tools) and `agents/bunqueue-assistant.md`
+  ("86 registrations, 80 always on") now say 79 primary tools (always registered;
+  dynamic mode starts them disabled per toolset), 2 dynamic-discovery
+  tools (3 with a decision model) and up to 3 workflow tools, which is what
+  `setupTools` registers.
+- Kept, with the reason: `.dockerignore` is the ignore file of the
+  `examples/postgres-multibroker/client.Dockerfile` build (context `../..`): a
+  `FROM scratch` / `COPY . /` probe exports 2,799 files with it and 4,043 without
+  it (then `dist`, `data`, `docs`, `.github`, the Markdown files), while the
+  `Dockerfile` build exports the same 906 files either way because BuildKit uses
+  `Dockerfile.dockerignore`; it gained a header saying so, and
+  `docs/features/docker-images.md` explains it. `tsconfig.typedoc.json` and
+  `typedoc.json` (`bun run docs:api`), `.mcp.json` (the repository's MCP server
+  for Claude Code), `agents/`, `skills/` and `.claude-plugin/` (the plugin),
+  `monitoring/` (the `monitoring` profile of `docker-compose.yml`,
+  `test/repro-monitoring-production.test.ts`), `.husky/` (the `prepare` script
+  sets `core.hooksPath`), `VERSIONING.md`, `GOVERNANCE.md`, `MAINTAINERS.md`,
+  `SECURITY.md` and `CONTRIBUTING.md` (current, cross-linked), both compose files
+  (untouched: auth settings are out of scope).
+- Docs in the same change: the changelog `[Unreleased]` Documentation entry,
+  `CONTRIBUTING.md`, `docs/README.md`, `docs/agents/release.md` (what the tarball
+  contains), `docs/features/docker-images.md`.
+- Gate: `bun run test:sandbox` green on the staged tree `ddcfaf6f`: unit 11746
+  pass / 0 fail / 399 skip, tcp 553 / 0, embedded 349 / 0, no anomalies
+  (`artifacts/test-sandbox/2026-11-13T01-41-22.807Z/`, in this worktree).
+- Skeptic: `CONDITIONAL` on `ddcfaf6f`, three docs-only notes (the #118/#119 links
+  and the advisory id above, "always registered" in the agent file, the final
+  state), all applied. The only changes after the sandbox run are those lines:
+  `docs/src/content/docs/changelog.md`, the generated posts
+  `docs/src/content/docs/blog/bunqueue-v2-9-3.md` and `bunqueue-v2-8-58.md`,
+  `agents/bunqueue-assistant.md` (one phrase; the file is not in the test image),
+  `feature_list.json` and `progress.md`. Skeptic: `PASS` on the final delta.
+- Host on the final tree (the wording of the evidence is the only change after
+  these runs): `bun test test/docs-*.test.ts test/agent-harness
+  test/agent-skills.test.ts` 173 pass / 0 fail (13 files), and with all of
+  `test/agent-skills` 221 / 0 (16 files); CI's docs-job test set 324 / 0
+  (29 files); the packaging and workflow tests 47 / 0 (4 files, one packs the
+  tarball); `generate-release-posts.ts --check` OK (259 posts);
+  `bun run check:docs-data` OK; `git diff --cached --check` clean; `./init.sh`
+  green (`bun run typecheck` on 902 and 2,106 files, `bun run format:check` on
+  2,307 files, contracts 99 / 0).
+- Not run: the Astro build of the docs site and its local preview.
+  `bun run test:model` and `bun run test:sandbox:sdk` are not triggered (no `src/`
+  or `sdk/` change).
+- Risk: a link from outside the repository to
+  `blob/main/MIGRATION_FROM_BULLMQ.md` or to an anchor of the old `CHANGELOG.md`
+  now misses; the history keeps both files (`git show 3e08f75b:<path>`).
+- Next: the skeptic on the final delta, then the commit when the user asks. Two
+  findings are new `not-started` items: `npm-files-benchmark-negation` and
+  `docs-mcp-tool-count-drift`.
 
 ### 2026-11-13 — agent-skills
 

@@ -1,3 +1,8 @@
+# Build-context filter for builds from the repository root whose Dockerfile has no
+# ignore file of its own: examples/postgres-multibroker/client.Dockerfile today.
+# Dockerfile, Dockerfile.test and Dockerfile.sdk-test each use their own
+# <Dockerfile>.dockerignore allow-list, which BuildKit prefers over this file.
+
 # Dependencies
 node_modules/
 

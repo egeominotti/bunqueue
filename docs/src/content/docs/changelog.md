@@ -68,6 +68,26 @@ head:
   tag, GitHub release, npm, Docker and contributor data, and 2.9.19 its npm
   version. The 2.9.22 release post already showed the matching install box and
   contributors and is unchanged.
+- Repository root cleanup. The root `CHANGELOG.md` was a second copy of the
+  release history that stopped at 2.9.4 (3 September 2026); it is now a short
+  pointer to this changelog (the file and its page on bunqueue.dev) and to the
+  GitHub releases page. Every version it listed is in this changelog,
+  so no release is dropped; the three references only the root copy carried
+  moved here: the issue links #118 and #119 in the 2.9.3 entries and the
+  `fast-uri` advisory id in the 2.8.58 entry (their two generated release posts
+  are regenerated). `MIGRATION_FROM_BULLMQ.md`, a one-off reply written
+  for one user's custom wrapper in February 2026, is removed; the
+  [migration guide](/guide/migration/) replaces it and gains the three points it
+  did not cover: the `QueueEvents` payloads, the job scheduler methods, and
+  `job.log()` / `queue.getJobLogs()`. `.npmignore` is removed: the package is
+  defined by the `files` list of `package.json`, and `bun pm pack` and `npm pack`
+  list the same 1,748 files with and without it, so the published package is
+  unchanged. `.env.example` no longer lists `NODE_ENV`, which bunqueue never
+  reads, and names the CORS variable the server actually reads,
+  `CORS_ALLOW_ORIGIN` (it said `CORS_ORIGINS`). The Claude Code plugin manifest
+  and the `bunqueue-assistant` agent now state the current MCP tool count (79
+  primary tools). `.dockerignore` stays, with a header saying which build uses
+  it. Nothing in the package or the runtime changes.
 
 ## [2.9.22] - 2026-11-13
 
@@ -2908,9 +2928,11 @@ this change set and their behavior is unchanged:
   `--completed-retention-ms` server flag. The cleanup tick removes bounded,
   oldest-first SQLite batches while protecting results owned by live
   dependency consumers.
-- Added observable, resumable SQLite startup migrations with per-version
-  markers, durable row/byte checkpoints for legacy payload rewrites, bounded
-  500-row/8 MiB transactions, progress and duration logs, and a fail-fast guard
+- Added observable, resumable SQLite startup migrations
+  ([#119](https://github.com/egeominotti/bunqueue/issues/119): the first boot
+  after a SQLite schema upgrade is no longer silent or all-or-nothing) with
+  per-version markers, durable row/byte checkpoints for legacy payload rewrites,
+  bounded 500-row/8 MiB transactions, progress and duration logs, and a fail-fast guard
   for databases created by newer binaries. TCP and HTTP listeners now bind only
   after migration and recovery complete, so no partially initialized service is
   advertised during a long upgrade. Migration info records go to stderr while
@@ -2989,8 +3011,9 @@ this change set and their behavior is unchanged:
 - Fixed explicit `undefined` exceptions being mistaken for “no error” by batch
   admission and deferred buffer scopes. Error capture now tracks presence
   separately from the thrown value, preserving JavaScript throw semantics.
-- Fixed completed SQLite rows becoming unreachable after eviction from
-  `maxCompletedJobs`: `clean(..., 'completed')` now pages across cold database
+- Fixed [#118](https://github.com/egeominotti/bunqueue/issues/118), completed
+  SQLite rows becoming unreachable after eviction from `maxCompletedJobs`:
+  `clean(..., 'completed')` now pages across cold database
   history and atomically removes jobs, results, and flow-failure records. This
   prevents unbounded disk growth when a retention policy is used and restores
   exact global/per-queue completed statistics. Trigger side effects are also
@@ -4089,7 +4112,8 @@ this change set and their behavior is unchanged:
 - Removed StrykerJS from the TypeScript SDK — mutation job, config, script,
   dev dependency and the `qs` override it needed. Its dependency graph produced
   every finding the weekly advisory gate reported (`qs` via `typed-rest-client`,
-  then `fast-uri` via `ajv`), none of it reachable from the published client.
+  then `fast-uri` via `ajv`, GHSA-7p8r-x3mc-p8w7), none of it reachable from the
+  published client.
   The planners keep their fast-check coverage and the other five SDKs still run
   mutation. The dev dependency tree drops from 163 packages to 10 with a clean
   `bun audit`.
