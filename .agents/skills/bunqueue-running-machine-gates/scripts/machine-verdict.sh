@@ -5,6 +5,8 @@
 set -euo pipefail
 
 readonly ALL_STEPS='unit,tcp,embedded,typecheck,format,tinyfs'
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$script_dir/machine-evidence.sh"
 
 usage() {
   cat <<'EOF'
@@ -72,8 +74,9 @@ step_field() { awk -F '\t' -v s="$2" -v c="$3" '$1 == s { print $c; exit }' "$1/
 count_word() { sed -n -E "s/^ *([0-9]+) $2s?\$/\1/p" "$1" 2>/dev/null | tail -n 1 || true; }
 # classify_machine DIR STEPS: prints "<pass|fail|infra><TAB><reason>".
 classify_machine() {
-  local dir=$1 wanted=$2 step rc bad=''
+  local dir=$1 wanted=$2 step rc bad='' incomplete=''
   if [ -f "$dir/INFRA" ]; then printf 'infra\t%s\n' "$(head -n 1 "$dir/INFRA")" && return; fi
+  if [ -f "$dir/COPY_INFRA" ]; then printf 'infra\t%s\n' "$(head -n 1 "$dir/COPY_INFRA")" && return; fi
   [ -f "$dir/steps.tsv" ] ||
     { printf 'fail\tthe Machine run did not finish (no steps.tsv was copied back)\n' && return; }
   if [ ! -f "$dir/DONE" ]; then
@@ -85,6 +88,20 @@ classify_machine() {
     if [ -z "$rc" ]; then bad="$bad $step(missing)"; elif [ "$rc" != 0 ]; then bad="$bad $step(exit $rc)"; fi
   done
   [ -z "$bad" ] || { printf 'fail\tfailed:%s\n' "$bad" && return; }
+  for step in install build-client $(printf '%s' "$wanted" | tr ',' ' '); do
+    [ -f "$dir/$step.log" ] || bad="$bad $step.log"
+  done
+  [ -f "$dir/gate-runner.log" ] || bad="$bad gate-runner.log"
+  [ -z "$bad" ] || { printf 'infra\tmissing step logs:%s\n' "$bad" && return; }
+  for step in $(printf '%s' "$wanted" | tr ',' ' '); do
+    case "$(log_status "$dir/$step.log" "$step")" in
+      pass) ;;
+      fail) bad="$bad $step(reported failures)" ;;
+      *) incomplete="$incomplete $step" ;;
+    esac
+  done
+  [ -z "$bad" ] || { printf 'fail\tfailed:%s\n' "$bad" && return; }
+  [ -z "$incomplete" ] || { printf 'infra\tincomplete or invalid result summaries:%s\n' "$incomplete" && return; }
   printf 'pass\tevery step passed\n'
 }
 
@@ -174,6 +191,7 @@ esac
 [ "$uncleaned" = 0 ] || [ "$worst" = 1 ] || worst=4
 if [ "$(kv "$env_file" interrupted)" = yes ]; then
   # Interrupted: nothing is claimed, but a Machine left behind still has to surface.
+  [ "$cleanup" != kept ] || uncleaned=1
   if [ "$uncleaned" = 1 ]; then worst=4; else worst=130; fi
 elif [ -n "$evidence" ] && [ "$worst" = 0 ]; then
   worst=5

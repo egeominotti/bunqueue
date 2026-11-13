@@ -26,6 +26,15 @@ host; run the first one rather than typing the steps:
   the logs back and deletes the Machines, on every exit path;
 - [scripts/machine-verdict.sh](scripts/machine-verdict.sh): the manifest and the exit
   code.
+- [scripts/machine-process.sh](scripts/machine-process.sh): shared bounded process-tree
+  termination; [scripts/machine-claims.sh](scripts/machine-claims.sh): atomic host-wide
+  Machine-name claims held through cleanup.
+- Bounded calls reuse [the shared command runner](../../../scripts/agents/bounded-command.ts)
+  and its [owned process-group lifetime](../../../scripts/agents/skill-eval-process.ts),
+  retaining the deadline until output pipes close and stopping silent descendants
+  even when the command launcher already exited.
+- [scripts/machine-evidence.sh](scripts/machine-evidence.sh): validates the final
+  result summaries independently of step exit receipts.
 
 ## Run it
 
@@ -50,11 +59,33 @@ host; run the first one rather than typing the steps:
    poll every 30 s) and, at the end, the exit code and
    `artifacts/machines/<run-id>/manifest.md`. `orb create`, the package install, the
    Bun download and each copy are stopped after 15 minutes each (exit 4).
+   OrbStack list/info/version and established SSH control queries are bounded to
+   30 seconds (`BUNQUEUE_MACHINE_CONTROL_SECONDS` shortens this for tests); a timeout
+   stops the owned command tree before returning infrastructure failure.
 4. Read the manifest, then copy its verdict, totals and path into the evidence.
 
 `--steps` takes a subset for diagnosis; the verdict is then DIAGNOSTIC (exit 5).
 `--keep` leaves the Machines running for debugging, also with a DIAGNOSTIC verdict;
 delete them yourself with `orb delete -f <name>`.
+
+Each name is claimed atomically before its list/create checks across cooperating
+worktrees, under `/tmp/bunqueue-machine-claims-$UID` (tests override
+`BUNQUEUE_MACHINE_CLAIM_ROOT`). Cleanup releases only its own token after confirmed
+deletion, or if creation was never attempted. Uncertain and kept Machines retain
+their claim: inspect the name with `orb list` and reconcile it before removing that
+claim directory. A failed create retains its settling marker even for non-timeout
+errors, since the daemon may still complete the request.
+
+Any failed copy of `gate-out/` or `gate-runner.log` leaves `COPY_INFRA` in the
+Machine's artifact directory. A passing receipt also needs every requested step
+log and the runner log; a partial transfer cannot establish PASS. An interrupted
+`--keep` run exits 4 because its Machines remain present.
+
+Step exit zero also needs complete, nonempty final result summaries: Bun test
+counts for unit/tinyfs, suites and assertions for TCP/embedded, both typecheck
+project completion markers, and format completion. Reported test/error counters
+produce FAIL (1); absent or inconsistent summaries produce infrastructure failure
+(4), even when `steps.tsv` claims success.
 
 ## Exit codes
 
@@ -75,8 +106,10 @@ starting a Machine.
 ## Interrupts and cleanup
 
 `machine-cleanup.sh` runs on every exit path: success, failure, `die`, SIGTERM and
-SIGINT. It freezes each live worker's process tree before signalling it (so no
-`orb create` or `ssh` survives), and signals only children of the gate: a worker that
+SIGINT. It signals each live worker so its command supervisor terminates its owned
+group without racing a second tree controller. A control query can defer the worker
+trap until its 30 s deadline; after that bound plus 5 s, an unresponsive worker tree
+is frozen top-down before termination. It signals only children of the gate: a worker that
 already exited is dropped from the list, because its pid may belong to another process
 by then. It waits up to 60 s for a create the OrbStack daemon may still finish after its
 CLI is gone, copies back `gate-out/` and `gate-runner.log` from every Machine the run
@@ -92,8 +125,9 @@ already exists is never created, touched or deleted, and a failing `orb list` is
 infrastructure failure, never "the name is free". Cleanup ignores further signals, and
 runs every `rsync` and `orb` call in a session of its own: a repeated Ctrl-C signals
 the terminal's whole process group, and on real OrbStack it killed the copy and the
-delete although the cleanup shell ignored it. It is bounded (about 60 s plus, per
-Machine, two 120 s copies and five 120 s deletes).
+delete although the cleanup shell ignored it. It is bounded (a 60 s settle window
+plus, per Machine, two 120 s copies, five 120 s deletes, 30 s list queries and
+termination grace).
 `test/agent-skills-machine-lifecycle.test.ts` proves all of this with a fake OrbStack.
 
 So an interrupt during `orb create` does not return at once: the gate waits the settle

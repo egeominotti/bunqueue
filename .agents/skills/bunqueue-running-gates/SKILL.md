@@ -29,6 +29,11 @@ Repository tests run in isolated OrbStack Machines by default, iteration include
 run on the macOS host is diagnostic only ([CLAUDE.md](../../../CLAUDE.md#mandatory-gates)).
 The Machines supplement the sandboxes and never replace them.
 
+Sandbox success requires a zero exit code, no reported failures or test errors,
+and complete valid nonempty results. Failed Docker cleanup fails the suite and retains ownership for
+retry; invalid baseline reports are ignored. See
+[harness reliability](../../../docs/features/agent-harness.md).
+
 ## Freeze the tree, then run
 
 The sandbox builds the working tree as it is when `docker build` reads the context,
@@ -190,6 +195,12 @@ commit, `--workflow SDK` waits until the timeout and exits 4.
 
 ## Gotchas
 
+- Live CI watching requires the repository's pinned Bun as well as `gh`; help and
+  dry-run remain read-only previews. The timeout covers queries, retry waits and
+  attempt history; unavailable history cannot downgrade a known FAILED verdict.
+  [bounded-command.ts](../../../scripts/agents/bounded-command.ts) uses
+  [skill-eval-process.ts](../../../scripts/agents/skill-eval-process.ts) to terminate
+  the owned CLI group, escalating from TERM to KILL after 100 ms.
 - `gh run list --branch main --limit 1` alone returns the newest run of any workflow:
   an `issue_comment` run of the Claude Code workflow, concluded `skipped`, is often
   newer than CI. Filter with `--workflow CI`, or list by `--commit`.

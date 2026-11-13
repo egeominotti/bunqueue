@@ -1,17 +1,14 @@
 # bunqueue
 
-High-performance job queue server for Bun: SQLite persistence, cron jobs, priorities,
-DLQ, S3 backups. Routing page for Claude Code: the mandatory rules and the work loop,
-with the reference in the linked pages. `AGENTS.md` has the same rules for Codex.
+Claude Code rules and workflow; details in linked references. `AGENTS.md` has the same rules for Codex.
 
 ## Startup Workflow
 
 1. Confirm the worktree and branch: `pwd`, `git branch --show-current`.
 2. Read this file completely, then only the pages your task needs
    ([Where things live](#where-things-live)).
-3. Run `./init.sh`, the startup check (`--help` lists its steps). It is not a commit
-   gate (`bun run test:sandbox` is), but a green run is part of the Definition of
-   Done.
+3. Run `./init.sh` (`--help` lists steps). A green run is part of the Definition of
+   Done; `bun run test:sandbox` is the commit gate.
 4. Read `feature_list.json` (work items) and `progress.md` (Current State, newest
    Session Log entry), then `git log --oneline -5`.
 5. If the baseline fails, repair it before adding scope; if you cannot,
@@ -39,6 +36,19 @@ with the reference in the linked pages. `AGENTS.md` has the same rules for Codex
   configuration.
 - **Code**: MAX 300 lines per file (split if larger), one concern per file,
   export only what's needed.
+- Preserve user changes. Never run `git reset`, `git checkout`, `git clean`, or
+  discard unrelated edits unless the user explicitly requests it.
+- Keep hot queue paths synchronous while a shard lock is held: no `await` inside a
+  synchronous critical section.
+- Maintain queue invariants together: heap membership, `jobIndex`, processing
+  maps, counters, temporal indexes, group ownership, and concurrency slots must
+  transition exactly once.
+- SQLite filtering, ordering, and pagination must happen in a consistent order.
+  Use deterministic tie-breakers for paginated queries and add migrations for
+  schema or index changes.
+- Do not silently change externally visible scheduling semantics; add explicit
+  regression coverage when priority, delay, FIFO-group, retry, or recovery
+  behavior changes.
 - **Lock hierarchy** (acquire in order): `jobIndex` → `completedJobs` →
   `shards[N]` → `processingShards[N]`. Read first, then acquire the lock, and
   release it in `finally`.
@@ -53,9 +63,8 @@ coverage. `FAIL` blocks commit and push; `CONDITIONAL` requires the user's
 explicit confirmation. Profile: `.claude/agents/skeptic.md`.
 
 **MANDATORY — BUN-NATIVE TOOLING ONLY**: type check exclusively with `bun check`
-and format exclusively with `bun fmt`, everywhere in the repository and in every
-SDK: `src`, `test`, `scripts`, `bench`, `examples`, `sdk/typescript` and
-`sdk/conformance`. Use the scripts (`bun run typecheck`, `bun run format`,
+and format exclusively with `bun fmt`, everywhere and in every SDK.
+Use the scripts (`bun run typecheck`, `bun run format`,
 `bun run format:check`, `bun run check`); inside scripts, hooks and CI always pass
 `--no-script`. Never add or run `tsc --noEmit`, ESLint, Prettier, Biome, oxlint,
 oxfmt, dprint or any other type-check, lint or format library, and never add
@@ -87,18 +96,11 @@ idempotent recovery, and DLQ exactly-once. On failure, retain the seed, minimize
 command history, and replay path. If the engine is wrong, add a deterministic
 `test/repro-model-*.test.ts` that fails before changing runtime code; if the
 specification is wrong, correct the model with evidence. Never weaken an
-invariant to make a campaign green. Deeper replay (`BUNQUEUE_MODEL_COMMANDS` is
-only the real bound with `BUNQUEUE_MODEL_SIZE=max`; at fast-check's default size
-a history has at most 10 commands):
-
-```bash
-BUNQUEUE_MODEL_RUNS=500 BUNQUEUE_MODEL_COMMANDS=150 BUNQUEUE_MODEL_SIZE=max \
-BUNQUEUE_MODEL_SEED=-1959189325 bun run test:model
-```
-
-Replay one failure exactly with the seed, path and size fast-check prints:
-`BUNQUEUE_MODEL_SEED=<seed> BUNQUEUE_MODEL_PATH=<path> BUNQUEUE_MODEL_SIZE=<size> bun run test:model`.
-Neither replaces `bun run test:sandbox`, whose unit suite runs the model again.
+invariant to make a campaign green. Replay the exact printed seed, path and size
+with `BUNQUEUE_MODEL_SEED`, `BUNQUEUE_MODEL_PATH` and `BUNQUEUE_MODEL_SIZE`.
+`BUNQUEUE_MODEL_COMMANDS` is the real bound only with `BUNQUEUE_MODEL_SIZE=max`.
+Campaign examples: [docs/testing.md](docs/testing.md#model-campaign-rules).
+Replay never replaces `bun run test:sandbox`, which runs the model again.
 
 **MANDATORY — after ANY modification under `sdk/`, run `bun run test:sandbox:sdk`**
 before handoff (and again before committing if the SDK changed afterward): every
@@ -120,16 +122,13 @@ file gets a fresh server, dynamic TCP/HTTP ports, and a unique temporary SQLite
 directory; never reuse a developer server or database. Benchmarks are native
 macOS only, never from a Machine or container.
 
-**MANDATORY — keep `/docs` in sync**: every code change updates the technical
-documentation in `docs/` in the same change-set, never as a follow-up: the
-module's `docs/features/<slug>.md` (purpose, public interface, control flow, edge
-cases, config); a new module gets a feature doc linked from `docs/README.md` and
-`docs/architecture.md`; a type, SQLite table/index, TCP command, HTTP endpoint,
-env var or default → `docs/data-model.md` and/or the feature doc; a component or
-data flow → `docs/architecture.md`. The user-facing site
-(`docs/src/content/docs/**`) and its changelog are separate: updating the internal
-`/docs` reference does not replace the changelog rule. A code change is not
-complete until `/docs` reflects it. No exceptions.
+**MANDATORY — keep `/docs` in sync** in the same change-set: update the module's
+`docs/features/<slug>.md` (purpose, API, flow, edge cases, config); link new modules
+from `docs/README.md` and `docs/architecture.md`. Types, SQLite tables/indexes, TCP
+commands, HTTP endpoints, env vars and defaults update `docs/data-model.md` and/or
+the feature doc; components and data flows update `docs/architecture.md`.
+The user site (`docs/src/content/docs/**`) is separate: internal documentation
+does not replace the changelog rule. Stale `/docs` means the change is incomplete.
 
 ## Definition of Done
 
@@ -163,9 +162,11 @@ A work item is `done` only when all of these hold and its `evidence` in
 ## Commits, pushes and releases
 
 **MANDATORY — every commit**: update `docs/src/content/docs/changelog.md` for the
-staged changes and include it in the same commit, with a mandatory, non-empty,
-concise, specific English commit message describing the actual changes; generic
-placeholder messages are forbidden.
+staged changes in the same commit. Use a mandatory, non-empty, concise, specific
+English commit message describing the changes; generic placeholder messages are forbidden.
+
+Do not create commits, push, bump the package version, or publish unless the
+user explicitly authorizes the relevant action.
 
 **MANDATORY — before every push**: verify that each outgoing commit already
 contains its changelog update and a compliant message; do not edit the changelog
@@ -186,12 +187,12 @@ drafted with `bun docs/scripts/generate-release-posts.ts`:
 
 | Need | Read |
 | --- | --- |
-| Work items, state, handoff, startup check | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
+| State and startup | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
 | The harness and its contract | [docs/agents/README.md](docs/agents/README.md) |
 | Procedures (Agent Skills) | [.agents/skills/](.agents/skills/) |
-| Writing or running tests | [docs/testing.md](docs/testing.md) |
-| Architecture, env vars, TCP commands, CLI, schema | [docs/agents/project-reference.md](docs/agents/project-reference.md) |
-| Simple Mode, Workflow Engine, Client SDK, options | [docs/agents/client-reference.md](docs/agents/client-reference.md) |
-| Debug endpoints, profiling (never expose profiles unauthenticated) | [docs/agents/debugging.md](docs/agents/debugging.md) |
-| Publishing, release checklist, release posts | [docs/agents/release.md](docs/agents/release.md) |
+| Tests | [docs/testing.md](docs/testing.md) |
+| Architecture and protocol | [docs/agents/project-reference.md](docs/agents/project-reference.md) |
+| Client APIs | [docs/agents/client-reference.md](docs/agents/client-reference.md) |
+| Debugging; never expose profiles unauthenticated | [docs/agents/debugging.md](docs/agents/debugging.md) |
+| Releases | [docs/agents/release.md](docs/agents/release.md) |
 | Engineering reference | [docs/README.md](docs/README.md), [docs/architecture.md](docs/architecture.md), [docs/data-model.md](docs/data-model.md) |

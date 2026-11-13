@@ -15,7 +15,6 @@ import {
 import { cleanupSdkResources, removeSdkContainer } from './sdk-sandbox-cleanup';
 import { runSdkSuitesSettled } from './sdk-sandbox-orchestration';
 import { sdkSandboxSuites as suites, type SdkSandboxSuite } from './sdk-sandbox-suites';
-
 const ROOT = `${import.meta.dir}/..`;
 const RUN_ID = new Date().toISOString().replaceAll(':', '-');
 const LOG_ROOT = `${ROOT}/artifacts/test-sandbox-sdk`;
@@ -26,7 +25,6 @@ const SEQUENTIAL = Bun.env.BUNQUEUE_SDK_TEST_SEQUENTIAL === '1';
 const active = new Set<string>();
 let postgres: SdkPostgresInfrastructure | null = null;
 const teardownErrors: Error[] = [];
-
 async function failedSuiteTelemetry(
   suite: SdkSandboxSuite,
   error: unknown
@@ -230,10 +228,6 @@ async function runSuite(suite: SdkSandboxSuite): Promise<SuiteTelemetry> {
     samples,
   });
   await writeSuiteArtifacts(LOG_DIR, telemetry, samples);
-  // Exit code alone would delete the container of a suite that exited 0 having reported
-  // nothing, which is exactly the container someone needs to open to find out why. The
-  // aggregate verdict already refuses an empty result; the retention decision has to
-  // agree with it or the evidence is gone by the time anyone reads the summary.
   if (suitePassed(telemetry)) {
     try {
       remove(container);
@@ -248,14 +242,20 @@ async function runSuite(suite: SdkSandboxSuite): Promise<SuiteTelemetry> {
   } else {
     active.delete(container);
     const counted = telemetry.tests.passed + telemetry.tests.failed + telemetry.tests.skipped;
-    const why = exitCode === 0 ? 'reported no results' : `exited ${exitCode}`;
+    const why =
+      exitCode !== 0
+        ? `exited ${exitCode}`
+        : telemetry.tests.failed > 0
+          ? 'reported test failures'
+          : (telemetry.tests.errors ?? 0) > 0
+            ? 'reported test errors'
+            : 'reported no results';
     console.error(
       `SDK suite ${suite.name} failed (${why}, ${counted} tests counted); retained container: ${container}`
     );
   }
   return telemetry;
 }
-
 const settled = await runSdkSuitesSettled(
   suites,
   async (suite) => {

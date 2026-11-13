@@ -67,6 +67,8 @@ runtimes. Repository map:
   Prettier, Biome, oxlint, oxfmt or lint-suppression comments. `tsc` remains only
   where files are emitted (`build:lib`, the SDK build), for typedoc and for
   compiler-API tests; non-JS SDKs keep their language's own toolchain.
+  Type checking includes the whole test tree (`tsconfig.test.json`): never exclude
+  a file from it, and never fix a type error by changing what a test does.
 - Keep hot queue paths synchronous while a shard lock is held: no `await` inside a
   synchronous critical section.
 - Maintain queue invariants together: heap membership, `jobIndex`, processing
@@ -117,7 +119,7 @@ bun fmt --check --no-script src test/path-to-test.test.ts
 git diff --check
 ```
 
-- **MANDATORY:** run `bun run test:model` after every change that can affect job
+- **MANDATORY:** run `bun run test:model` before the sandbox after changes affecting job
   lifecycle, persistence/recovery, scheduling/order, dependencies, deduplication,
   leases, rate/concurrency limits, counters, temporal indexes, or `jobIndex`. It
   runs the `fast-check` model against a real TCP broker and SQLite; it is
@@ -189,12 +191,12 @@ A work item is `done` only when all of these hold and its `evidence` in
 
 | Need | Read |
 | --- | --- |
-| Work items, state, handoff, startup check | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
+| State and startup | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
 | The harness and its contract | [docs/agents/README.md](docs/agents/README.md) |
 | Procedures (Agent Skills) | [.agents/skills/](.agents/skills/) |
-| Writing or running tests | [docs/testing.md](docs/testing.md) |
-| Architecture, repository map, env vars, TCP commands, CLI, schema | [docs/agents/project-reference.md](docs/agents/project-reference.md) |
-| Client APIs (Simple Mode, Workflow Engine, SDK options) | [docs/agents/client-reference.md](docs/agents/client-reference.md) |
-| Debug endpoints, CPU and memory profiling | [docs/agents/debugging.md](docs/agents/debugging.md) |
-| Publishing, release checklist, release posts | [docs/agents/release.md](docs/agents/release.md) |
+| Tests | [docs/testing.md](docs/testing.md) |
+| Architecture and protocol | [docs/agents/project-reference.md](docs/agents/project-reference.md) |
+| Client APIs | [docs/agents/client-reference.md](docs/agents/client-reference.md) |
+| Debugging and profiling | [docs/agents/debugging.md](docs/agents/debugging.md) |
+| Releases | [docs/agents/release.md](docs/agents/release.md) |
 | Engineering reference | [docs/README.md](docs/README.md), [docs/architecture.md](docs/architecture.md), [docs/data-model.md](docs/data-model.md) |

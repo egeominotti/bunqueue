@@ -65,6 +65,16 @@ const SHARED_RULES = [
   'bun fmt',
   '--no-script',
   'skeptic',
+  'Never run `git reset`, `git checkout`, `git clean`',
+  'Use deterministic tie-breakers for paginated queries and add migrations for schema or index changes.',
+  'Do not silently change externally visible scheduling semantics',
+  'never exclude a file from it',
+  'never fix a type error by changing what a test does',
+  'no `await` inside a synchronous critical section',
+  'heap membership',
+  'transition exactly once',
+  'before the sandbox',
+  'Do not create commits, push',
 ] as const;
 
 /** The sandbox gate itself: `bun run test:sandbox:sdk` must not satisfy it. */

@@ -50,6 +50,22 @@ rate; a `timeout` session is scored on what it loaded before the cap.
 
 ## Sessions are read-only
 
+Discovery is a prerequisite: a failed, timed-out or incomplete discovery produces
+a report and schedules no subscription sessions. Explicit-only skills may be
+absent by their Codex policy. Session deadlines cover the owned process tree;
+termination escalates when a CLI ignores SIGTERM or descendants keep its pipes
+open. Codex loading is scored only for successful completed command events that
+identify the canonical skill in this checkout; stale same-name user copies and
+failed reads do not count. The historical measurements below retain their original
+methodology and are not silently rescored by this change.
+
+SIGTERM/SIGINT cancels active process groups and prevents further scheduling,
+records the interruption and exits 143/130. Interrupted outcomes are excluded
+from hit/miss rates. Termination uses a 100 ms grace before KILL. Process ownership
+is implemented in `scripts/agents/skill-eval-process.ts`; CLI event and canonical
+path handling are in `scripts/agents/skill-eval-agents.ts`. Shell-quoted and
+backslash-escaped paths inside the current checkout retain their identity.
+
 | Agent | Session command | Why it cannot change the repository or prompt |
 | --- | --- | --- |
 | Claude Code | `claude -p <query> --output-format stream-json --verbose --permission-mode plan --max-turns 2 --permission-prompts none --strict-mcp-config --tools Skill,Read,Grep,Glob --setting-sources project --no-session-persistence` | plan mode, no `Bash`, `Edit` or `Write` tool, and anything that would prompt is denied |
@@ -79,8 +95,9 @@ way: both also list the user-level skills in `~/.agents/skills`.
   `error_max_turns`. Discovery: the `skills` array of the `system`/`init` event; the
   process is killed at that event.
 - **Codex** (verified). Codex has no skill tool: it lists each skill with a path and
-  reads the file with a shell command. A trigger is a `command_execution` item whose
-  `command` names `<skill>/SKILL.md`; a `grep` over that file counts too, which cannot
+  reads the file with a shell command. A trigger is a successful completed
+  `command_execution` item naming this checkout's canonical `<skill>/SKILL.md`;
+  a successful `grep` over that file counts too, which cannot
   be avoided. There is no turn cap, so the window is the whole session. Discovery:
   `codex debug prompt-input x` renders the model-visible prompt without a model call.
   A skill whose `agents/openai.yaml` sets `allow_implicit_invocation: false` is absent
@@ -245,8 +262,9 @@ request, and the rule that forbids it lives in the release reference.
   01:42 UTC (before every "after" run), and the "after" rows of the four skills that
   were not re-run a second time were measured with the intermediate `bunqueue-dev` and
   `bunqueue-releasing` descriptions in the listing.
-- A trigger says the skill was loaded, not that the agent then followed it. The output
-  scenarios (`evals` in `evals.json`) are not run by this script.
+- A trigger is the CLI-specific loading signal described above, not a filesystem
+  read trace or proof that the agent followed the skill. The output scenarios
+  (`evals` in `evals.json`) are not run by this script.
 - No thresholds are enforced. As a working rule, investigate a skill below 7/9
   should-trigger hits, and any should-not query that fires again when repeated.
 

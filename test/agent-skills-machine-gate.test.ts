@@ -25,7 +25,20 @@ const scratch = mkdtempSync(join(tmpdir(), 'bunqueue-machine-gate-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 type Machine = [Record<string, number>, Record<string, string>] | 'infra';
-const PASS: Machine = [steps(), { unit: bunLog([], 100) }];
+const PASS: Machine = [
+  steps(),
+  {
+    install: 'installed\n',
+    'build-client': 'built\n',
+    unit: bunLog([], 100),
+    tcp: 'Suites: 1/1 passed\nAssertions: 1/1 passed\n',
+    embedded: 'Test Suites: 1/1 passed\nIndividual Tests: 1/1 passed\n',
+    typecheck: 'No type errors in 1 files\nNo type errors in 1 files\n',
+    format: 'All 1 files are formatted\n',
+    tinyfs: bunLog([], 1),
+    'gate-runner': 'done\n',
+  },
+];
 // A unit failure as the gate recorded the former node gap (exit 3 until it was
 // fixed in the tests): node-less failures, the as-is rerun failing, the shim passing.
 const NODE_LESS: [string, string][] = [

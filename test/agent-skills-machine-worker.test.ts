@@ -12,7 +12,9 @@
  *   exit code (orb and rsync print nothing off a terminal);
  * - the package install asks dpkg for no terminal progress;
  * - `orb create` and the snapshot copy are stopped at the time bound and reported as an
- *   infrastructure failure (exit 4), the interrupted create staying marked for cleanup.
+ *   infrastructure failure (exit 4), the interrupted create staying marked for cleanup;
+ * - SIGTERM or SIGINT to the worker alone stops the command it waits on (a background
+ *   child of bash ignores SIGINT) and ends that command's log with a terminal line.
  */
 
 import { afterAll, describe, expect, test } from 'bun:test';
@@ -27,7 +29,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MACHINE_SKILL, machineBed } from './agent-skills-fakes';
+import { MACHINE_SKILL, machineBed, running } from './agent-skills-fakes';
 
 const scratch = mkdtempSync(join(tmpdir(), 'bunqueue-machine-worker-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -67,27 +69,24 @@ case "$cmd" in
 esac\n`
   );
   fake('rsync', `[ ! -e "${bed.orb}/rsync-slow" ] || sleep 20\n`);
-  const run = (env: Record<string, string> = {}) => {
-    const result = Bun.spawnSync(
-      [
-        'bash',
-        join(bed.repo, MACHINE_SKILL, 'scripts/machine-worker.sh'),
-        ...['--distro', 'ubuntu:24.04', '--name', `bunqueue-ci-${label}`, '--arch', 'arm64'],
-        ...[
-          '--run-dir',
-          join(dir, 'run'),
-          '--state-dir',
-          state,
-          '--snapshot',
-          join(dir, 'snapshot'),
-        ],
-        ...['--content-hash', 'x', '--bun-version', '1.4.4', '--steps', 'unit,tcp'],
-      ],
-      { env: { ...process.env, ...bed.env, BUNQUEUE_MACHINE_POLL_SECONDS: '1', ...env } }
-    );
+  const argv = () => [
+    'bash',
+    join(bed.repo, MACHINE_SKILL, 'scripts/machine-worker.sh'),
+    ...['--distro', 'ubuntu:24.04', '--name', `bunqueue-ci-${label}`, '--arch', 'arm64'],
+    ...['--run-dir', join(dir, 'run'), '--state-dir', state, '--snapshot', join(dir, 'snapshot')],
+    ...['--content-hash', 'x', '--bun-version', '1.4.4', '--steps', 'unit,tcp'],
+  ];
+  const env = (extra: Record<string, string> = {}) => ({
+    ...process.env,
+    ...bed.env,
+    BUNQUEUE_MACHINE_POLL_SECONDS: '1',
+    ...extra,
+  });
+  const run = (extra: Record<string, string> = {}) => {
+    const result = Bun.spawnSync(argv(), { env: env(extra) });
     return { code: result.exitCode, stderr: result.stderr.toString() };
   };
-  return { bed, state, out: join(dir, 'run', `bunqueue-ci-${label}`), run };
+  return { bed, state, out: join(dir, 'run', `bunqueue-ci-${label}`), argv, env, run };
 }
 
 describe('Machine gate: one worker', () => {
@@ -118,6 +117,30 @@ describe('Machine gate: one worker', () => {
     expect(existsSync(join(worker.state, 'creating.bunqueue-ci-create'))).toBe(true);
     expect(text(worker.state, 'created')).toBe('bunqueue-ci-create\n');
   }, 60_000);
+
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    test(`${signal} to the worker alone stops the command it waits on and ends its log`, async () => {
+      const worker = workerBed(`alone-${signal}`, 60);
+      const name = `bunqueue-ci-alone-${signal}`;
+      const child = Bun.spawn(worker.argv(), {
+        env: worker.env(),
+        stdout: 'ignore',
+        stderr: 'ignore',
+      });
+      const pidFile = join(worker.bed.orb, `pid-${name}`);
+      for (let tick = 0; tick < 200 && !existsSync(pidFile); tick++) await Bun.sleep(50);
+      const orb = Number(text(pidFile));
+      try {
+        expect(running(orb)).toBe(true);
+        child.kill(signal); // the worker only, not its process tree
+        expect(await child.exited).toBe(signal === 'SIGTERM' ? 143 : 130);
+        expect(running(orb)).toBe(false);
+        expect(text(worker.out, 'create.log')).toBe(`(interrupted by ${signal})\n`);
+      } finally {
+        if (running(orb)) process.kill(orb, 'SIGKILL');
+      }
+    }, 30_000);
+  }
 
   test('a snapshot copy that outlasts the bound is an infrastructure failure', () => {
     const worker = workerBed('copy');

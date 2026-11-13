@@ -6,7 +6,8 @@
  *
  * machine-gate.sh runs here with a fake `orb` (whose daemon finishes a create after
  * its CLI is killed), `ssh`, `rsync`, `git` and `uname`:
- * - an interrupt during `orb create` leaves no Machine and no worker process;
+ * - an interrupt during `orb create` leaves no Machine and no worker process, and each
+ *   create.log still ends with a terminal line;
  * - a create that appears only after the settle window is reported, never hidden;
  * - a Machine whose name exists is never touched, also when `orb list` is slow, and a
  *   failing `orb list` never reads as "the name is free";
@@ -63,6 +64,9 @@ describe('Machine gate: interrupts', () => {
       expect(text(run, 'manifest.md')).toContain('INTERRUPTED');
       expect(text(run, 'cleanup.log')).toMatch(/^workers to stop: \d+ \d+$/m);
       expect(existsSync(join(run, 'delete.log'))).toBe(true);
+      // Cleanup stops each worker inside `orb create` with SIGTERM: the log still ends.
+      for (const name of ['bunqueue-ci-intr', 'bunqueue-debian-intr'])
+        expect(text(run, name, 'create.log')).toBe('(interrupted by SIGTERM)\n');
     }, 60_000);
   }
 

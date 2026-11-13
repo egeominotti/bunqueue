@@ -42,6 +42,21 @@ head:
 
 ### Tooling
 
+- Contributor harness audit hardening: sandbox gates reject reported failures
+  even when a command exits zero, surface container cleanup errors and tolerate
+  incomplete baseline reports. Machine gates protect ownership across concurrent
+  worktrees, retain uncertain creates, bound cleanup and descendant processes,
+  reject incomplete copied evidence and report retained interrupted Machines as
+  infrastructure failures. CI watching applies its deadline to external calls
+  and preserves established failure verdicts. Skill evaluations stop after failed
+  discovery and measure successful reads from the current checkout with bounded
+  session cleanup. Shared instruction contracts enforce preservation, synchronous
+  queue invariants, pagination/migrations, scheduling regressions and complete
+  test-tree type checking. Regression tests cover these failure paths; product
+  APIs and scheduling behavior are unchanged. Completed audit and carried-over
+  PostgreSQL guard/Machine logging work items record their source CI results and
+  isolated validation evidence.
+
 - The SDK workflow's Python matrix tests Python 3.10 and 3.13, both on
   `ubuntu-latest`; the Python 3.9 leg and its `ubuntu-24.04` pin are gone. The
   Hypothesis flow-planner properties now run on both legs: the `test` and
@@ -227,6 +242,20 @@ head:
   `test/postgres-runner-coverage.test.ts` fails when a test file reads the URL,
   directly or through a test module it imports, and the runner does not select
   it. On their first run, against PostgreSQL 16, 17 and 18.6, all 21 cases pass;
+  nothing in the runtime changes.
+- The PostgreSQL runner-coverage guard now sees every way a test can reach
+  `BUNQUEUE_TEST_POSTGRES_URL` (`postgres-runner-guard-destructuring`). It
+  matched only `env.BUNQUEUE_TEST_POSTGRES_URL` and
+  `env['BUNQUEUE_TEST_POSTGRES_URL']` text, so a destructured read
+  (`const { BUNQUEUE_TEST_POSTGRES_URL } = process.env`), in a test file or in a
+  `test/support/` helper it imports, was skipped by every runner without the
+  guard failing. `test/postgres-runner-coverage.test.ts` now treats any test file
+  that mentions the name, or imports (transitively) a test module that mentions
+  it, as needing `test:postgres`; the one file that only lists the name,
+  `test/sdk-conformance-harness-lifecycle.test.ts`, is an explicit exception that
+  must still exist and still mention it. Two mutants outside the runner patterns
+  (a destructured read, and a read through a support helper) pass the old guard
+  and fail the new one. No test file is newly found outside the runner, and
   nothing in the runtime changes.
 - The fifteen slowest unit test files no longer sleep a fixed time for a
   background sweep (`test-suite-speedups`). Measured on the host, median of 3 runs
@@ -468,6 +497,14 @@ head:
   devDependency (its example was deleted in January 2026).
 
 ### Bug fixes
+
+- **Harness command cancellation covers child startup.** A command can start
+  before `spawn()` returns. SIGTERM in that window previously terminated the
+  supervisor before its signal handlers were registered, leaving the detached
+  command running. The shared CI, evaluation and Machine command supervisor
+  registers cancellation before launch and cleans the owned group once its PID
+  is available. A deterministic startup regression covers the race first found
+  by the CI watcher cancellation test on Linux.
 
 - **`Worker.close()` no longer emits its own `ClientClosedError` from a heartbeat
   still in flight.** The worker-registration `Heartbeat` and the job-lease

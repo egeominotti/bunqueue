@@ -11,12 +11,16 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ## Current State
 
-**Last Updated:** 2026-11-13
+**Last Updated:** 2026-11-14
 **Active items:** many sessions run at once; the items in progress are the
 `in-progress` entries of `feature_list.json`, each with its owning `branch`.
 
 ### What's Done
 
+- `harness-audit-hardening`, `postgres-runner-guard-destructuring` and
+  `machine-gate-interrupt-log-gaps`: integrated in `9b69dcba` + `45790ac7`;
+  full sandbox, fresh Ubuntu and source CI run `43526774536` GREEN. Final
+  record-only commit and authorized merge/main verification remain below.
 - `issue-189-tls-reload`: `SIGHUP` reloads the TLS certificate without a restart;
   commit `da289219` on `main`, sandbox green, skeptic `PASS`.
 - `agent-harness`: `CLAUDE.md`/`AGENTS.md` routing pages, `docs/agents/`, the state
@@ -50,14 +54,16 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
-- `postgres-runner-guard-destructuring` and `machine-gate-interrupt-log-gaps`:
-  implemented, skeptic CONDITIONAL only on the sandbox gate, not yet on `main`
-  (their worktrees hold the staged change).
+The three audit implementations are done, backed by green source CI. Their
+original staged worktrees remain preserved. Final integration steps are below;
+other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Land `postgres-runner-guard-destructuring` and `machine-gate-interrupt-log-gaps`
-   after a green `bun run test:sandbox` each.
+1. Commit/push the final record-only closure after reader checks and skeptic,
+   watch its PR CI, then normally squash merge PR #190 (linear main history),
+   watch main CI and fast-forward the original clean main checkout. All are
+   explicitly authorized; no release/version bump or publication authorized.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -70,11 +76,20 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   directly. The release push (CI's version gate tags, releases and publishes from
   `main`) therefore needs an account with write access to `main`, or a pull
   request merged by one.
+- `harness-audit-hardening`: the initial push as `kernelvoid99` failed HTTP403.
+  The user explicitly instructed using `egeominotti`; that existing account was
+  activated, write access verified, and push succeeded. CI run `43519834491`
+  failed only the new SIGTERM cancellation regression. The startup race is now
+  reproduced and fixed; fresh gates and follow-up CI `43526774536` are green.
+- The green product sandbox reports a TCP peak-memory anomaly: +78.9% against
+  baseline, 209.5 MiB (5.1% of limit), falling to 67.8 MiB at the next two-second
+  sample. No OOM, errors or end-growth signal; this is a transient observation,
+  not evidence of a leak. See `artifacts/harness-hardening/final-sandbox-anomaly-review.json`.
 - The release gates are long: `bun run test:sandbox` took 8.96 min of wall time on
   the last green run (2026-11-13, unit 6.85 min), and the SDK sandbox and both
   OrbStack Machines come on top.
-- `harness-production-grade`: `CLAUDE.md` and `AGENTS.md` are 71 and 52 bytes under
-  the 12,288-byte budget after the CI rule; the next rule added to them needs more
+- `harness-audit-hardening`: `CLAUDE.md` and `AGENTS.md` are 5 and 67 bytes under
+  the 12,288-byte budget after instruction parity; the next rule needs more
   non-rule prose moved out first. `scripts/ci-watch.sh` has watched one live run
   (43355036181: FAILED, then FLAKY after a rerun), but not yet one waiting for the
   `npm` environment approval (that status is handled from GitHub's documentation,
@@ -107,6 +122,163 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — cancellation startup fix validated
+
+- Follow-up commit `45790ac7f98b287eb25fca41a1ec3b74c5df0e23` pushed as
+  `egeominotti`, pre-commit and separate pre-push skeptic PASS. Source CI
+  [43526774536](https://github.com/egeominotti/bunqueue/actions/runs/43526774536)
+  attempt1 GREEN (`ci-watch.sh` exit0), unit12051/0/399,26 jobs succeeded and
+  9 skipped. All product/PG16-18/SDK/type/docs/format jobs passed.
+- The three integrated implementation items are closed from that source CI
+  evidence. This final state-only commit will be checked and pushed before the
+  authorized squash merge; merge/main CI are prospective, not claimed complete.
+- Frozen executable tree `2ec6b76dce8441415a0a6a0125a724c07d2b3d3e` fixes the
+  launch-time cancellation race with signal/abort ownership before spawn and
+  deferred owned-group cleanup. Red TERM/INT boundary tests0/2 on host/Linux;
+  green host8/0, isolated Linux original case50/0 and neighbors91/0.
+  `artifacts/harness-hardening/ci-cancel-startup-report.md`.
+- `bun run test:sandbox` PASS: unit11916/0/403, TCP553/0 (69 suites),
+  embedded349/0 (43), all error counters0,8.92min, no anomalies or OOM.
+  Peak unit1.49GiB/PID184, TCP194.6MiB/PID65, embedded53.2MiB/PID40.
+  Full logs/NDJSON and slow-test tables reviewed:
+  `artifacts/test-sandbox/2026-11-13T22-49-51.544Z/summary.md`.
+- Fresh `machine-gate.sh --distros ubuntu:24.04 --tree 2ec6b76dce8441415a0a6a0125a724c07d2b3d3e`
+  PASS: Ubuntu24.04.5 arm64, Bun1.4.4+38afee6c8, effective4CPU/16GiB,
+  unit12047/0/403, TCP553/0, embedded349/0, tinyfs9/0; typecheck890+2136
+  and format2337 clean.21m24s; matching snapshot, logs copied, Machine deleted.
+  `artifacts/machines/20261113T225904Z/manifest.md`.
+- No SDK/runtime changes in this follow-up; separate SDK/model gates not
+  triggered. Model suites ran in the full unit gates; the earlier six-SDK gate
+  still covers unchanged SDK orchestration. Startup179/0/type/format green.
+- Source commit's skeptic preflight independently23/0, final pre-commit PASS
+  on `7fb7d03c` and separate pre-push PASS are recorded; its readers408/0 plus
+  final92/0 and startup179/0 passed. The final record-only delta gets its own
+  checks/review. Active account `egeominotti`; merge main explicitly authorized
+  after green CI, through normal squash/rebase with no bypass or force.
+
+### 2026-11-13 — authenticated push and CI cancellation follow-up
+
+- User explicitly instructed using `egeominotti`; switched to that existing
+  authenticated account. Fresh skeptic pre-push PASS, commit `9b69dcba` pushed
+  to `harness-audit-hardening`, tracking worktree clean. Draft PR #190:
+  <https://github.com/egeominotti/bunqueue/pull/190>. The user subsequently
+  authorized fixes, commit, push and merge on main. Merge follows green gates
+  and CI through the normal protected branch path. No release authorized.
+- CI run `43519834491`, attempt1: unit12046/1/399; all other jobs passed,
+  including PostgreSQL16/17/18, TCP, embedded, SDKs, types, format and docs.
+  The failure is `test/agent-skills-ci-cancellation.test.ts:72`, SIGTERM during
+  a hung query: heartbeat expected `x`, received `xxxxx` after watcher exit.
+  Full log: `artifacts/harness-hardening/ci-unit-failure.log`.
+- The existing regression proves a failure on native Linux amd64. Root-cause
+  investigation reproduced the original failure in isolated Linux, then forced
+  the startup window deterministically: TERM/INT tests0/2 before the fix on host
+  and Linux. A child can run before `spawn()` returns and before the supervisor
+  registered cancellation, allowing default SIGTERM to leave its detached group.
+- The shared supervisor now registers cancellation before launch and defers
+  group cleanup until the PID is available; launch errors clear timers/listeners.
+  Host focused8/0; isolated Linux original case50/0 repeated, neighboring
+  CI/eval/Machine contracts91/0 across11files; typecheck890+2136 clean.
+  Report: `artifacts/harness-hardening/ci-cancel-startup-report.md`. Existing
+  heartbeat assertions remain intact and also verify the CLI is stopped when
+  the watcher returns; a bystander process must survive.
+- Full sandbox and fresh Ubuntu gate must cover the follow-up before the
+  authorized commit/push. Separate model/SDK gates are not triggered by this
+  CI/eval/Machine supervisor-only delta. The umbrella item remains active.
+
+### 2026-11-13 — harness audit hardening
+
+- Explicit user request: fix everything found in the harness audit, commit and
+  push. No release or publication authorized. Branch `harness-audit-hardening`,
+  base `edb86af4`, managed worktree `/Users/kernelvoid/.codex/worktrees/b7f5/bunqueue`.
+- Plan: `docs/superpowers/plans/2026-11-13-harness-audit-hardening.md`.
+- Audit: normal contracts 141/0, sandbox telemetry/lifecycle 27/0, startup green;
+  adversarial fake-tool probes found gaps in Machine ownership/cleanup/evidence,
+  sandbox verdict/cleanup/baselines, CI bounds/precedence, skill eval attribution,
+  instruction parity and work-item ownership. Evidence under
+  `artifacts/runner-guard-resume/harness-audit-probes/`.
+- Regression-first repairs cover sandbox verdicts, complete summaries, cleanup
+  and baselines; Machine ownership, late creates, bounded descendant cleanup and
+  copied evidence; CI deadlines/cancellation and eval attribution/launch errors;
+  instruction parity and startup inventory. Focused green: sandbox54/0,
+  Machine62/0 plus7 audit probes, CI/eval50/0; startup179/0 in11s.
+- Frozen executable tree `22a1f4960893ff27aa4b4922c2160d2078d3c458`:
+  `bun run test:sandbox` PASS, unit11912/0/403, TCP553/0, embedded349/0,
+  8.95min; `artifacts/test-sandbox/2026-11-13T21-44-23.117Z/summary.md`.
+  TCP memory anomaly is recorded under Blockers / Risks; other anomalies none.
+- `machine-gate.sh --distros ubuntu:24.04 --tree 22a1f4960893ff27aa4b4922c2160d2078d3c458`
+  PASS, Ubuntu24.04.5 arm64, Bun1.4.4+38afee6c8, effective4CPU/16GiB;
+  unit12043/0/403 (includes131 TypeScript SDK tests absent from sandbox),
+  TCP553/0 (69 suites), embedded349/0 (43 suites), tinyfs9/0, typecheck890+2135
+  and format2336 clean,21m19s. Snapshot hash matched; logs copied and Machine
+  deleted. `artifacts/machines/20261113T215345Z/manifest.md`.
+- `bun run test:sandbox:sdk` PASS, TypeScript882/0/0, Python219/0/0,
+  PHP105/0/0, Go114/0/1, Rust92/0/1, Elixir145/0/1; each SQLite/PostgreSQL
+  conformance18/18,6.26min, no anomalies or surviving processes.
+  `artifacts/test-sandbox-sdk/2026-11-13T22-15-13.834Z/summary.md`.
+- All full logs, totals, telemetry and slow tests reviewed. No engine lifecycle
+  changes; separate `bun run test:model` not triggered, model suites ran in both
+  full unit gates. SDK gate additionally validates shared runner changes.
+- Whole-branch skeptic found two code blockers (exited launcher descendants and
+  lost eval reports after launch rejection); both were reproduced and fixed.
+  Independent follow-up found no remaining confirmed code defect and verified
+  product/Ubuntu/SDK evidence. Whole-branch skeptic PASS on state tree
+  `db30ef625ed8ff27516a2894b64ed042617b4c33`; final recorded-state re-review
+  precedes commit. No remaining confirmed code blocker.
+- Post-gate delta: docs/state only, `gate-delta.sh` exit3; reader tests404/0,
+  30files39.19s, release-posts check259OK and docs data clean. Final `./init.sh`
+  green10s,179/0, typecheck890+2135 and format2336 clean; both whitespace checks
+  clean. Logs: `artifacts/harness-hardening/final-post-gate-tests.log`,
+  `final-post-gate-delta.log`, `final-init.log`.
+- Historical CONDITIONAL-only records remain historical evidence, not invented
+  approvals. The newly integrated changes require a fresh final skeptic PASS.
+- Original worktrees and unrelated work are preserved. No commit made yet;
+  actual Git push follows the local commit, then CI if remote write succeeds.
+
+### 2026-11-13 — resume PostgreSQL runner guard
+
+- Explicit user request: inspect previous work and continue. This covers the fix,
+  tests and review; it does not authorize commits, pushes or a release.
+- Item: `postgres-runner-guard-destructuring`; branch
+  `postgres-runner-guard-resume`, base `edb86af4`. Managed worktree:
+  `/Users/kernelvoid/.codex/worktrees/b7f5/bunqueue`. The original worktree and
+  the Machine-gate worktree remain unchanged.
+- Baseline: `./init.sh` green, 124 contract tests pass, typecheck and format clean.
+- Reproduction repeated: two temporary files outside the PostgreSQL runner's
+  patterns read the URL using destructuring, one through a support helper. The old
+  guard passes 4 / 0; the widened guard reports exactly both files, 4 pass / 1 fail.
+  Fixtures removed. Logs: `artifacts/runner-guard-resume/{before,after}-mutants.log`.
+- Verification on staged tree `8bf049756e2c03c43f996b8f76cedd7f1ea73a84`:
+  - `bun test test/postgres-runner-coverage.test.ts`: 5 pass / 0 fail.
+  - `./init.sh`: green, 124 contract tests pass; typecheck and format clean.
+  - `bun run test:sandbox`: exit 0, unit 11777 / 0 / 403, TCP 553 / 0,
+    embedded 349 / 0, 8.95 min, no resource anomalies. Unit peak RAM 1.57 GiB
+    (39.3%), peak PIDs 403; slowest unit test is the workflow model (35.74 s),
+    slowest integration file the TCP workflow engine (1.74 min).
+    Report: `artifacts/test-sandbox/2026-11-13T20-13-47.754Z/summary.md`.
+  - `machine-gate.sh --distros ubuntu:24.04 --tree 8bf04975`: exit 0,
+    Ubuntu 24.04.5 arm64, Bun 1.4.4+38afee6c8, effective 4 CPUs / 16 GiB;
+    unit 11908 / 0 / 403, TCP 553 / 0 (69 suites), embedded 349 / 0 (43 suites),
+    tinyfs 9 / 0, typecheck 890 + 2120 files and format 2319 files clean.
+    The 131 additional unit tests are from 16 TypeScript SDK files absent from
+    the sandbox image. Report:
+    `artifacts/machines/20261113T202258Z/manifest.md`; 21 min 12 s, Machine deleted,
+    all logs copied. The snapshot content hash matched inside the Machine.
+- Separate `test:model` and SDK sandbox not triggered (test guard/docs/state only);
+  both full unit gates included the model suites. No Debian release gate needed.
+- Independent investigation found no scoped defect. Initial skeptic CONDITIONAL
+  only on the then-pending Machine result and final state; final skeptic PASS on
+  state tree `12270964d9459641e19804c65de9d802a2c30057`. The reviewer independently
+  verified snapshot identity, Machine cleanup and the 131 additional SDK passes,
+  and ran documented-feature coverage (36 pass / 0 fail).
+- Post-gate delta: state-only, `gate-delta.sh` exit 3. Fresh contracts and docs:
+  `bun test --parallel=4 test/agent-harness test/agent-skills test/docs-*.test.ts`
+  260 pass / 0 fail across 21 files; release posts check 259 OK; `check:docs-data`
+  clean; final `./init.sh` green (124 pass / 0 fail, 8 s), typecheck, format and
+  whitespace clean. Logs in `artifacts/runner-guard-resume/`.
+- Integration/CI pending: no commit or push authorized. Item remains in-progress.
+- Next: `machine-gate-interrupt-log-gaps` still needs its sandbox gate; this guard
+  change is staged and validated, awaiting explicit integration authorization.
 
 ### 2026-11-13 — second batch
 

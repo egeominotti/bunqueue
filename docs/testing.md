@@ -1,5 +1,9 @@
 # Test Isolation and Reproducibility
 
+Contributor failure handling, shared sandbox verdicts, Machine ownership, bounded
+cleanup and their deterministic regressions are detailed in
+[Agent harness reliability](features/agent-harness.md).
+
 This document is the authoritative engineering reference for running bunqueue's
 test suites without reusing host processes, ports, databases, or environment
 state. Performance benchmarks use a different isolation model; see
@@ -22,8 +26,9 @@ from `BUN_VERSION` in `.github/workflows/ci.yml`, then runs
 `typecheck:prepare` step builds ignored output), `bun run format:check`,
 `git diff --check` (skipped with a notice where there is no Git checkout, as in a
 sanitized Machine snapshot) and the fast harness and skills contracts
-(`bun test test/agent-harness` plus the skills tests the script lists; the Machine
-lifecycle and worker tests, about 50 s, stay in the unit suite), and prints the active work items
+(`bun test test/agent-harness` plus the listed fast skill/evidence contracts;
+process-heavy Machine and CLI deadline/cancellation tests stay in the full unit
+suite, with their inventory checked by `test/agent-harness-init.test.ts`), and prints the active work items
 and the agent skills, in about 10 s. It is not a commit gate (`bun run test:sandbox`
 is), but a green `./init.sh` is part of the Definition of Done in `CLAUDE.md` and
 `AGENTS.md`. `./init.sh --full` adds `bun run test:sandbox`, and the gates below
@@ -1229,9 +1234,14 @@ set; the unit job has no database, so its PostgreSQL cases skip. The runner
 `test/postgres-*.test.ts` and `test/repro-postgres-*.test.ts` file, so a test
 that skips without the URL must live in a file with one of those names (database-free
 files with those names run in both jobs). `test/postgres-runner-coverage.test.ts`
-fails when a test file reads the URL, directly or through a test module it
-imports, and the runner does not select it: before that guard, four regression
-files named `repro-*` read the URL and were skipped in every run.
+fails when a test file mentions `BUNQUEUE_TEST_POSTGRES_URL` (any read, including
+`const { BUNQUEUE_TEST_POSTGRES_URL } = process.env`), or imports, directly or
+through other test modules such as `test/support/` helpers, a module that mentions
+it, and the runner does not select it: before that guard, four regression files
+named `repro-*` read the URL and were skipped in every run. A file that only lists
+the name without needing PostgreSQL goes in the guard's `MENTION_ONLY_EXCEPTIONS`
+with its reason (today `test/sdk-conformance-harness-lifecycle.test.ts`); the guard
+fails if an exception no longer exists or no longer mentions the name.
 Expiry boundary cases derive timestamps from the PostgreSQL clock so
 host/container clock skew cannot turn lifecycle coverage into a timing-only
 failure. The version gate, binary matrix, container publication, and GitHub release are all
