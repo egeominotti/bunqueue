@@ -22,6 +22,9 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 - `agent-harness`: `CLAUDE.md`/`AGENTS.md` routing pages, `docs/agents/`, the state
   files, `./init.sh`, the contract tests `test/agent-harness-*.test.ts`, and the
   harness files in the sandbox test image; sandbox green on the final tree.
+- `release-2.9.22`: published 2026-11-13 from tag `v2.9.22` at `29428c1c` (GitHub
+  release, Docker images, npm `latest` with provenance); release metadata
+  refreshed. Evidence in `feature_list.json`.
 
 ### What's In Progress
 
@@ -29,20 +32,13 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Next
 
-1. `release-2.9.22` (in progress at the user's explicit request): steps 1-5 of
-   [docs/agents/release.md](docs/agents/release.md) done and gated. The push of
-   `769d9e2b` did not release (CI failed at Python 3.9 setup on Ubuntu 26.04); the
-   CI-fix commit is the one CI releases from. Watch that run's version gate (tag,
-   GitHub release, npm, Docker), then step 7 (`generate-release-posts.ts
-   --refresh`, the post's install box and contributors). See its
-   `feature_list.json` evidence.
-2. `issue-189-unix-socket-followups`: reproducing tests first for the two
+1. `issue-189-unix-socket-followups`: reproducing tests first for the two
    unix-socket rollback notes in `src/infrastructure/server/httpListener.ts`, then
    the fix.
-3. `agent-harness-followups`: the non-blocking notes of the harness review.
-4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
+2. `agent-harness-followups`: the non-blocking notes of the harness review.
+3. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
    `node` in the Bun-only OrbStack Machines.
-5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
+4. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
 
 ## Blockers / Risks
 
@@ -67,6 +63,25 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — release-2.9.22 (published, step 7)
+
+- Published: tag `v2.9.22` at `29428c1c`; CI run 43327462318 (GitHub release, Docker
+  images, SBOM, attestations) and run 43329831287 (npm `bunqueue@2.9.22` as
+  `latest`, with provenance).
+- Step 7: `generate-release-posts.ts --refresh` rewrote
+  `docs/src/data/releaseMeta.json` (259 versions, 190 tagged): new entries for
+  2.9.22, 2.9.21 and 2.9.20, and `npm` for 2.9.19. The 2.9.22 post already
+  matched the refreshed byline, install box, contributors and footer, so it is
+  unchanged; its Release and Commits links answer 200.
+- State: item `done`, branch removed; a `## [Unreleased]` changelog section
+  records the refresh. Committed with this entry.
+- Evidence (host): `generate-release-posts.ts --check` OK (259 posts);
+  `check:docs-data` OK; `bun test test/docs-*.test.ts test/agent-harness-*.test.ts`
+  144 / 0; `bun run typecheck`, `bun run format:check` and `git diff --check`
+  clean; `./init.sh` green.
+- Next: commit with the changelog entry after the gates and a skeptic `PASS`; the
+  `agent-skills` branch also adds `## [Unreleased]`, to merge at rebase.
 
 ### 2026-11-12 — release-2.9.22 (preparation)
 

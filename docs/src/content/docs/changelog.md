@@ -18,6 +18,16 @@ head:
   <p class="bq-hero-sub">All notable changes to bunqueue: features, fixes, performance work and breaking changes, newest first.</p>
 </div>
 
+## [Unreleased]
+
+### Documentation
+
+- Release metadata refreshed after the 2.9.22 publication
+  (`docs/src/data/releaseMeta.json`): 2.9.20, 2.9.21 and 2.9.22 now carry their
+  tag, GitHub release, npm, Docker and contributor data, and 2.9.19 its npm
+  version. The 2.9.22 release post already showed the matching install box and
+  contributors and is unchanged.
+
 ## [2.9.22] - 2026-11-13
 
 ### Features
