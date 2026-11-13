@@ -74,8 +74,8 @@
 - [x] Run `./init.sh`, all focused regressions/contracts, `bun run typecheck`, `bun run format:check`, both diff whitespace checks.
 - [x] Stage and freeze the candidate; run `bun run test:sandbox` and a fresh native Ubuntu 24.04 Machine gate, serially; review full logs, totals and anomalies.
 - [x] Record evidence; prove any state-only delta and rerun its readers. Get whole-branch skeptic PASS.
-- [ ] Commit with the changelog, specific message and recorded evidence; inspect outgoing commit(s), get pre-push skeptic PASS, then push without force.
-- [ ] Watch CI to green; if branch protection rejects a direct main push, preserve the commit on a feature branch and use the normal PR path. Never change protection rules.
+- [x] Commit with the changelog, specific message and recorded evidence; inspect outgoing commit(s), get pre-push skeptic PASS, then push without force.
+- [x] Watch CI to green; if branch protection rejects a direct main push, preserve the commit on a feature branch and use the normal PR path. Never change protection rules.
 - [ ] After the CI cancellation follow-up passes its gates and PR CI, review and merge PR #190 through the normal protected-main path; watch the main CI run and align the original clean main checkout without discarding changes.
 
 ## Execution ledger
@@ -89,3 +89,4 @@
 - Local commit and actual push remain; the connected GitHub account reports no repository write permission. Never claim push or CI success without evidence.
 - Follow-up: user explicitly requested account `egeominotti`, then fixes, commit, push and merge on main. Account switched, commit `9b69dcba` pushed, draft PR #190 opened. CI run `43519834491` found a reproduced cancellation startup race; fix, new gates and integration remain pending. No version bump or publication authorized.
 - 2026-11-14: startup fix passed sandbox (11916unit/553TCP/349embedded) and fresh Ubuntu (12047unit/553TCP/349embedded/9tinyfs), no failures, on frozen tree `2ec6b76dce8441415a0a6a0125a724c07d2b3d3e`. Full evidence in the state files. Final state-only readers/review, follow-up commit/push, PR CI and authorized squash merge/main CI remain.
+- Follow-up committed/pushed as `45790ac7`, exact reviewed state tree `7fb7d03c`, skeptic pre-commit/pre-push PASS. Source CI `43526774536` attempt1 GREEN. Implementation items closed with actual evidence; final record-only delta must pass readers/review/PR CI before the authorized normal squash merge and main CI.

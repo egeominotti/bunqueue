@@ -17,6 +17,10 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Done
 
+- `harness-audit-hardening`, `postgres-runner-guard-destructuring` and
+  `machine-gate-interrupt-log-gaps`: integrated in `9b69dcba` + `45790ac7`;
+  full sandbox, fresh Ubuntu and source CI run `43526774536` GREEN. Final
+  record-only commit and authorized merge/main verification remain below.
 - `issue-189-tls-reload`: `SIGHUP` reloads the TLS certificate without a restart;
   commit `da289219` on `main`, sandbox green, skeptic `PASS`.
 - `agent-harness`: `CLAUDE.md`/`AGENTS.md` routing pages, `docs/agents/`, the state
@@ -50,26 +54,16 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
-- `harness-audit-hardening`: full harness audit repairs on its branch, including
-  the PostgreSQL guard and Machine logging fixes. Product sandbox, fresh native
-  Ubuntu and SDK sandbox passed on tree `22a1f496`; 404 state readers and final
-  startup are green, whole-branch skeptic PASS on state tree `db30ef62`.
-  Commit `9b69dcba` is pushed; PR #190 is in draft. The cancellation startup
-  regression found by CI run `43519834491` is fixed and passed fresh sandbox
-  and Ubuntu gates on tree `2ec6b76d`; final review, follow-up commit and CI
-  remain. The user explicitly authorized fixes, commit, push and merge on main;
-  no version bump or publication authorized.
-- `machine-gate-interrupt-log-gaps` and `postgres-runner-guard-destructuring` are
-  integrated into that candidate; their original staged worktrees are preserved.
-  They remain owned while final commit, push and CI evidence are pending.
+The three audit implementations are done, backed by green source CI. Their
+original staged worktrees remain preserved. Final integration steps are below;
+other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Finish `harness-audit-hardening`, including `postgres-runner-guard-destructuring`
-   and `machine-gate-interrupt-log-gaps`. The CI watcher startup cancellation fix
-   from run `43519834491` is gate-validated; finish state readers
-   and skeptic review, commit/push the follow-up, watch PR CI to green and close
-   its evidence, then merge and watch main CI. Align the original main checkout.
+1. Commit/push the final record-only closure after reader checks and skeptic,
+   watch its PR CI, then normally squash merge PR #190 (linear main history),
+   watch main CI and fast-forward the original clean main checkout. All are
+   explicitly authorized; no release/version bump or publication authorized.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -85,9 +79,8 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 - `harness-audit-hardening`: the initial push as `kernelvoid99` failed HTTP403.
   The user explicitly instructed using `egeominotti`; that existing account was
   activated, write access verified, and push succeeded. CI run `43519834491`
-  failed only the new SIGTERM cancellation regression (heartbeat still changed
-  after watcher exit). The startup race is now reproduced and fixed, with new
-  sandbox/Ubuntu gates green; remote CI on the follow-up remains pending.
+  failed only the new SIGTERM cancellation regression. The startup race is now
+  reproduced and fixed; fresh gates and follow-up CI `43526774536` are green.
 - The green product sandbox reports a TCP peak-memory anomaly: +78.9% against
   baseline, 209.5 MiB (5.1% of limit), falling to 67.8 MiB at the next two-second
   sample. No OOM, errors or end-growth signal; this is a transient observation,
@@ -132,6 +125,14 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 
 ### 2026-11-14 — cancellation startup fix validated
 
+- Follow-up commit `45790ac7f98b287eb25fca41a1ec3b74c5df0e23` pushed as
+  `egeominotti`, pre-commit and separate pre-push skeptic PASS. Source CI
+  [43526774536](https://github.com/egeominotti/bunqueue/actions/runs/43526774536)
+  attempt1 GREEN (`ci-watch.sh` exit0), unit12051/0/399,26 jobs succeeded and
+  9 skipped. All product/PG16-18/SDK/type/docs/format jobs passed.
+- The three integrated implementation items are closed from that source CI
+  evidence. This final state-only commit will be checked and pushed before the
+  authorized squash merge; merge/main CI are prospective, not claimed complete.
 - Frozen executable tree `2ec6b76dce8441415a0a6a0125a724c07d2b3d3e` fixes the
   launch-time cancellation race with signal/abort ownership before spawn and
   deferred owned-group cleanup. Red TERM/INT boundary tests0/2 on host/Linux;
@@ -150,10 +151,11 @@ Newest first. Prepend one entry per session; for multi-session work fill the
 - No SDK/runtime changes in this follow-up; separate SDK/model gates not
   triggered. Model suites ran in the full unit gates; the earlier six-SDK gate
   still covers unchanged SDK orchestration. Startup179/0/type/format green.
-- Skeptic code preflight independently23/0 and sandbox evidence verified;
-  final state readers and pre-commit PASS pending. Commit/push authorization
-  persists, active account `egeominotti`. Merge main explicitly authorized after
-  green CI; protection requires a normal squash/rebase, no bypass or force.
+- Source commit's skeptic preflight independently23/0, final pre-commit PASS
+  on `7fb7d03c` and separate pre-push PASS are recorded; its readers408/0 plus
+  final92/0 and startup179/0 passed. The final record-only delta gets its own
+  checks/review. Active account `egeominotti`; merge main explicitly authorized
+  after green CI, through normal squash/rebase with no bypass or force.
 
 ### 2026-11-13 — authenticated push and CI cancellation follow-up
 

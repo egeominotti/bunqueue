@@ -53,7 +53,9 @@ head:
   session cleanup. Shared instruction contracts enforce preservation, synchronous
   queue invariants, pagination/migrations, scheduling regressions and complete
   test-tree type checking. Regression tests cover these failure paths; product
-  APIs and scheduling behavior are unchanged.
+  APIs and scheduling behavior are unchanged. Completed audit and carried-over
+  PostgreSQL guard/Machine logging work items record their source CI results and
+  isolated validation evidence.
 
 - The SDK workflow's Python matrix tests Python 3.10 and 3.13, both on
   `ubuntu-latest`; the Python 3.9 leg and its `ubuntu-24.04` pin are gone. The
