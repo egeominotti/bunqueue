@@ -54,9 +54,22 @@ interface SocketFileAttributes {
   gid: number;
 }
 
-function readSocketAttributes(path: string): SocketFileAttributes | null {
+/** The file-system calls the unix-socket restore makes; injectable so tests need no root. */
+export interface SocketFileSystem {
+  statSync(path: string): SocketFileAttributes;
+  chownSync(path: string, uid: number, gid: number): void;
+  chmodSync(path: string, mode: number): void;
+}
+
+const nodeSocketFileSystem: SocketFileSystem = {
+  statSync: (path) => statSync(path),
+  chownSync: (path, uid, gid) => chownSync(path, uid, gid),
+  chmodSync: (path, mode) => chmodSync(path, mode),
+};
+
+function readSocketAttributes(path: string, fs: SocketFileSystem): SocketFileAttributes | null {
   try {
-    const stats = statSync(path);
+    const stats = fs.statSync(path);
     return { mode: stats.mode & 0o7777, uid: stats.uid, gid: stats.gid };
   } catch {
     return null; // The path is gone: there is nothing to restore.
@@ -65,34 +78,43 @@ function readSocketAttributes(path: string): SocketFileAttributes | null {
 
 /**
  * Re-apply what an operator set on the socket file (`chmod 660`, `chgrp`) after startup.
- * An owner/group the process may not set (EPERM) is kept as created, with a warning.
+ * An owner/group the process may not set (EPERM) is kept as created, with a warning. When
+ * not `strict` (the rollback rebind) any owner failure is kept that way, and the mode is
+ * still applied.
  */
-function restoreSocketAttributes(path: string, attributes: SocketFileAttributes | null): void {
+function restoreSocketAttributes(
+  path: string,
+  attributes: SocketFileAttributes | null,
+  fs: SocketFileSystem,
+  strict: boolean
+): void {
   if (!attributes) return;
-  const created = statSync(path);
+  const created = fs.statSync(path);
   if (created.uid !== attributes.uid || created.gid !== attributes.gid) {
     try {
-      chownSync(path, attributes.uid, attributes.gid);
+      fs.chownSync(path, attributes.uid, attributes.gid);
     } catch (error) {
       // Without privileges a process can only pick one of its own groups: keep the default.
-      if (!(error instanceof Error && 'code' in error && error.code === 'EPERM')) throw error;
+      const denied = error instanceof Error && 'code' in error && error.code === 'EPERM';
+      if (strict && !denied) throw error;
       serverLog.warn('HTTP unix socket owner not restored after a TLS reload', {
         path,
         uid: attributes.uid,
         gid: attributes.gid,
         keptUid: created.uid,
         keptGid: created.gid,
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
-  chmodSync(path, attributes.mode);
+  fs.chmodSync(path, attributes.mode);
 }
 
-/** Validate the TLS files and bind the HTTP listener. */
+/** Validate the TLS files and bind the HTTP listener (`fs` is a seam for tests). */
 export function createHttpListener(
   config: HttpListenerConfig,
-  { fetch, websocket }: HttpListenerHandlers
+  { fetch, websocket }: HttpListenerHandlers,
+  fs: SocketFileSystem = nodeSocketFileSystem
 ): HttpListener {
   // Validate the TLS files BEFORE binding: fail fast on a bad path.
   let served = config.tls ? readTlsMaterial(config.tls) : undefined;
@@ -103,7 +125,8 @@ export function createHttpListener(
   /**
    * Bind `path` and give the new socket file `attributes`. For the new pair a restore
    * failure is a bind failure (the path is unbound again and the reload rolls back); on a
-   * rollback the listener serving the previous pair stays up and the failure is logged.
+   * rollback an owner failure still lets the mode be applied, and the listener serving the
+   * previous pair stays up with any failure logged.
    */
   const rebindUnix = (
     path: string,
@@ -113,7 +136,7 @@ export function createHttpListener(
   ) => {
     const bound = serveUnix(path, tls);
     try {
-      restoreSocketAttributes(path, attributes);
+      restoreSocketAttributes(path, attributes, fs, !rollback);
     } catch (error) {
       if (rollback) {
         serverLog.warn('HTTP unix socket permissions not restored after a TLS reload rollback', {
@@ -164,7 +187,7 @@ export function createHttpListener(
   const prepareUnix = (path: string, material: TlsMaterial): TlsListenerSwap => {
     const previous = server;
     const previousMaterial = served;
-    const attributes = readSocketAttributes(path);
+    const attributes = readSocketAttributes(path, fs);
     // A unix path cannot be shared: free it (`stop()` unlinks it), then bind it again.
     void previous.stop();
     const rebindPrevious = () => {

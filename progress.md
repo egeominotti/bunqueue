@@ -50,12 +50,14 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   supported 16, runtime unchanged); working tree only, evidence `PARTIAL`. Next:
   `bun run test:sandbox`, the skeptic, then the commit the user asks for and its
   CI run.
+- `issue-189-unix-socket-followups` (branch `issue-189-unix-socket-followups`):
+  reproducing test, fix, docs and changelog in the worktree, not committed;
+  `bun run test:sandbox` and the skeptic are still to run.
 
 ### What's Next
 
-1. `issue-189-unix-socket-followups`: reproducing tests first for the two
-   unix-socket rollback notes in `src/infrastructure/server/httpListener.ts`, then
-   the fix.
+1. `issue-189-unix-socket-followups`: run `bun run test:sandbox` on the staged
+   tree, then the skeptic; the test, fix, docs and changelog are written.
 2. `cron-test-midnight-boundary`: `test/cronScheduler.test.ts:819` fails when the
    unit suite crosses 23:59 UTC; reproduce first, then an injected clock or a
    schedule that cannot be under 60 s away.
@@ -176,6 +178,24 @@ Newest first. Prepend one entry per session; for multi-session work fill the
   the historical mentions of Python 3.9 in released changelog sections, release
   posts, `bunqueue-running-gates`, `test/agent-skills-ci-watch.test.ts` and an
   eval prompt of `bunqueue-working-autonomously`.
+### 2026-11-13 — issue-189-unix-socket-followups
+
+- Branch `issue-189-unix-socket-followups`, base `bfa290c7`, staged, not committed.
+- Seam: `createHttpListener` takes an optional `SocketFileSystem` (the restore's
+  `statSync`/`chownSync`/`chmodSync`, default `node:fs`), so the owner and failure
+  paths run without root.
+- `test/repro-issue-189-unix-socket-restore.test.ts` failed on the seam-only tree
+  for the right reason: after an injected `chown` `EIO` the rollback left the
+  socket at mode `0o755` instead of the operator's `0o660` (2 pass, 1 fail). The
+  two warning-path tests (owner not restored on `EPERM`, rollback permissions not
+  restored on a `chmod` `EIO`) passed there and fail when their warning, or the
+  best-effort rollback, is mutated out.
+- Fix: on the rollback rebind any `chown` failure keeps the owner with the owner
+  warning and the mode is still applied; the new-pair restore stays strict.
+  `docs/features/security-tls-auth.md` and the changelog `[Unreleased]` updated.
+- Host checks: `bun test test/repro-issue-189*` 16 / 0, `bun run typecheck`,
+  `bun run format:check`, `git diff --check`, `./init.sh` green. Not run:
+  `bun run test:sandbox`, skeptic.
 
 ### 2026-11-13 — ci-flakes-record
 

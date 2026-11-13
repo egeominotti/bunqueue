@@ -96,8 +96,8 @@
       "name": "Unix-socket rollback follow-ups from the issue 189 review",
       "description": "Two non-blocking skeptic notes on src/infrastructure/server/httpListener.ts: (1) on the rollback rebind of the HTTP unix socket, a chown failure other than EPERM throws before chmodSync runs, so the previous mode is not restored either; (2) the two new warning paths (owner/group not restored, rollback permissions not restored) have no test. Write the reproducing tests first, then fix.",
       "dependencies": ["issue-189-tls-reload"],
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "2026-11-13, base bfa290c7; lands in the commit that adds this entry. bun run test:sandbox green on tree b1c55c1e (unit 11790 / 0 / 402, tcp 553 / 0 / 0, embedded 349 / 0 / 0; artifacts/test-sandbox/2026-11-13T11-34-48.707Z/), the only change after it being this state update; skeptic PASS. Host checks before the gate: (not committed, no sandbox yet): base bfa290c7. Seam: createHttpListener takes an optional SocketFileSystem (statSync/chownSync/chmodSync, default node:fs). Reproducing test test/repro-issue-189-unix-socket-restore.test.ts failed on the seam-only tree for the right reason (rollback after an injected chown EIO: socket mode 493 = 0o755 instead of 432 = 0o660; 2 pass, 1 fail); the two warning-path tests (EPERM owner on the new pair, chmod EIO on the rollback) each fail when their warning or the best-effort rollback is mutated out. Fix: restoreSocketAttributes(strict = !rollback) keeps the owner with the owner warning on any chown failure during the rollback and still applies chmod; the new-pair restore stays strict. Host checks: bun test test/repro-issue-189* 4 files 16 pass / 0 fail (with the server shutdown/drain files: 29 / 0), bun run typecheck OK, bun run format:check OK (2313 files), git diff --check clean, ./init.sh green. Still to do: bun run test:sandbox, skeptic, commit",
       "issue": 189
     },
     {

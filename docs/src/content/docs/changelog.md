@@ -227,6 +227,20 @@ head:
   2026-08-26 benchmark reports, which measured PostgreSQL 15.19, and earlier
   changelog entries are unchanged.
 
+### Bug fixes
+
+- **A TLS reload rollback on the HTTP unix socket now restores the socket's mode
+  even when restoring its owner fails** (#189 follow-up). When the bind of a new
+  certificate failed and the listener rebound the previous one, a `chown` failure
+  other than `EPERM` (an `EIO`, for example) aborted the restore before the
+  `chmod`, so the rebound socket kept the mode a new file gets (typically `0755`)
+  instead of the one an operator set (such as `0660`). The rollback restore is now
+  best-effort for the owner as well: any `chown` failure keeps the created owner
+  and logs `HTTP unix socket owner not restored after a TLS reload`, and the
+  previous mode is still applied. The bind of the new certificate stays strict:
+  such a failure still rolls the reload back. Both warning paths are now covered
+  by `test/repro-issue-189-unix-socket-restore.test.ts`.
+
 ## [2.9.22] - 2026-11-13
 
 ### Features
