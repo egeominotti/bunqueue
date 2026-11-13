@@ -2,7 +2,7 @@
 # Startup check for coding-agent sessions (docs/agents/README.md).
 #
 #   ./init.sh          pinned Bun, frozen lockfile, bun check, bun fmt, diff check,
-#                      harness contract, work items
+#                      harness and skills contracts, work items, skills
 #   ./init.sh --full   the same, then the full gate: bun run test:sandbox
 #
 # It stops at the first failure. It is not a commit gate (bun run test:sandbox is),
@@ -88,8 +88,8 @@ else
   echo "skipped: no Git checkout (run git diff --check on the host before the snapshot)"
 fi
 
-step 'Harness contract: bun test test/agent-harness'
-bun test test/agent-harness
+step 'Harness and skills contracts: bun test test/agent-harness test/agent-skills'
+bun test test/agent-harness test/agent-skills
 
 if [ "$full" -eq 1 ]; then
   step 'Full gate: bun run test:sandbox'
@@ -110,6 +110,13 @@ const ready = show("not-started").filter((item) =>
 );
 for (const item of ready) console.log(`ready       ${item.id}`);
 '
+
+step 'Agent skills (.agents/skills; docs/agents/README.md#skills)'
+for skill in .agents/skills/*/SKILL.md; do
+  [ -e "$skill" ] || continue
+  skill=${skill#.agents/skills/}
+  echo "${skill%/SKILL.md}"
+done
 
 echo
 echo "init.sh: green in $((SECONDS - started)) s"

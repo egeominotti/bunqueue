@@ -1,0 +1,60 @@
+{
+  "skill_name": "bunqueue-running-machine-gates",
+  "trigger_queries": [
+    { "query": "run the OrbStack machine gate for the 2.9.23 candidate", "should_trigger": true },
+    { "query": "we need the Ubuntu 24.04 and Debian 13 evidence for the release, can you do it?", "should_trigger": true },
+    { "query": "validate the staged tree on a clean linux host, not docker", "should_trigger": true },
+    { "query": "machine-gate.sh exited 3, is that ok for the release?", "should_trigger": true },
+    { "query": "the debian machine unit suite has 6 failures with 'node: command not found', is that a bug?", "should_trigger": true },
+    { "query": "orb create keeps failing with 'disk limit' when I start the release machines", "should_trigger": true },
+    { "query": "read artifacts/machines/20261112T204914Z/manifest.md and summarize it for the evidence", "should_trigger": true },
+    { "query": "rerun only the tcp suite in a fresh ubuntu machine to check that flaky test", "should_trigger": true },
+    { "query": "how do I copy the worktree into an isolated orbstack machine without mounting it?", "should_trigger": true },
+    { "query": "run bun run test:sandbox for my change", "should_trigger": false, "note": "bunqueue-running-gates" },
+    { "query": "set up an OrbStack machine for my personal dev environment with my dotfiles", "should_trigger": false, "note": "not a bunqueue gate" },
+    { "query": "the docker compose postgres test fails to start", "should_trigger": false, "note": "external-service tests" },
+    { "query": "benchmark bunqueue on Linux in an OrbStack machine", "should_trigger": false, "note": "benchmarks are native macOS only" },
+    { "query": "fix the TLS reload bug on Debian", "should_trigger": false, "note": "bunqueue-fixing-bugs" },
+    { "query": "bump the version to 2.9.23", "should_trigger": false, "note": "bunqueue-releasing" },
+    { "query": "write a Dockerfile for deploying bunqueue on Kubernetes", "should_trigger": false, "note": "deployment, not validation" },
+    { "query": "what does --isolate-network do in orbctl?", "should_trigger": false, "note": "a general OrbStack question" },
+    { "query": "the SDK sandbox failed on the elixir suite", "should_trigger": false, "note": "bunqueue-running-gates" }
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Run the Machine gate for the staged release candidate.",
+      "expected_output": "The agent checks git diff --check and git diff --cached --check, records git write-tree, runs machine-gate.sh --dry-run --tree <hash>, then runs it for real in the background, waits for the exit code, reads manifest.md, and reports the verdict (0, 3 or other), exact per-step totals, the run directory and that both Machines were deleted.",
+      "assertions": [
+        "A dry run precedes the real run",
+        "The real run names an explicit tree hash",
+        "The real run is started in the background or with a long timeout",
+        "The report quotes the manifest's verdict, per-step totals and path",
+        "No --mount, --forward-ssh-agent or host path is used"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "machine-gate.sh exited 3. The manifest lists 6 unit failures on both Ubuntu and Debian. Is the release blocked?",
+      "expected_output": "Exit 3 is the known environment gap: the 6 tests in the two version-gate files fail only because the Bun-only Machines have no node; they passed again with the node->bun shim and every other step passed. It is the canonical Machine result and not a blocker by itself, provided the sandbox gate also passed; the agent quotes the gap reruns from the manifest.",
+      "assertions": [
+        "Exit 3 is explained as the known node gap, not a product failure",
+        "The shim rerun result is cited as the proof",
+        "The answer notes the Machines never replace bun run test:sandbox"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "machine-gate.sh exited 1: the Debian unit step had 7 failures, 6 of them the known node ones.",
+      "expected_output": "A real failure: the seventh test is not explained by the gap. The agent reads the Debian unit.log for that test, checks whether it reproduces on Ubuntu and in the sandbox, and treats it as an environment difference or a bug (bunqueue-fixing-bugs) only after a focused reproduction; the release does not proceed on this evidence.",
+      "assertions": [
+        "The extra failure is treated as a real failure, not waved through with the gap",
+        "The agent inspects the failing test's log in the run directory",
+        "No release step proceeds on this Machine evidence"
+      ],
+      "files": []
+    }
+  ]
+}

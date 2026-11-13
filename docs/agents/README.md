@@ -71,9 +71,10 @@ cleanly, and their conflicts have one fixed resolution:
 fails when `bun --version` differs from `BUN_VERSION` in
 `.github/workflows/ci.yml`; then runs `bun install --frozen-lockfile --ignore-scripts`,
 `bun run typecheck`, `bun run format:check`, `git diff --check` and
-`git diff --cached --check`, and `bun test test/agent-harness` (both contract
-files), and prints the work items in progress, blocked or ready and the next
-steps. It stops at the first failure (`set -euo pipefail`). Where there is no Git
+`git diff --cached --check`, and `bun test test/agent-harness test/agent-skills`
+(the harness and the [skills](#skills) contracts), and prints the work items in
+progress, blocked or ready, the agent skills and the next steps. It stops at the
+first failure (`set -euo pipefail`). Where there is no Git
 checkout rooted at the repository (a sanitized OrbStack Machine snapshot has no
 `.git`) it skips the git steps with a notice instead of failing. It writes ignored
 output only: `node_modules` from `bun install`, and `sdk/typescript/dist`, `dist`
@@ -115,8 +116,96 @@ harness rots:
   container sees what the host sees.
 
 `Dockerfile.test` copies the harness files and `docs/agents/` into the test image,
-and `Dockerfile.test.dockerignore` allow-lists them.
+and `Dockerfile.test.dockerignore` allow-lists them. The skills have a contract of
+their own, described under [Skills](#skills).
 
 Structural score, measured with the course's read-only `validate-harness.mjs`
 (`--target <repo>`; not vendored here): 32/100 before the harness, 100/100 after.
 It scores structure only, not how well agents work with it.
+
+## Skills
+
+Procedures an agent needs only for some tasks are Agent Skills (the agentskills.io
+format) in [`.agents/skills/`](../../.agents/skills/), the directory Codex, Gemini CLI,
+Cursor and Copilot read. Claude Code reads only `.claude/skills/`, so every skill also
+has one relative symlink there: `.claude/skills/<name>` -> `../../.agents/skills/<name>`.
+A skill encodes a procedure and its gotchas and links to `CLAUDE.md`, `AGENTS.md` and
+the pages above for the rules; it never restates or overrides a rule.
+
+| Skill | For |
+| --- | --- |
+| [bunqueue-dev](../../.agents/skills/bunqueue-dev/SKILL.md) | orientation: architecture, source layout, conventions, routing to the other skills |
+| [bunqueue-working-sessions](../../.agents/skills/bunqueue-working-sessions/SKILL.md) | session start and end, work items, `progress.md`, handoff, Definition of Done evidence |
+| [bunqueue-fixing-bugs](../../.agents/skills/bunqueue-fixing-bugs/SKILL.md) | reproduce first, subagents, docs and changelog, skeptic rounds until `PASS` |
+| [bunqueue-running-gates](../../.agents/skills/bunqueue-running-gates/SKILL.md) | which gate a change needs, sandbox artifacts and KPIs, failure classification, `scripts/gate-delta.sh` for post-gate deltas |
+| [bunqueue-running-machine-gates](../../.agents/skills/bunqueue-running-machine-gates/SKILL.md) | the OrbStack Machine gate (`scripts/machine-gate.sh` and its helpers), cleanup on every exit path, the known node gap (exit 3) |
+| [bunqueue-releasing](../../.agents/skills/bunqueue-releasing/SKILL.md) | a release, only on the user's explicit request; Codex never invokes it implicitly, Claude Code can, so its first step stops without that request |
+
+The root `skills/bunqueue/` and `agents/` directories are something else: the Claude
+Code plugin (`.claude-plugin/plugin.json`) for applications that use bunqueue.
+
+On Windows, Git checks the `.claude/skills/` symlinks out as plain text files unless
+symlinks are enabled, and Claude Code then finds no skill there; clone with
+`git clone -c core.symlinks=true` (symlinks need Developer Mode or an elevated shell).
+`.agents/skills/` itself holds no symlink.
+
+A skill directory holds only:
+
+- `SKILL.md`: the portable frontmatter keys `name` (the directory name: 1-64
+  characters of `a-z`, `0-9` and inner single hyphens, without `anthropic` or
+  `claude`), `description` (one quoted line of at most 1024 characters without `<` or
+  `>`: what the skill does, then "Use when ...", and when not to use it), and
+  optionally `license` and string-valued `metadata`; then a body under 500 lines with a
+  Gotchas section;
+- `references/`: details one level deep, each linked from `SKILL.md`, with a Contents
+  section when longer than 100 lines;
+- `scripts/`: deterministic, non-interactive bash in strict mode, compatible with the
+  bash 3.2 of macOS, at most 300 lines each, with `--help`, `--dry-run`, distinct exit
+  codes and diagnostics on stderr, each linked from `SKILL.md`; `assets/`: data the
+  scripts read;
+- `agents/openai.yaml` (optional): Codex metadata; a skill that runs only on the user's
+  explicit request sets `policy.allow_implicit_invocation: false`;
+- `evals/evals.json`: trigger and output evaluations in a reduced form of the
+  anthropics/skills skill-creator format:
+
+```json
+{
+  "skill_name": "bunqueue-fixing-bugs",
+  "trigger_queries": [
+    { "query": "a realistic request", "should_trigger": true },
+    { "query": "a near miss for another skill", "should_trigger": false, "note": "why" }
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "a task",
+      "expected_output": "what a good run does",
+      "assertions": ["a checkable statement about the run"],
+      "files": []
+    }
+  ]
+}
+```
+
+with at least 8 queries that should trigger the skill, at least 8 near misses that
+share its words but belong to another skill or to none, and at least 3 output
+scenarios. They are run by hand or with skill-creator's tooling; the contract checks
+their shape only.
+
+`test/agent-skills.test.ts`, `test/agent-skills-scripts.test.ts`,
+`test/agent-skills-machine-gate.test.ts` and
+`test/agent-skills-machine-lifecycle.test.ts` (helpers in `test/agent-skills-support.ts` and
+`test/agent-skills-fakes.ts`; `bun test test/agent-skills`) run in the unit suite and
+fail, naming the skill and the rule, when a skill rots: the layout and the symlinks,
+the frontmatter, name and single-line description rules, every link resolving inside
+the repository (anchors included), every bundled file linked, the evals shape, the
+Codex invocation rule, strict-mode scripts of at most 300 lines whose `--help`, usage
+error and `--dry-run` behave (the dry run with every side-effecting command replaced by
+a recorder that must stay empty), the post-gate delta on listed paths and, where Git
+is installed, on a real repository with a rename, the Machine gate's verdicts on
+fixture logs and its list of known failures, its cleanup with a fake OrbStack (an
+interrupt during `orb create` leaves no Machine and no worker, a create that appears
+too late is reported as not deleted, an existing Machine name is never touched, a
+failing `orb list` is a failure, only the gate's own live workers are signalled), no skill file in the npm package, and every skill file and link
+target in the sandbox test image (`Dockerfile.test` copies `.agents/` and
+`.claude/skills/`, symlinks kept as symlinks).

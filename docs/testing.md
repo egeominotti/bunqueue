@@ -19,8 +19,9 @@ from `BUN_VERSION` in `.github/workflows/ci.yml`, then runs
 `bun install --frozen-lockfile --ignore-scripts`, `bun run typecheck` (whose
 `typecheck:prepare` step builds ignored output), `bun run format:check`,
 `git diff --check` (skipped with a notice where there is no Git checkout, as in a
-sanitized Machine snapshot) and the harness contract `bun test test/agent-harness`,
-and prints the active work items. It is not a commit gate (`bun run test:sandbox`
+sanitized Machine snapshot) and the harness and skills contracts
+`bun test test/agent-harness test/agent-skills`, and prints the active work items and
+the agent skills. It is not a commit gate (`bun run test:sandbox`
 is), but a green `./init.sh` is part of the Definition of Done in `CLAUDE.md` and
 `AGENTS.md`. `./init.sh --full` adds `bun run test:sandbox`, and the gates below
 apply unchanged.
@@ -431,6 +432,37 @@ revision, frozen-lockfile installation result, commands, exit codes, durations,
 and exact test totals. Copy the manifest and logs back under `artifacts/`, then
 delete the Machine. A reused Machine, host-only run, or run against a mounted
 worktree is diagnostic evidence only.
+
+The procedure is scripted by the
+[`bunqueue-running-machine-gates` agent skill](../.agents/skills/bunqueue-running-machine-gates/SKILL.md):
+its `scripts/machine-gate.sh`, run on the macOS host, creates the Machines with the
+flags above (Ubuntu 24.04 and Debian 13 by default, `--distros ubuntu:24.04` outside a
+release), copies a `git archive` snapshot of one tree over the SSH endpoint with agent
+and port forwarding off, installs the Bun version pinned in the snapshot's CI workflow,
+runs every step above (including `bun run build:client` before the unit suite and the
+tinyfs run), and writes `artifacts/machines/<run-id>/` with a `manifest.md`, a
+`steps.tsv` and a `delete.log`. When it ends, after success, a failure, SIGTERM or
+SIGINT, it stops its workers with their whole process trees, waits up to 60 s for a
+create the OrbStack daemon may still finish, copies the logs back and deletes every
+Machine the run created; a Machine whose name already exists is never touched.
+If such a create has not appeared by then, the run is recorded as not deleted (exit
+4) with the names to check. `test/agent-skills-machine-lifecycle.test.ts` checks these
+paths with a fake `orb`: an interrupt during `orb create` leaves no Machine and no
+worker process. A run with a step
+subset or `--keep` is diagnostic (exit 5), never release evidence, and `--dry-run`
+prints every command and creates nothing.
+
+The Machines are Bun-only: there is no `node` on `PATH`. Two unit test files,
+`test/repro-docker-version-gate-errors.test.ts` (2 tests) and
+`test/repro-release-source-commit.test.ts` (4 tests), run the version-gate step of
+`.github/workflows/ci.yml`, whose first command is `node -p`, so in a Machine they
+fail with `node: command not found`; the sandbox image (Bun's `node` fallback) and
+GitHub's runners (real Node) pass them. The canonical unit run installs no shim and
+records those six failures; the two files are then rerun as they are and with a
+node-to-Bun shim appended to `PATH`, the way the `oven/bun` image provides one, and
+must pass with it. `machine-gate.sh` performs these reruns itself and reports this
+known environment gap (exit 3) apart from a real failure (exit 1); it matches the
+failures by file and test title.
 
 `--isolated` removes macOS filesystem and integration access;
 `--isolate-network` also blocks direct access to the host and other Machines.

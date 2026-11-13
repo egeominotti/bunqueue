@@ -7,6 +7,10 @@
 !progress.md
 !session-handoff.md
 !init.sh
+!.agents/
+!.agents/**
+!.claude/skills/
+!.claude/skills/**
 !bun.lock
 !bunfig.toml
 !tsconfig.json

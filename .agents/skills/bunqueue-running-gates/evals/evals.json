@@ -1,0 +1,60 @@
+{
+  "skill_name": "bunqueue-running-gates",
+  "trigger_queries": [
+    { "query": "which gates do I need before committing this change to src/application/operations/pull.ts?", "should_trigger": true },
+    { "query": "bun run test:sandbox finished, summary.md says 'duration regression vs baseline: +31%' on unit. is that a problem?", "should_trigger": true },
+    { "query": "a test passes with bun test on my mac but the sandbox unit container says ENOENT /workspace/docs/foo.json", "should_trigger": true },
+    { "query": "the tcp suite failed once in the sandbox but I can't reproduce it, how do I tell if it's contention?", "should_trigger": true },
+    { "query": "I added one line to the changelog after the sandbox went green. do I have to run the whole thing again?", "should_trigger": true },
+    { "query": "test:model printed seed 81723 path 4:2:1 size max and failed, replay it", "should_trigger": true },
+    { "query": "I touched sdk/python/bunqueue/client.py, what do I run before handing off?", "should_trigger": true },
+    { "query": "read artifacts/test-sandbox/2026-11-12T20-20-16.500Z and tell me the totals for the evidence", "should_trigger": true },
+    { "query": "docker isn't running on this machine, can I just run bun test --parallel=4 instead of the sandbox?", "should_trigger": true },
+    { "query": "run the Debian 13 and Ubuntu 24.04 OrbStack Machines for the release", "should_trigger": false, "note": "bunqueue-running-machine-gates" },
+    { "query": "measure push throughput before and after my change", "should_trigger": false, "note": "native benchmarks" },
+    { "query": "fix the bug where cancel() leaves a job in the processing map", "should_trigger": false, "note": "bunqueue-fixing-bugs owns the fix" },
+    { "query": "write a GitHub Actions workflow for my own app that runs bunqueue tests", "should_trigger": false, "note": "another project" },
+    { "query": "how do I configure stall detection in a Worker?", "should_trigger": false, "note": "library usage" },
+    { "query": "start my session and tell me which work item is ready", "should_trigger": false, "note": "bunqueue-working-sessions" },
+    { "query": "publish the new version to npm", "should_trigger": false, "note": "bunqueue-releasing, and only CI publishes" },
+    { "query": "format the file I just wrote", "should_trigger": false, "note": "a single bun fmt call, no gate decision" },
+    { "query": "explain what QueueManager.getMemoryStats returns", "should_trigger": false, "note": "orientation" }
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I changed src/domain/queue/shard.ts to fix FIFO group ordering. What do I run before committing, and in which order?",
+      "expected_output": "bun run test:model first (FIFO groups are on its trigger list), then bun run test:sandbox in the background on a frozen, staged tree recorded with git write-tree, plus typecheck, format:check and git diff --check; no SDK gate unless sdk/ changed; read summary.md KPIs and anomalies and report exact totals with the artifact path.",
+      "assertions": [
+        "bun run test:model is required before the sandbox for this change",
+        "bun run test:sandbox is required, and nothing else is accepted in its place",
+        "The tree is staged and recorded with git write-tree before the gate starts",
+        "The report names per-suite totals, anomalies and the artifact directory"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Sandbox green on tree 386b8522. Since then I edited docs/agents/release.md and the changelog only. Can I commit without rerunning?",
+      "expected_output": "The agent runs gate-delta.sh --gated 386b8522, gets exit 3 (docs-only), reruns the focused tests it lists (agent-harness, agent-skills, docs tests, generate-release-posts --check, check:docs-data), and records both tree hashes in the evidence; it does not claim the old gate covers the new tree without that proof, and still requires the skeptic before a commit.",
+      "assertions": [
+        "The delta is proven with gate-delta.sh or git diff --cached --stat against the gated hash",
+        "The docs-reading tests are rerun on the new tree",
+        "Both the gated and the current tree hash appear in the evidence",
+        "A code path in the delta would require rerunning bun run test:sandbox"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "The unit suite failed in the sandbox: test/repro-chaos-soak.test.ts timed out, but it passes when I run it alone on my mac.",
+      "expected_output": "The agent reads the complete unit.log and summary.md, reruns the gate with BUNQUEUE_TEST_SEQUENTIAL=1 to separate contention from a product bug, checks CPU and memory KPIs around the failure timestamp, and only classifies it as an application bug after a sequential or focused reproduction; a host pass is not accepted as evidence.",
+      "assertions": [
+        "BUNQUEUE_TEST_SEQUENTIAL=1 is used to check for parallel-only contention",
+        "The host-only pass is treated as diagnostic, not as a gate result",
+        "A real bug is handed to the reproduce-first bug workflow"
+      ],
+      "files": []
+    }
+  ]
+}

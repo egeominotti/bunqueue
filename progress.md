@@ -25,6 +25,9 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 - `release-2.9.22`: published 2026-11-13 from tag `v2.9.22` at `29428c1c` (GitHub
   release, Docker images, npm `latest` with provenance); release metadata
   refreshed. Evidence in `feature_list.json`.
+- `agent-skills`: six cross-client Agent Skills in `.agents/skills/` with
+  Claude Code symlinks, their scripts, evaluations and contract tests; sandbox
+  green, skeptic `PASS`. Evidence in `feature_list.json`.
 
 ### What's In Progress
 
@@ -36,9 +39,12 @@ overview: [docs/agents/README.md](docs/agents/README.md).
    unix-socket rollback notes in `src/infrastructure/server/httpListener.ts`, then
    the fix.
 2. `agent-harness-followups`: the non-blocking notes of the harness review.
-3. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
+3. `cron-test-midnight-boundary`: `test/cronScheduler.test.ts:819` fails when the
+   unit suite crosses 23:59 UTC; reproduce first, then an injected clock or a
+   schedule that cannot be under 60 s away.
+4. `ci-script-tests-bun-only-machines`: the two CI-script test files that need
    `node` in the Bun-only OrbStack Machines.
-4. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
+5. `ci-python39-runner-pin`: the Python 3.9 SDK job's `ubuntu-24.04` pin.
 
 ## Blockers / Risks
 
@@ -63,6 +69,45 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-13 — agent-skills
+
+- Objective: cross-client Agent Skills for contributors (`agent-skills`,
+  branch `agent-skills`, worktree separate from the release). Six skills in
+  `.agents/skills/` (the path Codex, Gemini CLI, Cursor and Copilot read), one
+  relative symlink each in `.claude/skills/` for Claude Code, portable
+  frontmatter only (`name`, `description`, `license`, `metadata`), trigger and
+  output evaluations per skill, and the contract tests
+  `test/agent-skills.test.ts` and `test/agent-skills-scripts.test.ts`.
+- Sources for the format and practices: agentskills.io (specification, best
+  practices, descriptions, scripts, evaluations), the Claude Code skills docs,
+  Anthropic's skill authoring best practices, the Codex skills docs, and the
+  anthropics/skills and openai/skills skill-creator skills.
+- Evidence so far: `bun run test:sandbox` green on the first staged tree
+  `4e9adf35` (unit 11720 / 0 / 398, tcp 553 / 0, embedded 349 / 0). On `daf7db88`
+  it failed only on `test/cronScheduler.test.ts:819`, which expects the next
+  midnight to be more than 60 s away and ran at 23:59:13 UTC (unit 11739 pass /
+  1 fail, `artifacts/test-sandbox/2026-11-12T23-56-09.256Z/`): unrelated to the
+  skills, recorded as the new item `cron-test-midnight-boundary`.
+- Skeptic: `FAIL` on `4e9adf35` (Machines left behind after an interrupt during
+  `orb create`, renames hidden from `gate-delta.sh`, cleanup state ignored by the
+  verdict, wording, files over 300 lines), fixed: the Machine gate is split into
+  `machine-gate.sh`, `machine-worker.sh`, `machine-cleanup.sh` and
+  `machine-verdict.sh`. `CONDITIONAL` on `daf7db88` (a create that appears after
+  the settle window recorded as deleted; `orb list` piped into `grep -q` under
+  pipefail, so an existing name could read as free; reaped worker pids handed to
+  cleanup; exit 130 hiding a failed cleanup), fixed, each with a test in
+  `test/agent-skills-machine-lifecycle.test.ts` (fake OrbStack) or
+  `test/agent-skills-machine-gate.test.ts`.
+- Host (diagnostic) on the fixed tree: `bun test test/agent-skills
+  test/agent-harness` 99 / 0; typecheck, format and whitespace clean; `./init.sh`
+  green.
+- Final gate: `bun run test:sandbox` green on the fixed tree `bbd565ca` (unit
+  11746 / 0 / 399, tcp 553 / 0, embedded 349 / 0, no anomalies; in the
+  agent-skills worktree, `artifacts/test-sandbox/2026-11-13T00-20-42.544Z/`);
+  skeptic `PASS` on that tree. Then rebased onto `7bc922db` (the release
+  metadata refresh, itself sandbox-gated): the rebase adds only that commit's
+  files and merges the changelog and the state files.
 
 ### 2026-11-13 — release-2.9.22 (published, step 7)
 

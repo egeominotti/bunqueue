@@ -1,0 +1,9 @@
+# Codex skill metadata. Releasing has side effects (version bump, tags, npm and Docker
+# publication through CI), so Codex never loads this skill on its own: the user names
+# it ($bunqueue-releasing) or asks for a release explicitly.
+interface:
+  display_name: 'bunqueue: release'
+  short_description: 'Prepare and ship a bunqueue release on request'
+  default_prompt: 'Use $bunqueue-releasing to prepare the bunqueue release I asked for.'
+policy:
+  allow_implicit_invocation: false

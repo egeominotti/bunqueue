@@ -190,6 +190,7 @@ A work item is `done` only when all of these hold and its `evidence` in
 | --- | --- |
 | Work items, state, handoff, startup check | [feature_list.json](feature_list.json), [progress.md](progress.md), [session-handoff.md](session-handoff.md), [./init.sh](init.sh) |
 | The harness and its contract test | [docs/agents/README.md](docs/agents/README.md) |
+| Procedures (Agent Skills) | [.agents/skills/](.agents/skills/) |
 | Writing or running tests | [docs/testing.md](docs/testing.md) |
 | Architecture, repository map, env vars, TCP commands, CLI, schema | [docs/agents/project-reference.md](docs/agents/project-reference.md) |
 | Client APIs (Simple Mode, Workflow Engine, SDK options) | [docs/agents/client-reference.md](docs/agents/client-reference.md) |

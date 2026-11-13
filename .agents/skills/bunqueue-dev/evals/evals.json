@@ -1,0 +1,57 @@
+{
+  "skill_name": "bunqueue-dev",
+  "trigger_queries": [
+    { "query": "I'm new to the bunqueue codebase, where does a PUSH go after the TcpServer?", "should_trigger": true },
+    { "query": "where is the workflow engine's compensation logic in this repo?", "should_trigger": true },
+    { "query": "plan the change to add a per-queue TTL default in bunqueue, which files are involved?", "should_trigger": true },
+    { "query": "what's the lock order for shards and processing shards here?", "should_trigger": true },
+    { "query": "which skill should I use to validate my change before committing in bunqueue?", "should_trigger": true },
+    { "query": "review this diff to src/domain/queue/shard.ts for convention problems", "should_trigger": true },
+    { "query": "how are shards chosen for a queue name in bunqueue?", "should_trigger": true },
+    { "query": "explain the difference between embedded and TCP mode in the bunqueue source", "should_trigger": true },
+    { "query": "is there a max file length rule in this repo?", "should_trigger": true },
+    { "query": "in my Next.js app, how do I create a bunqueue Worker with concurrency 5?", "should_trigger": false, "note": "application usage: the plugin skill named bunqueue" },
+    { "query": "add a cron job with bunqueue to my project that runs every morning", "should_trigger": false, "note": "application usage" },
+    { "query": "use the bunqueue MCP tools to retry the DLQ of queue emails", "should_trigger": false, "note": "operating a broker through MCP" },
+    { "query": "migrate my app from BullMQ to bunqueue", "should_trigger": false, "note": "application migration" },
+    { "query": "explain how Redis streams work", "should_trigger": false, "note": "unrelated queue technology" },
+    { "query": "write a Python worker for a RabbitMQ queue", "should_trigger": false, "note": "another queue system" },
+    { "query": "deploy bunqueue with docker compose on my server", "should_trigger": false, "note": "operations" },
+    { "query": "what is the default backoff for retries when I call queue.add?", "should_trigger": false, "note": "library usage answered by the user docs" },
+    { "query": "draft the release notes for 2.9.23", "should_trigger": false, "note": "bunqueue-releasing" }
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to change how ACKs are batched. Where do I start?",
+      "expected_output": "The agent points to the ACK request flow (TcpServer -> AckBatcher -> Shard.complete -> jobResults), the relevant directories, the lock hierarchy and invariants, the docs/features page to update, and routes the validation to bunqueue-running-gates (test:model is triggered for lifecycle changes).",
+      "assertions": [
+        "The ACK flow is described with its components",
+        "The lock hierarchy or invariant rules are mentioned",
+        "Validation is routed to bunqueue-running-gates, including test:model"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "There is a skills/bunqueue folder at the repo root. Should I follow it while fixing the broker?",
+      "expected_output": "The agent explains that skills/bunqueue and agents/ are the Claude Code plugin for application developers using bunqueue, not contributor instructions, and that contributor procedures live in .agents/skills and CLAUDE.md/AGENTS.md.",
+      "assertions": [
+        "skills/bunqueue is identified as product documentation for applications",
+        "The contributor skills in .agents/skills are named instead"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I want to split src/client/worker/worker.ts, it's 340 lines.",
+      "expected_output": "The agent confirms the 300-line rule applies, proposes splitting by concern with only the needed exports, keeps behavior unchanged, and lists the docs and gates that follow (docs/features page, bun run test:sandbox, skeptic before commit).",
+      "assertions": [
+        "The 300-line limit is cited",
+        "The split keeps behavior unchanged and exports minimal",
+        "The docs and sandbox gate follow-ups are listed"
+      ],
+      "files": []
+    }
+  ]
+}

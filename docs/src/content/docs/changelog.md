@@ -20,6 +20,47 @@ head:
 
 ## [Unreleased]
 
+### Tooling
+
+- Agent Skills for contributors in `.agents/skills/`, the cross-client location
+  that Codex, Gemini CLI, Cursor and Copilot read, with one relative symlink per
+  skill in `.claude/skills/` for Claude Code (on Windows, clone with
+  `git clone -c core.symlinks=true`): `bunqueue-working-sessions` (session start
+  and end, work items, progress, handoff, evidence), `bunqueue-fixing-bugs`
+  (reproduce first, subagents, skeptic rounds until `PASS`),
+  `bunqueue-running-gates` (which gate a change needs, the sandbox artifacts and
+  KPIs, failure classification, and `scripts/gate-delta.sh`, which shows whether a
+  change made after a green gate is docs-only; a rename counts as both of its
+  paths), `bunqueue-running-machine-gates` and `bunqueue-releasing` (the release
+  checklist and its gotchas; Codex never invokes it implicitly, and its first step
+  stops when the user did not ask for a release). The Machine skill's
+  `scripts/machine-gate.sh` runs the OrbStack Machine gate end to end (Ubuntu 24.04
+  and Debian 13 by default, Ubuntu alone outside a release): isolated Machines, a
+  `git archive` snapshot of one tree copied over SSH without agent forwarding,
+  CI's Bun, every step, and a manifest under `artifacts/machines/`. When it ends,
+  after success, a failure, SIGTERM or SIGINT, it stops its workers with their whole
+  process trees, waits for a create the OrbStack daemon may still finish (and
+  reports one that never appeared as not deleted), copies the logs back and
+  deletes every Machine the run created; a Machine whose name already exists is
+  never touched. It reports the known gap of the Bun-only
+  Machines (six version-gate tests that need `node`, matched by file and title,
+  that pass again with a node-to-Bun shim) as exit 3, a real failure as exit 1, an
+  infrastructure failure or a Machine left behind as exit 4, a step subset or a
+  `--keep` run as diagnostic (exit 5) and an interrupt as exit 130, or 4 when a
+  Machine could not be deleted. The
+  `bunqueue-dev` skill moved from `.claude/skills/` to `.agents/skills/` with
+  portable frontmatter only, and routes to the new skills. Each skill ships trigger
+  and output evaluations in `evals/evals.json`. `test/agent-skills.test.ts`,
+  `test/agent-skills-scripts.test.ts`, `test/agent-skills-machine-gate.test.ts` and
+  `test/agent-skills-machine-lifecycle.test.ts`
+  check the layout, the symlinks, the frontmatter, the links, the evaluations,
+  every script's `--help`, `--dry-run` and size, the post-gate delta on a real
+  repository, the Machine gate's verdicts on fixture logs, and its cleanup with a
+  fake OrbStack (an interrupt during `orb create` leaves no Machine and no worker);
+  `Dockerfile.test` now copies `.agents/` and `.claude/skills/`, so they also run
+  in the sandbox, and `./init.sh` runs them and lists the skills. Nothing in the
+  package or the runtime changes.
+
 ### Documentation
 
 - Release metadata refreshed after the 2.9.22 publication

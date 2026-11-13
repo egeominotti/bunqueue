@@ -1,0 +1,59 @@
+{
+  "skill_name": "bunqueue-working-sessions",
+  "trigger_queries": [
+    { "query": "start a new session on this worktree and tell me what's ready to work on", "should_trigger": true },
+    { "query": "./init.sh fails at the format step, what do I do before starting my task?", "should_trigger": true },
+    { "query": "I'm done for today, update progress.md and feature_list.json for the next session", "should_trigger": true },
+    { "query": "rebase conflict in feature_list.json and progress.md after pulling main", "should_trigger": true },
+    { "query": "write the handoff for the TLS work, it continues tomorrow", "should_trigger": true },
+    { "query": "add a work item for the unix socket follow-ups and mark it in progress on my branch", "should_trigger": true },
+    { "query": "what evidence do I need to mark issue-189-tls-reload as done?", "should_trigger": true },
+    { "query": "resume the release-2.9.22 item from where the last session stopped", "should_trigger": true },
+    { "query": "the harness contract test says two in-progress items share a branch", "should_trigger": true },
+    { "query": "fix the bug in the unix socket rollback", "should_trigger": false, "note": "bunqueue-fixing-bugs" },
+    { "query": "run the sandbox and read the KPIs", "should_trigger": false, "note": "bunqueue-running-gates" },
+    { "query": "write a progress bar for the CLI push command", "should_trigger": false, "note": "a feature that mentions progress" },
+    { "query": "how does job.updateProgress work over TCP?", "should_trigger": false, "note": "library behavior" },
+    { "query": "create a feature flag for the new scheduler", "should_trigger": false, "note": "product code" },
+    { "query": "prepare the next release", "should_trigger": false, "note": "bunqueue-releasing" },
+    { "query": "set up git worktrees for my other project", "should_trigger": false, "note": "another project" },
+    { "query": "summarize what bunqueue's architecture looks like", "should_trigger": false, "note": "bunqueue-dev" },
+    { "query": "squash my last three commits", "should_trigger": false, "note": "a git operation, not the session lifecycle" }
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "New session. Get me started on the next thing to do.",
+      "expected_output": "The agent confirms pwd and branch, runs ./init.sh, reads progress.md (Current State, newest Session Log entry) and git log --oneline -5, lists ready items, and claims exactly one by setting it in-progress with the branch name stripped of any account prefix; it does not commit or push.",
+      "assertions": [
+        "./init.sh runs before any work",
+        "Exactly one item is set in-progress",
+        "The branch recorded has no account prefix",
+        "No commit or push happens"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Wrap up the session: the fix is implemented, the sandbox is still running.",
+      "expected_output": "The agent updates only its own Current State lines and Last Updated date, prepends a dated Session Log entry with the handoff sections, sets the item's evidence to PARTIAL naming what ran and that the sandbox is pending (a blocker, not a pass), and leaves ./init.sh green.",
+      "assertions": [
+        "The pending sandbox is recorded as not run, not as passed",
+        "The Session Log entry is prepended, newest first",
+        "Evidence is marked PARTIAL with exact commands and totals"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "After rebasing on main, feature_list.json has a conflict: both sides added an item at the end.",
+      "expected_output": "The agent keeps both items, places them in id order, renames one id if they collide, resolves progress.md with the newest Last Updated and both Session Log entries newest first, then runs bun test test/agent-harness test/agent-skills.",
+      "assertions": [
+        "Both items are kept",
+        "Items end in id order with unique ids",
+        "The harness contract test is run after resolving"
+      ],
+      "files": []
+    }
+  ]
+}

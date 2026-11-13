@@ -1,0 +1,62 @@
+{
+  "skill_name": "bunqueue-fixing-bugs",
+  "trigger_queries": [
+    { "query": "workers on 2.9.21 sometimes pick up the same job twice after a server restart, can you fix it? issue #201", "should_trigger": true },
+    { "query": "bug: Queue.getJobs({ state: 'delayed' }) returns jobs that were already promoted. please fix", "should_trigger": true },
+    { "query": "the workflow engine runs the compensation for a step that never started when a parallel branch fails, that's wrong", "should_trigger": true },
+    { "query": "CI failed on main with a flaky test in test/repro-wait-outage.test.ts, figure out if it's a real bug and fix it", "should_trigger": true },
+    { "query": "the skeptic flagged that the unix socket rebind loses its chmod 660, write the fix", "should_trigger": true },
+    { "query": "bun run test:model found a counterexample: seed -1959189325, a job resurrects after SIGKILL. investigate and fix", "should_trigger": true },
+    { "query": "DLQ retry in the TCP mode drops the job's data field, reproduce and patch it", "should_trigger": true },
+    { "query": "the python SDK hangs forever when the broker closes the connection mid-PULLB, can you sort it out", "should_trigger": true },
+    { "query": "cron jobs with timezone Europe/Rome fire an hour late after DST, looks like a regression from last release", "should_trigger": true },
+    { "query": "add a new TCP command to list paused queues", "should_trigger": false, "note": "feature work, no defect" },
+    { "query": "just run the sandbox gate on my staged changes and tell me if it's green", "should_trigger": false, "note": "bunqueue-running-gates" },
+    { "query": "prepare the 2.9.23 release, bump the version and write the post", "should_trigger": false, "note": "bunqueue-releasing" },
+    { "query": "in my express app the bunqueue Worker never processes jobs, what am I doing wrong with the connection options?", "should_trigger": false, "note": "application usage of bunqueue, the plugin skill" },
+    { "query": "explain how the WriteBuffer batches SQLite writes", "should_trigger": false, "note": "bunqueue-dev orientation" },
+    { "query": "refactor src/application/queueManager.ts into smaller files, it is getting long", "should_trigger": false, "note": "refactor without a defect" },
+    { "query": "update progress.md and hand off the work to the next session", "should_trigger": false, "note": "bunqueue-working-sessions" },
+    { "query": "run the Ubuntu and Debian OrbStack machines for the release candidate", "should_trigger": false, "note": "bunqueue-running-machine-gates" },
+    { "query": "benchmark bunqueue against BullMQ on my mac", "should_trigger": false, "note": "native benchmarks, no defect" }
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Bug report: after Queue.remove(id) on a completed job, waitUntilFinished() for that id still resolves with the old result over TCP. Fix it.",
+      "expected_output": "The agent writes a regression test first (test/repro-*.test.ts over the real TCP path), runs it, shows it failing on the assertion about the returned result, then delegates the fix to subagents, proves the test passes with neighbouring tests, updates docs and the changelog [Unreleased] Bug fixes section, runs or schedules bun run test:sandbox, and asks the skeptic before any commit; it does not commit without an explicit request.",
+      "assertions": [
+        "A reproducing test is written before any runtime source file is edited",
+        "The test is run and its failure output is shown or quoted before the fix",
+        "The failure is checked to be for the right reason (the bug's assertion, not a setup error)",
+        "Subagents are used to investigate or implement the fix",
+        "The changelog [Unreleased] section and the relevant docs/features page are updated in the same change",
+        "The skeptic is invoked on the staged diff before any commit, and no commit happens without the user's request"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The skeptic returned FAIL on my staged fix: it says the new SIGHUP handler changes behavior for servers started under nohup. What now?",
+      "expected_output": "The agent treats the concern as real, reproduces it with a test (a server under nohup receiving SIGHUP), decides the compatible behavior, fixes or documents it as an Upgrade note, reruns affected tests and the gate if code changed, and re-invokes the skeptic with a 'fixed since last round' list until PASS.",
+      "assertions": [
+        "The concern is answered with a test or a code change, not an argument",
+        "Affected tests are rerun, and the sandbox gate is rerun when code changed",
+        "The skeptic is invoked again with the fixes listed",
+        "A remaining CONDITIONAL item is put to the user for explicit confirmation rather than committed"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "My new regression test reads test-fixtures.json from the repo root. It passes with bun test locally but the sandbox unit container fails with ENOENT. Fix the test setup.",
+      "expected_output": "The agent explains that the test image only contains files allow-listed in Dockerfile.test.dockerignore and copied by Dockerfile.test, adds the file to both (or moves the fixture under test/), reruns the focused test and the sandbox gate, and records the change in the changelog.",
+      "assertions": [
+        "Both Dockerfile.test (COPY) and Dockerfile.test.dockerignore (allow-list) are updated, or the fixture moves under test/",
+        "The agent does not weaken or skip the test to make it pass",
+        "bun run test:sandbox is rerun to prove the fix in the container"
+      ],
+      "files": []
+    }
+  ]
+}

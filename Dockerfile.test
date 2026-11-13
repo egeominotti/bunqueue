@@ -40,6 +40,11 @@ COPY --chown=bun:bun README.md ./README.md
 # Agent harness (docs/agents/README.md): test/agent-harness-*.test.ts reads these.
 # COPY keeps the context's file mode, so init.sh stays executable.
 COPY --chown=bun:bun CLAUDE.md AGENTS.md feature_list.json progress.md session-handoff.md init.sh ./
+# Agent Skills (docs/agents/README.md#skills): test/agent-skills*.test.ts reads them.
+# .claude/skills holds one relative symlink per skill: COPY of a directory keeps the
+# symlinks as symlinks, and the skills' scripts keep their executable mode.
+COPY --chown=bun:bun .agents ./.agents
+COPY --chown=bun:bun .claude/skills ./.claude/skills
 COPY --chown=bun:bun docs/src/lib/reference-seo.ts ./docs/src/lib/reference-seo.ts
 COPY --chown=bun:bun docs/src/lib/rehypeTableLabels.ts ./docs/src/lib/rehypeTableLabels.ts
 COPY --chown=bun:bun docs/src/styles/docs-theme.css docs/src/styles/docs-reading.css ./docs/src/styles/

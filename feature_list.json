@@ -20,6 +20,15 @@
       "issue": null
     },
     {
+      "id": "agent-skills",
+      "name": "Agent Skills for contributors",
+      "description": "Cross-client Agent Skills in .agents/skills/ (Claude Code: one relative symlink per skill in .claude/skills/): bunqueue-dev (moved from .claude/skills/, portable frontmatter), bunqueue-working-sessions, bunqueue-fixing-bugs, bunqueue-running-gates (scripts/gate-delta.sh), bunqueue-running-machine-gates (scripts/machine-gate.sh with machine-worker.sh, machine-steps.sh, machine-cleanup.sh and machine-verdict.sh; cleanup of every created Machine on every exit path; the known node gap is exit 3) and bunqueue-releasing (Codex implicit invocation disabled), each with evals/evals.json; the contract tests test/agent-skills.test.ts, test/agent-skills-scripts.test.ts, test/agent-skills-machine-gate.test.ts and test/agent-skills-machine-lifecycle.test.ts; Dockerfile.test and its allow-list carry .agents/ and .claude/skills/; ./init.sh runs the skills contract; docs/agents/README.md, docs/testing.md, CLAUDE.md, AGENTS.md and the changelog describe them.",
+      "dependencies": ["agent-harness"],
+      "status": "done",
+      "evidence": "2026-11-13; lands in the commit that adds this entry, rebased onto 7bc922db. bun run test:sandbox green on the gated tree bbd565ca: unit 11746 / 0 / 399, tcp 553 / 0, embedded 349 / 0, no anomalies (agent-skills worktree, artifacts/test-sandbox/2026-11-13T00-20-42.544Z/); the skills and harness contract tests run inside the unit container. Earlier runs: green on 4e9adf35 (unit 11720 / 0 / 398); on daf7db88 one unrelated failure, test/cronScheduler.test.ts:819 at 23:59:13 UTC (work item cron-test-midnight-boundary). Host: bun test test/agent-skills test/agent-harness 99 / 0, bun run typecheck and bun run format:check clean, ./init.sh green; every script passes bash -n, --help and --dry-run under bash 3.2. After the rebase, bun run test:sandbox green again on the rebased tree 871688b7 (unit 11746 / 0 / 399, tcp 553 / 0, embedded 349 / 0, no anomalies; artifacts/test-sandbox/2026-11-13T00-32-55.365Z/); this sentence is the only change after that run. The rebase adds only the files of 7bc922db (release metadata refresh, itself sandbox-gated) and merges the changelog and state files. Skeptic: FAIL on 4e9adf35 (Machines left behind after an interrupt, renames hidden from gate-delta.sh), CONDITIONAL on daf7db88 (late create recorded as deleted, orb list under pipefail, reaped pids), all fixed with tests, then PASS on bbd565ca. bun run test:model and bun run test:sandbox:sdk not triggered (no src/ or sdk/ change). Not yet done, tracked for the next item: the trigger evaluations have not been run against real agents, and machine-gate.sh has only run against a fake OrbStack and recorded logs.",
+      "issue": null
+    },
+    {
       "id": "ci-python39-runner-pin",
       "name": "Revisit the Python 3.9 SDK runner pin",
       "description": "The SDK workflow's Python 3.9 job runs on ubuntu-24.04 because ubuntu-latest (Ubuntu 26.04) has no setup-python 3.9 build. Python 3.9 has been end-of-life since October 2025 and the ubuntu-24.04 image will be retired: decide when to drop 3.9 from the supported SDK runtimes (a release-compatibility decision for the user) or move the job to a container image that still ships it.",
@@ -32,6 +41,15 @@
       "id": "ci-script-tests-bun-only-machines",
       "name": "CI-script tests survive a Bun-only Machine",
       "description": "test/repro-docker-version-gate-errors.test.ts and test/repro-release-source-commit.test.ts run CI's version-gate bash, which calls node -p; in the documented Bun-only OrbStack Machine (docs/testing.md, node absent) they fail with node: command not found (6 tests), while CI and the sandbox (oven/bun node fallback) have node. Make them run the gate everywhere, e.g. by prepending a temporary node link to process.execPath on the PATH of the spawned bash, as the reviewer suggested, without weakening what they assert; then the release Machine gate needs no known-gap exception.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "",
+      "issue": null
+    },
+    {
+      "id": "cron-test-midnight-boundary",
+      "name": "Cron test fails when the unit suite crosses midnight UTC",
+      "description": "test/cronScheduler.test.ts:819 (\"cron with both schedule and repeatEvery uses schedule for nextRun\") expects the next midnight to be more than 60 s away and fails when the unit suite crosses 23:59 UTC: sandbox run artifacts/test-sandbox/2026-11-12T23-56-09.256Z/ in the agent-skills worktree, unit 11739 pass / 1 fail at 23:59:13 UTC. Reproduce first (a deterministic test that fails at 23:59:xx), then fix with an injected clock or a schedule that cannot be less than 60 s away, without weakening what the test asserts.",
       "dependencies": [],
       "status": "not-started",
       "evidence": "",

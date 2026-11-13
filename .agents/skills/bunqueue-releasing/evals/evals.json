@@ -1,0 +1,59 @@
+{
+  "skill_name": "bunqueue-releasing",
+  "trigger_queries": [
+    { "query": "let's cut 2.9.23: bump the version, date the changelog and write the release post", "should_trigger": true },
+    { "query": "prepare the release-preparation commit for bunqueue 2.10.0", "should_trigger": true },
+    { "query": "continue the 2.9.22 release, the gates are done, push it to main", "should_trigger": true },
+    { "query": "regenerate the API reference for the new version, docs:api", "should_trigger": true },
+    { "query": "write the upgrade notes for this release, the skeptic said some behavior changes are missing", "should_trigger": true },
+    { "query": "the release post says 2x faster, check every number in it against the changelog", "should_trigger": true },
+    { "query": "CI's version gate failed after I pushed the release commit, what now?", "should_trigger": true },
+    { "query": "the package is published, refresh the release post with the contributors and install box", "should_trigger": true },
+    { "query": "git push to main was rejected for the release commit with 'protected branch'", "should_trigger": true },
+    { "query": "add a changelog entry for my bug fix", "should_trigger": false, "note": "a single change's changelog entry" },
+    { "query": "commit my staged fix with a good message", "should_trigger": false, "note": "an ordinary commit" },
+    { "query": "what changed in 2.9.21?", "should_trigger": false, "note": "a question about a past release" },
+    { "query": "feature_list.json has a release-2.9.23 item, start on it", "should_trigger": false, "note": "a work item never authorizes a release by itself" },
+    { "query": "publish the python SDK to PyPI from my laptop", "should_trigger": false, "note": "no local publication; not the core release" },
+    { "query": "run the sandbox gate", "should_trigger": false, "note": "bunqueue-running-gates" },
+    { "query": "bump the msgpackr dependency version", "should_trigger": false, "note": "a dependency bump, not a release" },
+    { "query": "tag the docker image locally to test the production Dockerfile", "should_trigger": false, "note": "local build, not a release" },
+    { "query": "write a blog post about bunqueue's architecture", "should_trigger": false, "note": "not a release post" }
+  ],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Prepare the 2.9.23 release.",
+      "expected_output": "The agent confirms which steps the user is asking for (preparation commit, version bump, push are separate), opens or updates the release-2.9.23 work item, follows docs/agents/release.md in order: version bump on request, docs:api from a full clone, dated changelog with an Upgrade notes audit of git diff vPREV..HEAD -- src/, Docker tag alignment, the hand-written post with traced numbers, then the gates (sandbox, SDK sandbox if sdk/ changed, both Machines) and the skeptic; it never publishes locally and does not push without explicit authorization.",
+      "assertions": [
+        "The agent distinguishes the separate authorizations for the bump, the commit and the push",
+        "docs:api runs from a full clone, not from the git worktree",
+        "Upgrade notes are audited against git diff of the previous tag",
+        "The release post's numbers are traced to the changelog",
+        "No bun publish or npm publish is run, and no push happens without explicit authorization"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The release commit is ready and the skeptic said PASS. Push it.",
+      "expected_output": "With explicit authorization given, the agent verifies each outgoing commit has its changelog update and a compliant message, pushes to main, and if branch protection rejects the push it stops and reports the exact error, offering a pull request; it never force-pushes or bypasses protection. After the push it follows CI's version gate (tag, GitHub release, npm trusted publishing, Docker) and reports each job.",
+      "assertions": [
+        "Outgoing commits are checked for changelog updates and messages before the push",
+        "A protection rejection is reported, not worked around",
+        "CI's version-gate run is followed and reported"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "feature_list.json says release-2.9.23 is next. Go ahead.",
+      "expected_output": "The agent explains that a work item does not authorize a release and asks the user to confirm the release explicitly (and which steps), without bumping the version or pushing.",
+      "assertions": [
+        "No version bump, tag, push or publication happens",
+        "The agent asks for an explicit release request"
+      ],
+      "files": []
+    }
+  ]
+}
