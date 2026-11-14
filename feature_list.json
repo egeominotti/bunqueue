@@ -268,6 +268,15 @@
       "issue": null
     },
     {
+      "id": "race-chaos-accounting-flake",
+      "name": "Reproduce the legacy random chaos accounting failure",
+      "description": "Reproduce first: test/race-conditions.test.ts:606, Race Condition Tests > Mixed Concurrent Operations Stress Test > should maintain job count invariant under chaos, failed in Unit Tests job132344370497 of PR191 CI43560970951 attempt1 on1037ddd3: expected completed+dlq+active>=50, received49 (407.27ms). The unchanged code passed its single unit-job rerun in attempt2. It pushes100jobs with maxAttempts10, uses200unseeded Math.random pull/ack/fail operations, sleeps100ms and stops draining at the first empty200ms pull. Waiting excludes delayed and fail schedules retries1–3seconds later; a valid49counted+51delayed snapshot conserves100jobs but fails this predicate. CI did not print the state vector or IDs, so that explanation is not a proven cause and loss is not established. Preserve the failing assertion while diagnosing. Use a fresh isolated SQLite path, a recorded seed/operation trace and all100IDs; reproduce the valid-state counterexample, then distinguish omitted delayed work from an engine divergence. Any test fix must assert complete state and per-ID conservation instead of lowering the threshold, swallowing errors or using another arbitrary sleep.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "2026-11-14, observation only, not fixed. CI43560970951 attempt1 unit12041pass/1fail/399skip,488679assertions1127files479.59s; exactly one gh run rerun --failed, attempt2GREEN, ci-watch.sh exit3FLAKY. https://github.com/egeominotti/bunqueue/actions/runs/43560970951 . All other product/PG16-18/SDK/type/docs/format jobs passed; this commit changed metadata only and the test was untouched. Raw artifacts/tests-quality-final-pr-ci-unit-{failure.log,attempt1-summary.json,attempt2-summary.json,rerun-watch.log}; read-only .superpowers/sdd/2026-11-14-test-quality-speedups/chaos-accounting-ci-analysis.md confirms omitted-state possibility, not the actual CI cause.",
+      "issue": null
+    },
+    {
       "id": "release-2.9.22",
       "name": "Release bunqueue 2.9.22",
       "description": "Release checklist (docs/agents/release.md), every step only on the user's explicit request: set the package.json version to 2.9.22 and run bun run docs:api; date the 2.9.22 changelog section; align the Docker image references in README.md and the deployment, env-vars, installation and server guides as commit 2d617fd3 did for 2.9.21; generate and hand-write the release post per the release-post rules; gates: bun run test:sandbox, bun run test:sandbox:sdk (sdk/ changed since v2.9.21), fresh Ubuntu 24.04 and Debian 13 OrbStack Machines per docs/testing.md, skeptic PASS; push to main with explicit authorization (CI's version gate tags, releases and publishes); after publication run bun docs/scripts/generate-release-posts.ts --refresh and update the post.",

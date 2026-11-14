@@ -240,6 +240,11 @@ head:
   observed during PR validation. Its single failed-job rerun passed; a separate
   reproduce-first work item retains the assertion and records the evidence
   without claiming a cause or a fix.
+- Track a separate intermittent legacy chaos-accounting test failure in unit
+  CI. Its partial count omits delayed work, but the missing state/operation
+  trace leaves the observed cause unproved. The single unit-job rerun passed;
+  a reproduce-first follow-up preserves the oracle and requires full job
+  conservation rather than a relaxed threshold.
 
 - The CPU-intensive workers guide test "a non-yielding handler starves
   heartbeats and gets recovered" now observes the recovery it claims

@@ -78,6 +78,12 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ## Blockers / Risks
 
+- PR #191's metadata commit `1037ddd3` had a legacy random chaos-accounting
+  failure in Unit Tests, run43560970951 attempt1 (49 counted, expected at least
+  50). Its single unit-job rerun passed in attempt2, watcher exit3 FLAKY.
+  `race-chaos-accounting-flake` is not-started; delayed work is omitted from
+  that partial count, but actual CI state/IDs/seed were not captured. Preserve
+  the oracle and reproduce before asserting a cause or changing behavior.
 - PR #191's record commit `dd147ccf` had one PostgreSQL 17 processing-count
   failure in run43559077874 attempt1; the single failed-job rerun passed in
   attempt2 (`ci-watch.sh` exit3 FLAKY). The new not-started item
@@ -133,6 +139,26 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — unseeded chaos accounting finding tracked
+
+- CI43560970951 on metadata-only `1037ddd38f4e52da51dc461ef62b5d22a0122608`
+  failed only Unit Tests job132344370497: the unchanged legacy chaos case at
+  `race-conditions.test.ts:606` counted49 active/completed/DLQ jobs against its
+  at-least50 threshold. Unit12041/1/399; every product integration, PostgreSQL
+  version, SDK, docs, type and format job passed. The single failed-job rerun
+  passed in attempt2, watcher exit3 FLAKY; no second rerun was performed.
+- The test does not record its random trace or full state vector. Direct source
+  inspection confirms delayed retries are excluded and can outlast its
+  100ms sleep/200ms empty pull;49 counted+51 delayed is a valid100-job state,
+  but this does not establish the CI occurrence's cause. No assertion or runtime
+  change was made. New `race-chaos-accounting-flake` is not-started and requires
+  fresh isolated reproduction, a seeded trace, all IDs and complete conservation.
+- Failure, summaries, rerun watcher and read-only analysis are retained under
+  `artifacts/tests-quality-final-pr-ci-unit-*` and this plan's ignored workspace.
+  This final tracking record is metadata/changelog only; its own checks, skeptic,
+  push and exact-head CI precede normal PR #191 integration and main/local
+  verification. The PostgreSQL follow-up remains separate and unresolved.
 
 ### 2026-11-14 — intermittent PostgreSQL processing-count finding tracked
 
