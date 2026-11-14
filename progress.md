@@ -17,6 +17,12 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Done
 
+- `test-quality-speedups`: implementation `aa038a83`, all four task reviews and
+  whole-branch/pre-push skeptic PASS; full sandbox and fresh Ubuntu green on
+  tree `f3c1bdf4`. Source PR #191 CI
+  [43557827964](https://github.com/egeominotti/bunqueue/actions/runs/43557827964)
+  attempt1 GREEN, unit12042/0/399 and all product/PostgreSQL16–18/SDK/docs/type/
+  format jobs passed. Final state-record CI and authorized integration follow.
 - `harness-audit-hardening`, `postgres-runner-guard-destructuring` and
   `machine-gate-interrupt-log-gaps`: integrated in `9b69dcba` + `45790ac7`;
   full sandbox, fresh Ubuntu and source CI run `43526774536` GREEN. Final
@@ -55,23 +61,15 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
-- `test-quality-speedups` on `tests-quality-speedups`: the user approved the
-  full test-only audit. Strengthen assertions, remove ten redundant/vacuous
-  cases, preserve remaining coverage through concern-sized modules and shorten
-  real workflow/DLQ/stall test waits. Implementation and independent task
-  reviews are complete; full sandbox and fresh Ubuntu are green. Whole-branch
-  review and source PR CI/integration remain. No production or runner changes.
-
 The three audit implementations are done, backed by green source CI. Their
 original staged worktrees remain preserved. Their integration is complete;
 other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Close `docs/superpowers/plans/2026-11-14-test-quality-speedups.md`: prove the
-   final prose/state delta, obtain whole-branch skeptic PASS, then follow the
-   authorized commit/push/PR CI/merge workflow. No runtime changes, version bump
-   or publication.
+1. Validate/commit/push the test-quality final prose/state record, watch its
+   exact-head PR #191 CI, perform the authorized normal squash merge, then watch
+   main CI and fast-forward the original main checkout. No version/publication.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -130,6 +128,31 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — test quality validation and source CI complete
+
+- Source `aa038a83b040ebc7a9b3a0b54821c559beae2c77` pushed as `egeominotti`;
+  complete 43-file pre-commit and separate pre-push skeptic PASS. Source PR
+  [#191](https://github.com/egeominotti/bunqueue/pull/191) CI
+  [43557827964](https://github.com/egeominotti/bunqueue/actions/runs/43557827964)
+  attempt1 GREEN, `ci-watch.sh` exit0: unit12042/0/399,26 jobs succeeded and nine
+  expected skips; product, PostgreSQL16–18, all official SDKs, docs, type and
+  format jobs passed. This closes the implementation work item from source CI.
+- Frozen executable tree `f3c1bdf4746ea4d5e9a77e30b3a37582eda2d366` passed the
+  full sandbox: unit11907/0/403, TCP553/0, embedded349/0, errors0/anomaliesnone,
+  6.83 min versus8.92 baseline. Fresh native Ubuntu `20261114T041303Z` passed
+  unit12038/0/403, TCP553/0, embedded349/0, tinyfs9/0, type890+2149 and
+  format2359; complete logs copied and Machine deleted. Gate artifact paths and
+  full mutation/load/case-preservation evidence are in `feature_list.json`.
+- Source tree `3460918e` differs only by five prose/state paths; delta exit3,
+  410 reader tests,259 release-post checks, docs-data and final init179/0 passed.
+  Skeptic independently ran type890+2149,format2359 and six script entries588.
+  This final record is prose/state only and needs its own delta/readers and
+  skeptic before commit/push. Its CI and final merge/main CI are prospective.
+- Existing explicit commit/push/normal-merge authorization and `egeominotti`
+  preference remain; no version/release/publication. Keep managed worktrees,
+  original main's untracked content and all ignored evidence. Next: finish this
+  record's checks, exact-head PR CI, normal squash merge and main/local alignment.
 
 ### 2026-11-14 — test quality and duration audit implementation
 

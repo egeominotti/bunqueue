@@ -233,6 +233,9 @@ head:
   The full parallel sandbox measured 6.83 minutes versus 8.92 previously, with
   TCP at 5.94 versus 8.91 minutes and embedded at 1.58 versus 4.13 minutes;
   every suite passed, and a fresh native Ubuntu gate independently passed.
+- Record the completed test-quality work item with its isolated gate totals,
+  controlled-defect and case-preservation proofs, skeptic approvals and green
+  source PR CI evidence. The final record changes documentation and state only.
 
 - The CPU-intensive workers guide test "a non-yielding handler starves
   heartbeats and gets recovered" now observes the recovery it claims
