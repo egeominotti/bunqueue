@@ -214,6 +214,9 @@ head:
 
 ### Testing
 
+- Record the completed retry-delivery and job-conservation test corrections
+  with their isolated gate results, case-preservation checks, skeptic approvals
+  and green source CI evidence.
 - Test assertions now observe real lease ownership and renewal, rate-limit
   admission/refill, concurrency-policy removal, exact DLQ pagination, stored job
   logs, waiting-event IDs and forced closure with a running processor. Fixture

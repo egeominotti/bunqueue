@@ -17,6 +17,14 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Done
 
+- `ci-delivery-accounting-fixes`, `postgres-public-api-processing-flake` and
+  `race-chaos-accounting-flake`: implementation `bca26a94`, strict retry/durable
+  completion histories and exact all-state/ID conservation, all18 original race
+  cases retained. Sandbox/fresh Ubuntu gates passed; source PR #192 CI
+  [43588585824](https://github.com/egeominotti/bunqueue/actions/runs/43588585824)
+  attempt1 GREEN: unit12066/0/400, all PostgreSQL16/17/18.6 legs571/0/1 each,
+  TCP553/0,embedded349/0 and all SDK/type/format/docs jobs passed. Pre-commit and
+  separate pre-push skeptic PASS. Final state-record CI and integration follow.
 - `test-quality-speedups`: implementation `aa038a83`, all four task reviews and
   whole-branch/pre-push skeptic PASS; full sandbox and fresh Ubuntu green on
   tree `f3c1bdf4`. Source PR #191 CI
@@ -62,11 +70,8 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
-- `ci-delivery-accounting-fixes`, branch `fix-ci-delivery-accounting`, starts
-  from merged main `42225c31`. Both oracle defects have isolated RED/GREEN
-  evidence; strict delivery history and complete conservation checks are
-  implemented. PostgreSQL16–18, full sandbox and fresh Ubuntu gates passed;
-  final skeptic evidence-delta approval, commit/push and exact-head CI are next.
+The delivery/accounting implementation is done and source CI is green. The
+remaining PR #192 integration is described below.
 
 The three audit implementations are done, backed by green source CI. Their
 original staged worktrees remain preserved. Their integration is complete;
@@ -74,11 +79,10 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Finish `ci-delivery-accounting-fixes`: review the complete PostgreSQL16–18
-   results, sandbox and fresh Ubuntu gates, obtain the mandatory skeptic PASS
-   before each authorized commit/push, then watch exact-head CI and integrate.
-   PR #191 already merged as `42225c31`; its main CI43563916357 is green and
-   the original main checkout was aligned. No version/publication action.
+1. Validate/push the final evidence record for PR #192, watch its exact-head CI,
+   perform the authorized normal squash merge, watch main CI and fast-forward
+   the original main checkout. The implementation's CI43588585824 is already
+   GREEN on `bca26a94`. No version/publication action.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -89,8 +93,8 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 - The legacy partial-count predicate from CI43560970951 has been reproduced
   with all100IDs retained (49completed/51delayed), then replaced with exact
-  conservation checks under `ci-delivery-accounting-fixes`; its source CI is
-  pending. The original CI snapshot/seed were not retained.
+  conservation checks under `ci-delivery-accounting-fixes`; its source
+  CI43588585824 is GREEN on `bca26a94`. The original CI snapshot/seed were not retained.
 - The PostgreSQL invocation-count oracle from CI43559077874 rejects a proven
   legal Progress-failure retry. Strict token/attempt/durable-history checks now
   distinguish that path from unexplained repeats, but the specific historical
@@ -145,6 +149,35 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — retry and conservation corrections validated in source CI
+
+- Implementation `bca26a9408cea04e443808f8af12351e67ae149a`, tree6a934451, is
+  committed and pushed as `egeominotti` on `fix-ci-delivery-accounting`;
+  [PR #192](https://github.com/egeominotti/bunqueue/pull/192) targets main.
+  Separate mandatory pre-commit and pre-push skeptic verdicts are PASS.
+- Exact-head CI43588585824 attempt1 GREEN, watcher exit0:26successful jobs,
+  9expected release skips. Unit12066/0/400,486376assertions1136files472.87s;
+  TCP69/69suites553/553, embedded43/43suites349/349, PostgreSQL16/17/18.6 each
+  571/0/1opt-insoakskip,572tests126files. Both affected cases and the real
+  SQL-lock regression passed in every PostgreSQL leg. All SDK, public API,
+  WebSocket/SSE, type, format and docs jobs passed. Separate automated code
+  review43588585715 succeeded without findings.
+- All three work items are done on this implementation evidence. Gated
+  executable treee2c50d57, sandbox/fresh Ubuntu receipts, RED/GREEN sequences,
+  case-preservation audit and limitations are recorded in feature_list.json.
+  The final source post-gate delta6a934451 changes only changelog/state;
+  gate-delta.sh exit3,408/0readers,259releaseposts/64docsassets and init9s green.
+- Current closure changes only the changelog and work-state records; no new
+  executable changes. Remaining integration: focused readers/delta proof,
+  skeptic before each authorized closure commit/push, exact-head PR CI, normal
+  squash merge, main CI and original-main alignment. Existing authorization
+  persists; no release/version/publication action. All owned Machines deleted.
+- Evidence: artifacts/ci-delivery-accounting/source-ci-{final.json,watch.log,
+  unit.log,tcp.log,embedded.log,pg16.log,pg17.log,pg18.log}; isolated manifests
+  and current ledger are linked in the implementation entry below. Historical
+  CI43559077874 cause remains unclassified; the corrected checker rejects any
+  repeated delivery lacking the specifically proven failure/retry history.
 
 ### 2026-11-14 — delivery and accounting oracle defects reproduced
 
