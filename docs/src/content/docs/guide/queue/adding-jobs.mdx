@@ -36,7 +36,7 @@ const configuredJob = await queue.add('job-name', data, {
   backoff: 2000, // Exponential base delay in ms (default: 1000, jitter applied, capped at 1h)
   // OR: backoff: { type: 'exponential', delay: 2000, maxDelay: 60000 }  // optional per-job cap
   timeout: 30000, // Fail the job if processing takes longer
-  jobId: 'custom-id', // Custom ID, makes the add idempotent (see Deduplication)
+  jobId: 'custom-id', // Custom ID; retained-ownership dedup (see limits below)
   removeOnComplete: true, // Delete job data after it completes
 });
 ```
@@ -55,7 +55,7 @@ const configuredJob = await queue.add('job-name', data, {
   backoff: 2000, // Exponential base delay in ms (default: 1000, jitter applied, capped at 1h)
   // OR: backoff: { type: 'exponential', delay: 2000, maxDelay: 60000 }  // optional per-job cap
   timeout: 30000, // Fail the job if processing takes longer
-  jobId: 'custom-id', // Custom ID, makes the add idempotent (see Deduplication)
+  jobId: 'custom-id', // Custom ID; retained-ownership dedup (see limits below)
   removeOnComplete: true, // Delete job data after it completes
 });
 ```
@@ -76,7 +76,7 @@ job = queue.add(
     backoff=2000,             # Exponential base delay in ms (default: 1000)
     # OR: backoff={"type": "exponential", "delay": 2000}
     timeout=30000,            # Fail the job if processing takes longer
-    job_id="custom-id",       # Custom ID, makes the add idempotent
+    job_id="custom-id",       # Custom ID; retained-ownership dedup (see limits below)
     remove_on_complete=True,  # Delete job data after it completes
 )
 ```
@@ -94,7 +94,7 @@ $job = $queue->add('job-name', $data, [
     'attempts' => 5,            // Max total executions (default: 3)
     'backoff' => 2000,          // Or ['type' => 'exponential', 'delay' => 2000]
     'timeout' => 30000,         // Fail the job if processing takes longer
-    'jobId' => 'custom-id',     // Custom ID, makes the add idempotent
+    'jobId' => 'custom-id',     // Custom ID; retained-ownership dedup (see limits below)
     'removeOnComplete' => true, // Delete job data after it completes
 ]);
 ```
@@ -112,7 +112,7 @@ job, err = queue.Add("job-name", data, bunqueue.JobOptions{
     "attempts":         5,           // Max total executions (default: 3)
     "backoff":          2000,        // Or map[string]any{"type": "exponential", "delay": 2000}
     "timeout":          30000,       // Fail the job if processing takes longer
-    "jobId":            "custom-id", // Custom ID, makes the add idempotent
+    "jobId":            "custom-id", // Custom ID; retained-ownership dedup (see limits below)
     "removeOnComplete": true,        // Delete job data after it completes
 })
 ```
@@ -131,7 +131,7 @@ let job = queue.add("job-name", data, JobOptions {
     backoff: Some(Backoff::Milliseconds(2000)),
     // OR: Backoff::Strategy { kind: "exponential".into(), delay: 2000, max_delay: None }
     timeout: Some(30_000),            // Fail the job if processing takes longer
-    job_id: Some("custom-id".into()), // Custom ID, makes the add idempotent
+    job_id: Some("custom-id".into()), // Custom ID; retained-ownership dedup (see limits below)
     remove_on_complete: Some(true),   // Delete job data after it completes
     ..Default::default()
 })?;
@@ -151,7 +151,7 @@ let job = queue.add("job-name", data, JobOptions {
     attempts: 5,            # Max total executions (default: 3)
     backoff: 2000,          # Or %{type: "exponential", delay: 2000}
     timeout: 30_000,        # Fail the job if processing takes longer
-    jobId: "custom-id",     # Custom ID, makes the add idempotent
+    jobId: "custom-id",     # Custom ID; retained-ownership dedup (see limits below)
     removeOnComplete: true  # Delete job data after it completes
   )
 ```
@@ -160,6 +160,11 @@ let job = queue.add("job-name", data, JobOptions {
 </Tabs>
 
 The full option list is in the [reference table](/guide/queue/options/).
+
+Custom-ID suppression depends on retained live ownership. Memory/SQLite use a
+bounded cache (50,000 IDs by default), while PostgreSQL checks live database
+identity. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits);
+keep external effects idempotent and reconcile uncertain admissions before retrying.
 
 `timeout` starts when the broker marks the job active. The broker tracks the
 absolute processing deadline and fails the job with reason `timeout` when it is
@@ -452,8 +457,9 @@ For named, managed schedules, see [Job Schedulers](/guide/queue/schedulers/) and
 
 ### Durable jobs (no SQLite buffer-loss window)
 
-By default SQLite mode batches writes to disk for up to 10 ms. A crash inside
-that window can lose the not-yet-flushed jobs. For jobs where that is
+By default SQLite mode batches writes with a typical 10 ms flush interval;
+stalls or retries can keep writes pending longer. A crash can lose the
+not-yet-flushed jobs. For jobs where that is
 unacceptable, `durable: true` bypasses bunqueue's buffer and commits before
 `add()` returns. Host, filesystem, and physical-media durability still apply:
 
@@ -543,7 +549,7 @@ cannot make it survive a process restart.
 
 | SQLite mode |         Published native workload median | Data loss window            | Use for                         |
 | ----------- | ---------------------------------------: | --------------------------- | ------------------------------- |
-| Default     | 186,384 jobs/s, public on-disk `addBulk` | Up to 10 ms                 | Re-creatable work               |
+| Default     | 186,384 jobs/s, public on-disk `addBulk` | Pending admissions; typical flush 10 ms, longer during stalls/retries | Re-creatable work |
 | Durable     |   60,835 ops/s, sequential Embedded adds | No SQLite buffer-loss window after `add()` resolves | Payments, orders, audit records |
 
 Those figures label different workloads and are not a direct per-operation

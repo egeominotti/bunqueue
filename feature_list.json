@@ -79,6 +79,15 @@
       "issue": null
     },
     {
+      "id": "custom-id-cache-eviction-live-reuse",
+      "name": "Reproduce live custom-ID reuse after ownership-cache eviction",
+      "description": "Documentation audit on base 7901c130 traced ordinary memory/SQLite add and addBulk through handleCustomId: live lookup is gated by a bounded ownership-cache hit (default 50,000), while SQLite admission uses UPSERT. Evicting ownership can therefore readmit an unfinished ID; exact returned payload, counters, heap/processing memberships and persisted outcomes still need an executed reproduction. Reproduce first with a small QueueManagerConfig.maxCustomIds and real memory/temporary SQLite paths, covering waiting, active and cross-queue generations plus single/bulk admission; assert the original job and every affected counter/state before proposing a runtime fix. Preserve PostgreSQL database identity checks and atomic flow reject-existing semantics. Current docs explicitly qualify the cache boundary; this item does not claim an engine fix or passing regression.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "Source inspection on 2026-11-14, base 7901c130: src/application/operations/customId.ts, queue-manager/state.ts, src/shared/lruMap.ts and SQLite statements/batchInsert; existing internal docs/features/deduplication-and-unique.md already describes readmission after eviction. Full trace retained in the artifacts/docs-audit/ reports. No runtime reproduction or code change in docs-audit-polish.",
+      "issue": null
+    },
+    {
       "id": "dead-code-sweep",
       "name": "Remove provably dead internal code, stale scripts and unused devDependencies",
       "description": "Owner request: remove useless and deprecated things without any business-logic or public-API change. Remove only what is internal and provably dead: src/ modules no package export, bin, test, script, bench, example, docs script or SDK file imports (import graph over src/ with the package exports map, both bins, the tsconfig path aliases and type-only imports as roots), exported names no other file mentions, deprecated internals whose replacement is already used, scripts nothing calls (package.json, CI, docs, other scripts, husky) and devDependencies nothing imports or runs. Deprecated items that users can still reach are kept and listed in deprecated-public-apis-next-major. Ships on branch small-followups together with npm-files-benchmark-negation and docs-mcp-tool-count-drift.",
@@ -94,6 +103,16 @@
       "dependencies": [],
       "status": "not-started",
       "evidence": "",
+      "issue": null
+    },
+    {
+      "id": "docs-audit-polish",
+      "name": "Audit and correct current public and internal documentation",
+      "description": "Check current guides and API/SDK examples against implementation, internal references against source, all documentation links and anchors, generated discovery/SEO metadata, and desktop/mobile rendering. Correct demonstrated drift while preserving established navigation, historical release facts and runtime behavior. Record coverage, evidence and remaining limitations; validate the built site and documentation consumers.",
+      "dependencies": [],
+      "status": "in-progress",
+      "branch": "docs-audit-polish",
+      "evidence": "PARTIAL 2026-11-14, base 7901c130, branch docs-audit-polish; exact-index approval and source CI pending. Three independent content audits; task review corrected residual timing/recovery/ordering claims; whole-change skeptic FAIL then combined editorial fixes and scoped PASS. No runtime, SDK, test, tooling or site-layout code changes. Fresh native Ubuntu gate PASS on a62e260d06b315394ddb4ab90184e094778d9686: unit 12062/0/404, TCP 69/69 suites 553/553, embedded 43/43 suites 349/349, tinyfs 9/0, typecheck 890+2163 and format 2373 clean; effective 4 CPU/16 GiB, Bun 1.4.4+38afee6c8, Machine deleted (artifacts/machines/20261114T123532Z/manifest.md). Later editorial candidate fbdfb375: gate-delta.sh exit 3 against that Machine tree and prior green sandbox tree e2c50d5737b2dff3d2efc2c4ad3e96318cb54a4a; no new model/SDK/full-sandbox trigger. bun run --cwd docs build:390 content pages/914 HTML; discovery115 full-text/389 sitemap/6 inlined; rendered crawl91309 links+10477 assets,0 missing targets/fragments/assets or duplicate IDs;1302 relative Markdown file links and81 internal anchors resolve. Diagnostic host readers422/0,2010 assertions,32 files,127.62s; bun run typecheck and bun run format:check clean; bun run check:docs-data64 tracked assets; release-post --check259; ./init.sh green11s. Representative desktop/mobile320px inspection in both themes. Source-confirmed custom-ID ownership-cap limitation documented; runtime manifestation tracked separately in custom-id-cache-eviction-live-reuse, no engine fix claimed. Evidence artifacts/docs-audit/.",
       "issue": null
     },
     {

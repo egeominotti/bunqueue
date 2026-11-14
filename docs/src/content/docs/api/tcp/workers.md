@@ -129,7 +129,10 @@ List all registered workers and their stats.
 
 ### AddWebhook
 
-Register a webhook to receive event notifications. URLs are validated to prevent SSRF (localhost, private IPs, and cloud metadata endpoints are blocked).
+Register a webhook to receive event notifications. Registration rejects prohibited
+literal hostnames/IPs, including localhost, private IPs and cloud metadata
+endpoints. DNS resolution and redirect destinations are not validated as an
+egress policy; use trusted registrations and network egress controls.
 
 **Request:**
 

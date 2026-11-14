@@ -4,7 +4,15 @@
 
 ## Purpose
 
-Prevents duplicate jobs from entering a queue. Two independent mechanisms cover different needs: **custom job IDs** (`jobId`) make a re-add idempotent — while the prior job is unfinished (waiting / waiting-children / **active**) the add is a no-op that returns the existing job, and once it has _completed_ the deterministic id is recycled for a fresh job (#92) — and **unique keys** (`deduplication.id`) suppress / extend / replace pending jobs within an optional TTL window. Both checks run inside the shard write lock during `pushJob` so concurrent adds of the same key cannot race. This is how store-and-forward edges, cron `preventOverlap`, and BullMQ-style `deduplication`/`debounce` options avoid creating redundant work.
+Suppresses duplicate admissions within ownership limits. **Custom job IDs**
+(`jobId`) return an unfinished generation while its ownership is retained;
+ordinary memory/SQLite adds depend on a bounded ownership LRU (50,000 IDs by
+default), whereas PostgreSQL checks live database identity. **Unique keys**
+(`deduplication.id`) independently suppress / extend / replace jobs while their
+key is owned, within an optional TTL. Local checks run under shard write locks,
+but locking does not recover ownership evicted from the custom-ID cache.
+Terminal custom IDs can be reused for a fresh generation. Keep external
+effects idempotent; neither mechanism promises permanent business deduplication.
 
 ## Responsibilities & Scope
 
@@ -130,11 +138,18 @@ before the TCP `PUSH`/`PUSHB` (for example `sdk/python/bunqueue/options.py` and
 silently ignored by `handleDeduplication`, which returns early without a
 `uniqueKey`.
 
-SQLite columns: `jobs.unique_key`, `jobs.custom_id` (`schema.ts:34-35`). Note `idx_jobs_unique ON jobs(queue, unique_key) WHERE unique_key IS NOT NULL` (`schema.ts:58-59`) is a **non-unique** index for lookup speed — uniqueness is enforced in memory, not by the database. Custom-id idempotency is backstopped by the `jobs.id` PRIMARY KEY (the custom id becomes the row id).
+SQLite columns: `jobs.unique_key`, `jobs.custom_id` (`schema.ts:34-35`). Note
+`idx_jobs_unique ON jobs(queue, unique_key) WHERE unique_key IS NOT NULL`
+(`schema.ts:58-59`) is a **non-unique** lookup index. The custom ID becomes the
+`jobs.id` primary key, but ordinary single/batch persistence uses
+`ON CONFLICT(id) DO UPDATE`; the primary key is not a live-generation
+deduplication guard after ownership-cache eviction. `durable` changes commit
+timing, not this admission limitation.
 
 Consequently, custom IDs are broker-wide rather than queue-scoped. A live
-generation suppresses the same ID even when the next push names another queue;
-the existing job and its original data win. `uniqueKey`, by contrast, remains
+generation suppresses the same ID across queues only while the local ownership
+cache retains it; PostgreSQL uses the authoritative namespace/id row instead.
+`uniqueKey`, by contrast, remains
 scoped by queue.
 
 ## Business Logic / Control Flow
@@ -144,7 +159,13 @@ Single push: `pushJob` takes the required write locks and runs both checks insid
 ### 1. Custom-ID idempotency — `handleCustomId` (`customId.ts`)
 
 1. No `customId` → return a fresh generated id.
-2. `id = jobId(input.customId)` (the custom id _is_ the job id). Look up `customIdMap`. If the prior job is still **unfinished** (and not in `completedJobs`), the re-add is an idempotent no-op (BullMQ parity) — never a second insert of the same deterministic id, which would otherwise collide on the `jobs.id` PRIMARY KEY. Three unfinished states are covered:
+2. `id = jobId(input.customId)` (the custom id _is_ the job id). Look up
+   `customIdMap`. **Only on a cache hit**, an unfinished generation (not in
+   `completedJobs`) can become an idempotent skip. A cache miss has no
+   authoritative live-row/index rejection; the later checks only identify
+   terminal/dependency retirement. The existing owner's shard may be locked
+   via `jobIndex` without repairing that missing admission check. On a hit,
+   three unfinished states are covered:
    - **waiting / delayed / prioritized** — `jobIndex` type `queue` and present in the PriorityQueue → return the existing job.
    - **waiting-children** — `jobIndex` type `queue` but held in `shard.waitingDeps` (its row is already persisted, so it is _not_ in the PriorityQueue) → idempotent skip via the existing id.
    - **active (processing)** — `jobIndex` type `processing`; the job was popped from the queue and is still running on a worker, with its row still on disk → idempotent skip via the existing id.
@@ -216,7 +237,12 @@ RAM-only, uncounted prefix while avoiding a false all-or-nothing guarantee.
 
 ### Forwarder dedup key (`src/client/forwarder.ts:97`)
 
-Store-and-forward assigns each forwarded job the deterministic remote id `fwd:<source.queueKey>:<localJobId>`, sent as the remote `jobId`. The server's custom-id idempotency then makes a re-forward after a crash/retry a no-op remotely while the remote job is still live; once it completes or reaches the DLQ the id is released and a re-forward creates a new job. See [Store-and-Forward](./store-and-forward.md).
+Store-and-forward assigns the deterministic remote id
+`fwd:<source.queueKey>:<localJobId>`, sent as `jobId`. Suppression lasts while
+remote live ownership is retained: memory/SQLite use the bounded cache;
+PostgreSQL checks the database. Completion/DLQ permits a fresh generation, and
+cache eviction can end local-engine protection earlier. Keep remote effects
+idempotent. See [Store-and-Forward](./store-and-forward.md).
 
 ### Bunqueue auto-dedup/debounce (`dedupDebounce.ts:21`)
 
@@ -248,7 +274,13 @@ Lifecycle / release:
 ## Edge Cases & Failure Modes
 
 - **TTL semantics:** `ttl` undefined ⇒ `expiresAt = null` ⇒ never expires (`calculateExpiration`, `deduplication.ts:60`). Expiry is lazy on read plus a periodic sweep.
-- **Re-add of an active / waiting-children custom id is idempotent:** when the prior job has been popped from the PriorityQueue (active = `jobIndex` type `processing`; or waiting-children = type `queue` but held in `shard.waitingDeps`) its row is still on disk, so re-adding the same `jobId` must NOT take the reuse path — that would re-insert the same deterministic id and collide on the `jobs.id` PRIMARY KEY (durable → throws `UNIQUE constraint failed: jobs.id`; buffered → the write buffer silently drops the insert, turning the intended no-op into a reject). `handleCustomId` instead returns the existing job (or, when the live `Job` is unreachable without `processingShards`, an `existingId` result) and inserts nothing (`src/application/operations/customId.ts:45-65`). This is the custom-id twin of the unique-key fix #69. The guard is `!ctx.completedJobs.has(id)` plus a `queue`/`processing` location check, so completed (#92) and DLQ jobs still fall through to reuse.
+- **Active / waiting-children custom IDs require retained local ownership:** on
+  a `customIdMap` hit, `handleCustomId` checks `!completedJobs.has(id)` plus the
+  queue/processing location and returns the existing job/id without insertion.
+  After eviction, those live checks are skipped. SQLite's upsert does not turn
+  that miss into uniqueness rejection. This is a correctness limitation to
+  investigate with a failing public-path regression, not supported live-job
+  replacement semantics. No evicted-live-ID runtime reproduction is claimed here.
 - **Custom-id reuse after completion (#92):** completed rows survive on disk; the reuse path evicts them so the recycled id does not falsely report `completed` or collide on the PK at flush (`src/application/operations/customId.ts:67-73`).
 - **Custom-id reuse after DLQ:** a terminal DLQ generation is retired from SQLite in the same transaction that inserts the replacement jobs row (durable or not), and then from the owning shard, `jobIndex` and its O(1) counter. Both `PUSH` and `PUSHB` share this path, so the deterministic id has exactly one observable generation and the old entry cannot keep `failed` inflated or reappear after restart.
 - **Orphan-row reconciliation via upsert:** a durable `jobs` row can outlive its in-memory tracking when the legacy fire-and-forget `obliterate()` races an in-flight durable insert, or when a write-buffer flush is reordered relative to that insert. (`obliterateAsync()` is the authoritative ordered API for new code.) The `customIdMap` / `jobIndex` entries may be cleared while the row survives. A later re-add of the same custom id finds no mapping → reuse path → insert. To stop the recycled id colliding on the PK (`UNIQUE constraint failed: jobs.id`), **both** insert statements use `ON CONFLICT(id) DO UPDATE` (upsert): the orphan row is overwritten in place at insert time. The `DO UPDATE SET` clause covers **all** non-id columns — including the per-execution fields `started_at` / `completed_at` / `progress` / `progress_msg` / `last_heartbeat` / `stacktrace`, which are absent from the INSERT column list so `excluded.<col>` resolves to their DEFAULT (the fresh-job value). Without resetting these, an upsert over a previously-completed orphan would leave a brand-new `waiting` job reporting `progress=100` / a stale `completed_at` / a prior life's `stacktrace`. A brand-new id is a plain INSERT with **zero** extra cost, so the customId hot path is not taxed (`statements.ts` `insertJob`, `sqliteBatch.ts` batch insert). In the buffered batch path this also prevents one collision from failing the whole flush and dropping every innocent job batched in the same window (`reportLostJobs`). `jobs` has no foreign keys; its completion-count triggers intentionally observe the `DO UPDATE` state/queue transition, while avoiding `REPLACE`'s separate DELETE+INSERT lifecycle. Covered by `test/repro-idem-active-readd.test.ts`.
@@ -286,7 +318,18 @@ Lifecycle / release:
   single job or batch prefix is still persisted, counted, announced and
   notified before the cleanup error is surfaced; a cleanup exception cannot
   leave committed jobs invisible to accounting.
-- **Memory bounds:** `customIdMap` is an `LRUMap` capped at `maxCustomIds` (default `50_000` in `application/types/config.ts`; initialized in `queue-manager/state.ts`). Unique-key registries are swept every cleanup tick (`cleanExpiredUniqueKeys`, `cleanupTasks.ts`) and any single-queue registry exceeding **1000** entries is force-trimmed by half via insertion-order iteration — under churn a still-live key can be evicted, weakening (not breaking) dedup. LRU eviction of `customIdMap` likewise allows a re-add to slip through.
+- **Memory bounds:** ordinary memory/SQLite `customIdMap` is an `LRUMap` capped
+  at `QueueManagerConfig.maxCustomIds` (default `50_000` in
+  `application/types/config.ts`; initialized in `queue-manager/state.ts`).
+  Eviction is not live-job-aware; after it, a re-add is not guaranteed to
+  preserve the original generation. This is not repaired by SQLite's primary
+  key or durable admission. Only the low-level QueueManager config exposes the
+  cap: no Queue/Worker option, typed standalone-server field, CLI flag or env
+  setting does. PostgreSQL checks locked database identity independently.
+  Atomic flow creation separately checks `jobIndex`/SQLite rows or PostgreSQL
+  `rejectExisting`, rejecting existing IDs; ordinary adds retain their own limit.
+  Unique-key registries are separately swept every cleanup tick and force-trimmed
+  by half above 1000 per-queue entries; that can also end suppression early.
 - **Debounce is metadata-only (gotcha):** `debounce` sets
   `job.debounceId`/`job.debounceTtl` (`operations/add/single.ts:63-64`,
   `operations/add/bulk.ts:63-64`, `domain/job/create.ts:103-104`) but does **not**

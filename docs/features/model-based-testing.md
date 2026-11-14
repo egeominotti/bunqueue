@@ -188,8 +188,9 @@ as a command that does not throw.
 The generated transitions also assert the following contracts:
 
 - only legal state-graph edges occur;
-- custom IDs are idempotent while live and create a new generation only after a
-  terminal state;
+- custom IDs are idempotent while live within the generated campaign's retained
+  ownership working set, and terminal reuse creates a new generation; this does
+  not prove ordinary memory/SQLite admission safe after ownership-cache eviction;
 - `attempts <= maxAttempts` and `stallCount <= maxStalls`; exceeding either
   bound is terminal;
 - crash recovery increments the persisted counters, never leaves a ghost
@@ -476,7 +477,7 @@ violates it or the required state is not observable.
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | C6        | Every persisted lifecycle transition is atomic under injected I/O failure                                                                             | Existing failure tests are examples, not a transition-by-transition storage fault model               |
 | C7        | Pagination has a no-duplicate/no-skip contract under concurrent mutation                                                                              | Static ordering is deterministic, but no snapshot/cursor contract exists for mutating result sets     |
-| C8        | Strong custom-ID/unique-key idempotency holds for every live job                                                                                      | Bounded LRU/registry trimming intentionally weakens the guarantee after eviction                      |
+| C8        | Strong custom-ID/unique-key idempotency holds for every live job                                                                                      | Ordinary memory/SQLite custom-ID checks depend on a bounded ownership LRU; evicted-live correctness needs its own regression/investigation. Unique-key trimming separately ends ownership. |
 | C9        | Internal resource conservation is directly observable for unique keys, groups, limiter tokens, temporal reverse indexes, and dependency reverse edges | `/stats` exposes aggregate subsets, so exact independent cardinality oracles need diagnostic counters |
 | C10       | JSON monitoring totals remain exact across the full `bigint` range                                                                                    | TCP/HTTP stats convert to `number` and lose precision above 2^53                                      |
 

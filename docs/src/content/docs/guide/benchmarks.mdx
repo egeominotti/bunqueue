@@ -50,7 +50,7 @@ These labels are not interchangeable:
 | Internal in-memory | Direct `QueueManager` batch API, no `dataPath`, no SQLite write               |
 | Embedded on-disk   | Public `Queue` API and a fresh SQLite `dataPath`                              |
 | TCP on-disk        | Public client over localhost MessagePack to a broker with its own SQLite file |
-| Buffered           | Normal write-behind persistence, with the documented ≤10 ms hard-crash window |
+| Buffered           | Normal write-behind persistence; a crash can lose pending admissions. Typical flush interval: 10 ms, longer during stalls/retries |
 | Durable (SQLite)   | `durable:true`; the timed call waits for synchronous SQLite persistence       |
 | Workflow           | A complete multi-node execution, not one queue operation                      |
 

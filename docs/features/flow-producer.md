@@ -163,7 +163,8 @@ not trusted. It checks:
   `NOT NULL`); `backoff.delay` must be a finite number `>= 0` and `backoff.maxDelay`
   `0..86_400_000` ms. Unsupported repeat, deduplication and debounce inputs are
   rejected before the rules;
-- a 10 MB per-job and 64 MB aggregate flow-data bound;
+- a JSON string length bound of 10 × 1024 × 1024 characters per job and
+  64 × 1024 × 1024 characters across the graph (not byte counts);
 - unique IDs, dependencies, children, and parent/metadata back-references;
 - duplicate edges and graph cycles;
 - mutually exclusive failure policies;

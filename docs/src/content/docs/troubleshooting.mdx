@@ -293,8 +293,9 @@ Treat it as a signal that you no longer own the job, not as a transient error.
 
 In SQLite mode, job listings (`getJobs`, `GetJobs` over TCP) read from SQLite,
 while non-durable pushes go through a write buffer that flushes about every
-10ms. A job added a moment ago can therefore be missing from a listing for up
-to ~10ms. Use `getJob(id)` / `getState(id)` (which read the in-memory index) for
+10ms. A job added a moment ago can therefore be missing from a listing until
+the flush completes; stalls/retries can extend that interval. Use
+`await queue.getJob(id)` / `await queue.getJobState(id)` (which read the in-memory index) for
 read-after-write checks, or add the job with `durable: true` to bypass the
 buffer.
 

@@ -24,7 +24,8 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   [43588585824](https://github.com/egeominotti/bunqueue/actions/runs/43588585824)
   attempt1 GREEN: unit12066/0/400, all PostgreSQL16/17/18.6 legs571/0/1 each,
   TCP553/0,embedded349/0 and all SDK/type/format/docs jobs passed. Pre-commit and
-  separate pre-push skeptic PASS. Final state-record CI and integration follow.
+  separate pre-push skeptic PASS. Closure CI43589950704 and main CI43590920538
+  attempt1 GREEN; PR #192 squash merged as `7901c130`, original main aligned.
 - `test-quality-speedups`: implementation `aa038a83`, all four task reviews and
   whole-branch/pre-push skeptic PASS; full sandbox and fresh Ubuntu green on
   tree `f3c1bdf4`. Source PR #191 CI
@@ -70,8 +71,13 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
-The delivery/accounting implementation is done and source CI is green. The
-remaining PR #192 integration is described below.
+- `docs-audit-polish`, branch `docs-audit-polish`, base main7901c130: audit
+  current guides, public API/SDK examples, internal references, generated site
+  links/discovery and desktop/mobile rendering; fix demonstrated documentation
+  drift under the existing user authorization and repository validation rules.
+
+The delivery/accounting implementation and PR #192 integration are complete;
+main CI43590920538 is GREEN on `7901c130`.
 
 The three audit implementations are done, backed by green source CI. Their
 original staged worktrees remain preserved. Their integration is complete;
@@ -79,10 +85,9 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Validate/push the final evidence record for PR #192, watch its exact-head CI,
-   perform the authorized normal squash merge, watch main CI and fast-forward
-   the original main checkout. The implementation's CI43588585824 is already
-   GREEN on `bca26a94`. No version/publication action.
+1. Finish `docs-audit-polish`: source-qualified corrections, final site build,
+   isolated validation, skeptic review and authorized integration with exact-head
+   CI. No version/publication action.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -149,6 +154,47 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — documentation contracts audited and corrected
+
+- `docs-audit-polish`, base `7901c130`, branch `docs-audit-polish`: three
+  independent content audits identified incorrect current API examples,
+  scheduling/retry/durability guarantees, configuration fallbacks and internal
+  model/module references. Editorial corrections cover the public guides,
+  protocol, engineering docs and product agent references. Runtime, SDK source,
+  tests, site components and historical releases/benchmarks are unchanged.
+- Baseline site build and discovery passed: 390 content pages, 914 HTML files,
+  115 full-text pages, 389 sitemap URLs and six inlined sources. Diagnostic
+  rendered crawl found zero missing local links/anchors/assets and duplicate
+  IDs across 91,281 links and 10,477 assets. Internal Markdown anchors: 81/81.
+- Final candidate `fbdfb375` also builds successfully: 390 content pages and
+  914 HTML files, discovery 115/389/6. Rendered crawl: 91,309 links and 10,477
+  assets, zero missing targets/fragments/assets or duplicate IDs; 1,302 relative
+  Markdown file links and 81 internal anchors resolve.
+- Fresh native Ubuntu gate PASS on tree `a62e260d`, Bun 1.4.4+38afee6c8,
+  effective 4 CPU/16 GiB: unit 12,062/0/404, TCP 69/69 suites and 553/553,
+  embedded 43/43 and 349/349, tinyfs 9/0; typecheck 890+2,163 and format 2,373
+  clean. Logs copied and Machine deleted; manifest
+  `artifacts/machines/20261114T123532Z/manifest.md`. Later changes are proven
+  editorial deltas against that tree and the prior green sandbox tree `e2c50d57`.
+- Host diagnostic readers: 422/0, 2,010 assertions, 32 files, 127.62 s; typecheck
+  and formatting clean, 64 tracked docs assets, 259 matching release posts,
+  `./init.sh` green in 11 s. No runtime, SDK, model or new full-sandbox trigger.
+- Task review corrected residual timing/recovery/ordering claims. Whole-change
+  skeptic found bounded custom-ID ownership and PostgreSQL recovery
+  qualifications; the combined fix received scoped PASS. Exact-index approval
+  and source CI are still pending at this checkpoint.
+- Browser inspection used an owned local Chrome tab; mobile 320-pixel home,
+  quickstart, database guide, HTTP API and changelog work in both themes, and
+  keyboard search returns relevant results. This is representative inspection,
+  not an assertion that every page or third-party/provider example was executed.
+- Evidence: `artifacts/docs-audit/` and the task's ignored SDD reports. Existing
+  commit/push/merge authorization and egeominotti identity apply; no release
+  action. Preserve the original checkout's untracked `.claude/worktrees/`.
+- `custom-id-cache-eviction-live-reuse` separately tracks the source-confirmed
+  memory/SQLite admission limitation. Current docs state the bounded ownership,
+  PostgreSQL authority and independent flow checks; exact runtime effects need
+  reproduction first. This documentation change does not fix the engine.
 
 ### 2026-11-14 — retry and conservation corrections validated in source CI
 

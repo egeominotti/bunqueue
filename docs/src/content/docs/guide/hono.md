@@ -47,7 +47,7 @@ const app = new Hono();
 app.post('/api/send-email', async (c) => {
   const body = await c.req.json();
   const job = await emails.add('send', body, {
-    attempts: 3, // retry up to 3 times on failure
+    attempts: 3, // up to 3 total attempts (2 retries)
     backoff: 5000, // exponential from a 5s base: ~10s, then ~20s between retries
   });
   return c.json({ queued: true, jobId: job.id });

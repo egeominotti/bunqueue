@@ -115,7 +115,7 @@ plus the batch helpers `ExtractedJob`/`BatchContext`/`FinalizeContext` and
 `groupByProcShard`/`extractJobs`/`groupByQueueShard`/`releaseResources`/
 `finalizeBatchAck` in `ackHelpers.ts`.
 
-`isTimedOut(job, now)` follows `processingDeadline` (`src/domain/job/timeoutRule.ts`): an absent, `0` or NaN `timeout` never times out, a fractional deadline rounds up, and the deadline itself is due, exactly as the timeout scheduler fails jobs. `QueueManager.pull`/`pullWithLock`/`pullBatch`/`pullBatchWithLock` reject a `timeoutMs` outside 0..60,000 ms (NaN, Infinity, negative) with the TCP `PULL` message, before claiming anything.
+`isTimedOut(job, now)` follows `processingDeadline` (`src/domain/job/timeoutRule.ts`): an absent, `0` or NaN `timeout` never times out, a fractional deadline rounds up, and the deadline itself is due, exactly as the timeout scheduler fails jobs. Direct `QueueManager.pull`/`pullWithLock`/`pullBatch`/`pullBatchWithLock` use `pullTimeoutArgument`: numeric strings are converted; negative, NaN and non-number values mean no wait. Positive waits above 60,000 ms are honored, and Infinity waits until delivery or signal abort. TCP/HTTP `PULL`/`PULLB` instead require a finite timeout in 0..60,000 ms before claiming anything.
 
 Job-type helpers re-exported from the `src/domain/types/job.ts` facade: `createJob`, `generateJobId`, `jobId`, `calculateBackoff`, `canRetry`, `isReady`, `isDelayed`, `isExpired`, `isTimedOut`, `normalizeStacktrace`, `createJobLock`, `renewLock`, `isLockExpired`, and the `JobState` const enum.
 
@@ -135,7 +135,7 @@ See [data-model](../data-model.md) for full definitions. The central shape is `J
 - Failure: `stacktrace` (capped at `stackTraceLimit`, default `10`).
 - `timeline: JobTimelineEntry[]` — capped at `MAX_TIMELINE_ENTRIES = 20` and persisted as a MessagePack BLOB on lifecycle transitions, so it survives SQLite recovery.
 
-`JobInput` (`src/domain/types/jobs/model.ts:92-137`) is the wire/SDK input; `createJob` (`src/domain/job/create.ts:108-151`) fills defaults from `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`). Note `removeOnComplete`/`removeOnFail` are coerced via `toBoolean` because the wire boundary is not runtime-type-safe (#90, `src/domain/job/create.ts`). Every public admission path (TCP/HTTP, flows, embedded `Queue.add`/`addBulk`, cron templates) first runs the shared `validateJobOptions` ([Job Options Validation](./job-options-validation.md)), which refuses only what cannot run, so every option value 2.9.10 ran is admitted. `createJob` first applies `normalizeJobInput` (`src/domain/job/optionNormalize.ts`, also applied by `QueueManager.push/pushBatch` and the PostgreSQL engine): a numeric string is its number, `maxAttempts` 0 is stored as 1 (it runs once, as on 2.9.10) and a fraction rounds up (so the attempts made never exceed `maxAttempts`), `maxAttempts` above 2,147,483,647 or Infinity is that maximum, and `delay`/`timeout`/`ttl`/`dedup.ttl`/`debounceTtl`/`repeat.every` beyond `MAX_JOB_DURATION_MS` (4.32e15 ms) are clamped. `createJob` still defends internal callers and stored rows: `parseBackoff` turns the object form of `backoff` into `backoffConfig` and keeps `maxDelay` only when it is a finite number in `0..MAX_BACKOFF_DELAY` (24 h), and a NaN or non-number `timestamp`, `delay`, `backoff`/`backoff.delay`, `priority` or `maxAttempts` falls back to now, no delay or the default, so no NaN reaches a `NOT NULL` SQLite column (the write buffer would drop the row). A `null` backoff is treated as absent. A negative `delay` is accepted by the validator and kept as on 2.9.10: `runAt = createdAt + jobRunDelay(delay)` (`src/domain/job/options.ts`, bounded to ±`MAX_JOB_DURATION_MS`), a run time in the past, so the job is created `waiting` (never `delayed`), stays out of the delayed index and, since ready jobs are ordered by `runAt`, goes ahead of ready jobs with a later run time. `ChangeDelay`/`MoveToDelayed` keep a negative delay the same way (`runAt = now + delay`).
+`JobInput` (`src/domain/types/jobs/model.ts:92-137`) is the wire/SDK input; `createJob` (`src/domain/job/create.ts:108-151`) fills defaults from `JOB_DEFAULTS` (`src/domain/job/constants.ts:5-13`). Note `removeOnComplete`/`removeOnFail` are coerced via `toBoolean` because the wire boundary is not runtime-type-safe (#90, `src/domain/job/create.ts`). Every public admission path (TCP/HTTP, flows, embedded `Queue.add`/`addBulk`, cron templates) first runs the shared `validateJobOptions` ([Job Options Validation](./job-options-validation.md)), which refuses only what cannot run, so every option value 2.9.10 ran is admitted. `createJob` first applies `normalizeJobInput` (`src/domain/job/optionNormalize.ts`, also applied by `QueueManager.push/pushBatch` and the PostgreSQL engine): a numeric string is its number, `maxAttempts` 0 is stored as 1 (it runs once, as on 2.9.10) and a fraction rounds up (so the attempts made never exceed `maxAttempts`), `maxAttempts` above 2,147,483,647 or Infinity is that maximum, and `delay`/`timeout`/`ttl`/`dedup.ttl`/`debounceTtl`/`repeat.every` beyond `MAX_JOB_DURATION_MS` (4.32e15 ms) are clamped. `createJob` still defends internal callers and stored rows: `parseBackoff` turns the object form of `backoff` into `backoffConfig` and keeps `maxDelay` only when it is a finite number in `0..MAX_BACKOFF_DELAY` (24 h), and a NaN or non-number `timestamp`, `delay`, `backoff`/`backoff.delay`, `priority` or `maxAttempts` falls back to now, no delay or the default, so no NaN reaches a `NOT NULL` SQLite column (the write buffer would drop the row). A `null` backoff is treated as absent. A negative `delay` is accepted by the validator and kept as on 2.9.10: `runAt = createdAt + jobRunDelay(delay)` (`src/domain/job/options.ts`, bounded to ±`MAX_JOB_DURATION_MS`), a run time in the past, so the job is created `waiting` (never `delayed`) and stays out of the delayed index. Among equal-priority FIFO jobs, earlier `runAt` values go first; priority and LIFO ordering still apply. `ChangeDelay`/`MoveToDelayed` keep a negative delay the same way (`runAt = now + delay`).
 
 `JobState` enum values: `waiting`, `prioritized`, `delayed`, `active`, `completed`, `failed` (`src/domain/types/jobs/model.ts:4-11`). The additional logical states `waiting-children` (dependency gate) and `paused` (queue-level) are represented via shard membership (`waitingDeps`/`waitingChildren`) and `QueueState.paused`, not the enum.
 
@@ -157,7 +157,11 @@ admission.
 1. Compute `idx = shardIndex(queue)` and acquire every target, custom-ID owner,
    and parent shard write lock required by the request in ascending order.
 2. **Inspect custom-ID idempotency** (`handleCustomId`, `customId.ts`). A live
-   generation is an idempotent skip. Reusing a completed, DLQ, or
+   generation is an idempotent skip only on a retained `customIdMap` hit.
+   Memory/SQLite ordinary adds use a bounded LRU (50,000 default); cache misses
+   do not perform authoritative live-generation rejection, and SQLite upserts
+   do not repair that limit. PostgreSQL uses separate locked database checks;
+   see [Deduplication & Unique Jobs](./deduplication-and-unique.md). Reusing a completed, DLQ, or
    payload-free dependency-completion generation produces a retirement plan;
    it does not delete the old generation yet. When a completed generation has
    left the bounded hot cache, the lookup consults SQLite so its row and stale
@@ -467,7 +471,13 @@ detached CLI, and durable recovery paths.
 
 ## Edge Cases & Failure Modes
 
-- **Idempotent push**: a live `customId` returns the existing job (no insert). A recycled terminal `customId` evicts the stale completed row or DLQ entry first, including persisted terminal state, counters, result, logs, and their bounded owner indexes, so state queries and auxiliary reads expose only the new generation; timeout markers are cleared too (#33/#75).
+- **Custom-ID push**: a live `customId` returns the existing job only while
+  ownership is retained by the local bounded cache; PostgreSQL instead checks
+  database identity. Cache eviction is not terminal reuse and does not promise
+  preservation of the live generation. A recycled terminal `customId` retires
+  stale completed/DLQ state, counters, result, logs, owner indexes and timeout
+  markers before publishing the successor (#33/#75). See
+  [Deduplication & Unique Jobs](./deduplication-and-unique.md).
 - **Dedup of active jobs**: default strategy treats an active job (in `jobIndex`, not in queue) as a duplicate and returns its id without inserting (`src/application/operations/pushDeduplication.ts:96-110`); the returned placeholder carries the correct existing id (`src/application/operations/push.ts:76-85`).
 - **Pull loss prevention**: `requeueJob` restores any job that fails to move to processing.
 - **Expired (TTL) jobs** are silently dropped during pull (`isExpired`) and never delivered. Their SQLite row (or pending buffered INSERT) is deleted before the heap/counter/index removal, preventing restart resurrection while keeping the shard critical section synchronous.

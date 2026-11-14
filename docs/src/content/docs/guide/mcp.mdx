@@ -439,7 +439,7 @@ The server also offers 3 prompts, `bunqueue_health_report`, `bunqueue_debug_queu
 <details>
 <summary>Job options: retries, timeouts, custom ids, deduplication</summary>
 
-`add_job` and each item of `add_jobs_bulk` accept `priority`, `delay`, `attempts`, `backoff` (a number, used as an exponential base, or `{ type: 'fixed' | 'exponential', delay, maxDelay }`), `timeout`, `jobId`, `deduplication` (`{ id, ttl, extend, replace }`, per queue), `removeOnComplete`, `removeOnFail`, `durable`, `lifo`, `tags` and `stallTimeout`. Adding a `jobId` again while that job is unfinished returns the existing job. The flow tools take the same options, except `deduplication`, `tags` and `durable`. `get_job` shows the options a job carries.
+`add_job` and each item of `add_jobs_bulk` accept `priority`, `delay`, `attempts`, `backoff` (a number, used as an exponential base, or `{ type: 'fixed' | 'exponential', delay, maxDelay }`), `timeout`, `jobId`, `deduplication` (`{ id, ttl, extend, replace }`, per queue), `removeOnComplete`, `removeOnFail`, `durable`, `lifo`, `tags` and `stallTimeout`. Re-adding a custom `jobId` returns its unfinished generation while ownership is retained: memory/SQLite use a bounded cache (50,000 IDs by default), whereas PostgreSQL checks the database. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits); keep external effects idempotent. The flow tools take the same options, except `deduplication`, `tags` and `durable`, and independently reject existing flow IDs rather than collapsing duplicates. `get_job` shows the options a job carries.
 
 </details>
 

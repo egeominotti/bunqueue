@@ -87,7 +87,10 @@ The oracle checks these contracts together:
   before its dependencies.
 - **Failure policies:** fail-parent, ignore, continue, and remove-dependency
   modes produce their declared parent transition.
-- **Resources:** custom IDs and unique keys remain exclusive; concurrency and
+- **Resources:** within the generated campaign's retained ownership working
+  set, custom IDs and unique keys remain exclusive. This does not prove
+  ordinary memory/SQLite adds safe after cache eviction; see
+  [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits). Concurrency and
   rate tokens admit no extra job or leak when rate acquisition rejects after a
   concurrency acquisition; expired jobs leave memory, counters, index, write
   buffer, and SQLite exactly once.

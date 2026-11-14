@@ -72,7 +72,7 @@ for (const entry of entries) {
 }
 
 // Put everything back in the queue for another try
-await queue.retryDlq();
+await queue.retryDlqAsync();
 ```
 
 </TabItem>

@@ -133,7 +133,7 @@ names shown in the table.
 | `attempts`         | `number`                    | `3`     | Max total executions, first run included (`3` = 1 run + 2 retries)   |
 | `backoff`          | `number \| { type, delay, maxDelay? }` | `1000`  | Backoff base in ms, or `{ type, delay, maxDelay? }` (`'fixed'` is fixed; `'exponential'` or any other type is exponential); `maxDelay` caps each retry delay (default: 1 hour, max: 1 day) |
 | `timeout`          | `number`                    | -       | Processing timeout in ms                                             |
-| `jobId`            | `string`                    | -       | Custom ID for idempotent adds                                        |
+| `jobId`            | `string`                    | -       | Custom ID; retained-ownership duplicate suppression with [backend/cache limits](/guide/queue/deduplication/#custom-id-limits) |
 | `deduplication`    | `object`                    | -       | TTL-based dedup (`id`, `ttl`, `extend`, `replace`)                   |
 | `removeOnComplete` | `boolean`                   | `false` | Auto-delete after completion                                         |
 | `removeOnFail`     | `boolean`                   | `false` | Auto-delete after failure                                            |
@@ -173,7 +173,7 @@ An invalid option makes `add()` throw, for example `timeout must be at least 0`;
 passed (`attempts`, `deduplication.ttl`, `debounce.ttl`).
 
 A negative `delay` makes the job ready at once, in every mode and entry point, as in
-2.9.10: its run time is in the past (`now + delay`), so among jobs of the same priority
+2.9.10: its run time is in the past (`now + delay`), so among FIFO jobs of the same priority
 it runs ahead of ready jobs added before it with a later run time. So
 `{ delay: runAt - Date.now() }` is safe when `runAt` has already passed. The same holds
 for the `delay` argument of `changeDelay()` (a PostgreSQL broker applies a negative one

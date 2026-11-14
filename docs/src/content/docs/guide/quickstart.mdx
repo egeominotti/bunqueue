@@ -200,7 +200,7 @@ await emailQueue.add(
     priority: 10, // Higher = processed first
     delay: 5000, // Wait 5 seconds before processing
     attempts: 3, // At most 3 attempts (2 retries) if the processor throws
-    backoff: 1000, // Wait 1 second between retries (grows on each attempt)
+    backoff: 1000, // Exponential 1s base: about 2s, then 4s, with jitter
   }
 );
 
@@ -230,7 +230,7 @@ await emailQueue.add(
     priority: 10, // Higher = processed first
     delay: 5000, // Wait 5 seconds before processing
     attempts: 3, // At most 3 attempts (2 retries) if the processor throws
-    backoff: 1000, // Wait 1 second between retries (grows on each attempt)
+    backoff: 1000, // Exponential 1s base: about 2s, then 4s, with jitter
   }
 );
 
@@ -250,7 +250,7 @@ queue.add("send-email", {"to": "a@test.com", "subject": "Hi"},
     priority=10,   # Higher = processed first
     delay=5000,    # Wait 5 seconds before processing
     attempts=3,    # At most 3 attempts (2 retries) if the processor raises
-    backoff=1000)  # Wait 1 second between retries (grows on each attempt)
+    backoff=1000)  # Exponential 1s base: about 2s, then 4s, with jitter
 
 # Many jobs at once (one optimized batch)
 queue.add_bulk([
@@ -268,7 +268,7 @@ $queue->add('send-email', ['to' => 'a@test.com', 'subject' => 'Hi'], [
     'priority' => 10,   // Higher = processed first
     'delay' => 5000,    // Wait 5 seconds before processing
     'attempts' => 3,    // At most 3 attempts (2 retries) if the processor throws
-    'backoff' => 1000,  // Wait 1 second between retries (grows on each attempt)
+    'backoff' => 1000,  // Exponential 1s base: about 2s, then 4s, with jitter
 ]);
 
 // Many jobs at once (one optimized batch)
@@ -288,7 +288,7 @@ queue.Add("send-email", map[string]any{"to": "a@test.com", "subject": "Hi"},
         "priority": 10,   // Higher = processed first
         "delay":    5000, // Wait 5 seconds before processing
         "attempts": 3,    // At most 3 attempts (2 retries) if the processor errors
-        "backoff":  1000, // Wait 1 second between retries (grows on each attempt)
+        "backoff":  1000, // Exponential 1s base: about 2s, then 4s, with jitter
     })
 
 // Many jobs at once (one optimized batch)
@@ -314,7 +314,7 @@ queue.add("send-email", data.clone(), JobOptions {
     priority: Some(10),                         // Higher = processed first
     delay: Some(5000),                          // Wait 5 seconds before processing
     attempts: Some(3),                          // At most 3 attempts (2 retries)
-    backoff: Some(Backoff::Milliseconds(1000)), // Wait 1 second between retries
+    backoff: Some(Backoff::Milliseconds(1000)), // Exponential 1s base: about 2s, then 4s, with jitter
     ..Default::default()
 })?;
 
@@ -332,7 +332,7 @@ queue.add_bulk(vec![
 # Priority, delay, retries
 {:ok, _job} =
   Bunqueue.Queue.add(queue, "send-email", %{to: "a@test.com", subject: "Hi"},
-    # Higher = processed first; wait 5s; at most 3 attempts; 1s between retries
+    # Higher = processed first; wait 5s; at most 3 attempts; retries ~2s, ~4s with jitter
     priority: 10,
     delay: 5000,
     attempts: 3,

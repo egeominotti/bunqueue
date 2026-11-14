@@ -479,7 +479,13 @@ Timezones and schedule management in the [cron guide](/guide/cron/).
 
 ## Deduplicate jobs with jobId
 
-Adding a job with the `jobId` of an unfinished job (waiting, delayed, waiting for children, or active) returns the existing job instead of creating a duplicate, so re-runs after a restart do not queue the same work twice. Once that job has completed or moved to the DLQ, the same `jobId` creates a fresh job, so it does not by itself guarantee "exactly one welcome email per user".
+Adding an unfinished `jobId` returns its live generation while ownership is
+retained. Memory/SQLite use a bounded cache (50,000 IDs by default); eviction
+can end protection before completion. PostgreSQL checks database identity.
+After completion or DLQ the ID may create a fresh job. See
+[Custom-ID limits](/guide/queue/deduplication/#custom-id-limits): reconcile
+uncertain admissions and keep welcome-email or other external effects
+idempotent in the application.
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">

@@ -252,10 +252,14 @@ Resolved in `config/resolve.ts` (config file > env > default) and passed into `H
 | `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` / `RATE_LIMIT_CLEANUP_MS` | rate limiter            | `60000` / `10000` / `60000` (`rateLimiter.ts`)                    |
 
 `createHttpServer` reads `rateLimiterEnvConfig()` before it subscribes or binds, so a
-malformed `RATE_LIMIT_*` value (whole numbers >= 1 only) fails server creation instead
-of every request; the standalone server reports it even earlier, from
+rejected `RATE_LIMIT_*` value fails server creation instead of every request;
+window 0 disables limiting, while compatible fallbacks warn for negative windows
+(disabled), unreadable request limits (unlimited), and 0/negative/unreadable cleanup periods
+(default sweep). The standalone server
+reports errors even earlier, from
 `resolveServerConfig`, before the banner. See
-[Rate Limiting & Concurrency](./rate-limiting-and-concurrency.md).
+[Rate Limiting & Concurrency](./rate-limiting-and-concurrency.md#configuration)
+for the complete input rules.
 
 WS/SSE tuning constants are compile-time, not env-configurable: SSE `MAX_CLIENTS=1000`, `HEARTBEAT_MS=30000`, `RETRY_MS=3000`, `EVENT_BUFFER_SIZE=1000`; WS `MAX_WS_CLIENTS=1000`, `BACKPRESSURE_BYTES=1048576`, idle `120s`, `maxPayloadLength=1 MiB`.
 

@@ -75,8 +75,8 @@ High-performance job queue server for Bun. SQLite persistence, cron jobs, priori
 
 1. **PUSH**: Client → TcpPool → TcpServer → QueueManager → Shard[hash(queue)] → PriorityQueue → WriteBuffer → SQLite
 2. **PULL**: Client → TcpServer → QueueManager → Shard → PriorityQueue.pop() → Job (state: active)
-3. **ACK**: Client → TcpServer → AckBatcher → Shard.complete() → jobResults (LRU) + completedJobs (Set)
-4. **FAIL**: Client → TcpServer → Shard.fail() → retry (backoff) OR → DLQ (max attempts)
+3. **ACK**: Worker → optional client-side AckBatcher → TCP handler (`handlers/core.ts`) → QueueManager.ack → `operations/ack/completion.ts` → shard/index/storage, jobResults (LRU) + completedJobs (Set)
+4. **FAIL**: Client → TCP handler (`handlers/core.ts`) → QueueManager.fail → `operations/ack/failure.ts` → shard/index/storage → retry (backoff) OR → DLQ (max attempts)
 
 ## Directory Structure
 
@@ -148,7 +148,7 @@ Cleanup runs every 10s (it also purges expired `removedResults`). Evicts 10% whe
 TCP_PORT=6789              HTTP_PORT=6790
 HOST=0.0.0.0               BUNQUEUE_DATA_PATH=./data/bunq.db
 AUTH_TOKENS=token1,token2  CORS_ALLOW_ORIGIN=*
-METRICS_AUTH=false          # Require auth for /metrics endpoint
+METRICS_AUTH=false          # Require auth for /prometheus scrape endpoint
 TCP_SOCKET_PATH=           # RESERVED, not wired: TCP always binds HOST:TCP_PORT
                            # (client ConnectionOptions.socketPath is not read either)
 HTTP_SOCKET_PATH=          # Unix socket for HTTP (works)
@@ -257,9 +257,14 @@ bun run bench                           # Native macOS benchmarks only
 
 | Mode               | Throughput      | Data Loss Risk |
 | ------------------ | --------------- | -------------- |
-| Buffered (default) | ~100k jobs/sec  | Up to 10ms     |
-| Durable            | ~10k jobs/sec   | None           |
-| Auto-batch (TCP)   | ~145k ops/s (concurrent), ~10k ops/s (sequential) | None (same as PUSH/PUSHB) |
+| Buffered (default) | ~100k jobs/sec  | Pending application buffer; typical flush interval 10 ms, longer during stalls/retries |
+| Durable            | ~10k jobs/sec   | Bypasses the application admission buffer; host/storage power-loss limitations remain |
+| Auto-batch (TCP)   | ~145k ops/s (concurrent), ~10k ops/s (sequential) | Inherits the selected PUSH/PUSHB admission durability |
+
+These throughput figures are indicative historical measurements, not results of
+this documentation review. SQLite uses WAL with `synchronous=NORMAL`; durable
+admission does not promise unconditional power-loss safety. See
+[Persistence](../features/persistence.md).
 
 
 ## Background Tasks

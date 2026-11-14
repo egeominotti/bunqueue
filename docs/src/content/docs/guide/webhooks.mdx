@@ -375,7 +375,7 @@ Because of retries, the same event can arrive twice. Deduplicate on `jobId` + `e
 
 ## Gotchas
 
-- **SSRF protection:** URLs pointing to localhost, private or link-local IP ranges, or cloud metadata endpoints are rejected at registration time. Only `http:`/`https:` URLs up to 2048 characters are accepted. This means you cannot register a webhook to a local dev server from the same machine.
+- **Webhook URL validation:** Registration rejects prohibited literal hostnames/IPs, including localhost, private or link-local IP ranges and cloud metadata endpoints. Only `http:`/`https:` URLs up to 2048 characters are accepted. DNS resolution and redirect destinations are not validated as an egress policy; use trusted webhook registrations and network egress controls.
 - **Missing events:** check the `--events` and `--queue` filters, and remember `job.progress` only fires when a processor calls `job.updateProgress()`.
 - **Nothing delivered:** run `bunqueue webhook list` and look at the `Delivered: N ok / N failed` counters and the `[disabled]` marker; delivery failures are also logged by the server with the target URL.
 - **Invalid signature errors:** verify against the raw body, make sure no proxy rewrites the payload, and confirm both sides use the same secret.

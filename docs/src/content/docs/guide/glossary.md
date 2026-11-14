@@ -118,7 +118,10 @@ Capping how many jobs run per time window, to protect a downstream service like 
 
 ### Deduplication and idempotency
 
-Giving a job a custom `jobId` so adding it again while the first one is still waiting or running does nothing. This makes `add()` safe to call more than once for the same logical task. See the [Queue API](/guide/queue/).
+Giving a job a custom `jobId` suppresses repeat adds while its live ownership is
+retained. Memory/SQLite use a bounded cache (50,000 IDs by default); PostgreSQL
+checks database identity. This is separate from application idempotency for
+external effects. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits).
 
 ## Composing jobs
 
@@ -171,7 +174,9 @@ The compact binary format used on the TCP wire, smaller and faster to parse than
 An edge pattern: a small embedded queue stores jobs on a persistent local volume,
 then forwards them to a central server when it can reach it. A network outage
 does not drop jobs while the local process and volume survive; use SQLite
-`durable: true` when even its 10ms hard-crash window is unacceptable. See
+`durable: true` when losing pending buffered admissions on a crash is
+unacceptable. SQLite's typical 10 ms flush interval can be longer during
+stalls/retries. See
 [IoT & Edge](/guide/iot-edge/).
 
 :::tip[Related]

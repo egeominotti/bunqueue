@@ -464,7 +464,14 @@ zero.
   their caller, so use them when the outcome matters.
 - **Synchronous TCP boundaries**: `getJobs`/`getWaiting`/… (sync) return `[]`, `count()` returns `0`, `getCountsPerPriority()` returns `{}`, and `isPaused()` returns `false` in TCP mode because their signatures cannot await a round trip. Use the corresponding `Async` variants for authoritative remote results. The same rule applies to synchronous DLQ reads and fire-and-forget mutation forms; use `getDlqAsync`, `getDlqStatsAsync`, `retryDlqAsync`, `retryDlqByFilterAsync`, `purgeDlqAsync`, and `retryCompletedAsync` when the result matters. Selective `removeDlqJob` is deliberately Promise-based even without the suffix, and `removeDlqJobAsync` is its explicit alias. Limit getters, worker discovery, dependency methods, deduplication methods, and `moveToWaitingChildren` are asynchronous and now query or mutate the selected broker runtime directly.
 - **Detached conversion helpers**: broker-returned `Job` instances always receive a complete live operation context. Low-level callers that invoke `createPublicJob` without a context receive only detached fallback behavior and must not treat that helper as a broker client.
-- **Idempotency**: `jobId`/`deduplication.id` make `add` idempotent (custom-id dedup, server-side, only while the job is live: completion or the DLQ releases the id). `forward()` uses deterministic remote ids (`fwd:<queue>:<localId>`) so re-forwards don't duplicate (see [Store-and-Forward](./store-and-forward.md)).
+- **Duplicate suppression**: custom `jobId` returns a live generation only while
+  ownership is retained. Ordinary memory/SQLite adds use a bounded cache (50,000
+  IDs by default), so eviction can end protection before completion/DLQ;
+  PostgreSQL checks database identity. `deduplication.id` separately depends on
+  unique-key ownership/TTL. `forward()` uses deterministic remote IDs with the
+  same backend limits. Keep external effects idempotent; see
+  [Deduplication & Unique Jobs](./deduplication-and-unique.md) and
+  [Store-and-Forward](./store-and-forward.md).
 - **Metrics/event retention**: `getMetrics(type,start,end)` returns queue-scoped,
   newest-first one-minute buckets over identical embedded/TCP paths.
   `trimEvents(maxLength)` returns the exact number removed from that queue's

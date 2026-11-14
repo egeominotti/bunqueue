@@ -168,7 +168,7 @@ Then, in your code:
 
 - **Classes**: `Queue`, `Worker`, `QueueEvents`, `FlowProducer`, same constructors minus the Redis connection.
 - **Job options**: `priority`, `delay`, `attempts`, `backoff` (including the `{ type, delay }` object form), `jobId`, `removeOnComplete`, `removeOnFail`, `repeat`.
-- **`jobId` deduplication**: adding the same `jobId` while that job is still live (waiting, prioritized, delayed, waiting-children or active) returns the existing job instead of creating a duplicate. Once it has completed or reached the DLQ, the ID can be reused for a fresh job.
+- **`jobId` deduplication**: a live generation is returned while ownership is retained. Ordinary memory/SQLite adds use a bounded cache (50,000 IDs by default); eviction can end this protection before completion. PostgreSQL checks live database identity. After completion or DLQ, the ID may be reused for a fresh job. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits); keep external effects idempotent.
 - **Events**: `worker.on('completed' | 'failed' | 'progress', ...)` fire with the same signatures.
 - **`QueueEvents` payloads**: `completed` carries `{ jobId, returnvalue }`, `failed` carries `{ jobId, failedReason }` and `progress` carries `{ jobId, data }`; `waiting`, `active`, `stalled`, `delayed`, `removed`, `duplicated`, `waiting-children` and `drained` are emitted under the same names. A `failed` event also fires for an attempt that will be retried, with `terminal: false`. In server mode pass the same `connection` as the Queue (or `embedded: false`): with neither, `QueueEvents` listens to the embedded queue of its own process.
 - **Job schedulers**: `queue.upsertJobScheduler(id, { pattern }, { name, data, opts })` (or `{ every }` for a fixed interval), `getJobScheduler()`, `getJobSchedulers()` and `removeJobScheduler()` keep their BullMQ v5 names. See [Job schedulers](/guide/queue/schedulers/).
@@ -249,7 +249,7 @@ await queue.add('task', data, { repeat: { every: 3600000 } }); // fixed interval
 
 ### removeOnComplete is boolean only
 
-BullMQ accepts `removeOnComplete: { age, count }` for retention rules. bunqueue accepts only `true` or `false`. Use `queue.clean()` for age-based cleanup.
+BullMQ accepts `removeOnComplete: { age, count }` for retention rules. bunqueue accepts only `true` or `false`. Use `await queue.cleanAsync(graceMs, limit, 'completed')` for age-based cleanup in embedded or TCP mode.
 
 ### Sandboxed processors
 

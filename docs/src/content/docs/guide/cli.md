@@ -93,11 +93,16 @@ Job IDs are UUID v7 strings (time-ordered). Push accepts options for priority, r
 ```bash
 bunqueue push emails '{"to":"vip@example.com"}' --priority 10          # higher = sooner
 bunqueue push notifications '{"msg":"hi"}' --delay 5000                # run in 5s
-bunqueue push orders '{"orderId":"ORD-123"}' --job-id order-ORD-123    # idempotent ID
+bunqueue push orders '{"orderId":"ORD-123"}' --job-id order-ORD-123    # retained-ownership dedup
 bunqueue push emails '{"to":"a@b.c"}' --max-attempts 5 --backoff 2000  # retry config
 bunqueue push notifications '{"userId":"1"}' -u user-1-notify          # unique key (dedup)
 bunqueue push aggregate '{"type":"sum"}' --depends-on job-1,job-2      # wait for other jobs
 ```
+
+Custom IDs use the selected broker's ownership rules: memory/SQLite keep a
+bounded cache (50,000 IDs by default), whereas PostgreSQL checks the database.
+See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits); keep
+external effects idempotent.
 
 | Option                 | Short | Default | Description                         |
 | ---------------------- | ----- | ------- | ----------------------------------- |

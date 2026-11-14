@@ -155,7 +155,7 @@ larger finite value is accepted and stored as the maximum.
 | Field (wire name)              | Rule                                                               |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `priority`                     | any finite number; with `groupId`: `group.priority` integer 0..2,097,151 |
-| `delay`                        | finite; a negative delay is a past run time (ready at once, ahead of later ready jobs); clamped to ±`MAX_JOB_DURATION_MS` |
+| `delay`                        | finite; a negative delay is a past run time (ready at once; among equal-priority FIFO jobs, earlier run times go first); clamped to ±`MAX_JOB_DURATION_MS` |
 | `ttl`, `timeout`               | finite, at least 0; clamped to `MAX_JOB_DURATION_MS`               |
 | `stallTimeout`                 | finite (a negative value stalls at once, as 0 does)                |
 | `maxAttempts` (`attempts`)     | any number, ±Infinity included; stored as `attemptCount`: 1 or less → 1 (runs once), a fraction rounds up, at most 2,147,483,647 |
@@ -189,14 +189,16 @@ Why these bounds:
   flows, cron templates, MCP, Cloud, PostgreSQL): `delay: runAt - Date.now()` turns
   negative once `runAt` has passed, and `createJob` stores `runAt = createdAt +
   jobRunDelay(delay)`, a run time in the past. The job is `waiting`, never `delayed`
-  and never in the delayed index, and because the waiting queue (and the PostgreSQL
-  claim order) sorts ready jobs by `runAt`, it goes AHEAD of ready jobs whose run time
-  is later, as on 2.9.10 (a 2.11 candidate clamped it to now, which put it behind them).
+  and never in the delayed index. Among equal-priority FIFO jobs, the waiting queue
+  (and the PostgreSQL claim order) sorts by `runAt`, so it goes ahead of ready jobs
+  whose run time is later, as on 2.9.10; priority and LIFO ordering still apply.
+  A 2.11 candidate clamped it to now, which put it behind those FIFO jobs.
   The public `job.delay` and `job.opts.delay` report 0 (`effectiveJobDelay`), as a job
   read back from the broker does. ChangeDelay/MoveToDelayed apply a negative delay the
   same way in the SQLite/embedded engine (`delayArgument`: `runAt = now + delay`); the
   PostgreSQL engine keeps its own 2.9.10 result, `now + max(0, delay)` (a negative
-  ChangeDelay/MoveToDelayed makes the job ready now, behind earlier ready jobs): the
+  ChangeDelay/MoveToDelayed makes the job ready now, behind otherwise equal-priority
+  FIFO jobs with earlier run times): the
   engines differed on 2.9.10 and keep differing. The public `moveToDelayed(timestamp)`
   keeps 2.9.10's client-side `max(0, timestamp - now)`, so a past timestamp means "now"
   (a plain decimal string timestamp is read as its number, as 2.9.10's `-` coerced it).
@@ -232,8 +234,11 @@ directly, legacy cron templates, stored rows) are still made safe:
 - `createJob` never stores NaN or a non-number in `createdAt`, `runAt`, `backoff`,
   `priority` or `maxAttempts`: it falls back to now / no delay / the defaults, so SQLite
   never drops the row. Infinity is kept (it is a valid "never" for these fields). A
-  negative `delay` is stored as no delay (`effectiveJobDelay`, also used by the client
-  to report the added job's `delay`).
+  negative `delay` is stored as a past run time (`createdAt + jobRunDelay(delay)`,
+  bounded to ±`MAX_JOB_DURATION_MS`), so it is ready immediately. Among
+  equal-priority FIFO jobs, it sorts ahead of jobs with later run times;
+  priority and LIFO ordering still apply. Only the client-facing `delay` projection is nonnegative
+  (`effectiveJobDelay` reports 0).
 - `isReady(job)` is `!(job.runAt > now)`, the complement of `isDelayed`, as every state
   view already classifies jobs: a NaN run time is ready, not "waiting" forever. This
   also removes a synchronous infinite loop in the group scheduler (promote, not ready,
@@ -278,7 +283,8 @@ embedded jobs, MCP, Cloud):
   engine still clamps to [0, 100].
 - `Update`: JSON serializable (`validateUpdatedJobData`), with no size limit, as on
   2.9.10 in both modes (an 11 MB `updateData` succeeded, and an embedded `add` never
-  checked the data size either). TCP `PUSH`/`PUSHB` keep their 10 MB data limit.
+  checked the data size either). TCP `PUSH`/`PUSHB` keep their limit of
+  10 × 1024 × 1024 JSON string characters, rather than a byte cap.
 - PUSH `lifo` is stored as a boolean (`createJob`): `1` and `true` each sorted before
   the other in the heap comparator.
 - `ClearLogs`: `keepLogs` is applied as 2.9.10 applied it (`keepLogsArgument`): omitted,
@@ -332,7 +338,7 @@ recovered.
   Queue jobs, FlowProducer jobs and DLQ jobs, plus object and invalid progress, in both
   modes.
 - `test/repro-job-options-negative-delay.test.ts`: a negative `delay` is a `waiting`
-  job pulled at once, ahead of later ready jobs (`runAt === createdAt + delay`, empty
+  job pulled at once, ahead of equal-priority FIFO jobs with later run times (`runAt === createdAt + delay`, empty
   delayed index) through
   embedded and TCP `add`/`addBulk`, flows, HTTP `POST /queues/:q/jobs` and `/jobs/bulk`,
   MCP `add_job`/`add_jobs_bulk`/`add_flow`/`add_cron` and Cloud `job:push`; NaN,

@@ -40,7 +40,7 @@ historical SDK API remains available explicitly from `bunqueue-client/legacy`.
 
 ### What are the requirements?
 
-Bun 1.4.0 or newer (enforced via the package `engines` field) on macOS, Linux, or Windows via WSL. An SSD helps write throughput. Install steps are on the [installation page](/guide/installation/).
+Bun 1.4.0 or newer (enforced via the package `engines` field) on macOS, Linux, or Windows. An SSD helps write throughput. Install steps are on the [installation page](/guide/installation/).
 
 ### How heavy is the install?
 
@@ -68,8 +68,8 @@ bunqueue start
 ### How does persistence work?
 
 Jobs are written to SQLite in WAL mode (write-ahead logging, a journal that lets
-reads and writes overlap). By default writes are buffered for up to 10 ms and
-flushed in batches. If that process-crash window is unacceptable for a job, add
+reads and writes overlap). By default writes use a typical 10 ms flush interval;
+stalls or retries can keep them buffered longer. If that process-crash exposure is unacceptable for a job, add
 it with `{ durable: true }` to commit before `add()` returns. This closes
 bunqueue's application buffer; power-loss durability still depends on SQLite's
 host, filesystem, and storage. Current native
@@ -112,48 +112,53 @@ Three knobs, in order of impact: raise worker `concurrency` (parallel jobs per w
 
 ### How does deduplication work?
 
-Pass a `jobId`. Adding the same `jobId` while the earlier job is still unfinished (waiting, delayed, waiting for children, or active) returns the existing job instead of creating a duplicate. Once that job has completed or moved to the DLQ, the same `jobId` creates a fresh job. This makes webhook handlers and restart-recovery code safe to re-run while the work is pending:
+Pass a `jobId` to return the unfinished generation while its ownership is
+retained. Memory/SQLite use a bounded cache (50,000 IDs by default); after
+eviction, a re-add is not guaranteed to preserve the original live job.
+PostgreSQL checks live identity in the database. After completion or DLQ, the
+ID may create a fresh job. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits)
+and keep webhook/payment effects idempotent in your application:
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">
 
 ```typescript
-await queue.add('charge', data, { jobId: `order-${orderId}` }); // idempotent
+await queue.add('charge', data, { jobId: `order-${orderId}` }); // retained-ownership dedup; see limits above
 ```
 
 </TabItem>
 <TabItem label="Node.js / Deno">
 
 ```typescript
-await queue.add('charge', data, { jobId: `order-${orderId}` }); // idempotent
+await queue.add('charge', data, { jobId: `order-${orderId}` }); // retained-ownership dedup; see limits above
 ```
 
 </TabItem>
 <TabItem label="Python">
 
 ```python
-queue.add("charge", data, job_id=f"order-{order_id}")  # idempotent
+queue.add("charge", data, job_id=f"order-{order_id}")  # retained-ownership dedup; see limits above
 ```
 
 </TabItem>
 <TabItem label="PHP">
 
 ```php
-$queue->add('charge', $data, ['jobId' => "order-{$orderId}"]); // idempotent
+$queue->add('charge', $data, ['jobId' => "order-{$orderId}"]); // retained-ownership dedup; see limits above
 ```
 
 </TabItem>
 <TabItem label="Go">
 
 ```go
-queue.Add("charge", data, bunqueue.JobOptions{"jobId": "order-" + orderID}) // idempotent
+queue.Add("charge", data, bunqueue.JobOptions{"jobId": "order-" + orderID}) // retained-ownership dedup; see limits above
 ```
 
 </TabItem>
 <TabItem label="Rust">
 
 ```rust
-// idempotent
+// Retained-ownership dedup; see limits above
 queue.add("charge", data, JobOptions {
     job_id: Some(format!("order-{order_id}")),
     ..Default::default()
@@ -164,7 +169,7 @@ queue.add("charge", data, JobOptions {
 <TabItem label="Elixir">
 
 ```elixir
-# idempotent
+# Retained-ownership dedup; see limits above
 {:ok, _job} = Bunqueue.Queue.add(queue, "charge", data, jobId: "order-#{order_id}")
 ```
 
@@ -239,7 +244,7 @@ Workers send heartbeats (periodic "still alive" pings). If one goes silent, stal
 
 ### What is the dead letter queue?
 
-The DLQ is the holding area for jobs that exhausted their retries, threw an unrecoverable error, or stalled too many times. Nothing is silently dropped: you can inspect entries, retry them (`queue.retryDlq()`), or purge them. It also supports auto-retry and expiration policies. See [DLQ](/guide/dlq/).
+The DLQ is the holding area for jobs that exhausted their retries, threw an unrecoverable error, or stalled too many times. Nothing is silently dropped: you can inspect entries, retry them (`await queue.retryDlqAsync()`), or purge them. It also supports auto-retry and expiration policies. See [DLQ](/guide/dlq/).
 
 ### Can I control processing order?
 
@@ -317,7 +322,7 @@ The job was already removed: it completed with `removeOnComplete: true`, failed 
 
 ### High memory usage
 
-Usually accumulation: completed jobs kept around, a growing DLQ, or oversized job payloads (keep payloads small, store big blobs elsewhere and pass a reference). Add jobs with `removeOnComplete: true`, purge the DLQ periodically (`queue.purgeDlq()`), and clean old jobs with `queue.clean(3600000, 1000)` (grace period in ms, max jobs to remove).
+Usually accumulation: completed jobs kept around, a growing DLQ, or oversized job payloads (keep payloads small, store big blobs elsewhere and pass a reference). Add jobs with `removeOnComplete: true`, purge the DLQ periodically (`await queue.purgeDlqAsync()`), and clean old jobs with `await queue.cleanAsync(3600000, 1000, 'completed')` (grace period in ms, max jobs to remove). These async methods work in embedded and TCP modes.
 
 ## Contributing
 

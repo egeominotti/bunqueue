@@ -6,7 +6,7 @@
 
 This module groups two unrelated client-side concerns that share the "compatibility / integration" theme.
 
-1. **Store-and-Forward** (`forwarder.ts`): drains jobs from a local (typically embedded SQLite) queue to a remote bunqueue server over TCP/TLS. Built for the edge/gateway pattern — a device buffers work locally while offline, then ships it to a central broker when the uplink is up. With a surviving SQLite volume, a remote failure leaves the forward in the local retry/backoff/DLQ path. Re-forwards use a deterministic remote `jobId`; deduplication is bounded by the remote custom-id retention window.
+1. **Store-and-Forward** (`forwarder.ts`): drains jobs from a local (typically embedded SQLite) queue to a remote bunqueue server over TCP/TLS. Built for the edge/gateway pattern — a device buffers work locally while offline, then ships it to a central broker when the uplink is up. With a surviving SQLite volume, a remote failure leaves the forward in the local retry/backoff/DLQ path. Re-forwards use a deterministic remote `jobId`; suppression depends on the remote backend's live-ownership/cache limits, not a guaranteed time window.
 
 2. **BullMQ v5 compatibility shims** (`bullmqCompat.ts`): a thin adapter exposing BullMQ-named read APIs (`getPrioritized`, `getWaitingChildren`, `getJobDependencies`, …) on the [Client SDK: Queue](./client-queue-sdk.md), so code written against BullMQ can read prioritized jobs, waiting-children, and parent/child dependency views with minimal changes. The asynchronous read paths are authoritative in embedded and TCP modes; synchronous compatibility snapshots retain the explicit transport boundaries described in [Public API Completeness](./public-api-completeness.md).
 
@@ -175,7 +175,15 @@ The Forwarder holds no locks of its own. Concurrency is the `Worker`'s `concurre
 
 ## Edge Cases & Failure Modes
 
-- **Idempotent re-forwards (bounded).** Every push carries `jobId = fwd:<queueKey>:<localId>`. The server dedupes custom job ids, so a re-forward after a crash/retry does not duplicate the job remotely (`forwarder.ts:11-15`, `forwarder.ts:97`). **Invariant/gotcha:** dedupe only holds *while the remote job is live* (waiting, delayed or active). The server releases a custom id when the job completes (`src/application/operations/ack/completion.ts:43`) or moves to the DLQ (`src/application/operations/ack/failure.ts:29`), and the bounded `customIdMap` LRU can evict it earlier (see [Deduplication & Unique Jobs](./deduplication-and-unique.md)). A re-forward of the same `localId` after that creates a duplicate remote job. Local job-id reuse across DB resets would likewise collide.
+- **Re-forward suppression is ownership-bounded.** Every push carries
+  `jobId = fwd:<queueKey>:<localId>`. A memory/SQLite destination returns the
+  live generation only while its bounded ownership cache retains the ID
+  (50,000 entries by default); after eviction, preserving that generation is
+  not guaranteed. PostgreSQL checks locked database identity independently.
+  Completion/DLQ permits a new generation in either backend. Keep external
+  effects idempotent and reconcile uncertain forwards; see
+  [Deduplication & Unique Jobs](./deduplication-and-unique.md). Local job-ID
+  reuse across database resets must also be considered.
 - **Listener-error isolation.** A throwing `forwarded` listener is caught and ignored so it cannot fail an already-succeeded forward (`forwarder.ts:103-107`).
 - **`error` event suppression.** Worker `failed`/`error` are only re-emitted as `Forwarder` `error` when `listenerCount('error') > 0` (`forwarder.ts:123,126`). This prevents `EventEmitter`'s default "throw on unhandled error" from crashing the process on a transient uplink failure — but it also means errors are silently dropped if you never attach an `error` listener. Failed forwards remain local jobs; they survive process restart only when the source uses a surviving SQLite volume, subject to the normal buffered/durable write boundary and retry/DLQ retention.
 - **Auto-batch disabled on the remote.** The remote queue forces `autoBatch:{ enabled:false }` (`forwarder.ts:88`); forwards are individual pushes, not coalesced.

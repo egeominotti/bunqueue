@@ -24,12 +24,12 @@ import { Aside } from '@astrojs/starlight/components';
 
 | Failure                                        | What happens to the job                                                                                                                                          |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worker crashes mid-job                         | If its TCP connection closes, the server puts the jobs it held back in the queue at once. A worker that hangs with its connection open loses the job when its lease expires. Either way it may run twice, never zero times. |
-| Server killed hard (`kill -9`)                 | Jobs written to disk survive and recover on restart. Jobs accepted in the last ~10 ms may be lost, unless they were added with `durable: true`.                  |
+| Worker crashes mid-job                         | A TCP disconnect immediately releases eligible deliveries still owned by that client. Renewed leases remain active until expiry/stall recovery; detached pulls are not tracked. Processing may run again. See [TCP recovery](/api/tcp/#connection-lifecycle). |
+| Server killed hard (`kill -9`)                 | Committed jobs survive ordinary process termination and recover on restart. Pending buffered admissions may be lost; the typical flush interval is 10 ms, longer during stalls/retries. `durable: true` bypasses this application buffer. |
 | Server restarted gracefully (SIGTERM, deploys) | After shutdown completes successfully, buffered SQLite writes are flushed before exit. A flush error or forced termination follows the hard-kill row instead.   |
 | Job fails repeatedly                           | After its retry attempts are exhausted it moves to the DLQ (dead letter queue, a parking lot for failed jobs you can inspect and retry). See [DLQ](/guide/dlq/). |
 | Disk fills up                                  | The server stays up and `/health` reports `degraded` with HTTP 503. Durable pushes fail explicitly instead of pretending to succeed.                                 |
-| The whole machine is lost                      | You restore the last S3 snapshot. Your maximum data loss is the backup interval.                                                                                 |
+| The whole machine is lost                      | Restore the latest successful, restorable S3 snapshot. Loss extends back to that snapshot; monitor its age against your target backup interval.                                                                                 |
 
 </div>
 
@@ -54,8 +54,9 @@ import { Aside } from '@astrojs/starlight/components';
 Once a job is durably admitted, the processing guarantee is **at-least-once**:
 it can run more than once, but the broker does not silently discard that
 generation. SQLite's default write buffer precedes durable admission, so a hard
-crash can still lose jobs accepted inside its documented 10 ms window unless
-they use `durable: true`. No queue can atomically combine your external side
+crash can still lose pending buffered admissions (a typical 10 ms flush interval,
+not an upper bound during stalls/retries) unless they use `durable: true`.
+No queue can atomically combine your external side
 effect with its own acknowledgment, so a crash can always land between them.
 What bunqueue guarantees around those edges:
 
@@ -64,7 +65,7 @@ What bunqueue guarantees around those edges:
   If the job's processing `timeout` already finalized that generation, the
   ACK/FAIL is instead an explicit idempotent no-op. Two generations can never
   both complete the same job.
-- Re-adding a job with the same custom `jobId` is a no-op, even under heavy concurrency. Producers that retry on timeout should always set one.
+- Re-adding a custom `jobId` returns its unfinished generation while ownership is retained. Memory/SQLite use a bounded cache (50,000 IDs by default), so eviction can end this protection while a job is still live; PostgreSQL checks live identity in the database. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits). After completion or DLQ, the ID may create a fresh job. Reconcile uncertain admissions before retrying, and retain application-side idempotency keys for external effects.
 - Duplicate ACKs are harmless.
 
 <Aside type="caution" title="What you must do">
@@ -92,7 +93,7 @@ What bunqueue guarantees around those edges:
 
 | SQLite mode             |         Published native workload median | Bunqueue process-crash buffer window |
 | ----------------------- | ---------------------------------------: | ------------------------------------ |
-| Buffered (default)      | 186,384 jobs/s, public on-disk `addBulk` | up to 10 ms of accepted jobs         |
+| Buffered (default)      | 186,384 jobs/s, public on-disk `addBulk` | pending admissions; typical flush 10 ms, longer during stalls/retries |
 | `durable: true` per job |   60,835 ops/s, sequential Embedded adds | none after `add()` resolves          |
 
 ```typescript
@@ -101,7 +102,7 @@ await queue.add('capture-payment', data, { durable: true }); // committed before
 ```
 
 Mixing is free: mark only the jobs that are money as durable and keep the rest
-batched. The 10 ms window applies to abrupt process termination; a successfully
+batched. Pending buffer loss applies to abrupt process termination; a successfully
 completed graceful shutdown flushes the buffer. Measured numbers per mode are
 in [Benchmarks](/guide/benchmarks/).
 
@@ -273,7 +274,7 @@ and give your orchestrator a termination grace period slightly above that
 </ul>
 
   <Aside title="Honest limits">
-  In SQLite mode, buffered jobs can lose up to ~10 ms of writes on a hard crash; `durable: true` closes that per job, and losing the single host means restoring a snapshot. PostgreSQL mode removes that buffer and supports several brokers, but database availability and recovery are still your responsibility. Both modes provide at-least-once processing, so handlers must tolerate duplicates. Watch SQLite WAL growth or PostgreSQL storage/connection health as appropriate. For a PostgreSQL schema upgrade, stop the old broker fleet, initialize and verify one new broker, then start the rest at the same version; do not rely on an application-only downgrade after migration.
+  In SQLite mode, a hard crash can lose pending buffered admissions; the typical flush interval is 10 ms and can be longer during stalls/retries. `durable: true` bypasses that application admission buffer per job, and losing the single host means restoring a snapshot. PostgreSQL mode removes that buffer and supports several brokers, but database availability and recovery are still your responsibility. Both modes provide at-least-once processing, so handlers must tolerate duplicates. Watch SQLite WAL growth or PostgreSQL storage/connection health as appropriate. For a PostgreSQL schema upgrade, stop the old broker fleet, initialize and verify one new broker, then start the rest at the same version; do not rely on an application-only downgrade after migration.
   </Aside>
 </div>
 

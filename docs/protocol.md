@@ -181,8 +181,13 @@ Client MUSTs:
   `PUSHB` entries are typed `JobInput`, whose field is **`customId`**. A
   bulk client MUST rename `jobId → customId` per entry or custom ids are
   silently lost.
-- `jobId` is idempotent: re-pushing an existing custom id returns the
-  existing job's `id` instead of enqueuing a duplicate.
+- `jobId` returns the unfinished generation while ownership is retained.
+  Ordinary memory/SQLite admission depends on a bounded ownership LRU (50,000
+  IDs by default); after eviction, preserving the original live generation is
+  not guaranteed. SQLite uses upserts, so its primary key does not add that
+  guard, and `durable` does not remove the limit. PostgreSQL uses locked live-row
+  checks instead. After completion or DLQ, an ID can create a fresh generation.
+  See [Custom-ID limits](https://bunqueue.dev/guide/queue/deduplication/#custom-id-limits).
 - The broker deduplicates on `uniqueKey` alone; `dedup` is only the
   `ttl`/`extend`/`replace` policy and is ignored without a `uniqueKey`. A
   client `deduplication {id, ttl?, extend?, replace?}` option MUST send `id`
@@ -195,8 +200,13 @@ Client MUSTs:
   an integer from 0 through 2,097,151, served in ascending order (`0` first).
   Without `groupId`, the ordinary queue priority keeps its higher-first range.
 - `groupMaxSize` is a positive safe integer. The broker checks pending depth
-  and admission atomically; if any job in a `PUSHB` or `PUSHF` graph would
-  exceed the limit, it rejects the complete command without partial writes.
+  and admission atomically per job. Memory/SQLite `PUSHB` retains an already
+  accepted prefix on runtime rejection (for example a later member exceeding
+  its group cap), despite returning an error; preflight validation rejects
+  before mutation. Reconcile accepted jobs before retrying; stable custom IDs
+  alone are insufficient after memory/SQLite ownership eviction. Keep external
+  effects idempotent. PostgreSQL batch insertion is transactional. `PUSHF` rejects the
+  complete graph without partial writes if any member exceeds its cap.
 
 ### 6.2 Query
 
@@ -436,8 +446,10 @@ entries.
 
 ### 6.7 Webhooks, rate limits, monitoring
 
-- `AddWebhook` (`url`, `events`) → **`{data: {webhookId}}`**. Localhost and
-  private-network URLs are rejected (SSRF guard). Event names look like
+- `AddWebhook` (`url`, `events`) → **`{data: {webhookId}}`**. Prohibited literal
+  hostnames/IPs are rejected at registration; DNS resolution and redirect
+  destinations are not checked as an egress policy. Use trusted registrations
+  and network egress controls. Event names look like
   `job.completed`.
 - `RemoveWebhook` takes **`webhookId`**; `SetWebhookEnabled` takes **`id`**.
   Yes, they differ; both are normative.
