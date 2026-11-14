@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
-import { PostgresPublicApiHarness, waitFor } from './support/postgres-public-api-harness';
+import {
+  PostgresPublicApiHarness,
+  waitFor,
+  POSTGRES_PUBLIC_API_CLIENT_CLOSE_TIMEOUT_MS,
+  POSTGRES_PUBLIC_API_TEARDOWN_TIMEOUT_MS,
+} from './support/postgres-public-api-harness';
 import { expectedPostgresVersionPrefix } from './support/postgres-version';
+import { PublicDeliveryTrace } from './support/postgres-public-delivery-trace';
 
 const postgresUrl = Bun.env.BUNQUEUE_TEST_POSTGRES_URL;
 let harness: PostgresPublicApiHarness | null = null;
@@ -8,16 +14,16 @@ let harness: PostgresPublicApiHarness | null = null;
 beforeAll(async () => {
   if (!postgresUrl) return;
   harness = await PostgresPublicApiHarness.start(postgresUrl, expectedPostgresVersionPrefix);
-});
+}, POSTGRES_PUBLIC_API_TEARDOWN_TIMEOUT_MS);
 
 afterEach(async () => {
   await harness?.closeClients();
-});
+}, POSTGRES_PUBLIC_API_CLIENT_CLOSE_TIMEOUT_MS);
 
 afterAll(async () => {
   await harness?.close();
   harness = null;
-});
+}, POSTGRES_PUBLIC_API_TEARDOWN_TIMEOUT_MS);
 
 function fixture(): PostgresPublicApiHarness {
   if (!harness) throw new Error('PostgreSQL public API harness is not running');
@@ -34,6 +40,7 @@ describe(`PostgreSQL ${expectedPostgresVersionPrefix} public Queue and Worker AP
       const observer = current.queue<{ value: number }>(name, 3);
       const events = current.queueEvents<number, { phase: string }>(name, 2);
       const executions = new Map<string, number>();
+      const trace = new PublicDeliveryTrace();
       const waiting = new Set<string>();
       const completed = new Map<string, number>();
       const progressed = new Set<string>();
@@ -47,13 +54,23 @@ describe(`PostgreSQL ${expectedPostgresVersionPrefix} public Queue and Worker AP
         name,
         1,
         async (job) => {
+          const invocation = trace.start(job);
           executions.set(job.id, (executions.get(job.id) ?? 0) + 1);
-          await job.updateProgress({ phase: 'running' });
-          await job.log(`processed-${job.data.value}`);
-          return job.data.value * 2;
+          try {
+            await job.updateProgress({ phase: 'running' });
+            invocation.stage = 'log';
+            await job.log(`processed-${job.data.value}`);
+            return trace.returned(invocation, job.data.value * 2);
+          } catch (error) {
+            trace.threw(invocation, error);
+            throw error;
+          }
         },
         { concurrency: 8 }
       );
+      worker.on('failed', (job, error) => trace.failed(job, error));
+      worker.on('error', (error) => trace.unexpected('error', error));
+      worker.on('stalled', (id) => trace.unexpected('stalled', id));
       await worker.waitUntilReady();
 
       const jobs = await producer.addBulk(
@@ -74,7 +91,12 @@ describe(`PostgreSQL ${expectedPostgresVersionPrefix} public Queue and Worker AP
       expect(progressed).toEqual(ids);
       expect(new Set(completed.keys())).toEqual(ids);
       expect(executions.size).toBe(jobs.length);
-      expect([...executions.values()].every((count) => count === 1)).toBe(true);
+      await trace.assert(
+        postgresUrl!,
+        current.namespace,
+        name,
+        new Map(jobs.map((job, value) => [job.id, value * 2]))
+      );
       expect(await jobs[7].waitUntilFinished(events, 5_000)).toBe(14);
       expect(await observer.getJobState(jobs[7].id)).toBe('completed');
       expect(await observer.getJobCountsAsync()).toMatchObject({
@@ -82,6 +104,10 @@ describe(`PostgreSQL ${expectedPostgresVersionPrefix} public Queue and Worker AP
         completed: jobs.length,
         failed: 0,
         waiting: 0,
+        delayed: 0,
+        prioritized: 0,
+        paused: 0,
+        'waiting-children': 0,
       });
 
       let retained = await observer.getJobsAsync({ asc: true, end: -1, state: 'completed' });

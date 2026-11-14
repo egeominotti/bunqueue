@@ -1403,6 +1403,26 @@ completion-retention suite repeats the authoritative lookup with a zero-sized
 local result cache. These files are part of the
 normal `test:postgres` command and therefore run in every PostgreSQL 16–18 CI
 matrix entry; they are not an opt-in soak.
+
+The public Queue/Worker lifecycle checker retains every processor invocation's
+token, attempt, stage and monotonic start/end timestamps. With no applied failure,
+each ID must execute once. A repeated invocation is accepted only after the
+specifically covered pre-log Progress error: a matching token-bearing Worker
+failure, durable failed/retried events, the next attempt and its failure timeline
+must agree. Repeated tokens, overlapping invocations, recovery/release events,
+missing predecessors and other processor errors fail the checker. A repeatable-read
+snapshot additionally requires one terminal row, one completion tombstone and
+one durable completed event per original ID, with the exact result.
+
+`test/repro-postgres-public-progress-retry.test.ts` holds a real PostgreSQL row
+lock after public Worker claim, observes the blocked Progress request, and waits
+for its configured SQL lock timeout. It proves rollback at attempt zero, an
+applied failure, a new token at attempt one, then one result and log. This
+regression distinguishes legal retry from an unexplained duplicate; it does not
+identify the cause of historical CI43559077874, whose logs lacked that evidence.
+`test/postgres-public-delivery-oracle.test.ts` checks that malformed delivery and
+completion histories are rejected. Runtime retry, lease and heartbeat settings
+are unchanged.
 Concurrent brokers claim each job once under both ordinary and 16-consumer
 high-contention campaigns, stale owners are fenced, broker/client shutdown is safe, remotely
 renewed leases survive disconnect, shared limits and workers work, missed cron

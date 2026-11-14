@@ -212,6 +212,41 @@ Run benchmarks only on native macOS, never in an OrbStack Machine or container.
   Docker Compose is only for functional tests requiring external services and
   must use a unique project name and disposable volumes.
 
+### Concurrent job conservation
+
+The race-condition suites use a separate temporary SQLite directory for each
+test. `test/race-conditions.test.ts` records 200 operations from a test-owned
+seeded generator without changing runtime retry jitter. Conservation compares
+every original ID against mutually exclusive waiting, prioritized, delayed,
+active, completed, failed/DLQ and waiting-children listings and their counters.
+An empty pull does not mean delayed retries have disappeared, and a pull's wait
+argument is not a processing timeout. The suite checks the retained population
+after all operations settle instead of sleeping briefly and requiring only half
+the jobs to appear in a partial count.
+
+A controlled 51-delayed/49-completed history protects that boundary. A separate
+case deliberately removes one original job through the persistence path and
+proves that the checker rejects the missing ID even with 99 completions. Set
+`BUNQUEUE_RACE_TRACE=1` for the seeded operation/outcome trace, attempts, retry
+deadlines and complete state snapshot. The seed reproduces operation choices;
+timestamps and completion order remain part of the captured evidence.
+The snapshot guard reads retry deadlines independently of the state-filtered
+listings: a job becoming due between waiting and delayed reads can be absent
+from both. A controlled-clock regression covers that boundary; only a crossed
+deadline repeats the snapshot, while assertion failures propagate immediately.
+
+The PostgreSQL public Worker lifecycle test correlates tokens, attempts, applied
+Worker failures and durable transition events. Its absolute processor-once
+assertion was invalid when a Progress command rolled back and the default retry
+policy applied. The replacement requires one invocation when no failure applied,
+and permits the covered pre-log Progress retry only with a complete predecessor
+history. Distinct tokens, nonoverlap, contiguous attempts, exact results and one
+durable completion per ID are mandatory. A real row-lock/SQL-timeout regression
+proves the retry; checker mutation cases reject unexplained repeats and duplicate
+completions. See [PostgreSQL validation](features/postgres-multibroker.md#validation).
+The specific historical CI failure remains unclassified because its original
+logs did not retain the necessary per-attempt evidence.
+
 ### Behavioral test oracles and controlled observation
 
 Removing a case needs a coverage map: the surviving test must use the same

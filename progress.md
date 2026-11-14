@@ -17,12 +17,21 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Done
 
+- `ci-delivery-accounting-fixes`, `postgres-public-api-processing-flake` and
+  `race-chaos-accounting-flake`: implementation `bca26a94`, strict retry/durable
+  completion histories and exact all-state/ID conservation, all18 original race
+  cases retained. Sandbox/fresh Ubuntu gates passed; source PR #192 CI
+  [43588585824](https://github.com/egeominotti/bunqueue/actions/runs/43588585824)
+  attempt1 GREEN: unit12066/0/400, all PostgreSQL16/17/18.6 legs571/0/1 each,
+  TCP553/0,embedded349/0 and all SDK/type/format/docs jobs passed. Pre-commit and
+  separate pre-push skeptic PASS. Final state-record CI and integration follow.
 - `test-quality-speedups`: implementation `aa038a83`, all four task reviews and
   whole-branch/pre-push skeptic PASS; full sandbox and fresh Ubuntu green on
   tree `f3c1bdf4`. Source PR #191 CI
   [43557827964](https://github.com/egeominotti/bunqueue/actions/runs/43557827964)
   attempt1 GREEN, unit12042/0/399 and all product/PostgreSQL16–18/SDK/docs/type/
-  format jobs passed. Final state-record CI and authorized integration follow.
+  format jobs passed. PR #191 merged as `42225c31`, main CI43563916357 GREEN;
+  the original main checkout was aligned.
 - `harness-audit-hardening`, `postgres-runner-guard-destructuring` and
   `machine-gate-interrupt-log-gaps`: integrated in `9b69dcba` + `45790ac7`;
   full sandbox, fresh Ubuntu and source CI run `43526774536` GREEN. Final
@@ -61,15 +70,19 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
+The delivery/accounting implementation is done and source CI is green. The
+remaining PR #192 integration is described below.
+
 The three audit implementations are done, backed by green source CI. Their
 original staged worktrees remain preserved. Their integration is complete;
 other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Validate/push the final CI-flake tracking record, watch its exact-head PR #191
-   CI, perform the authorized normal squash merge, then watch main CI and
-   fast-forward the original main checkout. No version/publication.
+1. Validate/push the final evidence record for PR #192, watch its exact-head CI,
+   perform the authorized normal squash merge, watch main CI and fast-forward
+   the original main checkout. The implementation's CI43588585824 is already
+   GREEN on `bca26a94`. No version/publication action.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -78,17 +91,14 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ## Blockers / Risks
 
-- PR #191's metadata commit `1037ddd3` had a legacy random chaos-accounting
-  failure in Unit Tests, run43560970951 attempt1 (49 counted, expected at least
-  50). Its single unit-job rerun passed in attempt2, watcher exit3 FLAKY.
-  `race-chaos-accounting-flake` is not-started; delayed work is omitted from
-  that partial count, but actual CI state/IDs/seed were not captured. Preserve
-  the oracle and reproduce before asserting a cause or changing behavior.
-- PR #191's record commit `dd147ccf` had one PostgreSQL 17 processing-count
-  failure in run43559077874 attempt1; the single failed-job rerun passed in
-  attempt2 (`ci-watch.sh` exit3 FLAKY). The new not-started item
-  `postgres-public-api-processing-flake` requires reproduction and per-job
-  failure/lease diagnostics; the cause is unproved and the assertion remains.
+- The legacy partial-count predicate from CI43560970951 has been reproduced
+  with all100IDs retained (49completed/51delayed), then replaced with exact
+  conservation checks under `ci-delivery-accounting-fixes`; its source
+  CI43588585824 is GREEN on `bca26a94`. The original CI snapshot/seed were not retained.
+- The PostgreSQL invocation-count oracle from CI43559077874 rejects a proven
+  legal Progress-failure retry. Strict token/attempt/durable-history checks now
+  distinguish that path from unexplained repeats, but the specific historical
+  CI cause remains unclassified because per-attempt evidence was absent.
 - `main` requires pull requests; only an account with bypass rights can push to it
   directly. The release push (CI's version gate tags, releases and publishes from
   `main`) therefore needs an account with write access to `main`, or a pull
@@ -139,6 +149,69 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — retry and conservation corrections validated in source CI
+
+- Implementation `bca26a9408cea04e443808f8af12351e67ae149a`, tree6a934451, is
+  committed and pushed as `egeominotti` on `fix-ci-delivery-accounting`;
+  [PR #192](https://github.com/egeominotti/bunqueue/pull/192) targets main.
+  Separate mandatory pre-commit and pre-push skeptic verdicts are PASS.
+- Exact-head CI43588585824 attempt1 GREEN, watcher exit0:26successful jobs,
+  9expected release skips. Unit12066/0/400,486376assertions1136files472.87s;
+  TCP69/69suites553/553, embedded43/43suites349/349, PostgreSQL16/17/18.6 each
+  571/0/1opt-insoakskip,572tests126files. Both affected cases and the real
+  SQL-lock regression passed in every PostgreSQL leg. All SDK, public API,
+  WebSocket/SSE, type, format and docs jobs passed. Separate automated code
+  review43588585715 succeeded without findings.
+- All three work items are done on this implementation evidence. Gated
+  executable treee2c50d57, sandbox/fresh Ubuntu receipts, RED/GREEN sequences,
+  case-preservation audit and limitations are recorded in feature_list.json.
+  The final source post-gate delta6a934451 changes only changelog/state;
+  gate-delta.sh exit3,408/0readers,259releaseposts/64docsassets and init9s green.
+- Current closure changes only the changelog and work-state records; no new
+  executable changes. Remaining integration: focused readers/delta proof,
+  skeptic before each authorized closure commit/push, exact-head PR CI, normal
+  squash merge, main CI and original-main alignment. Existing authorization
+  persists; no release/version/publication action. All owned Machines deleted.
+- Evidence: artifacts/ci-delivery-accounting/source-ci-{final.json,watch.log,
+  unit.log,tcp.log,embedded.log,pg16.log,pg17.log,pg18.log}; isolated manifests
+  and current ledger are linked in the implementation entry below. Historical
+  CI43559077874 cause remains unclassified; the corrected checker rejects any
+  repeated delivery lacking the specifically proven failure/retry history.
+
+### 2026-11-14 — delivery and accounting oracle defects reproduced
+
+- User requested investigation and fixes for both recorded CI anomalies, within
+  the tests-only scope. Existing commit/push/merge authorization and use of
+  `egeominotti` persist. Branch `fix-ci-delivery-accounting`, base main42225c31;
+  managed worktree reused, original checkout and prior branch/artifacts preserved.
+- Chaos RED on isolated Ubuntu24.04arm64/Bun1.4.4: the exact old `>=50` predicate
+  receives49 despite all100IDs retained as49completed+51delayed. Reproduced with
+  both controlled long backoff and the original default-backoff/100ms wait/
+  first-empty200ms pull. Seeded operations now enforce all-state/per-ID
+  conservation; a missing-job mutation and a deadline-crossing regression guard
+  the checker. All18original cases remain,17other bodies token-identical.
+- PostgreSQL17 controlled RED: a real row lock blocks Progress until SQL timeout,
+  then matching applied FAIL/new-token attempt1 completes once with result14 and
+  one log; the old invocation-count assertion rejects the two legal attempts.
+  Strict histories retain token/attempt/stage/timing and durable failure/retry/
+  completion evidence;21 checker cases include19 negative and2 positive cases. The specific
+  historical CI cause remains unknown;150 spontaneous24-job rounds had no repeat.
+- Focused Linux race validation17/0/559assertions. Final PostgreSQL16.16/17.12/
+  18.7 matrices each571/0/1skip,572tests126files, on the final monotonic trace.
+  Independent review caught the race snapshot guard gap; its RED/GREEN regression
+  and fix are included. Sandbox PASS on treee2c50d57:11931/0/404unit,553/0TCP,
+  349/0embedded,0errors/anomalies/OOM,6.79min,423validresource samples. Fresh
+  Ubuntu24.04.5arm64/Bun1.4.4+38afee6c8/4CPU16GiB PASS same tree:12062/0/404unit,
+  553/0TCP,349/0embedded,tinyfs9/0,type890+2163/format2373,15m40s; all logs
+  copied and Machine deleted. Manifests under artifacts/test-sandbox/
+  2026-11-14T10-45-13.122Z/ and artifacts/machines/20261114T104513Z/.
+  Final evidence-only delta, skeptic approval and source CI remain pending.
+- Artifacts: `artifacts/ci-delivery-accounting/`; current ledger/reviews in
+  `.superpowers/sdd/2026-11-14-ci-delivery-accounting/`. Development Machine is
+  owned and isolated; its initial diagnostic full runs had setup failures
+  (remote Bun PATH; test-role CREATEDB permission), corrected before final runs.
+  Runtime, SDKs, retry/lease settings and publication state are unchanged.
 
 ### 2026-11-14 — unseeded chaos accounting finding tracked
 
