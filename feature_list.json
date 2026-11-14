@@ -222,6 +222,15 @@
       "issue": null
     },
     {
+      "id": "postgres-public-api-processing-flake",
+      "name": "Reproduce intermittent PostgreSQL 17 public-worker processing counts",
+      "description": "Reproduce first: test/postgres-public-api-queue-worker.test.ts, shares Queue, Worker, QueueEvents, progress, results, and logs across four brokers, failed at line77 in PostgreSQL 17.x Integration Tests of PR191 CI run43559077874 attempt1 on dd147ccf (548pass/1fail/1skip). All24 completed/event IDs and executions.size24 passed, but every processor count===1 was false (10.928s); the same case passed494.55ms in source run43557827964 and passed the single failed-job rerun in attempt2. Runtime and test files were unchanged by dd147ccf. Preserve the assertion. Repeat on a fresh isolated PostgreSQL17 four-broker fixture under controlled load, recording affected IDs, processor counts, failed/stalled reasons, attempts, lock tokens, lease deadlines and timestamps. The processor increments before awaiting progress/log commands and default3attempts permit ordinary retries, so repeated invocation alone does not prove concurrent delivery. Distinguish a legitimate failure/recovery retry, a fixture assumption and an engine divergence before changing tests or runtime; never use the user's existing database or weaken the invariant.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "2026-11-14, observation only, not fixed. CI43559077874 attempt1 job132338509583 failed; exactly one gh run rerun --failed, attempt2 job132340799679 passed; ci-watch.sh --run43559077874 exit3FLAKY,26validation jobs successful/9release skips. https://github.com/egeominotti/bunqueue/actions/runs/43559077874 . Raw failure/rerun summaries and watch logs artifacts/tests-quality-closure-ci-*.log/json; prior source PG17 log artifacts/tests-quality-source-ci-pg17.log. Read-only contract analysis .superpowers/sdd/2026-11-14-test-quality-speedups/pg17-delivery-ci-analysis.md; cause unproved, no assertion/runtime change.",
+      "issue": null
+    },
+    {
       "id": "postgres-runner-guard-destructuring",
       "name": "Make the PostgreSQL runner-coverage guard see destructured env reads",
       "description": "test/postgres-runner-coverage.test.ts finds files that read BUNQUEUE_TEST_POSTGRES_URL by matching process.env.BUNQUEUE_TEST_POSTGRES_URL / process.env['...'] text, so a file that destructures it (const { BUNQUEUE_TEST_POSTGRES_URL } = process.env) or reads it through a helper would again be skipped by every runner without the guard failing. Widen the detection (any mention of the variable name in a test file) and prove it on a mutant file.",

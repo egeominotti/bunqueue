@@ -236,6 +236,10 @@ head:
 - Record the completed test-quality work item with its isolated gate totals,
   controlled-defect and case-preservation proofs, skeptic approvals and green
   source PR CI evidence. The final record changes documentation and state only.
+- Track an intermittent PostgreSQL 17 public-worker processing-count failure
+  observed during PR validation. Its single failed-job rerun passed; a separate
+  reproduce-first work item retains the assertion and records the evidence
+  without claiming a cause or a fix.
 
 - The CPU-intensive workers guide test "a non-yielding handler starves
   heartbeats and gets recovered" now observes the recovery it claims

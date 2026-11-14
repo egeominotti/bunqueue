@@ -67,9 +67,9 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Validate/commit/push the test-quality final prose/state record, watch its
-   exact-head PR #191 CI, perform the authorized normal squash merge, then watch
-   main CI and fast-forward the original main checkout. No version/publication.
+1. Validate/push the final CI-flake tracking record, watch its exact-head PR #191
+   CI, perform the authorized normal squash merge, then watch main CI and
+   fast-forward the original main checkout. No version/publication.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -78,6 +78,11 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ## Blockers / Risks
 
+- PR #191's record commit `dd147ccf` had one PostgreSQL 17 processing-count
+  failure in run43559077874 attempt1; the single failed-job rerun passed in
+  attempt2 (`ci-watch.sh` exit3 FLAKY). The new not-started item
+  `postgres-public-api-processing-flake` requires reproduction and per-job
+  failure/lease diagnostics; the cause is unproved and the assertion remains.
 - `main` requires pull requests; only an account with bypass rights can push to it
   directly. The release push (CI's version gate tags, releases and publishes from
   `main`) therefore needs an account with write access to `main`, or a pull
@@ -128,6 +133,25 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — intermittent PostgreSQL processing-count finding tracked
+
+- PR #191 record commit `dd147ccfda69c052c4eee25dfb5b0b98f5418418` changed only
+  prose/state. CI43559077874 attempt1 failed the unchanged PostgreSQL 17 test
+  `postgres-public-api-queue-worker.test.ts`: all24 jobs completed, but at least
+  one processor invocation count exceeded one. The same test passed in the
+  source CI, PostgreSQL16/18 passed, and the single failed-job rerun passed in
+  attempt2; `ci-watch.sh` exit3 reports FLAKY, not a clean first-attempt result.
+- Preserved raw job132338509583 failure, both attempt summaries, watch logs and
+  source comparison. A read-only contract check found that progress/log errors
+  can legally trigger default retries; the log does not distinguish those from
+  recovery or a delivery defect. No cause/fix is claimed and no assertion or
+  runtime file changed. New `postgres-public-api-processing-flake` is
+  not-started and explicitly requires reproduction on its own isolated database.
+- This tracking record adds only metadata/changelog; its delta, readers,
+  skeptic, commit/push and exact-head CI precede the already authorized normal
+  merge, main CI and original-main fast-forward. No second rerun of
+  run43559077874, version bump, release or publication is authorized here.
 
 ### 2026-11-14 — test quality validation and source CI complete
 
