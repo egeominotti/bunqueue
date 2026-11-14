@@ -174,7 +174,7 @@ Common patterns: `dev:` / `staging:` / `prod:` on one server, `tenant-${id}:` pe
 Notes:
 
 - Queue membership, worker locks, counts, pause/drain/obliterate, rate limits, and cron schedulers are scoped by the prefixed queue key (two prefixes can reuse the same `schedulerId`).
-- Custom `jobId` ownership is broker-wide: `dev:order-123` and `prod:order-123` are distinct; two queues using plain `order-123` refer to the same live identity. A prefix is naming isolation, not an authorization boundary.
+- Custom `jobId` scope is broker-wide (PostgreSQL: namespace-wide): `dev:order-123` and `prod:order-123` are distinct. Re-adding plain `order-123` across queues returns its live generation only while ownership is retained. Memory/SQLite use a bounded cache (50,000 IDs by default), whereas PostgreSQL checks the database; see [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits). A prefix is naming isolation, not an authorization boundary.
 - Backward compatible: without `prefixKey`, behavior is unchanged. Works in embedded and TCP modes.
 - The only user-visible side effect: `Job.queueName` inside processors shows the prefixed key (e.g. `dev:emails`).
 
@@ -410,7 +410,8 @@ locally while the central broker is unavailable._
 
 If the remote is down, locally persisted jobs stay in the source queue (retry,
 then DLQ) while that process and volume survive. Use `durable: true` locally if
-SQLite's 10ms hard-crash window is unacceptable. Full guide:
+losing pending buffered admissions on a crash is unacceptable. SQLite's typical
+10 ms flush interval can be longer during stalls/retries. Full guide:
 [IoT & Edge](/guide/iot-edge/).
 
 ## Where to go next

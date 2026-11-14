@@ -203,7 +203,21 @@ check `event.eventType` on the client side as well.
 
 ## Connection Lifecycle
 
-When a TCP connection closes, the server automatically releases all jobs that were being processed by that client back to their queues. This uses retry logic with exponential backoff (up to 3 attempts) to ensure jobs are not left in an inconsistent state.
+When a TCP connection closes, the server immediately releases eligible deliveries
+still owned by that client without charging a processing attempt. Renewed leases
+remain active because a pooled worker may heartbeat them on another connection;
+lease expiry/stall recovery reclaims them if heartbeats stop. Detached pulls
+(`detach: true`) are not tracked for disconnect release. Memory/SQLite discard
+eligible `cron:` prevent-overlap deliveries so the next scheduled tick can
+recreate them. PostgreSQL also attempts that discard, but dependency-protected
+IDs use ordinary transactional release instead.
+
+The cleanup operation retries with exponential backoff, up to 3 attempts. That
+budget retries cleanup, not job processing. If cleanup exhausts its retries, a
+force-release fallback differs by backend: memory/SQLite expire heartbeat/start
+state for stall recovery; PostgreSQL queues another transactional, token-fenced
+release of the retained lease session. If release cannot complete, eventual
+lease expiry remains the recovery path.
 
 ## Rate Limiting
 
@@ -241,7 +255,10 @@ Queue names must satisfy the following constraints:
 
 ## Job Data Limits
 
-Job data payloads are limited to **10 MB** when serialized.
+New `PUSH`/`PUSHB` and flow admissions limit each JSON-serialized job payload to
+10 × 1024 × 1024 string characters. This is a character count, not a byte cap;
+`Update` intentionally has no job-data size limit. Enforce application payload
+limits separately from the transport's 64 MiB frame limit.
 
 ## Command Summary
 

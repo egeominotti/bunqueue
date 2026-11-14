@@ -187,9 +187,13 @@ are separate, so a healthy IPv6 listener is not misreported as unreachable.
 
 ### 7. Backup (`executeBackupCommand`, `src/cli/commands/backup.ts:21`)
 
-Requires a data path from
-`BUNQUEUE_DATA_PATH`→`BQ_DATA_PATH`→`DATA_PATH`→`SQLITE_PATH`; otherwise
-fails. It accepts temporary S3 credentials (`S3_SESSION_TOKEN` /
+Reads the server's config file (`--config`/`-c <file>`, else discovered
+`bunqueue.config.{ts,js,mjs}` in the working directory). The data path resolves as
+`storage.dataPath` > `BUNQUEUE_DATA_PATH` > `BQ_DATA_PATH` > `DATA_PATH` >
+`SQLITE_PATH`; without a path it fails. The selected storage driver must be
+SQLite; PostgreSQL and memory are refused. Backup settings use the file's
+`backup` section > `S3_*`/`AWS_*` environment > defaults, through
+`resolveBackupCommandConfig`. It accepts temporary S3 credentials (`S3_SESSION_TOKEN` /
 `AWS_SESSION_TOKEN`) and virtual-host addressing
 (`S3_VIRTUAL_HOSTED_STYLE`). It validates S3 config via
 `S3BackupManager.validate()`. `restore` refuses without `--force` (`-f`) and
@@ -308,7 +312,7 @@ Client-affecting env vars / flags (defaults in parentheses):
 - `--json` (off), `--help`/`-h`, `--version`/`-v`.
 - `NO_COLOR` (any non-empty value) disables ANSI output; `FORCE_COLOR` forces it (`0`/`false` force it off); `TERM=dumb` disables it.
 - Connection timeout 5000 ms (`src/cli/client.ts:171-176`); command timeout has a 30000 ms base (`src/cli/client.ts:44-48`).
-- `backup` reads the server's config file (`--config`/`-c <file>`, else `bunqueue.config.{ts,js,mjs}` in the working directory) with the server's precedence: data path ← `storage.dataPath` > `BUNQUEUE_DATA_PATH` > `BQ_DATA_PATH` > `DATA_PATH` > `SQLITE_PATH`, backup settings ← the `backup` section > `S3_*`/`AWS_*` > defaults (`resolveBackupCommandConfig`). A configuration that selects PostgreSQL or memory is refused.
+- `backup` uses the server's config-file discovery, storage selection and backup precedence described in the Backup section above.
 
 Server-start flags (`bunqueue start`, merged over `bunqueue.config.ts`, CLI
 wins): `--tcp-port` (6789; 0-65535, 0 lets the OS pick), `--http-port` (6790;

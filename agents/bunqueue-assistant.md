@@ -68,11 +68,11 @@ Validated on the client with the broker's validator; an invalid option throws.
 | Option | Meaning | Default |
 |---|---|---|
 | `priority` | Integer, higher runs first. | `0` |
-| `delay` | Ms until ready (max 365 days; negative = now). | `0` |
+| `delay` | Run-time offset in ms, bounded to ±4,320,000,000,000,000; negative keeps a past run time (ready immediately; among equal-priority FIFO jobs, earlier run times go first). Priority and LIFO ordering still apply. | `0` |
 | `attempts` | Max attempts including the first. | `3` |
 | `backoff` | Ms (exponential with jitter, cap 1 h) or `{type:'fixed'\|'exponential', delay, maxDelay?}`. | `1000`, exponential |
 | `timeout` | Processing timeout in ms (the processor `signal` aborts). | none |
-| `jobId` | Custom id; while that job is live, `add` returns it instead of creating one. Not with `repeat`. | UUIDv7 |
+| `jobId` | Custom id; returns the live generation while ownership is retained. Memory/SQLite use a bounded 50,000-ID default cache; PostgreSQL checks the database. See [custom-ID limits](https://bunqueue.dev/guide/queue/deduplication/#custom-id-limits). Not with `repeat`. | UUIDv7 |
 | `removeOnComplete` / `removeOnFail` | Drop the job on completion / final failure. Only booleans are honoured. | `false` |
 | `durable` | Write straight to SQLite (no write buffer); in TCP it skips the auto-batcher. | `false` |
 | `stallTimeout` | Stall interval for this job only. | queue `stallInterval` (30 s) |
@@ -82,7 +82,7 @@ Validated on the client with the broker's validator; an invalid option throws.
 | `stackTraceLimit` | Stack lines kept on failure. | `10` |
 | `failParentOnFailure` / `removeDependencyOnFailure` / `continueParentOnFailure` / `ignoreDependencyOnFailure` | What a failed child does to its parent. | `false` |
 | `timestamp` | Overrides creation time. | `Date.now()` |
-| `deduplication` `{id, ttl?, extend?, replace?}` | A duplicate add with the same id returns the existing job; `ttl` bounds the key, `extend` restarts it, `replace` swaps a pending owner. | none |
+| `deduplication` `{id, ttl?, extend?, replace?}` | While the unique key is owned, a duplicate returns the existing job; `ttl` bounds the key, `extend` restarts it, `replace` swaps a pending owner. Separate from custom-ID ownership. | none |
 | `group` `{id, maxSize?, priority?}` | Puts the job in a group; `maxSize` caps pending group jobs. | none |
 | `keepLogs`, `sizeLimit`, `debounce` | Stored and shown on the job; not enforced by `Queue.add` (`debounce` is applied by `Bunqueue`). | none |
 
@@ -179,7 +179,7 @@ DLQ config defaults: `autoRetry` false, `autoRetryInterval` 1 h, `maxAutoRetries
 
 ### Queue: schedulers (repeatable jobs)
 
-`RepeatOpts`: `pattern | every`, `limit`, `immediately`, `count`, `prevMillis`, `offset`, `jobId`, `timezone` (embedded default UTC, not sent over TCP), `skipMissedOnRestart` (true), `skipIfNoWorker` (false), `preventOverlap` (true).
+`RepeatOpts`: `pattern | every`, `limit`, `immediately`, `count`, `prevMillis`, `offset`, `jobId`, `timezone` (forwarded in both modes; default UTC), `skipMissedOnRestart` (true), `skipIfNoWorker` (false), `preventOverlap` (true).
 
 | API | What it does | Embedded | TCP |
 |---|---|---|---|

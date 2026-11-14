@@ -230,7 +230,7 @@ No queue locks are taken in this module. The only per-connection mutable securit
 - **Token compare is O(validTokens):** every check loops all configured tokens; intended for small token lists.
 - **Webhook delivery:** fire-and-forget with up to `WEBHOOK_MAX_RETRIES` attempts (default 3), linear backoff `WEBHOOK_RETRY_DELAY_MS * (attempt+1)` (default 1000ms), and a 10s per-request `AbortSignal.timeout` (`webhookManager.ts:142-171`). Signature is computed once and reused across retries.
 - **Cloud signing:** signs the post-compression body; the receiver must verify over the same compressed bytes. On `401`/`403` the error is logged loudly rather than silently buffered (`httpSender.ts:122-128`).
-- **SSRF validator is hostname-string based:** it does not resolve DNS, so a public hostname that resolves to a private IP (DNS rebinding) is not caught; only literal private/loopback/metadata hosts (IPv4 and the IPv6 literal forms listed above) and the listed protocols are blocked.
+- **SSRF validator is hostname-string based:** it does not resolve DNS, so a public hostname that resolves to a private IP (DNS rebinding) is not caught; only literal private/loopback/metadata hosts (IPv4 and the IPv6 literal forms listed above) and the listed protocols are blocked. Delivery does not validate redirect destinations as an egress policy. Use trusted registrations and network egress controls.
 
 ## Configuration
 

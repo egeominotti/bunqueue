@@ -407,10 +407,10 @@ process.on('SIGTERM', async () => {
 ### Job Options
 - `priority`: Higher number = processed sooner
 - `delay`: Milliseconds before job becomes available
-- `attempts`: Max retries (default: 3)
+- `attempts`: Maximum attempts, including the first (default: 3)
 - `backoff`: Retry delay in ms (default: 1000)
 - `timeout`: Processing timeout in ms
-- `jobId`: Custom ID for idempotency/deduplication
+- `jobId`: Custom ID; live-generation suppression depends on retained ownership. Memory/SQLite use a bounded cache (50,000 IDs by default); PostgreSQL checks the database. See [custom-ID limits](https://bunqueue.dev/guide/queue/deduplication/#custom-id-limits); keep external effects idempotent.
 - `durable`: Bypass write buffer, immediate disk write
 - `removeOnComplete` / `removeOnFail`: Auto-cleanup
 
@@ -504,7 +504,7 @@ billing.obliterateAll();
 
 ## Webhooks
 
-Receive HTTP notifications on job events. SSRF-protected, with HMAC signing and retry.
+Receive HTTP notifications on job events, with literal-host URL validation, HMAC signing and retry.
 
 ```typescript
 // Webhooks are managed via CLI, MCP, or the TCP/HTTP API — there is no queue.addWebhook() SDK method.
@@ -520,8 +520,8 @@ Events: `job.pushed`, `job.started`, `job.completed`, `job.failed`, `job.progres
 
 Features:
 - HMAC-SHA256 signature (`X-Webhook-Signature` header) when secret is set
-- Automatic retries (default 3) with exponential backoff
-- SSRF protection (blocks localhost, private IPs, cloud metadata)
+- Up to 3 delivery attempts by default, including the first, with linear backoff
+- Registration rejects prohibited literal hostnames/IPs (localhost, private IPs, cloud metadata); DNS resolution and redirect destinations are not validated as an egress policy. Use trusted registrations and network egress controls.
 - Enable/disable without deleting
 - Per-queue or global
 
@@ -592,9 +592,13 @@ Same API: `add()`, `addBulk()`, `Worker(name, processor, opts)`, `FlowProducer.a
 
 | Mode | Throughput | Data Loss Risk |
 |------|-----------|---------------|
-| Buffered (default) | ~100k jobs/sec | Up to 10ms |
-| Durable | ~10k jobs/sec | None |
-| Auto-batch (TCP) | ~145k ops/s concurrent | None |
+| Buffered (default) | ~100k jobs/sec | Pending application buffer; typical flush interval 10 ms, longer during stalls/retries |
+| Durable | ~10k jobs/sec | Bypasses application admission buffer; host/storage power-loss limitations remain |
+| Auto-batch (TCP) | ~145k ops/s concurrent | Inherits selected PUSH/PUSHB admission durability |
+
+Throughput figures are indicative historical measurements. SQLite uses WAL with
+`synchronous=NORMAL`; durable admission does not guarantee unconditional
+power-loss safety.
 
 ## More
 

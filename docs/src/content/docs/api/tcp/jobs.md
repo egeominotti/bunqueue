@@ -29,7 +29,7 @@ Add a single job to a queue.
   cmd: 'PUSH',
   queue: string,          // Queue name (required, max 256 chars, alphanumeric/underscore/dash/dot/colon)
   name: string,           // Job name metadata (required for protocol v3 clients)
-  data: any,              // Untouched user payload (required, max 10 MB)
+  data: any,              // Untouched user payload (required, max 10 × 1024 × 1024 JSON characters)
   priority?: number,      // Ungrouped: any finite number, higher first. With groupId: 0 first, then ascending (0..2097151)
   delay?: number,         // Delay in ms before processing (default: 0; negative = ready, past run time)
   maxAttempts?: number,   // Max attempts (default: 3; 1 or less runs once, fraction rounds up, max 2147483647)
@@ -37,7 +37,7 @@ Add a single job to a queue.
   ttl?: number,           // Time-to-live in ms (>= 0)
   timeout?: number,       // Processing timeout in ms (>= 0; 0 = none)
   uniqueKey?: string,     // Deduplication key
-  jobId?: string,         // Custom job ID (idempotent)
+  jobId?: string,         // Custom job ID (retained-ownership dedup; see Custom-ID limits below)
   dependsOn?: string[],   // Job IDs this job depends on
   tags?: string[],        // Metadata tags
   groupId?: string,       // Job group identifier
@@ -84,8 +84,16 @@ violation fails the command with `{ ok: false, error }` naming the field, for ex
 accepted in either mode is accepted with its 2.9.10 result; durations above about
 136,900 years (4.32e15 ms) are clamped. Durations may be fractional. A negative `delay`
 keeps its past run time, as in 2.9.10: the job is ready at once (never `delayed`) and
-runs ahead of ready jobs with a later run time. Embedded `Queue.add`, `addBulk`, flows and job schedulers apply the same
+runs ahead of equal-priority FIFO jobs with a later run time; priority and LIFO
+ordering still apply. Embedded `Queue.add`, `addBulk`, flows and job schedulers apply the same
 rules (their messages name the SDK option, such as `attempts`).
+
+Custom `jobId` suppression depends on retained live ownership: memory/SQLite
+use a bounded cache (50,000 IDs by default), while PostgreSQL checks the database.
+After local cache eviction, preserving the original generation is not guaranteed;
+neither SQLite's upsert nor `durable` removes that limit. See
+[Custom-ID limits](/guide/queue/deduplication/#custom-id-limits). Atomic flow
+creation has a separate reject-existing contract.
 
 The `backoff` field also accepts an object form: `{ type: 'fixed' | 'exponential', delay?: number, maxDelay?: number }` (any other `type` runs as exponential, as in 2.9.10). `maxDelay` caps each computed retry delay for that job (default: 1 hour when omitted). A missing `delay` is the 1000 ms default base; a given one must be a finite number of at least 0; `maxDelay` must be a finite number between 0 and 86,400,000 ms (1 day); `maxDelay: null` is treated as omitted, and any other invalid value fails the command. The same rule applies to every job in `PUSHB` and `PUSHF`.
 
@@ -139,8 +147,14 @@ violation the whole batch is rejected with an error naming the offending index
 
 When `groupId` is present, `priority` is the intra-group priority and must be an
 integer from `0` through `2,097,151`; lower values run first. `groupMaxSize`
-makes pending-depth admission atomic. If one member would exceed its group cap,
-the complete `PUSHB` is rejected without partial writes.
+makes the pending-depth check and admission atomic for each job. In memory/SQLite,
+a runtime rejection such as a later member exceeding its group cap preserves
+the already accepted prefix, even though `PUSHB` returns an error. Preflight
+validation failures reject before mutation. Reconcile accepted jobs before
+retrying a failed batch; stable custom IDs alone do not make retries safe after
+memory/SQLite ownership-cache eviction. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits).
+Keep external effects idempotent. PostgreSQL uses transactional
+batch insertion. `PUSHF` graph creation is fully atomic.
 
 **Response:**
 
@@ -182,7 +196,8 @@ calls.
 
 The complete graph is validated before mutation: strict runtime types,
 duplicate/missing/asymmetric edges, cycles, policy conflicts, 10,000 jobs,
-10 MB per job and 64 MB aggregate data. With configured SQLite, all job rows
+10 × 1024 × 1024 JSON string characters per job and 64 × 1024 × 1024
+characters across the graph. With configured SQLite, all job rows
 commit in one immediate transaction before any leaf becomes visible. In
 PostgreSQL mode commits the graph, dependency edges, and ordered durable events
 in one database transaction before publication. In memory-only mode,
@@ -486,7 +501,8 @@ Change the delay of a delayed job (recomputes `runAt`).
 
 `delay` (ms from now) is required and must be a finite number (a numeric string counts
 as its number). As with the `PUSH` `delay` and as in 2.9.10, a negative value makes the
-job ready at once with a past run time (ahead of later ready jobs); a PostgreSQL broker
+job ready at once with a past run time (ahead of equal-priority FIFO jobs with later
+run times; priority and LIFO ordering still apply); a PostgreSQL broker
 applies it as "now", as it did on 2.9.10. NaN or an infinity fails the command (`delay must be a finite number`).
 
 `token` is required when the job is active and currently leased. Worker

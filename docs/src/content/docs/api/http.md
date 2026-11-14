@@ -114,7 +114,7 @@ Some endpoints, such as `DELETE /jobs/:id`, queue control, DLQ, rate-limit/concu
 
 - **Queue names**: 1-256 characters, alphanumeric + `-_.:`
 - **Numeric fields**: Validated by the same validator as the TCP commands, embedded `Queue.add` and flows, which rejects only what no job can run with: a non-number, `NaN`, an infinity in any field except `maxAttempts` (where an infinity means the maximum attempt count), a negative `timeout`, `ttl`, `backoff` or `backoff.delay` (a missing `backoff.delay` is the 1000 ms default), and, with `groupId`, a `priority` that is not an integer from 0 to 2,097,151. A negative `delay` makes the job ready at once with a past run time (as in 2.9.10), a move-to-delayed/delay `delay` is required, and a lock `duration` must be a finite number. Every value 2.9.10 accepted keeps its 2.9.10 result.
-- **Job data**: Max 10MB per pushed job payload (updating an existing job's data has no size limit, as in 2.9.10)
+- **Job data**: Max 10 × 1024 × 1024 JSON string characters per pushed job payload (a character count, not a byte limit; updating an existing job's data has no size limit, as in 2.9.10).
 - **Job IDs**: UUID v7 format (auto-generated) or custom string (via `jobId` field)
 
 ---
@@ -230,7 +230,7 @@ curl -X POST http://localhost:6790/queues/emails/jobs \
 
 | Field              | Type                 | Default      | Description                                                                                                                                                                                                                                        |
 | ------------------ | -------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data`             | `any`                | -            | Job payload. Any JSON-serializable value. Max 10MB. A push without `data` is accepted and creates a job with no payload.                                                                                                                         |
+| `data`             | `any`                | -            | Job payload. Any JSON-serializable value. Max 10 × 1024 × 1024 JSON string characters. A push without `data` is accepted and creates a job with no payload.                                                                                                                         |
 | `name`             | `string`             | `"default"`  | Job name, stored as the top-level `job.name`.                                                                                                                                                                                                      |
 | `priority`         | `number`             | `0`          | Higher value = processed sooner. Any finite number; with `groupId` it is the group priority and must be an integer from 0 to 2,097,151.                                                                                                          |
 | `delay`            | `number`             | `0`          | Milliseconds before the job becomes available for processing. A negative delay makes it ready at once (past run time).                                                                                                                      |
@@ -239,13 +239,13 @@ curl -X POST http://localhost:6790/queues/emails/jobs \
 | `ttl`              | `number`             | -            | Time-to-live from creation in milliseconds (0 or more). Job is discarded if not processed within this window.                                                                                                                                      |
 | `timeout`          | `number`             | -            | Processing timeout in milliseconds (0 or more; 0 means none). The broker fails the active attempt at its absolute deadline; a later outcome from that lease generation is ignored.                                                                 |
 | `uniqueKey`        | `string`             | -            | Deduplication key. If a job with the same `uniqueKey` already exists in the queue, no new job is created: the response is `200` with the existing job's `id`.                                                                                     |
-| `jobId`            | `string`             | -            | Broker-wide custom job ID. If a live job with this ID already exists in any queue, the push is idempotent and returns the existing ID.                                                                                                             |
+| `jobId`            | `string`             | -            | Custom ID, broker-wide (PostgreSQL: namespace-wide). Returns the live generation while ownership is retained; memory/SQLite use a bounded cache, whereas PostgreSQL checks the database. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits). |
 | `tags`             | `string[]`           | `[]`         | Metadata tags for filtering and querying.                                                                                                                                                                                                          |
 | `groupId`          | `string`             | -            | Job-group identifier. Claims use ascending group priority with FIFO ties and round-robin across groups; execution is concurrent unless a Worker supplies a group concurrency cap.                                                                  |
 | `lifo`             | `boolean`            | `false`      | Last-in-first-out ordering. When true, the job is processed before other jobs at the same priority.                                                                                                                                                |
 | `removeOnComplete` | `boolean`            | `false`      | Automatically remove the job from memory after completion. Saves memory for fire-and-forget jobs.                                                                                                                                                  |
 | `removeOnFail`     | `boolean`            | `false`      | Automatically remove the job after final failure (after all retries exhausted).                                                                                                                                                                    |
-| `durable`          | `boolean`            | `false`      | SQLite: bypass the write buffer and commit before returning (slower, but no 10 ms buffer-loss window). PostgreSQL admissions are already transactional and do not use the SQLite buffer.                                                           |
+| `durable`          | `boolean`            | `false`      | SQLite: bypass the application admission buffer and commit before returning. PostgreSQL admissions are already transactional and do not use the SQLite buffer.                                                           |
 | `dependsOn`        | `string[]`           | `[]`         | Job IDs that must complete before this job becomes available. The job enters `waiting-children` state until all dependencies are met.                                                                                                              |
 | `repeat`           | `object`             | -            | Repeat configuration: `{ every: ms, limit: n }` for interval-based, or `{ pattern: "cron expression" }` for cron-based (optional `tz`, `startDate`, `endDate`, `immediately`).                                                                     |
 
@@ -262,9 +262,13 @@ each job object whole.
 { "ok": true, "id": "019ce9d7-6983-7000-946f-48737be2b0f9" }
 ```
 
-The `id` is a UUID v7 (time-ordered, sortable). If `jobId` was provided and a
-live job with that broker-wide ID already exists, including in another queue,
-the existing job's ID is returned (idempotent).
+Generated `id` values are UUID v7 (time-ordered, sortable). A custom `jobId`
+returns the live generation while ownership is retained, including across
+queues. Memory/SQLite use a bounded cache (50,000 IDs by default); eviction can
+end this protection before completion, and SQLite upserts/durable admission do
+not repair it. PostgreSQL checks live database identity. See
+[Custom-ID limits](/guide/queue/deduplication/#custom-id-limits); keep external
+effects idempotent and reconcile uncertain admissions before retrying.
 
 **Error responses:**
 
@@ -273,7 +277,7 @@ the existing job's ID is returned (idempotent).
 | `400`  | `Invalid JSON body`                      | Request body is not valid JSON               |
 | `404`  | `Not found`                              | Empty queue name (no route matches)          |
 | `400`  | `Queue name contains invalid characters` | Queue name has chars outside `a-zA-Z0-9_-.:` |
-| `400`  | `Job data too large (max 10MB)`          | Serialized data exceeds 10MB                 |
+| `400`  | `Job data too large (max 10MB)`          | JSON data exceeds 10 × 1024 × 1024 string characters |
 | `400`  | `priority must be a number`              | Non-numeric priority (`"high"`)              |
 | `400`  | `delay must be a number`                 | Non-numeric delay (a negative one runs at once) |
 | `400`  | `timeout must be at least 0`             | Negative processing timeout                  |
@@ -301,7 +305,7 @@ curl -X POST http://localhost:6790/queues/emails/jobs/bulk \
   }'
 ```
 
-Each item in `jobs` supports the same fields as a single push and is validated with the same rules (option bounds and `dependsOn` existence; a `dependsOn` entry may also reference the `customId` of any job in the same batch, in any order). Two differences: the custom ID field is `customId` (not `jobId`), and the `attempts` alias is not accepted (use `maxAttempts`). Validation is all-or-nothing: if any job fails validation, the whole batch is rejected with an error naming the offending index (`jobs[i]: ...`) and nothing is pushed. A runtime admission error after validation, such as a full group (`group.maxSize`) or an unresolved custom-ID dependency, can leave the jobs accepted before it pushed, so check which IDs exist before you resubmit.
+Each item in `jobs` supports the same fields as a single push and is validated with the same rules (option bounds and `dependsOn` existence; a `dependsOn` entry may also reference the `customId` of any job in the same batch, in any order). Two differences: the custom ID field is `customId` (not `jobId`), and the `attempts` alias is not accepted (use `maxAttempts`). Validation is all-or-nothing: if any job fails validation, the whole batch is rejected with an error naming the offending index (`jobs[i]: ...`) and nothing is pushed. On memory/SQLite, a runtime admission error after validation, such as a full group (`group.maxSize`) or an unresolved custom-ID dependency, can preserve the accepted prefix. Reconcile accepted work and outcomes before resubmitting; stable custom IDs alone do not make retries safe after ownership-cache eviction. Keep external effects idempotent. PostgreSQL batch insertion is transactional. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits).
 
 **Response** (`200`):
 
@@ -1602,7 +1606,7 @@ curl -X POST http://localhost:6790/webhooks \
 
 | Field    | Type       | Required | Description                                                                                                         |
 | -------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
-| `url`    | `string`   | Yes      | HTTP or HTTPS endpoint URL. Validated against SSRF (localhost, private IPs, cloud metadata blocked).                |
+| `url`    | `string`   | Yes      | HTTP or HTTPS endpoint URL. Registration rejects prohibited literal hostnames/IPs (localhost, private IPs, cloud metadata). DNS resolution and redirect destinations are not validated; use trusted registrations and network egress controls. |
 | `events` | `string[]` | Yes      | Event types: `job.pushed`, `job.started`, `job.completed`, `job.failed`, `job.progress`. Other values are rejected. |
 | `queue`  | `string`   | No       | Filter to specific queue. Omit for all queues.                                                                      |
 | `secret` | `string`   | No       | HMAC signing secret for verifying webhook authenticity.                                                             |
@@ -2069,7 +2073,18 @@ When `AUTH_TOKENS` is configured, the upgrade request must carry `Authorization:
 
 #### Connection Cleanup
 
-When a WebSocket disconnects, all jobs owned by that client (pulled but not ACKed) are automatically released back to the queue. This prevents jobs from being stuck when a worker disconnects unexpectedly.
+When a WebSocket disconnects, cleanup immediately releases eligible deliveries
+still owned by that client without charging a processing attempt. Renewed leases
+remain active because another pooled connection may still heartbeat them;
+lease expiry/stall recovery reclaims them if heartbeats stop. Detached pulls
+are not tracked for disconnect release. Memory/SQLite discard eligible `cron:`
+prevent-overlap deliveries so the next scheduled tick can recreate them.
+PostgreSQL also attempts that discard, but dependency-protected IDs use ordinary
+transactional release instead.
+
+The WebSocket close path logs a cleanup failure. It does not use the TCP
+cleanup retry loop or force-release fallback; jobs left active remain subject
+to lease expiry/stall recovery.
 
 #### Complete Dashboard Example
 

@@ -165,7 +165,8 @@ defineConfig({
 number ≥ 1); it does not delete SQLite rows. Set `completedRetentionMs` to opt
 into age-based durable cleanup (up to 1,000 oldest eligible rows per 10-second
 cleanup tick). The default is `null`, so completed rows remain until
-`queue.clean(...)`, `obliterate`, or another explicit policy removes them.
+`await queue.cleanAsync(graceMs, limit, 'completed')`, `obliterate`, or another
+explicit policy removes them. The async cleanup method works in embedded and TCP modes.
 Results still needed by live dependency consumers are protected until the
 consumer leaves the graph. Finite non-negative values are rounded down to whole
 milliseconds and `null` disables retention. A negative, non-finite or

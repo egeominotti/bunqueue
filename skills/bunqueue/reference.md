@@ -44,21 +44,33 @@ queue.pause(): void
 queue.resume(): void
 queue.drain(): void
 queue.obliterate(): void
-queue.clean(grace: number, limit: number, type?: string): number  // grace ms, max jobs, optional state
+queue.clean(grace: number, limit: number, type?: string): string[]  // embedded only; grace ms, max jobs, optional state
+await queue.cleanAsync(grace: number, limit: number, type?: string): Promise<string[]> // both modes
 
-// DLQ (embedded only)
-queue.setDlqConfig(config: DlqConfig): void
+// DLQ (async methods work in embedded and TCP modes)
+await queue.setDlqConfigAsync(config: Partial<DlqConfig>): Promise<void>
+await queue.getDlqConfigAsync(): Promise<DlqConfig>
+await queue.getDlqAsync(filter?: DlqFilter): Promise<DlqEntry[]>
+await queue.getDlqStatsAsync(): Promise<DlqStats>
+await queue.retryDlqAsync(id?: string): Promise<number>
+await queue.retryDlqByFilterAsync(filter: DlqFilter): Promise<number>
+await queue.purgeDlqAsync(): Promise<number> // purges the entire queue's DLQ; no filter
+
+// Sync variants: embedded results; TCP reads use empty snapshots/client config cache,
+// and TCP mutators send without awaiting (retry/purge return 0).
+queue.setDlqConfig(config: Partial<DlqConfig>): void
 queue.getDlq(filter?: DlqFilter): DlqEntry[]
-queue.retryDlq(filter?: DlqFilter): number
-queue.purgeDlq(filter?: DlqFilter): number
+queue.retryDlq(id?: string): number
+queue.retryDlqByFilter(filter: DlqFilter): number
+queue.purgeDlq(): number // entire DLQ; no filter
 
 // Stall detection (embedded only)
 queue.setStallConfig(config: StallConfig): void
 
-// Cron (embedded only)
-await queue.upsertJobScheduler(name: string, schedule: { pattern?: string, every?: number }, template: { data: any }): void
-await queue.removeJobScheduler(name: string): void
-await queue.getJobSchedulers(): Promise<CronEntry[]>
+// Cron (embedded and TCP)
+await queue.upsertJobScheduler(id: string, schedule: RepeatOpts, template?: JobTemplate): Promise<SchedulerInfo | null>
+await queue.removeJobScheduler(id: string): Promise<boolean>
+await queue.getJobSchedulers(): Promise<SchedulerInfo[]>
 
 // Auto-batching (TCP only, enabled by default)
 const queue = new Queue('jobs', {
@@ -72,10 +84,10 @@ const queue = new Queue('jobs', {
 interface JobOptions {
   priority?: number;          // Higher = processed sooner (default: 0)
   delay?: number;             // ms before available (default: 0)
-  attempts?: number;          // Max retries (default: 3)
+  attempts?: number;          // Maximum attempts, including the first (default: 3)
   backoff?: number;           // Retry delay ms (default: 1000)
   timeout?: number;           // Processing timeout ms
-  jobId?: string;             // Custom ID (idempotency/dedup)
+  jobId?: string;             // Custom ID; retained-ownership dedup (see limits below)
   durable?: boolean;          // Bypass write buffer (default: false)
   removeOnComplete?: boolean; // Auto-remove on success
   removeOnFail?: boolean;     // Auto-remove on failure
@@ -687,9 +699,17 @@ await queue.add('reminder', data, { delay: 3600000 }); // 1 hour
 ```
 
 ### Idempotent Jobs (Deduplication)
+
+Ordinary `add`/`addBulk` return the live generation only while ownership is
+retained. Memory/SQLite use a bounded cache (50,000 custom IDs by default);
+eviction can end protection before completion, and SQLite upserts/durable
+admission do not restore it. PostgreSQL checks live database identity. Atomic
+flow creation separately rejects existing IDs. Keep external effects idempotent
+and reconcile uncertain/partially accepted admissions before retrying. See
+[custom-ID limits](https://bunqueue.dev/guide/queue/deduplication/#custom-id-limits).
 ```typescript
 await queue.add('process', data, { jobId: 'unique-key-123' });
-await queue.add('process', data, { jobId: 'unique-key-123' }); // Ignored, same ID
+await queue.add('process', data, { jobId: 'unique-key-123' }); // Existing generation only while ownership is retained
 ```
 
 ### ETL Pipeline with Flows

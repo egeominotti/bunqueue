@@ -234,7 +234,8 @@ interface Job<T = unknown> {
 
   /**
    * Change the delay of a job (any finite number of ms; a negative delay makes the job
-   * ready at once with a past run time, ahead of later ready jobs, as in 2.9.10). Throws for a NaN, infinite or non-numeric delay. A job that
+   * ready at once with a past run time, ahead of equal-priority FIFO jobs with later
+   * run times, as in 2.9.10; priority and LIFO ordering still apply). Throws for a NaN, infinite or non-numeric delay. A job that
    * can no longer be changed (gone, active or finished) is left as is, as in 2.9.10; a
    * Worker processor's own `changeDelay` throws instead, since its delivery must end.
    */
@@ -483,8 +484,9 @@ interface JobOptions {
 
   /**
    * Delay in milliseconds before job becomes available (default: 0). A negative delay
-   * makes the job ready at once with a run time in the past, so it runs ahead of later
-   * ready jobs, as in 2.9.10. The maximum is `MAX_JOB_DURATION_MS` (4,320,000,000,000,000
+   * makes the job ready at once with a run time in the past, so it runs ahead of
+   * equal-priority FIFO jobs with later run times, as in 2.9.10. Priority and LIFO
+   * ordering still apply. The maximum is `MAX_JOB_DURATION_MS` (4,320,000,000,000,000
    * ms, about 136,900 years); a longer finite delay is clamped to it.
    */
   delay?: number;
@@ -506,8 +508,9 @@ interface JobOptions {
   timeout?: number;
 
   /**
-   * Custom job ID for idempotent/deduplication.
-   * If a job with this ID already exists, the existing job is returned.
+   * Custom job ID; returns the live generation while ownership is retained.
+   * Memory/SQLite use a bounded ownership cache (50,000 IDs by default);
+   * PostgreSQL checks database identity. See custom-ID limits in the deduplication guide.
    */
   jobId?: string;
 

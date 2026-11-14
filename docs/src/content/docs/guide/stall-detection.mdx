@@ -390,8 +390,9 @@ unlimited, while the stall checker moves the job to the DLQ on its first stall.
 - In practice the safety net acts only when stall detection itself could not
   (for example its recovery failed on lock contention).
 
-Cron jobs with `preventOverlap` are discarded and recreated at the next tick
-instead.
+Memory/SQLite discard eligible cron jobs with `preventOverlap` so the next
+tick can recreate them. PostgreSQL discards only when dependency safety
+permits; dependency-protected IDs continue through normal lease recovery.
 
 A recovered job also stops belonging to the connection that went silent: when
 that connection finally closes, the server does not release the job's next

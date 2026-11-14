@@ -266,8 +266,9 @@ before any broker can claim a leaf. Without either persistent backend,
 embedded mode is intentionally memory-only: creation is still atomically
 visible to workers, but a process crash cannot recover it.
 
-- A flow may contain at most 10,000 jobs, at most 10 MB of data per job and
-  64 MB across the batch. A root is depth 0; descendants may be at most 100
+- A flow may contain at most 10,000 jobs, at most 10 × 1024 × 1024
+  JSON string characters of data per job and 64 × 1024 × 1024 characters
+  across the batch (character counts, not byte limits). A root is depth 0; descendants may be at most 100
   edges below it.
 - `jobId` is allowed, but cannot be empty or contain `:`. Reusing any existing
   or retained flow ID—including durable job/DLQ rows, completion or timeout

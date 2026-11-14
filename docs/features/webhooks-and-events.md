@@ -34,7 +34,15 @@ metrics.
   engine. PostgreSQL mode persists job logs and lifecycle events, but webhook
   definitions/delivery remain process-local. See [Persistence](./persistence.md)
   and [PostgreSQL 16–18 Multi-Broker Persistence](./postgres-multibroker.md).
-- Stall recovery — `clientTracking` only _triggers_ recovery (resets heartbeats); the stall detector in [Background Tasks](./background-tasks.md) reclaims orphaned jobs.
+- Memory/SQLite disconnect release — `clientTracking` immediately releases eligible deliveries
+  still owned by the disconnecting client under shard/processing locks, persisting
+  the uncharged requeue. Renewed leases stay active to protect pooled workers;
+  expiry/stall recovery handles them if heartbeats stop. Only the force-release
+  fallback after cleanup failures expires heartbeat/start state. Stall
+  classification belongs to [Background Tasks](./background-tasks.md). PostgreSQL
+  uses transactional, token-fenced release; its force-release fallback queues
+  another attempt for the retained lease session, with eventual lease expiry
+  available if release cannot complete.
 
 ## Dependencies
 
@@ -277,6 +285,9 @@ for the moves without a job event (see [Client SDK: Queue](./client-queue-sdk.md
 
 ### Client tracking & disconnect release
 
+The `clientTracking` phases below describe memory/SQLite; the PostgreSQL
+transactional/session implementation is described in Concurrency & Locking.
+
 - `registerClientJob` (on PULL) and `unregisterClientJob` (on ACK/FAIL) maintain `clientJobs: Map<clientId, Set<jobId>>`, deleting the set when empty, together with its reverse index `clientJobOwners: Map<jobId, ClientJobOwner>` (`clientOwnership.ts`). Every mutation of the two maps goes through that module, so a job is in `clientJobs.get(c)` exactly when its owner record names `c`, and every operation is O(1) per job.
 - **Delivery identity.** The owner record stores the `jobIndex` entry current at registration. Only a pull installs a `{ type: 'processing' }` entry and every pull installs a fresh object, so the record identifies one delivery: a later delivery of the same job id never matches it. `ownsCurrentDelivery(clientId, jobId)` is true only when the record names the client and the job's current `jobIndex` entry is that same processing object.
 - **One owner per delivery.** `registerClientJob` detaches any previous owner of the job before recording the new one. `unregisterClientJob` removes only the caller's own claim, so a late outcome handled on one connection cannot detach a newer delivery owned by another.
@@ -290,17 +301,26 @@ for the moves without a job event (see [Client SDK: Queue](./client-queue-sdk.md
 
 ## Concurrency & Locking
 
+The following lock/heartbeat mechanics describe the memory/SQLite
+`clientTracking` implementation; PostgreSQL's transaction/session path follows
+below.
+
 - `releaseClientJobs` follows the project lock hierarchy: **shardLocks before processingLocks** (`clientTracking.ts`). Reads (phase 1) are lock-free; the release decision is repeated and the mutations happen under both locks.
 - The `renewalCount > 0` guard prevents a **double-execute** race: with a pooled client, heartbeats travel on a different connection than the one that pulled, so the pulling socket closing does not mean the worker died — such jobs are left for lock-expiry/stall detection to reclaim (`isReleasable`, `clientTracking.ts`).
 - `forceReleaseClientJobs` is intentionally lock-free and acts only on deliveries the client still owns (`ownsCurrentDelivery`): for each it drops `jobLocks[jobId]` (no stale token survives the disconnect) and sets `lastHeartbeat = 0` and `startedAt = 0` so the stall detector's grace gate passes on its next eligible tick. A job recovered from the client and delivered again keeps the new owner's lock and timers. It accepts that a concurrent stall/lock-expiry path may mutate the same job — worst case the write lands on an object no longer in the map (wasted, never corrupting) (`clientTracking.ts`).
 - `releaseClientJobs` drops the client (`dropClient`: its `clientJobs` set and only its own owner records) in a `finally` block even on mid-flight lock failure, preventing an unbounded leak across disconnects that hit lock timeouts (`clientTracking.ts`).
 
-The PostgreSQL adapter keeps the same connection-facing contract with durable
-lease ownership. Disconnect release row-locks the exact generation and only
-requeues a still-live, never-renewed token. A heartbeat received by another
-broker increments `lease_renewals` and transfers `lease_broker_id`, so loss of
-the original pull socket cannot double-deliver the job. Broker shutdown releases
-its remaining untransferred leases; expired protected cron leases are discarded.
+The PostgreSQL adapter uses durable lease ownership. Disconnect release
+row-locks the exact generation and only releases a still-live, never-renewed
+token. Protected cron deliveries are discarded when destruction is safe;
+dependency-protected IDs instead follow ordinary transactional release. A
+heartbeat received by another broker increments `lease_renewals` and transfers
+`lease_broker_id`, so loss of the original pull socket cannot double-deliver the
+job. The PostgreSQL force-release override queues `runClientRelease` for the
+retained session, rather than expiring local heartbeat/start timestamps;
+repeated attempts remain token-fenced. If they cannot complete, lease expiry
+still provides recovery. Broker shutdown releases its remaining untransferred
+leases, using the same dependency-protected cron discard check.
 
 - `EventsManager`/`WebhookManager` hold no locks; `broadcast` and
   `broadcastBatch` are synchronous and webhook delivery is async
@@ -308,6 +328,9 @@ its remaining untransferred leases; expired protected cron leases are discarded.
 
 ## Edge Cases & Failure Modes
 
+- **Egress boundary:** registration checks URL hostname text, without DNS
+  resolution; delivery does not validate redirect destinations as an egress
+  policy. Use trusted webhook registrations and network egress controls.
 - **SSRF protection:** `validateWebhookUrl` (on by default; disabled via `validateUrls: false`) rejects non-http(s) schemes, URLs > 2048 chars, localhost variants, private IPv4 (`10.*`, `172.16–31.*`, `192.168.*`), link-local `169.254.*`, `0.*`, `127.*`, **IPv4-mapped / IPv4-compatible IPv6** whose embedded IPv4 is loopback/private (`extractMappedIpv4` unwraps the dotted `::ffff:127.0.0.1`, the URL-parser-normalized hex form `[::ffff:7f00:1]`, **and** the deprecated `::`-prefixed compatible form `[::127.0.0.1]`/`[::7f00:1]` before the octet check), **IPv6 ULA `fc00::/7` and link-local `fe80::/10`** plus the unspecified `::` (`checkBlockedIpv6`), and cloud-metadata hosts (`169.254.169.254`, `metadata.google.internal`, `*.internal`) (`webhookValidation.ts:42`).
 - **Dead-event rejection:** `AddWebhook` rejects events not in `WEBHOOK_EVENTS`, so a webhook can't be created against an event that would silently never fire (`handlers/monitoring/webhooks.ts:13-29`).
 - **Delivery is best-effort / fire-and-forget:** failures are logged and counted
@@ -323,7 +346,10 @@ its remaining untransferred leases; expired protected cron leases are discarded.
   are caught and ignored; a failed telemetry batch performs isolated scalar
   retries before returning.
 - **Job-log bounds:** per-job cap is `maxLogsPerJob = 100` (`queue-manager/state.ts`); the `jobLogs` LRU itself holds at most `maxJobLogs = 10_000` distinct jobs (`application/types/config.ts`), evicting whole-job entries. Adding logs to a job not in `jobIndex` returns `false`.
-- **Cron `preventOverlap` invariant:** disconnect release must discard (not requeue) `cron:*` jobs, or they re-run immediately on reconnect (#73).
+- **Cron `preventOverlap`:** memory/SQLite disconnect release discards eligible
+  `cron:*` deliveries rather than requeueing them (#73). PostgreSQL performs the
+  same discard only when destruction is safe; dependency-protected IDs follow
+  ordinary transactional release instead.
 
 ## Configuration
 

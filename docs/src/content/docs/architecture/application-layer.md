@@ -115,6 +115,12 @@ and the user-facing [storage guide](/guide/databases/).
 
 ## PUSH Operation Flow
 
+This memory/SQLite path uses the bounded `customIdMap` LRU (50,000 IDs by
+default). Its live-generation suppression requires a cache hit; eviction can
+end protection while a job remains live, and SQLite upserts do not add a
+uniqueness rejection. PostgreSQL uses separate locked database admission.
+See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits).
+
 <div class="bq-diag">
   <div class="bq-diag-head"><b>PUSH flow</b><span>memory / SQLite push(queue, input)</span></div>
   <div class="bq-diag-layer">1. Generate UUIDv7 ID, 2. check customId idempotency <i>customIdMap, if exists return existing job</i></div>

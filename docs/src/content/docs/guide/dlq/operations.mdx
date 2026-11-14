@@ -134,8 +134,8 @@ const n = await queue.retryDlqAsync();                     // retry and get the 
 <TabItem label="Node.js / Deno">
 
 ```typescript
-await queue.retryDlq();                       // retry everything
-await queue.retryDlq('job-123');              // retry one job
+await queue.retryDlqAsync();                  // retry everything
+await queue.retryDlqAsync('job-123');         // retry one job
 await queue.retryJobs({ count: 100 });        // retry only the first 100 entries
 ```
 

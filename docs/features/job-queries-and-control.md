@@ -432,7 +432,8 @@ are PostgreSQL-specific and do not alter the synchronous SQLite implementation.
   `updateJobData` requires JSON-serializable data, with no size limit; `changeDelay`/
   `moveToDelayed`/`changeWaitingDelay` take any finite delay (`delayArgument`: a negative
   one keeps its past run time, `now + delay`, so the job is ready at once and sorts
-  ahead of later ready jobs, as on 2.9.10); `clearLogs` applies `keepLogsArgument` (0 or less
+  ahead of equal-priority FIFO jobs with later run times, as on 2.9.10; priority
+  and LIFO ordering still apply); `clearLogs` applies `keepLogsArgument` (0 or less
   clears all, a fraction keeps its whole part) and rejects only NaN or text; `pull*`
   honour any `timeoutMs` (`pullTimeoutArgument`: negative or NaN is no wait, no 60 s cap) and `pullWithLock`/`extendLock`
   grant any finite lease. See [Job Options Validation](./job-options-validation.md).

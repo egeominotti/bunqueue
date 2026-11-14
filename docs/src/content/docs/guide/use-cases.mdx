@@ -340,7 +340,7 @@ Not shown here. The Elixir equivalent is in the [Elixir SDK reference](https://g
 
 *PHP, Rust and Elixir follow the same shape, `add` / `addBulk` on the producer and a worker with retries handled server-side, see the [SDK guide](/guide/sdks/).*
 
-If all 5 attempts fail, the job lands in the dead letter queue (DLQ), a holding area for jobs that ran out of retries. Inspect it with `queue.getDlq()` and retry with `queue.retryDlq()`. See the [DLQ guide](/guide/dlq/).
+If all 5 attempts fail, the job lands in the dead letter queue (DLQ), a holding area for jobs that ran out of retries. In TypeScript, inspect it with `await queue.getDlqAsync()` and retry with `await queue.retryDlqAsync()` in either mode. See the [DLQ guide](/guide/dlq/) for the other SDK methods.
 
 ## Webhook delivery
 
@@ -518,7 +518,13 @@ Not shown here. The Elixir equivalent is in the [Elixir SDK reference](https://g
 
 ## Image processing
 
-Generating thumbnails and variants during an upload request makes the upload slow. Queue one job per image, report progress as each variant finishes, and cap the runtime with a timeout.
+Generating thumbnails and variants during an upload request makes the upload slow. Queue one job per image, report progress as each variant finishes, and fail a processing generation after its timeout.
+
+For the standard TypeScript Worker, timeout aborts the processor signal and
+abandons the eventual outcome; ordinary Promise-based image work or uploads can
+continue. Pass/check the processor signal to stop cooperative work. CPU work
+requiring hard termination needs a supervised process/thread boundary. See
+[Worker lifecycle](/guide/worker/lifecycle/).
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">
@@ -527,7 +533,7 @@ Generating thumbnails and variants during an upload request makes the upload slo
 const images = new Queue('images', {
   embedded: true,
   dataPath: './data/app.db',
-  defaultJobOptions: { attempts: 3, timeout: 120_000 }, // kill stuck jobs after 2 minutes
+  defaultJobOptions: { attempts: 3, timeout: 120_000 }, // fail this generation after 2 minutes
 });
 
 new Worker('images', async (job) => {
@@ -562,7 +568,7 @@ await images.add('product-image', {
 ```typescript
 const images = new Queue('images', {
   embedded: false,
-  defaultJobOptions: { attempts: 3, timeout: 120_000 }, // kill stuck jobs after 2 minutes
+  defaultJobOptions: { attempts: 3, timeout: 120_000 }, // fail this generation after 2 minutes
 });
 
 new Worker('images', async (job) => {
@@ -621,7 +627,7 @@ images.add("product-image", {
         {"name": "thumb", "width": 150, "height": 150},
         {"name": "full", "width": 1200, "height": 900},
     ],
-}, attempts=3, timeout=120_000)  # kill stuck jobs after 2 minutes
+}, attempts=3, timeout=120_000)  # fail this generation after 2 minutes
 ```
 
 </TabItem>
@@ -665,7 +671,7 @@ images.Add("product-image", map[string]any{
         map[string]any{"name": "thumb", "width": 150, "height": 150},
         map[string]any{"name": "full", "width": 1200, "height": 900},
     },
-}, bunqueue.JobOptions{"attempts": 3, "timeout": 120000}) // kill stuck jobs after 2 minutes
+}, bunqueue.JobOptions{"attempts": 3, "timeout": 120000}) // fail this generation after 2 minutes
 ```
 
 </TabItem>
@@ -694,10 +700,11 @@ support that design:
 - On SQLite, `durable: true` skips the 10ms write buffer and writes the job
   before `add()` returns. PostgreSQL admissions are already transactional and
   do not use that buffer.
-- `jobId` makes enqueueing idempotent: adding the same unfinished `jobId` twice
-  returns the existing job instead of creating another generation. Use the
-  same key with the payment provider because a lease recovery can redeliver a
-  job after its side effect completed but before its ACK committed.
+- `jobId` suppresses repeat adds while live ownership is retained. Memory/SQLite
+  use a bounded cache (50,000 IDs by default); eviction can end protection before
+  completion. PostgreSQL checks the database. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits).
+  Use an application/provider idempotency key regardless: retries or lease
+  recovery can replay an external effect after it completed but before ACK.
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">
@@ -1240,7 +1247,7 @@ The options you saw above, all set per job or via `defaultJobOptions`:
 | `timeout` | Max processing time before the job is failed | none |
 | `priority` | Higher numbers run sooner | 0 |
 | `delay` | Wait this many ms before the job is runnable | 0 |
-| `jobId` | Custom ID, adding the same ID while that job is unfinished returns the existing job | auto |
+| `jobId` | Custom ID; duplicate suppression depends on retained ownership and backend [limits](/guide/queue/deduplication/#custom-id-limits) | auto |
 | `durable` | SQLite: bypass its 10ms buffer; PostgreSQL is already transactional | false |
 | `removeOnComplete` | Delete the job once it succeeds | false |
 
@@ -1249,8 +1256,9 @@ Full list in the [queue guide](/guide/queue/).
 ## Gotchas
 
 - **No `dataPath` means no persistence.** An embedded queue without `dataPath` (or a `DATA_PATH` env var) keeps everything in memory and loses it on restart.
-- **SQLite's default write buffer trades 10ms for speed.** A hard crash can lose
-  jobs accepted in that window; use `durable: true` where that matters.
+- **SQLite's default write buffer improves throughput.** A hard crash can lose
+  pending buffered admissions; its typical 10 ms flush interval can be longer
+  during stalls/retries. Use `durable: true` where that exposure matters.
   PostgreSQL has no equivalent admission buffer.
 - **Throwing is how you retry.** A worker that catches every error and returns normally marks the job completed. Let errors propagate when you want a retry.
 - **Do not auto-retry money.** Set `setDlqConfig({ autoRetry: false })` on payment-like queues so failed charges wait for review.

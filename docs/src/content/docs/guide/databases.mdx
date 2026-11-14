@@ -305,7 +305,7 @@ application-level deduplication for external effects.
 ## SQLite retention and schema upgrades
 
 `maxCompletedJobs` is a hot-cache/recovery bound, not a database-retention
-policy. `queue.clean(..., 'completed')` is SQLite-authoritative and deletes the
+policy. `await queue.cleanAsync(graceMs, limit, 'completed')` is SQLite-authoritative and deletes the
 oldest eligible retained rows even after they leave that cache. For automatic
 retention, set `storage.completedRetentionMs`,
 `BUNQUEUE_COMPLETED_RETENTION_MS`, or `--completed-retention-ms`; it is disabled
@@ -316,8 +316,11 @@ exists, including after restart; the cleanup tick unregisters the name after
 the last row is committed away. Invalid direct retention values cannot make
 that deletion immediate: negative, non-finite, and unsafe values disable the
 policy, while finite non-negative fractions are floored to milliseconds. In the
-server's own configuration (config file, environment or CLI flag) such a value
-is rejected instead, and the server does not start.
+server's configuration, invalid config-file values and negative or unreadable
+environment/CLI values preserve the no-retention fallback with a warning.
+Environment/CLI forms that would be misread (for example `1e12`) are rejected;
+see [Configuration](/guide/configuration/) and [Environment Variables](/guide/env-vars/)
+for each input's rules.
 
 Deleting retained rows makes their SQLite pages reusable, which bounds future
 growth for a steady workload, but it does not automatically shrink a database
@@ -373,7 +376,7 @@ bunqueue embedded and forward jobs to one central, durable bunqueue server:
 const local = new Queue('ingest', {
   embedded: true,
   dataPath: '/var/lib/bunqueue/spool.db',
-  defaultJobOptions: { durable: true }, // close SQLite's 10ms hard-crash window
+  defaultJobOptions: { durable: true }, // bypass SQLite's application admission buffer
 });
 
 const forwarder = local.forward({

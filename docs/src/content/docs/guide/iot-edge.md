@@ -123,12 +123,14 @@ What `forward()` guarantees:
   push fails, the job fails locally, retries with backoff, and after its attempts
   lands in the local DLQ. When the uplink returns, `local.retryDlq()` re-enqueues
   it. This assumes the gateway process or persistent volume survives; use
-  `durable: true` for local jobs that cannot tolerate SQLite's 10ms hard-crash
-  window.
-- **Re-forwards deduplicate while the remote job is live.** Each forwarded job
+  `durable: true` for local jobs that cannot tolerate losing pending buffered
+  admissions on a crash. SQLite's typical 10 ms flush interval can be longer
+  during stalls/retries.
+- **Re-forwards deduplicate while remote ownership is retained.** Each forwarded job
   carries a deterministic remote job id, `fwd:<local queue>:<local job id>`, and
-  the server treats a second push with that id as a no-op while the remote job
-  is waiting, delayed or active. Once it completes or reaches the DLQ the id is
+  a memory/SQLite server returns the live generation only while its bounded
+  ownership cache retains the ID (50,000 entries by default). PostgreSQL checks
+  live database identity instead. Once it completes or reaches the DLQ the id is
   released, so a re-forward after that creates a new remote job. End-to-end
   processing is at-least-once: make remote processors idempotent.
 - **Priority is preserved.** Pass `durable: true` in the forward options to
@@ -143,7 +145,8 @@ The embedded queue persists to SQLite in WAL mode: committed frames use an
 append-only sidecar and SQLite recovery preserves transactional consistency
 across ordinary process or power interruption. Hardware, filesystem, and
 volume durability still belong to the operator. By default writes are batched
-for up to 10 ms; for readings you cannot afford to lose inside that window,
+at a typical 10 ms flush interval (longer during stalls/retries); for readings
+you cannot afford to lose while buffered,
 mark them durable, meaning committed before `add()` returns:
 
 ```typescript
@@ -180,9 +183,11 @@ See [Cron & Scheduled Jobs](/guide/cron/) for cron expressions and timezones.
 
 ## Gotchas
 
-- **Forward dedup only covers live jobs.** The server releases a custom job id
+- **Forward dedup has backend and lifetime limits.** The server releases a custom job id
   when the remote job completes or moves to the DLQ, whether or not the job
-  itself is kept, and its bounded id cache can evict entries earlier. A
+  itself is kept. Memory/SQLite's 50,000-entry default ownership cache can evict
+  live IDs earlier; PostgreSQL's database identity check is independent of that
+  cache. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits). A
   re-forward that arrives after the original finished is accepted as a new job,
   so strict exactly-once effects require downstream idempotency.
 - **`forwarder.on('error')` is observability, not control flow.** Failed forwards are already handled by the local retry and DLQ path; the event just tells you the uplink is unhappy.

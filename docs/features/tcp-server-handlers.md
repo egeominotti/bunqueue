@@ -139,9 +139,14 @@ listener when idle, and clears it during server shutdown.
 
 Auth (`handleAuth`, `handler.ts:30`): iterate configured tokens, comparing with `constantTimeEqual` (timing-safe). On match, set `ctx.authenticated = true` and return `ok()`; on no match, emit `auth:failed` and return `error('Invalid token')`.
 
+The handler admission cap sometimes labeled 10 MB below counts
+10 × 1024 × 1024 JSON string characters, not bytes. `Update` has no job-data
+size cap. Atomic flows also count JSON characters for their aggregate bound;
+the TCP frame limit remains a separate 64 MiB byte limit.
+
 Core paths:
 
-- `handlePush` (`core.ts`): validates queue name, data size (≤10MB), and numeric
+- `handlePush` (`core.ts`): validates queue name, JSON data length (≤10 × 1024 × 1024 string characters), and numeric
   option bounds. Memory/SQLite validates each `dependsOn` id against
   `jobIndex`, `completedJobs`, or `depCompletions`. PostgreSQL first queries the
   authoritative namespace so a remote parent is accepted even while the local
@@ -156,12 +161,15 @@ Core paths:
   different ID rolls the entire batch back. SQLite keeps its synchronous local
   validation. On validation failure, the handler returns an indexed
   `jobs[i]: ...` error when available; on success it returns `resp.batch(ids)`.
+  Memory/SQLite runtime admission errors (such as a later group-cap rejection)
+  retain the accepted prefix; they do not roll the batch back.
 - `handlePushFlow` (`flow.ts`): passes the fully resolved multi-queue graph to
   `QueueManager.pushFlow`. The application validator checks the complete batch
   before mutation, including strict string/array/boolean wire types, internal
   parent metadata, duplicate/missing/asymmetric edges, cycles, mutually
-  exclusive failure policies, 10,000 jobs, 10 MB per job and 64 MB total flow
-  data. Success uses `resp.data({ jobs })`; any validation, ownership, or
+  exclusive failure policies, 10,000 jobs, 10 × 1024 × 1024 JSON string characters
+  per job and 64 × 1024 × 1024 characters across the graph. Success uses
+  `resp.data({ jobs })`; any validation, ownership, or
   persistence error rejects the whole command.
 - `handlePull` (`src/infrastructure/server/handlers/core.ts`): caps `timeout`
   to `[0, 60000]`, validates optional group defaults, and forwards them to the
@@ -296,7 +304,16 @@ Concurrency relevant to this layer:
 
 - The transport processes frames of a single connection in parallel under a per-connection `Semaphore(50)` (`tcp/constants.ts:1`, constructed at `tcp/connections.ts:42` and acquired at `src/infrastructure/server/tcp.ts:85`), so multiple `handleCommand` calls can be in flight on the same `ctx`. Handlers are therefore expected to be safe against concurrent invocation — they are, because they hold no per-call state and `QueueManager` serializes the underlying mutations.
 - `ctx.authenticated` is the single shared mutable field; once `handleAuth` flips it to `true` it is monotonic for the connection's lifetime, so the concurrent reads in the auth gate are benign.
-- Client-job ownership: `registerClientJob` (on pull) / `unregisterClientJob` (on applied ack/fail) keep a per-`clientId` set so that on disconnect the TCP `close` handler can call `releaseClientJobs` (with retry + force-release fallback) to requeue leased jobs. Ignored retired generations do not clear tracking for a possibly newer lease with the same ID. Ownership is per delivery: registering a delivery detaches its previous owner, every recovery path detaches the silent owner, and disconnect release acts only on a delivery the connection still owns (see [Webhooks, Events & Job Logs](./webhooks-and-events.md)). See [Worker Registry & Management](./workers-management.md).
+- Client-job ownership: `registerClientJob` (on pull) / `unregisterClientJob`
+  (on applied ack/fail) keep a per-`clientId` set for disconnect cleanup. TCP
+  retries cleanup with a backend-specific force-release fallback: local engines
+  expire heartbeat/start state, whereas PostgreSQL queues transactional,
+  token-fenced release of the retained session. Release only touches eligible
+  current deliveries and excludes renewed leases; local protected cron jobs
+  are discarded, while PostgreSQL dependency-protected cron IDs use ordinary
+  release. Ignored retired generations do not clear a newer lease's tracking.
+  See [Webhooks, Events & Job Logs](./webhooks-and-events.md) and
+  [Worker Registry & Management](./workers-management.md).
 - Lock tokens (`token`) are an opaque ownership credential minted by `pullWithLock`/`pullBatchWithLock` and verified by `ack`/`fail`/`extendLock`/`renewJobLock`; the handlers only pass them through.
 
 ## Edge Cases & Failure Modes
@@ -352,7 +369,7 @@ auth, telemetry, timeout, SQLite path, TLS, Cloud, and S3 fields plus
 [PostgreSQL 16–18 Multi-Broker Persistence](./postgres-multibroker.md), and
 [Security: TLS, Auth, CORS](./security-tls-auth.md).
 
-Input-validation limits enforced by the handlers (from `protocol.ts`): queue name ≤256 chars and `^[a-zA-Z0-9_\-.:]+$`; job data ≤10MB; `PULL`/`PULLB` timeout `[0,60000]`; `PULLB` count `[1,1000]`; `WaitJob` timeout `[0,600000]`. Job options go through the shared `validateJobOptions` (the same validator and rules as atomic flows, embedded `Queue.add`/`addBulk` and cron templates), which refuses only what no job can run with and admits every value 2.9.10 accepted in either mode ([Job Options Validation](./job-options-validation.md)): a non-number, `NaN` or an infinity is refused (a plain numeric string counts as its number); `priority` is any finite number (grouped: `group.priority` integer `[0,2097151]`); a negative job `delay` keeps its past run time (ready at once, ahead of later ready jobs, as on 2.9.10); `timeout` and `ttl` cannot be negative; `maxAttempts` of 1 or less runs once (`Infinity` is stored as 2,147,483,647); `stallTimeout`, `stackTraceLimit`, `keepLogs`, `sizeLimit`, `dedup.ttl` and `debounceTtl` only need to be finite; `timestamp` within ±4.32e15; `groupMaxSize` a positive safe integer; `repeat.every` positive. Durations above `MAX_JOB_DURATION_MS` (4.32e15 ms) are clamped by `normalizeJobInput`, which also stores the normalized values. `PUSH` passes the whole command. `backoff` accepts either a number (ms) or the object form `{ type, delay?, maxDelay? }` (`validateBackoffField`) — any `type` (`fixed` is fixed, anything else runs as exponential), a missing `delay` is the 1000 ms default, a given `delay` must be a finite number `>= 0`, and an optional `maxDelay` (per-job retry-delay cap; `null` = absent) must be a finite number in `[0, 1day]` (`MAX_BACKOFF_DELAY`); `PUSH`, `PUSHB` (per job, via `validatePushBatchJobs`, error `jobs[i]: ...`) and `PUSHF` validate the applicable rules. `PUSHF` additionally caps the full graph as described above. `ChangeDelay`/`MoveToDelayed` require a finite `delay` (`validateDelayArgument`; the engine keeps a negative one as a past run time, `now + delay`); `PULL`/`PULLB` `lockTtl`, `ExtendLock` `duration`, `ExtendLocks` `durations[i]` and a non-zero `JobHeartbeat` `duration` must be finite numbers, any sign, passed through as on 2.9.10 (`validateLockDuration`; `NaN`, an infinity or a string is refused before any job is claimed or lease changed). `ChangePriority` takes any finite priority (missing = 0) and normalizes `lifo` to a boolean; `Progress` is never refused (`normalizeProgress`); `Update` needs only JSON-serializable data (no size limit); `ClearLogs` applies `keepLogsArgument`. `Cron` template options, spawned `priority`/`dedup.ttl` and `repeatEvery` (at most `MAX_JOB_DURATION_MS`) are validated by `assertValidCronInput` with the same rules, and the thrown message is returned as the protocol error.
+Input-validation limits enforced by the handlers (from `protocol.ts`): queue name ≤256 chars and `^[a-zA-Z0-9_\-.:]+$`; job data ≤10MB; `PULL`/`PULLB` timeout `[0,60000]`; `PULLB` count `[1,1000]`; `WaitJob` timeout `[0,600000]`. Job options go through the shared `validateJobOptions` (the same validator and rules as atomic flows, embedded `Queue.add`/`addBulk` and cron templates), which refuses only what no job can run with and admits every value 2.9.10 accepted in either mode ([Job Options Validation](./job-options-validation.md)): a non-number, `NaN` or an infinity is refused (a plain numeric string counts as its number); `priority` is any finite number (grouped: `group.priority` integer `[0,2097151]`); a negative job `delay` keeps its past run time (ready at once; among equal-priority FIFO jobs, earlier run times go first, as on 2.9.10; priority and LIFO ordering still apply); `timeout` and `ttl` cannot be negative; `maxAttempts` of 1 or less runs once (`Infinity` is stored as 2,147,483,647); `stallTimeout`, `stackTraceLimit`, `keepLogs`, `sizeLimit`, `dedup.ttl` and `debounceTtl` only need to be finite; `timestamp` within ±4.32e15; `groupMaxSize` a positive safe integer; `repeat.every` positive. Durations above `MAX_JOB_DURATION_MS` (4.32e15 ms) are clamped by `normalizeJobInput`, which also stores the normalized values. `PUSH` passes the whole command. `backoff` accepts either a number (ms) or the object form `{ type, delay?, maxDelay? }` (`validateBackoffField`) — any `type` (`fixed` is fixed, anything else runs as exponential), a missing `delay` is the 1000 ms default, a given `delay` must be a finite number `>= 0`, and an optional `maxDelay` (per-job retry-delay cap; `null` = absent) must be a finite number in `[0, 1day]` (`MAX_BACKOFF_DELAY`); `PUSH`, `PUSHB` (per job, via `validatePushBatchJobs`, error `jobs[i]: ...`) and `PUSHF` validate the applicable rules. `PUSHF` additionally caps the full graph as described above. `ChangeDelay`/`MoveToDelayed` require a finite `delay` (`validateDelayArgument`; the engine keeps a negative one as a past run time, `now + delay`); `PULL`/`PULLB` `lockTtl`, `ExtendLock` `duration`, `ExtendLocks` `durations[i]` and a non-zero `JobHeartbeat` `duration` must be finite numbers, any sign, passed through as on 2.9.10 (`validateLockDuration`; `NaN`, an infinity or a string is refused before any job is claimed or lease changed). `ChangePriority` takes any finite priority (missing = 0) and normalizes `lifo` to a boolean; `Progress` is never refused (`normalizeProgress`); `Update` needs only JSON-serializable data (no size limit); `ClearLogs` applies `keepLogsArgument`. `Cron` template options, spawned `priority`/`dedup.ttl` and `repeatEvery` (at most `MAX_JOB_DURATION_MS`) are validated by `assertValidCronInput` with the same rules, and the thrown message is returned as the protocol error.
 
 ## Related Docs
 

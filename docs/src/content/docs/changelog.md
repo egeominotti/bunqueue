@@ -455,6 +455,20 @@ head:
 
 ### Documentation
 
+- Record the completed documentation audit with its green source CI, isolated
+  Linux validation, rendered-link checks and review evidence. Keep live custom-ID
+  reuse after cache eviction as a separate reproduce-first runtime work item.
+
+- Correct current guides, protocol and agent references against the implementation:
+  use authoritative async methods for TCP DLQ and cleanup operations, distinguish
+  accepted-prefix bulk admission from atomic flow creation, and describe actual
+  retry timing, bounded custom-ID ownership, cooperative timeouts and disconnect
+  recovery. Clarify configuration fallbacks, payload and webhook validation
+  boundaries, SQLite durability, persistence fields and backup configuration.
+  Repair the workflow summary's missing classifier result and stale API names.
+  Track live-ID reuse after cache eviction for a separate runtime reproduction.
+  These corrections document existing behavior; they do not change the runtime.
+
 - Release metadata refreshed after the 2.9.22 publication
   (`docs/src/data/releaseMeta.json`): 2.9.20, 2.9.21 and 2.9.22 now carry their
   tag, GitHub release, npm, Docker and contributor data, and 2.9.19 its npm

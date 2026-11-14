@@ -156,14 +156,17 @@ selects descending createdAt/job-id order before offset/limit pagination.
 group getter/control commands expose server-authoritative depth, active count,
 fixed-window TTL/configuration, concurrency, pause state, and immediate manual
 deadlines. Grouped `PUSH`/`PUSHB`/`PUSHF` inputs carry normalized `groupId`,
-ascending BullMQ Pro priority, and optional atomic `groupMaxSize`; a failed
-capacity check rejects the complete batch/graph through the ordinary error
-response.
+ascending BullMQ Pro priority, and optional per-job atomic `groupMaxSize`.
+Memory/SQLite `PUSHB` retains an accepted prefix if a later member fails its
+capacity check, despite an error response; preflight validation rejects before
+mutation. PostgreSQL batch insertion is transactional. `PUSHF` rejects the
+complete graph on a capacity error.
 
 `PUSHF` carries `{ cmd: 'PUSHF', jobs: AtomicFlowJobInput[] }`, where every
 entry already has its final string `id`, queue, job input, and graph links. The
 broker validates strict runtime types, symmetric parent/child metadata,
-acyclicity, 10,000 jobs, 10 MB per job and 64 MB aggregate flow data before
+acyclicity, 10,000 jobs, 10 × 1024 × 1024 JSON string characters per job and
+64 × 1024 × 1024 characters across the graph before
 mutation. Success is `{ ok: true, data: { jobs: Job[] } }`; the snapshots cover
 exactly the requested IDs. With SQLite configured, all rows commit in one
 immediate transaction before the graph is visible to workers. See
@@ -200,7 +203,12 @@ outside the `Response` union because it does not answer a command.
 
 ## Business Logic / Control Flow
 
-**Server creation (`createTcpServer`, `tcp.ts:25-35`)**: before anything binds, resolve `idleTimeoutMs` and `maxWriteQueueBytes` (an explicit config value is validated; otherwise `tcpIdleTimeoutMs()` / `tcpMaxWriteQueueBytes()` parse `TCP_IDLE_TIMEOUT_MS` / `TCP_MAX_WRITE_QUEUE_BYTES`) and read `rateLimiterEnvConfig()` (`RATE_LIMIT_*`). A malformed value throws (`Invalid TCP_IDLE_TIMEOUT_MS: "1e12" (expected a whole number of milliseconds >= 0)`, or a `RangeError` naming `TcpServerConfig.idleTimeoutMs`), so the server fails at startup instead of on the first connection or request. The env rules are exported (`TCP_IDLE_TIMEOUT_SETTING`, `TCP_MAX_WRITE_QUEUE_SETTING` in `tcp/constants.ts`) and the standalone server validates them earlier, in `resolveServerConfig`, before storage opens or the banner prints. The env values are strict: digits only, an empty value keeps the default, and `1e12`, `-1`, `abc` or `64MB` are rejected (`parseInt` used to read them as 1 ms, "disabled" or a 64-byte cap).
+The `validateJobData` cap described above as 10 MB counts JSON string length:
+10 × 1024 × 1024 characters, not bytes. `Update` intentionally has no job-data
+size cap; applications must enforce their own payload limits. The 64 MiB frame
+limit is a separate transport bound.
+
+**Server creation (`createTcpServer`, `tcp.ts:25-35`)**: before anything binds, resolve `idleTimeoutMs` and `maxWriteQueueBytes` (an explicit config value is validated; otherwise `tcpIdleTimeoutMs()` / `tcpMaxWriteQueueBytes()` parse `TCP_IDLE_TIMEOUT_MS` / `TCP_MAX_WRITE_QUEUE_BYTES`) and read `rateLimiterEnvConfig()` (`RATE_LIMIT_*`). A rejected value throws (`Invalid TCP_IDLE_TIMEOUT_MS: "1e12" (expected a whole number of milliseconds >= 0)`, or a `RangeError` naming `TcpServerConfig.idleTimeoutMs`), so the server fails at startup instead of on the first connection or request. The env rules are exported (`TCP_IDLE_TIMEOUT_SETTING`, `TCP_MAX_WRITE_QUEUE_SETTING` in `tcp/constants.ts`) and the standalone server validates them earlier, in `resolveServerConfig`, before storage opens or the banner prints. Empty env values keep defaults; compatible parseInt forms such as `5000ms` work for milliseconds. Negative or unreadable idle/write-queue values disable that setting with a warning; misread forms such as `1e12` or `64MB` for a byte count fail. See [Configuration](./configuration.md#upgrade-compatibility-with-2910) and [Rate Limiting & Concurrency](./rate-limiting-and-concurrency.md#configuration) for each fallback.
 
 **Connection open (`TcpConnectionRegistry.init`, `tcp/connections.ts:31-59`)**: allocate `clientId = uuid()`, build `HandlerContext` with `authenticated = authTokens.size === 0` (auto-auth when no tokens configured) and `signal = AbortSignal.any([connection signal, server drain signal])`, and attach per-connection `TcpConnectionData`: a fresh `FrameParser`, `Semaphore(50)`, `SocketWriteQueue(maxWriteQueueBytes)`, abort controller, null `stallTimer`, and null event queue. Register in `connections` map and emit `client:connected`. `init` is idempotent (returns early if `socket.data` exists) and is called from **both** the `open` handler and lazily at the top of the `data` handler (`tcp.ts:38-44`): under native TLS, Bun can deliver `data` before `open` has run, and the handler previously destructured a null `socket.data`, escalating a TypeError to the process-level unhandledRejection handler (a pre-auth remote DoS on an exposed TLS port, #108). Lazy init preserves that first frame instead of dropping it.
 
@@ -336,7 +344,17 @@ connections (`closeAll`) and stops the listener; see the shutdown order in
   constraint, relation, driver, host, SQLite, and network diagnostics to
   `Internal server error` before framing. Non-throwing storage-status payloads
   apply the same projection; SQLite disk-full retains its actionable detail.
-- **Job release on disconnect with retry:** `releaseClientJobsWithRetry` (`tcp/clientRelease.ts:4-23`) retries up to 3× with exponential backoff (100/200/400ms). If all retries fail, `TcpConnectionRegistry.close` falls back to `forceReleaseClientJobs` (`tcp/connections.ts:116-124`), which unconditionally clears client tracking (prevents a `connections`/ownership Map leak) and resets heartbeats so the stall detector recovers any orphaned `active` jobs on its next tick — chosen over leaking the jobs. Both paths act only on deliveries the connection still owns: a job recovered from it (stall, orphan, lock expiry, timeout) is detached at recovery, and a later delivery to another worker is never released or expired by this connection's close (see [Webhooks, Events & Job Logs](./webhooks-and-events.md)).
+- **Job release on disconnect with retry:** `releaseClientJobsWithRetry`
+  (`tcp/clientRelease.ts:4-23`) retries cleanup up to 3 times with exponential
+  backoff (100/200/400ms), independently of processing attempts. Exhaustion
+  invokes the backend's `forceReleaseClientJobs`: memory/SQLite clear owned
+  tracking and expire heartbeat/start state for stall recovery; PostgreSQL
+  queue another transactional, token-fenced release of the retained lease
+  session. If release cannot complete, eventual lease expiry remains available.
+  Immediate release excludes renewed leases and stale delivery owners. Local
+  eligible `cron:` deliveries are discarded; PostgreSQL uses ordinary release
+  for dependency-protected cron IDs that cannot safely be discarded. See
+  [Webhooks, Events & Job Logs](./webhooks-and-events.md).
 - **Idempotency** is a command-level concern (`jobId`/`uniqueKey`/`dedup`), not a transport one; the transport delivers exactly the frames it parsed. `reqId` is purely for client-side response correlation and is echoed back verbatim, including on errors.
 - **TLS startup invariant:** `readTlsMaterial` runs _before_ `Bun.listen` binds the port, so a bad cert/key path fails fast at startup instead of leaving a half-started listener.
 - **Replaceable TLS listener:** with TLS the listener binds with `reusePort: true` (after a plain exclusive probe bind on a configured port other than `0`, so a busy port still fails with `Failed to listen at <host>` and a second broker cannot share it). `prepareTlsReload(material)` binds a second listener on the bound port with the new pair and the **same** `socketHandlers` object, so every connection, accepted by either listener, lives in the one `TcpConnectionRegistry`; `commit` points `server` at it and stops the old one with `stop(false)` (its connections stay open), `abort` stops the new one. `beginDrain()` and `stop()` refuse any later prepare. A plain listener binds exactly as before (no probe, no SO_REUSEPORT) and has no reload.

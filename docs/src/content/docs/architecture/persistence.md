@@ -94,7 +94,7 @@ Benchmarks](/guide/benchmarks/) for distributions and TCP results.
       <div class="bq-diag-cell">(queue, state, created_at, id) <i>stable state pagination</i></div>
       <div class="bq-diag-cell">(run_at) <i>delayed job scheduler</i></div>
       <div class="bq-diag-cell">(queue, unique_key) <i>deduplication</i></div>
-      <div class="bq-diag-cell">(custom_id) <i>idempotency</i></div>
+      <div class="bq-diag-cell">(custom_id) <i>lookup; live dedup depends on ownership cache</i></div>
     </div>
     <div class="bq-diag-row">
       <div class="bq-diag-cell">(parent_id) <i>parent job lookup</i></div>

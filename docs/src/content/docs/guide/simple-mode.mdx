@@ -982,7 +982,7 @@ number; anything else throws when the app is created.
 
 ## Deduplication defaults
 
-Prevent duplicate jobs automatically: jobs with the same name + data get the same dedup ID within the TTL window:
+Prevent duplicate jobs automatically: jobs with the same name + data get the same dedup ID. Suppression lasts while that key is owned, for at most the TTL; completion or other release transitions can end it sooner. Use application-level deduplication for a full business time window (see [Deduplication](/guide/queue/deduplication/#with-a-ttl-window)):
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">

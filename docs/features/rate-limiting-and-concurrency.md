@@ -60,7 +60,7 @@ External/runtime:
   - `deleteQueue(queue): void`, `getQueueNames(): string[]`, `getStateMap(): Map<string, QueueState>`
 - `class RateLimiter` (`src/domain/types/queue.ts:35-83`) — token bucket. `constructor(capacity, refillRate = capacity)`, `tryAcquire(): boolean`, `getTokens(): number`, `getTtl(maxJobs?)`.
 - `class ConcurrencyLimiter` (`src/domain/types/queue.ts:94-130`) — `constructor(limit, activeJobIds?)`, `tryAcquire(jobId): boolean`, `release(jobId): void`, `getActive()` (number of holders), `getLimit()`, `setLimit(limit)`. It keeps a `Set<JobId>` of slot holders instead of a counter: a job that already holds a slot re-acquires it without taking another, and releasing a job that holds none changes nothing.
-- `class ProtocolRateLimiter` (`src/infrastructure/server/rateLimiter.ts:129`) — `constructor(config?: Partial<RateLimiterConfig>)`, `isAllowed(clientId): boolean`, `getRemaining(clientId): number`, `removeClient(clientId)`, `stop()`. Module helpers `getRateLimiter(config?)` (lazy singleton), `stopRateLimiter()` and `rateLimiterEnvConfig()` (the `RATE_LIMIT_*` defaults, parsed on first use and cached; `createTcpServer`/`createHttpServer` call it first so a malformed value fails startup). Programmatic fields are validated in the constructor (`windowMs` finite ms >= 1, `maxRequests` whole number >= 1, `cleanupIntervalMs` finite ms >= 1 or `0` to disable the sweep, a test-only opt-out); a missing field takes the env default.
+- `class ProtocolRateLimiter` (`src/infrastructure/server/rateLimiter.ts:129`) — `constructor(config?: Partial<RateLimiterConfig>)`, `isAllowed(clientId): boolean`, `getRemaining(clientId): number`, `removeClient(clientId)`, `stop()`. Module helpers `getRateLimiter(config?)` (lazy singleton), `stopRateLimiter()` and `rateLimiterEnvConfig()` (the `RATE_LIMIT_*` defaults, parsed on first use and cached; `createTcpServer`/`createHttpServer` call it before binding, applying the compatibility rules below). Programmatic fields are validated in the constructor (`windowMs` finite ms >= 1 or `0` to disable rate limiting, `maxRequests` whole number >= 1, `cleanupIntervalMs` finite ms >= 1 or `0` to disable the sweep, a test-only opt-out); a missing field takes the env default.
 
 ### Client-side classes
 
@@ -131,7 +131,7 @@ interface QueueState {
 
 // src/infrastructure/server/rateLimiter.ts:11 — protocol abuse limiter config
 interface RateLimiterConfig {
-  windowMs: number; // default 60000 (RATE_LIMIT_WINDOW_MS), finite ms >= 1
+  windowMs: number; // default 60000 (RATE_LIMIT_WINDOW_MS), finite ms >= 1; 0 disables
   maxRequests: number; // default 10000 (RATE_LIMIT_MAX_REQUESTS), whole number >= 1
   cleanupIntervalMs?: number; // default 60000 (RATE_LIMIT_CLEANUP_MS); 0 disables (tests only)
 }
@@ -371,7 +371,7 @@ Key invariant: **if `limiter.groupKey` is set, the `WorkerRateLimiter` is disabl
 - **`isMaxed` scope:** it reflects the global concurrency limiter, not worker-local concurrency or rate-token availability. With no configured global concurrency it is `false`.
 - **Memory bounds.**
   - `SlidingWindowDeque` advances a head pointer for O(1) amortized expiry and compacts the array when `head > 1000` (`rateLimiter.ts:95`); the cleanup interval (`safeInterval`) deletes empty per-client deques every `cleanupIntervalMs` (`rateLimiter.ts:180-205`). The maintenance timer is unreferenced: it continues while TCP/HTTP work keeps the process alive but cannot prevent a stopped broker from exiting. Request-time lazy expiry remains authoritative, so timer scheduling never changes admission correctness.
-  - The sweep is the only eviction for HTTP clients (TCP clients are also dropped on disconnect), so `RATE_LIMIT_CLEANUP_MS` rejects `0`: before, `0` or a non-number skipped the `if (ms)` guard, no sweep ever ran and the per-client map grew without bound. `-1`, `1e12` (`parseInt`: 1) or a period above 2^31 - 1 used to spin the sweep about every millisecond; a long period is now honoured. A `NaN` window (`RATE_LIMIT_WINDOW_MS=abc`) never expired a timestamp, so a client that reached the limit stayed blocked forever, and `RATE_LIMIT_MAX_REQUESTS=abc` disabled the limit silently. Each of these now fails startup with `Invalid NAME: "value" (expected ...)`.
+  - The sweep is the only eviction for HTTP clients (TCP clients are also dropped on disconnect). `RATE_LIMIT_CLEANUP_MS` of `0`, negative or unreadable keeps the 60,000 ms default with a warning; long periods are honored. Misread forms such as `1e12` fail startup. An unreadable window (`RATE_LIMIT_WINDOW_MS=abc`) also fails startup because it could prevent expiry forever. An unreadable request limit (`RATE_LIMIT_MAX_REQUESTS=abc`) preserves the compatibility behavior of disabling rate limiting, now with a warning; `0` and negative request limits remain errors.
   - `WorkerRateLimiter.evictExpired` advances head and compacts when more than half the token array is dead space (`workerRateLimiter.ts:108`).
   - `GroupConcurrencyLimiter.decrement` deletes a group's map entry once its count hits 0, so idle groups don't accumulate (`groupConcurrency.ts:74`).
 - **Negative/non-positive limits:** CLI rejects `limit <= 0`; TCP handlers only require a finite number, so `RateLimit limit:0` would create a token bucket that never refills enough to grant a token (effectively blocks the queue). `ConcurrencyLimiter` with limit `0` blocks all pulls.
@@ -387,18 +387,21 @@ Key invariant: **if `limiter.groupKey` is set, the `WorkerRateLimiter` is disabl
 ## Configuration
 
 Protocol-level limiter (`rateLimiterEnvConfig()`, `src/infrastructure/server/rateLimiter.ts`).
-Values are whole numbers (digits only; an empty value keeps the default). The rules
+Values use the shared compatible numeric parser: forms such as `+5000`, `5000.0`
+and, for duration fields, `5000ms` retain their parseInt reading, while misread exponent/unit forms are
+rejected (see [Configuration](./configuration.md#upgrade-compatibility-with-2910)). An empty
+value keeps the default. The rules
 are exported (`RATE_LIMIT_WINDOW_SETTING`, `RATE_LIMIT_MAX_REQUESTS_SETTING`,
 `RATE_LIMIT_CLEANUP_SETTING`) and the standalone server validates them in
-`resolveServerConfig`, so a bad value prints one `Fatal error:` line before storage
+`resolveServerConfig`, so a rejected value prints one `Fatal error:` line before storage
 opens or the banner prints. Embedded and programmatic servers keep the lazy
 accessor, which applies the same rules when the TCP or HTTP server is created:
 
 | Env var                   | Default | Accepted                     | Meaning                                |
 | ------------------------- | ------- | ---------------------------- | -------------------------------------- |
-| `RATE_LIMIT_WINDOW_MS`    | 60000   | ms >= 1                      | Sliding window size per client         |
-| `RATE_LIMIT_MAX_REQUESTS` | 10000   | >= 1                         | Max raw requests per client per window |
-| `RATE_LIMIT_CLEANUP_MS`   | 60000   | ms >= 1 (above 2^31 - 1 too) | Interval to evict idle client deques   |
+| `RATE_LIMIT_WINDOW_MS`    | 60000   | ms >= 1; 0 disables; negative → 0 with warning; unreadable is an error | Sliding window size per client |
+| `RATE_LIMIT_MAX_REQUESTS` | 10000   | >= 1; unreadable → unlimited with warning; 0/negative are errors | Max raw requests per client per window |
+| `RATE_LIMIT_CLEANUP_MS`   | 60000   | ms >= 1 (above 2^31 - 1 too); 0/negative/unreadable → default with warning | Interval to evict idle client deques |
 
 Per-queue limits are runtime-set (TCP/HTTP/CLI/SDK), persisted in `queue_state`, and have no env defaults (unset = unlimited).
 

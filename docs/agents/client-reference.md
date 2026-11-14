@@ -65,6 +65,7 @@ const flow = new Workflow('order')
     .step('notify-warehouse', async () => ({ notified: true }))
     .step('notify-email', async () => ({ sent: true }))
   )
+  .step('classify', async () => ({ tier: 'basic' }))
   .branch((ctx) => (ctx.steps['classify'] as { tier: string }).tier)
   .path('vip', (w) => w.step('vip-handler', async () => ({ discount: 20 })))
   .path('basic', (w) => w.step('basic-handler', async () => ({ discount: 0 })))
@@ -192,10 +193,10 @@ const queue3 = new Queue('jobs', { autoBatch: { enabled: false } });
 interface JobOptions {
   priority?: number; // Higher = sooner
   delay?: number; // ms before processing
-  attempts?: number; // Max retries (default: 3)
+  attempts?: number; // Maximum attempts, including the first (default: 3)
   backoff?: number; // Retry backoff (default: 1000ms)
   timeout?: number; // Processing timeout
-  jobId?: string; // Custom ID (idempotent)
+  jobId?: string; // Custom ID; retained-ownership dedup (memory/SQLite default cache: 50,000 IDs; PostgreSQL checks DB)
   removeOnComplete?: boolean;
   removeOnFail?: boolean;
   durable?: boolean; // Bypass write buffer

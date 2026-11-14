@@ -402,8 +402,9 @@ needed for a local setup.
 Understanding four facts about the transport explains most SDK behavior:
 
 1. **Framing**: every message is a 4-byte big-endian length prefix
-   followed by a standard msgpack map. Maximum frame size is 64 MB;
-   maximum job payload is 10 MB.
+   followed by a standard msgpack map. Maximum frame size is 64 MiB;
+   new wire admissions limit JSON job data to 10 × 1024 × 1024 string
+   characters. Updates have no job-data size cap; apply your own payload limits.
 2. **Pipelining**: every request carries a `reqId` the server echoes
    back, so many commands are in flight on one socket concurrently. A
    single connection is usually all a service needs.
@@ -561,7 +562,7 @@ builders: runtime handling of unknown keys differs by language.
 | `backoff`                                    | number \| `{ type, delay, maxDelay? }`       | 1000    | `type`: `'fixed'` or `'exponential'`; `delay` (1000 when missing); `maxDelay` retry cap, default 1 h, up to 1 day |
 | `ttl`                                        | ms                                           | -       | Expires the job if not processed in time                                                                |
 | `timeout`                                    | ms                                           | -       | Per-job processing timeout (0 = none)                                                                   |
-| `jobId`                                      | string                                       | -       | Custom id; **idempotent**, re-adding an unfinished id is a no-op                                        |
+| `jobId`                                      | string                                       | -       | Custom ID; live-generation suppression depends on retained ownership and [backend/cache limits](/guide/queue/deduplication/#custom-id-limits) |
 | `deduplication`                              | `{ id, ttl?, extend?, replace? }`            | -       | Dedup window keyed on `id`                                                                              |
 | `debounce`                                   | `{ id, ttl? }`                               | -       | Persists compatibility metadata; use `deduplication` with `replace: true` for last-write-wins execution |
 | `dependsOn`                                  | string[]                                     | -       | Job ids that must complete first                                                                        |
@@ -621,11 +622,12 @@ Not shown here. The Elixir equivalent is in the [Elixir SDK reference](https://g
 
 ### Idempotency and bulk
 
-`jobId` makes `add` idempotent: re-adding an id whose job is still
-unfinished (waiting, active, waiting-children) returns the existing job
-instead of creating a duplicate. This holds for `addBulk` too, each bulk
-entry's `jobId` is preserved on the wire, so an idempotent batch ingest can
-be re-run safely after a crash:
+`jobId` is preserved for single and bulk adds. Re-adding it returns the live
+generation while ownership is retained. Memory/SQLite use a bounded cache
+(50,000 IDs by default); after eviction, a re-add is not guaranteed to preserve
+the original live generation. PostgreSQL checks the database. Stable IDs alone
+do not make arbitrary batch replay safe: reconcile accepted work and keep
+external effects idempotent. See [Custom-ID limits](/guide/queue/deduplication/#custom-id-limits):
 
 <Tabs syncKey="sdk">
 <TabItem label="TypeScript">

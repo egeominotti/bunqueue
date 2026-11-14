@@ -462,8 +462,11 @@ remote server via `embeddedQueue.forward({ to, queue })`
 ([`src/client/forwarder.ts`](../src/client/forwarder.ts)). Remote failures fall
 back to local retry/DLQ. With persistent local storage, queued work survives
 uplink outages while its process or volume survives; a deterministic remote jobId
-`fwd:<queue>:<localId>` dedupes re-forwards within the server's custom-id
-retention window. Trade-off: at-least-once delivery with bounded dedup; ideal for
+`fwd:<queue>:<localId>` suppresses re-forwards while remote live ownership is
+retained. Memory/SQLite use a bounded cache (50,000 IDs by default); PostgreSQL
+checks database identity. Cache eviction can end local-engine suppression before
+completion, so retain application idempotency for external effects. Trade-off:
+at-least-once delivery with bounded dedup; ideal for
 IoT/edge that must tolerate intermittent connectivity. See
 [Store-and-Forward](./features/store-and-forward.md).
 

@@ -1,6 +1,6 @@
 ---
 title: "Deduplication and Idempotent Job Adds"
-description: "Stop bunqueue from queueing the same job twice: custom job ids for idempotent adds, deduplication keys with a TTL, and looking up or clearing a key."
+description: "Deduplicate job adds with custom ids or TTL keys, understand backend and ownership-cache limits, and look up or clear a key."
 head:
   - tag: meta
     attrs:
@@ -9,30 +9,29 @@ head:
   - tag: meta
     attrs:
       name: keywords
-      content: "idempotent job, deduplication key, custom jobId, duplicate jobs, exactly once enqueue, dedup ttl, job id lookup"
+      content: "idempotent job, deduplication key, custom jobId, duplicate jobs, custom id limits, dedup ttl, job id lookup"
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 <div class="bq-wrap bq-hero">
   <span class="bq-eyebrow">guide · queue</span>
-  <h1 class="bq-hero-h1 bq-bench-h1">The same job, <em>only once.</em></h1>
-  <p class="bq-hero-sub">Retried HTTP calls, at-least-once webhooks and impatient users all produce duplicate adds. A custom id or a dedup key makes the second one a no-op instead of a second charge.</p>
+  <h1 class="bq-hero-h1 bq-bench-h1">Control duplicate <em>job adds.</em></h1>
+  <p class="bq-hero-sub">Retried HTTP calls, at-least-once webhooks and impatient users all produce duplicate adds. Custom ids and dedup keys suppress duplicates within their ownership limits. Keep payment and other external effects idempotent in your application.</p>
 </div>
 
 ## Deduplication
 
 ### With `jobId` (idempotent adds)
 
-Give a job a custom `jobId` and adding it twice does nothing: while a generation
-with that ID is live (`waiting`, `delayed`, `prioritized`,
-`waiting-children`, or `active`), the existing job is returned instead of
-creating a duplicate. Custom IDs are broker-wide because they are also the
-global persisted job primary key, so this remains idempotent even if the second
-add targets another queue. Once the prior generation is terminal, the ID may be
-reused; bunqueue retires its completed/DLQ state before admitting exactly one
-fresh generation. This makes `add()` safe to call repeatedly in embedded and
-TCP modes.
+Give a job a custom `jobId` to suppress repeated adds while its live ownership
+is retained (`waiting`, `delayed`, `prioritized`, `waiting-children`, or `active`).
+Memory/SQLite use a bounded ownership cache; PostgreSQL checks the live row in
+the database. See [Custom-ID limits](#custom-id-limits) before relying on retries.
+Custom IDs are broker-wide (PostgreSQL: namespace-wide), so include a queue or
+tenant prefix when identities must be distinct. Once a generation is terminal,
+the ID may be reused; bunqueue retires its completed/DLQ state before admitting
+a fresh generation.
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">
@@ -108,25 +107,53 @@ job1.id == job2.id  # true, same job returned
 </TabItem>
 </Tabs>
 
-Typical uses: webhook retries, double-submits from a UI, restoring jobs on service startup without duplicating them.
+Typical uses: suppressing duplicate webhook retries, UI submissions and startup
+restoration while ownership is retained. External effects still need
+application-level idempotency.
+
+#### Custom-ID limits
+
+Ordinary `add()` / `addBulk()` on memory/SQLite brokers depend on a bounded
+least-recently-used ownership cache, **50,000 custom IDs by default**, shared
+across queues. This includes both embedded mode and TCP/HTTP clients of those
+brokers. Eviction can remove ownership while the job is still live; after that,
+re-adding the ID is **not guaranteed to return or preserve the original live
+generation**. Do not rely on custom IDs alone to make arbitrary retries safe.
+SQLite's primary key is not an extra deduplication guard: ordinary admission
+uses upserts. `durable: true` changes commit timing and does not remove this limit.
+
+The capacity is configurable only through the low-level
+`QueueManagerConfig.maxCustomIds`; it is not a Queue/Worker option, standalone
+server config field, CLI flag or environment setting. PostgreSQL instead uses
+locked database identity checks, independent of this cache. Atomic flow
+creation separately rejects existing IDs rather than collapsing onto them;
+that independent flow check does not make ordinary `add()` safe after eviction.
+
+Retain application-level idempotency keys for external effects, and reconcile
+accepted work before retrying a partially failed batch.
 
 :::note[Completed ids are reused, not returned]
-Idempotency collapses onto every unfinished generation, including a job that is
-currently active. Only after the previous job completes or fails does re-adding
-the same `jobId` start a fresh generation; bunqueue evicts the stale terminal
-record first. So an id such as `report-2026-06-17` is safe to reuse: it is
-idempotent during one run and starts cleanly after that run becomes terminal.
+With retained ownership, a re-add returns the unfinished generation, including
+an active job. After completion or DLQ, the same `jobId` may start a fresh
+generation and the stale terminal record is retired first. The memory/SQLite
+cache limit above can end duplicate suppression earlier; terminal reuse is not
+the only boundary. A reused ID is not permanent external-effect idempotency.
 :::
 
 ### With a TTL window
 
-The `deduplication` option dedupes within a time window instead of permanently. The `id` field is required:
+The `deduplication` option suppresses duplicates while the key is owned, for at
+most the TTL. The `id` field is required. Completion, terminal failure or removal
+can end suppression sooner. Memory/SQLite also release the key on retryable
+failure and recovery/move transitions; PostgreSQL retains it across a retry.
+TTL is not a minimum suppression period: use application-level deduplication
+when a full business time window is required.
 
 <Tabs syncKey="lang">
 <TabItem label="Bun">
 
 ```typescript
-// Same id within 1 hour = no new job. After the TTL, a new job is allowed.
+// Suppress this id while owned, for at most 1 hour; release can end it sooner.
 await queue.add('notification', { userId: '123' }, {
   deduplication: { id: 'notify-123', ttl: 3600000 }
 });
@@ -136,7 +163,7 @@ await queue.add('notification', { userId: '123' }, {
 <TabItem label="Node.js / Deno">
 
 ```typescript
-// Same id within 1 hour = no new job. After the TTL, a new job is allowed.
+// Suppress this id while owned, for at most 1 hour; release can end it sooner.
 await queue.add('notification', { userId: '123' }, {
   deduplication: { id: 'notify-123', ttl: 3600000 }
 });
@@ -146,7 +173,7 @@ await queue.add('notification', { userId: '123' }, {
 <TabItem label="Python">
 
 ```python
-# Same id within 1 hour = no new job. After the TTL, a new job is allowed.
+# Suppress this id while owned, for at most 1 hour; release can end it sooner.
 queue.add("notification", {"user_id": "123"},
           deduplication={"id": "notify-123", "ttl": 3600000})
 ```
@@ -155,7 +182,7 @@ queue.add("notification", {"user_id": "123"},
 <TabItem label="PHP">
 
 ```php
-// Same id within 1 hour = no new job. After the TTL, a new job is allowed.
+// Suppress this id while owned, for at most 1 hour; release can end it sooner.
 $queue->add('notification', ['userId' => '123'], [
     'deduplication' => ['id' => 'notify-123', 'ttl' => 3600000],
 ]);
@@ -165,7 +192,7 @@ $queue->add('notification', ['userId' => '123'], [
 <TabItem label="Go">
 
 ```go
-// Same id within 1 hour = no new job. After the TTL, a new job is allowed.
+// Suppress this id while owned, for at most 1 hour; release can end it sooner.
 queue.Add("notification", map[string]any{"userId": "123"}, bunqueue.JobOptions{
     "deduplication": map[string]any{"id": "notify-123", "ttl": 3600000},
 })
@@ -177,7 +204,7 @@ queue.Add("notification", map[string]any{"userId": "123"}, bunqueue.JobOptions{
 ```rust
 use bunqueue_client::{Deduplication, JobOptions};
 
-// Same id within 1 hour = no new job. After the TTL, a new job is allowed.
+// Suppress this id while owned, for at most 1 hour; release can end it sooner.
 queue.add("notification", data, JobOptions {
     deduplication: Some(Deduplication {
         id: "notify-123".into(),
@@ -192,7 +219,7 @@ queue.add("notification", data, JobOptions {
 <TabItem label="Elixir">
 
 ```elixir
-# Same id within 1 hour = no new job. After the TTL, a new job is allowed.
+# Suppress this id while owned, for at most 1 hour; release can end it sooner.
 {:ok, _job} =
   Bunqueue.Queue.add(queue, "notification", %{user_id: "123"},
     deduplication: %{id: "notify-123", ttl: 3_600_000}

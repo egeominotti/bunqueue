@@ -169,8 +169,9 @@ Move an active job back to the delayed state.
 
 A missing or non-finite `delay` fails the command (`delay is required`,
 `delay must be a finite number`, ...) and leaves the job unchanged. As in 2.9.10, a
-negative `delay` makes the job ready at once with a past run time (ahead of later ready
-jobs; a PostgreSQL broker uses "now", as on 2.9.10) and a very large one is applied (clamped at
+negative `delay` makes the job ready at once with a past run time (ahead of
+equal-priority FIFO jobs with later run times; priority and LIFO ordering still
+apply; a PostgreSQL broker uses "now", as on 2.9.10) and a very large one is applied (clamped at
 about 136,900 years).
 
 **Response:**

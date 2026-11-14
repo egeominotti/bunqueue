@@ -57,7 +57,8 @@ Create or update a cron/repeating job schedule.
 The spawned-job options are validated with the same rules and messages as
 [`PUSH`](/api/tcp/jobs/#push), so a cron cannot admit a job a `PUSH` would refuse, and
 every template 2.9.10 stored is still accepted: only what no job can run with fails
-(a NaN or non-numeric value, a negative `timeout` or `maxAttempts`, ...). Template
+(a NaN or non-numeric value, a negative `timeout` or `backoff.delay`, ...). A
+`maxAttempts` at or below one, including a negative number, runs the job once. Template
 fields are reported with a `jobOptions.` prefix (`jobOptions.timeout must be at least
 0`), `priority` and `dedup.ttl` without it, and a `repeatEvery` above
 4,320,000,000,000,000 ms fails with
