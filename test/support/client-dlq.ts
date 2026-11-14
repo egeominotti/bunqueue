@@ -1,10 +1,14 @@
 /** Shared helpers for the test/client-dlq-dedup-*.test.ts files. */
 import { Queue, Worker } from '../../src/client';
 
-/** Poll `predicate` every 10ms until it holds or `timeoutMs` passes; the assertions decide. */
+/** Poll real state; a missing fixture is an explicit failure, never an empty result. */
 export async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
-  while (!(await predicate()) && Date.now() < deadline) await Bun.sleep(10);
+  while (!(await predicate())) {
+    if (Date.now() >= deadline)
+      throw new Error(`DLQ fixture did not reach expected state within ${timeoutMs}ms`);
+    await Bun.sleep(10);
+  }
 }
 
 export const inDlq = (queue: Queue<Record<string, unknown>>, id: string) => () =>
@@ -35,8 +39,11 @@ export async function addAndFailJob(
   );
 
   // Wait for the job to exhaust attempts and land in DLQ
-  await waitFor(inDlq(queue, job.id));
-  await worker.close();
+  try {
+    await waitFor(inDlq(queue, job.id));
+  } finally {
+    await worker.close();
+  }
 
   return job.id;
 }

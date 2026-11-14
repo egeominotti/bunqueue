@@ -156,8 +156,37 @@ the job taken back (`waiting` or `delayed`, one attempt counted).
 `advanced-dlq-contract.ts` verifies configuration, complete failure history,
 filtering, deterministic pagination, statistics, selective/id retry,
 `maxEntries`, `maxAge`, purge, and an actual background auto-retry through its
-bounded terminal state. `timeout-contract.ts` separately fixes the public
-failure-reason semantics for timed-out jobs.
+bounded terminal state. Its capped fixture requires all three processor calls
+and exactly the two retained entries. Manual expiry/purge runs with default
+maintenance and closes its complete broker lifetime before
+`advanced-dlq-auto-retry-contract.ts` starts a separate broker with 100 ms
+maintenance. The exhausted entry and live worker are observed for a further
+650 ms to detect additional deliveries while retaining the exact failure history.
+
+`stall-detection-contract.ts` owns a broker with a 100 ms sweep while retaining
+the 200 ms stall policy and 50 ms grace period. Workers stay connected until
+stall recovery is observed, event IDs and queue counters are checked, and a
+one-second heartbeat-protected processor spans multiple configured sweeps.
+`maintenance-contract-support.ts` provides throwing observations and cleanup
+that attempts every resource and exposes every error. `timeout-contract.ts`
+separately fixes the public failure-reason semantics for timed-out jobs.
+
+## Workflow engine
+
+Both `test-workflow-engine.ts` wrappers execute the same 19 scenarios through
+`scripts/shared/workflow-contract.ts`. The support module owns fresh engines,
+unique queues, bounded state/event observation and cleanup; scenario modules
+separate basic graphs, control, recovery, operators and observers. TCP uses the
+runner's explicit broker port and embedded mode uses the real shared manager.
+The engines retain their default in-memory workflow store and concurrency of
+five; the five-execution fixture keeps its explicit concurrency of ten.
+
+Barriers prove simultaneous execution and keep the first step pending while an
+execution subscription is installed. Signal delivery waits for `waiting`,
+archive checks wait for every execution, and observers require the actual event
+set. The 200 ms step timeout, 1,000 ms signal timeout, retry attempts and compensation
+order remain behavioral assertions. A scenario passes only after cleanup also
+succeeds.
 
 ## Release gate
 

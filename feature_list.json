@@ -306,6 +306,16 @@
       "issue": null
     },
     {
+      "id": "test-quality-speedups",
+      "name": "Strengthen test oracles and remove redundant waits and cases",
+      "description": "Approved test-only audit: strengthen manual lease, rate/concurrency and DLQ pagination assertions; remove six equivalent cases and four method/listener existence checks; preserve all remaining scenarios while splitting touched legacy files; replace workflow observation sleeps; configure test-owned real DLQ/stall maintenance and deterministic cleanup. No runtime, SDK, dependency, CI or gate-runner changes.",
+      "dependencies": [],
+      "status": "in-progress",
+      "branch": "tests-quality-speedups",
+      "evidence": "PARTIAL 2026-11-14, base699b18a0. All four test-only tasks independently approved. Six equivalent cases removed,143 cases mechanically moved, three inherited client assertions strengthened; four existence checks removed and one rate-burst case added (net-9). Known lease/limit/pagination/log/event/force-close/state/concurrency/heartbeat/retry defects are detected; disposable mutants restored/hash-verified. Workflow19/DLQ16/stall9 checks per mode retained through loaded repeats; source/config/SDK/runner unchanged. Frozen tree f3c1bdf4746ea4d5e9a77e30b3a37582eda2d366 passed bun run test:sandbox: unit11907/0/403,431447assertions/1111files;TCP553/0(69suites);embedded349/0(43),all errors0/anomaliesnone,wall6.83min versus8.92baseline,TCP5.94versus8.91min,embedded1.58versus4.13min. PeakRAM/PIDs unit1.57GiB/218,TCP169.4MiB/62,embedded53.0MiB/42;425validsamples. Artifacts artifacts/test-sandbox/2026-11-14T04-05-50.533Z/ and artifacts/test-quality-speedups/final-sandbox-review.json. Same tree passed fresh nativeUbuntu24.04.5arm64 machine-gate.sh exit0: unit12038/0/403(+131SDKTypeScript),TCP553/0,embedded349/0,tinyfs9/0,type890+2149,format2359;4CPU/16GiB,Bun1.4.4+38afee6c8,all logs copied/Machine deleted. Manifest artifacts/machines/20261114T041303Z/manifest.md. Explicit script checks579files/format clean, startup179/0; task reports/structural/load/mutation receipts .superpowers/sdd/2026-11-14-test-quality-speedups/. Only prose/state updates after gates; post-gate readers, whole-branch skeptic and source PR CI/integration pending. Model suites passed in unit gates; separate model/SDK gates not triggered by this tests-only diff.",
+      "issue": null
+    },
+    {
       "id": "test-suite-pruning",
       "name": "Delete redundant and never-executed tests",
       "description": "Owner request: delete useless tests, each only after re-verifying that another test asserts the same behaviour through the same code path with equal or stronger assertions. Deletes the five fully commented-out SandboxedWorker files, test/bug-unregister-worker-field.test.ts, test/repro-delayed-error-zero-max-delay.test.ts and test/client-pipelining.test.ts (its 500-job id-uniqueness check moves to test/server-pipelining.test.ts), plus individual duplicate tests in the lock, cron, S3 backup, write-buffer, flow, ack, TLS and backoff files; replaces the no-op assertion of test/docs-dlq-guide/configuration.test.ts with the expiry it names. Records postgres-tests-never-run, sandboxed-worker-missing-cases and test-suite-speedups. No src/ change.",

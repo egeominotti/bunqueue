@@ -1,5 +1,8 @@
 import { Queue, Worker } from '../../src/client';
 import type { DlqEntry, FailureReason } from '../../src/client/types';
+import { CoreE2eHarness } from '../../test/core-e2e/support/harness';
+import { runAdvancedDlqAutoRetryContract } from './advanced-dlq-auto-retry-contract';
+import { cleanupAll, eventually } from './maintenance-contract-support';
 
 type Mode = 'embedded' | 'tcp';
 type Payload = { value: number };
@@ -11,27 +14,11 @@ interface ContractResult {
 
 const FAILURE_REASON = 'max_attempts_exceeded' as FailureReason;
 
-async function eventually<T>(
-  read: () => T | Promise<T>,
-  accept: (value: T) => boolean,
-  timeoutMs = 10_000
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  let value = await read();
-  while (!accept(value) && Date.now() < deadline) {
-    await Bun.sleep(25);
-    value = await read();
-  }
-  return value;
-}
-
 export async function runAdvancedDlqContract(mode: Mode): Promise<ContractResult> {
-  const tcpPort = Number.parseInt(process.env.TCP_PORT ?? '16789', 10);
+  const harness = await CoreE2eHarness.start(mode, 'advanced-dlq-manual');
   const queueName = `advanced-dlq-${mode}-${crypto.randomUUID()}`;
   const queue = new Queue<Payload>(queueName, {
-    ...(mode === 'embedded'
-      ? { embedded: true }
-      : { connection: { hostname: '127.0.0.1', port: tcpPort } }),
+    ...harness.queueOptions(),
     defaultJobOptions: { attempts: 1, backoff: 0 },
   });
   let passed = 0;
@@ -60,7 +47,9 @@ export async function runAdvancedDlqContract(mode: Mode): Promise<ContractResult
 
   const failJobs = async (
     values: number[],
-    attempts = 1
+    attempts = 1,
+    expectedEntries = values.length,
+    retainedValues?: number[]
   ): Promise<{ processed: number; entries: DlqEntry<Payload>[] }> => {
     for (const value of values) {
       await queue.add('fail', { value }, { attempts, backoff: 0 });
@@ -73,22 +62,27 @@ export async function runAdvancedDlqContract(mode: Mode): Promise<ContractResult
         processed++;
         throw new Error(`failure-${processed}`);
       },
-      mode === 'embedded'
-        ? { embedded: true, concurrency: 1 }
-        : { connection: { hostname: '127.0.0.1', port: tcpPort }, concurrency: 1 }
+      harness.workerOptions({ concurrency: 1 })
     );
     worker.on('error', () => undefined);
 
-    await eventually(
-      () => processed,
-      (count) => count === values.length * attempts
-    );
-    const entries = await eventually(
-      () => queue.getDlqAsync(),
-      (current) => current.length === values.length
-    );
-    await worker.close();
-    return { processed, entries };
+    try {
+      await worker.waitUntilReady();
+      await eventually(
+        () => processed,
+        (count) => count === values.length * attempts
+      );
+      const entries = await eventually(
+        () => queue.getDlqAsync(),
+        (current) =>
+          current.length === expectedEntries &&
+          (retainedValues === undefined ||
+            current.map((entry) => entry.job.data.value).join(',') === retainedValues.join(','))
+      );
+      return { processed, entries };
+    } finally {
+      await worker.close(true);
+    }
   };
 
   console.log(`=== Advanced DLQ contract (${mode}) ===\n`);
@@ -153,9 +147,10 @@ export async function runAdvancedDlqContract(mode: Mode): Promise<ContractResult
     console.log('\n4. maxEntries evicts the oldest terminal jobs...');
     await clean();
     await queue.setDlqConfigAsync({ maxEntries: 2 });
-    const bounded = await failJobs([31, 32, 33]);
+    const bounded = await failJobs([31, 32, 33], 1, 2, [32, 33]);
     check(
-      bounded.entries.length === 2 &&
+      bounded.processed === 3 &&
+        bounded.entries.length === 2 &&
         bounded.entries.map((entry) => entry.job.data.value).join(',') === '32,33',
       'maxEntries keeps only the two newest entries',
       bounded.entries.map((entry) => entry.job.data.value).join(',')
@@ -174,62 +169,24 @@ export async function runAdvancedDlqContract(mode: Mode): Promise<ContractResult
     const purged = await queue.purgeDlqAsync();
     check(purged === 2, 'purge returns the exact number removed', String(purged));
     check((await queue.getDlqAsync()).length === 0, 'purge leaves the DLQ empty');
-
-    console.log('\n6. The background task performs one bounded automatic retry...');
-    await clean();
-    await queue.setDlqConfigAsync({
-      autoRetry: true,
-      autoRetryInterval: 1,
-      maxAutoRetries: 1,
-      maxAge: null,
-    });
-    await queue.add('auto-retry', { value: 51 }, { attempts: 1, backoff: 0 });
-    let processingAttempts = 0;
-    const autoRetryWorker = new Worker<Payload>(
-      queueName,
-      () => {
-        processingAttempts++;
-        throw new Error(`automatic-failure-${processingAttempts}`);
-      },
-      mode === 'embedded'
-        ? { embedded: true, concurrency: 1 }
-        : { connection: { hostname: '127.0.0.1', port: tcpPort }, concurrency: 1 }
-    );
-    autoRetryWorker.on('error', () => undefined);
-    const automatic = await eventually(
-      async () => ({ processingAttempts, entries: await queue.getDlqAsync() }),
-      (current) =>
-        current.processingAttempts === 2 &&
-        current.entries.length === 1 &&
-        current.entries[0]?.retryCount === 1,
-      75_000
-    );
-    await autoRetryWorker.close();
-    check(
-      automatic.processingAttempts === 2,
-      'the maintenance loop redelivers the terminal job exactly once',
-      String(automatic.processingAttempts)
-    );
-    check(
-      automatic.entries.length === 1 &&
-        automatic.entries[0]?.retryCount === 1 &&
-        automatic.entries[0]?.nextRetryAt === null &&
-        automatic.entries[0]?.attempts.map((attempt) => attempt.error).join(',') ===
-          'automatic-failure-1,automatic-failure-2',
-      'the exhausted automatic retry retains its full history and stops',
-      JSON.stringify(automatic.entries[0])
-    );
   } catch (error) {
     console.error('   [FAIL] unexpected contract error:', error);
     failed++;
   } finally {
     try {
-      await queue.obliterateAsync();
-      await queue.close();
+      await cleanupAll([() => queue.obliterateAsync(), () => queue.close(), () => harness.close()]);
     } catch (error) {
       console.error('   [FAIL] cleanup error:', error);
       failed++;
     }
+  }
+
+  // Starting another harness shuts shared managers/pools down: close the entire
+  // normal-maintenance lifetime before starting the accelerated retry broker.
+  if (failed === 0) {
+    const automatic = await runAdvancedDlqAutoRetryContract(mode);
+    passed += automatic.passed;
+    failed += automatic.failed;
   }
 
   console.log(`\n=== Summary ===\nPassed: ${passed}\nFailed: ${failed}`);

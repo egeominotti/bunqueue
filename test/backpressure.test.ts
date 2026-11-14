@@ -6,6 +6,7 @@
 
 import { describe, test, expect, afterEach } from 'bun:test';
 import { Queue, Worker, shutdownManager } from '../src/client';
+import { processorBarrier, waitForState } from './support/backpressure';
 
 describe('Backpressure - Embedded', () => {
   afterEach(() => {
@@ -58,145 +59,42 @@ describe('Backpressure - Embedded', () => {
   test('remove concurrency restores throughput', async () => {
     const queue = new Queue<{ idx: number }>('bp-conc-remove', { embedded: true });
     queue.obliterate();
-
     queue.setGlobalConcurrency(1);
-
-    let completed = 0;
-    const completionTimestamps: number[] = [];
-
+    const barrier = processorBarrier();
+    let started = 0;
     const worker = new Worker<{ idx: number }>(
-      'bp-conc-remove',
+      queue.name,
       async () => {
-        await Bun.sleep(100);
-        completed++;
-        completionTimestamps.push(Date.now());
+        started++;
+        await barrier.promise;
         return {};
       },
       { embedded: true, concurrency: 5 }
     );
-
-    for (let i = 0; i < 5; i++) {
-      await queue.add('task', { idx: i });
-    }
-
-    // Wait for first 2 to complete under concurrency=1
-    for (let i = 0; i < 40; i++) {
-      if (completed >= 2) break;
+    try {
+      await queue.addBulk(Array.from({ length: 5 }, (_, idx) => ({ name: 'task', data: { idx } })));
+      await waitForState(() => started >= 1, 'the first constrained processor');
+      // Keep the first processor active while peers attempt to pull.
       await Bun.sleep(100);
+      expect(started).toBe(1);
+      expect(await queue.getJobCounts()).toMatchObject({ active: 1, waiting: 4 });
+      queue.removeGlobalConcurrency();
+      await waitForState(() => started === 5, 'five simultaneous processors after removal');
+      expect(await queue.getJobCounts()).toMatchObject({ active: 5, waiting: 0, completed: 0 });
+      barrier.release();
+      await waitForState(
+        async () => (await queue.getJobCounts()).completed === 5,
+        'all completions'
+      );
+    } finally {
+      barrier.release();
+      try {
+        await worker.close();
+      } finally {
+        queue.close();
+      }
     }
-
-    const timeForFirst2 = completionTimestamps[1] - completionTimestamps[0];
-
-    // Remove the limit so remaining jobs can run concurrently
-    queue.removeGlobalConcurrency();
-
-    // Wait for all to complete
-    for (let i = 0; i < 60; i++) {
-      if (completed >= 5) break;
-      await Bun.sleep(100);
-    }
-
-    expect(completed).toBe(5);
-    // With concurrency=1, first 2 jobs should be sequential (~100ms apart)
-    expect(timeForFirst2).toBeGreaterThanOrEqual(80);
-
-    queue.removeGlobalConcurrency();
-    queue.removeGlobalRateLimit();
-    await worker.close();
-    queue.close();
-  }, 30000);
-
-  test('rate limit throttles processing', async () => {
-    const queue = new Queue<{ idx: number }>('bp-rate-limit', { embedded: true });
-    queue.obliterate();
-
-    queue.setGlobalRateLimit(3);
-
-    let completed = 0;
-    const completionTimestamps: number[] = [];
-
-    const worker = new Worker<{ idx: number }>(
-      'bp-rate-limit',
-      async () => {
-        completed++;
-        completionTimestamps.push(Date.now());
-        return {};
-      },
-      { embedded: true, concurrency: 10 }
-    );
-
-    for (let i = 0; i < 10; i++) {
-      await queue.add('task', { idx: i });
-    }
-
-    // Wait for jobs to process (rate limited)
-    for (let i = 0; i < 80; i++) {
-      if (completed >= 10) break;
-      await Bun.sleep(100);
-    }
-
-    // With rate limit of 3, not all 10 jobs should complete instantly
-    // Verify there is some throttling: total duration > 0
-    if (completionTimestamps.length >= 5) {
-      const duration =
-        completionTimestamps[completionTimestamps.length - 1] - completionTimestamps[0];
-      // Rate limiting should cause some spread in completion times
-      expect(duration).toBeGreaterThan(0);
-    }
-    expect(completed).toBeGreaterThanOrEqual(5);
-
-    queue.removeGlobalConcurrency();
-    queue.removeGlobalRateLimit();
-    await worker.close();
-    queue.close();
-  }, 30000);
-
-  test('remove rate limit restores speed', async () => {
-    const queue = new Queue<{ idx: number }>('bp-rate-remove', { embedded: true });
-    queue.obliterate();
-
-    queue.setGlobalRateLimit(1);
-
-    let completed = 0;
-
-    const worker = new Worker<{ idx: number }>(
-      'bp-rate-remove',
-      async () => {
-        completed++;
-        return {};
-      },
-      { embedded: true, concurrency: 5 }
-    );
-
-    for (let i = 0; i < 5; i++) {
-      await queue.add('task', { idx: i });
-    }
-
-    // Wait for first 2 to complete under rate limit=1
-    for (let i = 0; i < 40; i++) {
-      if (completed >= 2) break;
-      await Bun.sleep(100);
-    }
-
-    const completedBeforeRemove = completed;
-
-    // Remove rate limit
-    queue.removeGlobalRateLimit();
-
-    // Wait for all to complete
-    for (let i = 0; i < 60; i++) {
-      if (completed >= 5) break;
-      await Bun.sleep(100);
-    }
-
-    expect(completedBeforeRemove).toBeGreaterThanOrEqual(1);
-    expect(completed).toBe(5);
-
-    queue.removeGlobalConcurrency();
-    queue.removeGlobalRateLimit();
-    await worker.close();
-    queue.close();
-  }, 30000);
+  }, 10000);
 
   test('concurrency + worker concurrency interaction', async () => {
     const queue = new Queue<{ idx: number }>('bp-conc-worker', { embedded: true });

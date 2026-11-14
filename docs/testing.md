@@ -212,6 +212,69 @@ Run benchmarks only on native macOS, never in an OrbStack Machine or container.
   Docker Compose is only for functional tests requiring external services and
   must use a unique project name and disposable volumes.
 
+### Behavioral test oracles and controlled observation
+
+Removing a case needs a coverage map: the surviving test must use the same
+runtime, storage configuration, inputs and equal or stronger assertions.
+Similar names, embedded/TCP variants and persistence/memory variants alone are
+not evidence of duplication. Preserve every other case and its fixture when
+splitting a large test file.
+
+Fixtures must fail when their expected state never appears. Require known job
+IDs and exact result/page counts before checking filters or offsets; conditional
+assertions over an empty fixture and a polling helper that silently expires can
+both hide broken behavior. Locks require the actual ownership token and real
+lease effects; limits require observed admissions/active counts and successful
+removal, rather than method existence or positive elapsed time.
+Logging checks observe stored messages and the exact job's completion. Event
+checks install listeners and await readiness before enqueueing, then require the
+emitted job ID. Forced-close checks hold a started processor behind a barrier
+and require closure before release, with bounded failure and finally cleanup.
+
+Separate an observation window from the behavior being timed. A test can use a
+long explicit token-bucket window to observe its exact initial burst with ample
+scheduler margin, then verify the default refill from recorded admissions. Do
+not make a correct limiter fail because the observer missed a subsecond window.
+Barriers must release in finally, including on assertion failure.
+
+Fast broker sweeps are test configuration, not a change to shipped defaults.
+Keep manual expiry/purge assertions on a broker where automatic maintenance
+cannot consume the expected entries first; close it before starting a separate
+fast retry broker. A shorter heartbeat processor must still span several real
+stall confirmation opportunities. Keep stalled workers connected until recovery
+is observed, so disconnect recovery cannot substitute for stall detection.
+
+Use bounded execution-state/event waits for workflow progress. Wait for signal
+readiness, all executions before archive and all required events before event
+assertions; completion alone does not order event delivery. Retain real timeout,
+retry/backoff, maximum-long-poll and outage-duration contracts. Surface cleanup
+failures and close every owned resource even when observation fails.
+
+The 2026-11-14 test-only audit preserved all 19 workflow, 16 DLQ and 9 stall
+checks in each mode. Six equivalent cases and four existence/listener checks
+were removed, one distinct rate-burst case was added, and the retained legacy
+cases were inventoried before splitting. Controlled defects verify lease,
+limit, pagination, log, event, force-close, concurrency, heartbeat and retry
+oracles. Runtime sources, SDKs, runner defaults and real long-poll/outage
+contracts were unchanged.
+
+Equivalent full parallel sandbox runs with Bun 1.4.4 measured:
+
+| Suite | Before | After | Passing cases after |
+| --- | --- | --- | --- |
+| Unit/model | 6.89 min | 6.83 min | 11,907 (403 skipped) |
+| TCP | 8.91 min | 5.94 min | 553 |
+| Embedded | 4.13 min | 1.58 min | 349 |
+
+Overall wall time changed from 8.92 to 6.83 minutes. All three suites reported
+zero errors and no resource anomalies; timing is a single paired observation,
+not a performance guarantee. Reports are under
+`artifacts/test-sandbox/2026-11-13T22-49-51.544Z/` and
+`artifacts/test-sandbox/2026-11-14T04-05-50.533Z/`. A fresh native Ubuntu 24.04
+Machine independently passed all product suites, source/test type checks,
+formatting and nine tinyfs cases; its manifest is
+`artifacts/machines/20261114T041303Z/manifest.md`.
+
 ## Validation layers
 
 `bun run typecheck` covers all of `src`, including `src/mcp`, and the test tree

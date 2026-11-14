@@ -214,6 +214,26 @@ head:
 
 ### Testing
 
+- Test assertions now observe real lease ownership and renewal, rate-limit
+  admission/refill, concurrency-policy removal, exact DLQ pagination, stored job
+  logs, waiting-event IDs and forced closure with a running processor. Fixture
+  deadlines fail explicitly. Six equivalent cases and four method/listener
+  existence checks are removed; the remaining acknowledgement, job-management,
+  CLI and client scenarios are split into focused modules. Controlled defects
+  verify that the stronger assertions detect the behavior they claim.
+- The TCP and embedded workflow suites share all 19 scenarios and observe
+  execution states and event delivery instead of fixed sleeps. Barriers prove
+  concurrency and subscription readiness, cleanup failures fail the scenario,
+  and real step/signal timeouts, retry attempts and compensation order are kept.
+- DLQ and stall contracts use fast maintenance only in their own disposable
+  brokers. Manual expiry/purge keeps its normal broker lifetime, capped DLQ
+  fixtures wait for the exact retained entries, and automatic retries are
+  observed after exhaustion. Fast stall sweeps make the heartbeat case detect
+  missing heartbeats while retaining every original check in both modes.
+  The full parallel sandbox measured 6.83 minutes versus 8.92 previously, with
+  TCP at 5.94 versus 8.91 minutes and embedded at 1.58 versus 4.13 minutes;
+  every suite passed, and a fresh native Ubuntu gate independently passed.
+
 - The CPU-intensive workers guide test "a non-yielding handler starves
   heartbeats and gets recovered" now observes the recovery it claims
   (`cpu-intensive-blocking-test-flake`). Its handler busy-looped 3 s in the

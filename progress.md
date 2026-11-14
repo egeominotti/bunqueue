@@ -20,7 +20,8 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 - `harness-audit-hardening`, `postgres-runner-guard-destructuring` and
   `machine-gate-interrupt-log-gaps`: integrated in `9b69dcba` + `45790ac7`;
   full sandbox, fresh Ubuntu and source CI run `43526774536` GREEN. Final
-  record-only commit and authorized merge/main verification remain below.
+  record commit `a1aff9db` passed PR CI; PR #190 squash merged as `699b18a0`,
+  main CI `43529801350` GREEN and original main checkout aligned.
 - `issue-189-tls-reload`: `SIGHUP` reloads the TLS certificate without a restart;
   commit `da289219` on `main`, sandbox green, skeptic `PASS`.
 - `agent-harness`: `CLAUDE.md`/`AGENTS.md` routing pages, `docs/agents/`, the state
@@ -54,16 +55,23 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
+- `test-quality-speedups` on `tests-quality-speedups`: the user approved the
+  full test-only audit. Strengthen assertions, remove ten redundant/vacuous
+  cases, preserve remaining coverage through concern-sized modules and shorten
+  real workflow/DLQ/stall test waits. Implementation and independent task
+  reviews are complete; full sandbox and fresh Ubuntu are green. Whole-branch
+  review and source PR CI/integration remain. No production or runner changes.
+
 The three audit implementations are done, backed by green source CI. Their
-original staged worktrees remain preserved. Final integration steps are below;
+original staged worktrees remain preserved. Their integration is complete;
 other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Commit/push the final record-only closure after reader checks and skeptic,
-   watch its PR CI, then normally squash merge PR #190 (linear main history),
-   watch main CI and fast-forward the original clean main checkout. All are
-   explicitly authorized; no release/version bump or publication authorized.
+1. Close `docs/superpowers/plans/2026-11-14-test-quality-speedups.md`: prove the
+   final prose/state delta, obtain whole-branch skeptic PASS, then follow the
+   authorized commit/push/PR CI/merge workflow. No runtime changes, version bump
+   or publication.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -122,6 +130,35 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — test quality and duration audit implementation
+
+- User request: analyze deletable/improvable tests only, then explicitly approved
+  implementing every finding.
+  Approved scope: six equivalent cases, four vacuous existence/listener cases,
+  stronger manual lock/rate/concurrency/DLQ assertions, workflow observation
+  waits and fast test-owned DLQ/stall sweeps with deterministic cleanup.
+- Branch `tests-quality-speedups`, base `699b18a0`; reusing the existing managed
+  worktree. Original main and all previous worktrees remain preserved. Prior
+  explicit commit/push/merge workflow and egeominotti preference remain in force;
+  no version/release/publication authorization.
+- Plan/design: `docs/superpowers/plans/2026-11-14-test-quality-speedups.md` and
+  `docs/superpowers/specs/2026-11-14-test-quality-design.md`. Baseline init green;
+  assertion and consolidation tasks independently approved. Linux focused runs
+  pass 65 and 382 cases; exact inventory proves six deletions and 143 moves,
+  with three inherited client assertions strengthened separately. Workflow
+  extraction is approved: all 19 scenarios per mode pass three loaded repeats,
+  and missing-state/event/parallelism defects are rejected. Targeted workflow
+  times changed from 104.142 to 5.759 s TCP and 74.705 to 6.546 s embedded.
+  DLQ/stall work is also approved: all 25 checks per mode remain, 150 loaded
+  passes plus 25 explicit TCP checks pass, and missing heartbeats/exhausted-retry
+  bypasses are detected. DLQ measured about 60 to 1.4 s; stall about 29 to 3–5 s.
+  Runtime mutants are restored and hash-verified. Frozen tree `f3c1bdf4`
+  passed the full sandbox: unit11907/0/403, TCP553/0, embedded349/0, no anomalies,
+  6.83 min versus 8.92 baseline. Fresh Ubuntu `20261114T041303Z` passed the same
+  tree: unit12038/0/403, TCP553/0, embedded349/0, tinyfs9/0, type890+2149 and
+  format2359; logs copied and Machine deleted. Final prose/state proof,
+  whole-branch skeptic and PR CI/integration are pending.
 
 ### 2026-11-14 — cancellation startup fix validated
 
