@@ -236,15 +236,6 @@ head:
 - Record the completed test-quality work item with its isolated gate totals,
   controlled-defect and case-preservation proofs, skeptic approvals and green
   source PR CI evidence. The final record changes documentation and state only.
-- Track an intermittent PostgreSQL 17 public-worker processing-count failure
-  observed during PR validation. Its single failed-job rerun passed; a separate
-  reproduce-first work item retains the assertion and records the evidence
-  without claiming a cause or a fix.
-- Track a separate intermittent legacy chaos-accounting test failure in unit
-  CI. Its partial count omits delayed work, but the missing state/operation
-  trace leaves the observed cause unproved. The single unit-job rerun passed;
-  a reproduce-first follow-up preserves the oracle and requires full job
-  conservation rather than a relaxed threshold.
 
 - The CPU-intensive workers guide test "a non-yielding handler starves
   heartbeats and gets recovered" now observes the recovery it claims
@@ -529,6 +520,22 @@ head:
   devDependency (its example was deleted in January 2026).
 
 ### Bug fixes
+
+- Fix the legacy chaos test's incomplete job accounting. Delayed retries were
+  omitted and an empty pull ended the drain before retries became due, so a
+  valid 49-completed/51-delayed population failed a half-count threshold.
+  Seeded concurrent operations now check every original ID, exclusive state
+  membership and all counters exactly; regressions cover the delayed partition,
+  a missing retained job and a retry deadline crossing between state reads.
+  Split the race suites into smaller files with individually owned temporary
+  SQLite directories.
+- Fix the PostgreSQL public Worker test's absolute invocation-count assertion:
+  a rolled-back Progress command can legitimately trigger the default job retry.
+  A real SQL row-lock regression now proves that path. Tests require distinct
+  tokens, sequential attempts, matching applied failures and durable history,
+  nonoverlapping processing and exactly one committed completion with the right
+  result. Unexplained repeats still fail with per-attempt diagnostics. This
+  corrects the oracle; the original intermittent CI cause remains unclassified.
 
 - **Harness command cancellation covers child startup.** A command can start
   before `spawn()` returns. SIGTERM in that window previously terminated the

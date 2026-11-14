@@ -33,6 +33,16 @@
       "issue": null
     },
     {
+      "id": "ci-delivery-accounting-fixes",
+      "name": "Resolve PostgreSQL delivery and chaos accounting CI anomalies",
+      "description": "Investigate and resolve postgres-public-api-processing-flake and race-chaos-accounting-flake with isolated deterministic reproductions, complete job-state evidence and regression coverage. Preserve processing exclusivity and full conservation assertions; distinguish fixture defects from engine defects before changing behavior.",
+      "dependencies": [],
+      "status": "in-progress",
+      "branch": "fix-ci-delivery-accounting",
+      "evidence": "PARTIAL 2026-11-14, base42225c31, branchfix-ci-delivery-accounting; code implemented, exact-head CI pending. Real SQLite RED with original default backoff/waits/drain: all100IDs49completed+51delayed, old>=50 fails49; strict conservation GREEN. Read-clock boundary RED expected1got0, fixed by independent retry deadlines; missing-job mutation rejected. All18original race paths/options retained,17other bodies token-identical; final native family21/0/564, focused Linux17/0/559. Real PG17 row-lock RED proves applied Progress-failure retry token0/attempt0 -> newtoken/attempt1, result14/log1, durablefailed1/completed1, then oldonce1fails2. Strict checker21cases (19negative/2positive). FINAL owned-Linux PG16.16/17.12/18.7 each571pass/0fail/1opt-insoakskip,572tests126files. Artifacts artifacts/ci-delivery-accounting/. Historical CI43559077874 cause remains unclassified; no runtime/lease/SDK changes. Full bun run test:sandbox PASS on treee2c50d5737b2dff3d2efc2c4ad3e96318cb54a4a: unit11931/0/404,TCP553/0(69suites),embedded349/0(43),0errors/anomalies/OOM,423validsamples,6.79min; artifacts/test-sandbox/2026-11-14T10-45-13.122Z/. Fresh native Ubuntu24.04.5arm64 Machine gate PASS same tree: Bun1.4.4+38afee6c8,4CPU/16GiB,unit12062/0/404,TCP553/0,embedded349/0,tinyfs9/0,type890+2163/format2373,15m40s,matching snapshot/logs copied/Machine deleted; artifacts/machines/20261114T104513Z/manifest.md. ./init.sh green11s. Model/SDK standalone gates not triggered (tests/docs/state only; model runs inside unit gate). Complete21-file skeptic review found no blocking code issue; final evidence-delta approval/commit/push/CI remain pending.",
+      "issue": null
+    },
+    {
       "id": "ci-python39-runner-pin",
       "name": "Drop Python 3.9 from the Python SDK and remove the runner pin",
       "description": "The SDK workflow's Python 3.9 job ran on ubuntu-24.04 because ubuntu-latest (Ubuntu 26.04) has no setup-python 3.9 build. Python 3.9 has been end-of-life since October 2025 and the ubuntu-24.04 image will be retired. The user decided to drop Python 3.9: requires-python becomes >=3.10 in sdk/python/pyproject.toml (a breaking change the next Python SDK release must carry; the SDK version is not bumped here), the matrix tests Python 3.10 and 3.13 on ubuntu-latest, the python_version markers of the test and mutation extras go, and test/sdk-python-matrix.test.ts replaces test/repro-ci-python39-runner.test.ts.",
