@@ -17,6 +17,14 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Done
 
+- `docs-audit-polish`: source implementation `c9f0d0c0`, tree `4a58acc2`,
+  [PR #193](https://github.com/egeominotti/bunqueue/pull/193). Separate source
+  pre-commit/pre-push skeptic PASS; exact-head CI43597962861 attempt1 GREEN,
+  26 successful jobs and nine expected release skips. Unit 12,066/0/400,
+  TCP 553/553, embedded 349/349, PostgreSQL 16/17/18.6 each 571/0/1; all SDK,
+  type, format and docs jobs passed. Native Ubuntu and documentation validation
+  receipts are in the work item. Runtime cache-eviction effects remain a
+  separate reproduce-first investigation; this change corrects documentation.
 - `ci-delivery-accounting-fixes`, `postgres-public-api-processing-flake` and
   `race-chaos-accounting-flake`: implementation `bca26a94`, strict retry/durable
   completion histories and exact all-state/ID conservation, all18 original race
@@ -71,11 +79,6 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's In Progress
 
-- `docs-audit-polish`, branch `docs-audit-polish`, base main7901c130: audit
-  current guides, public API/SDK examples, internal references, generated site
-  links/discovery and desktop/mobile rendering; fix demonstrated documentation
-  drift under the existing user authorization and repository validation rules.
-
 The delivery/accounting implementation and PR #192 integration are complete;
 main CI43590920538 is GREEN on `7901c130`.
 
@@ -85,9 +88,8 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Finish `docs-audit-polish`: source-qualified corrections, final site build,
-   isolated validation, skeptic review and authorized integration with exact-head
-   CI. No version/publication action.
+1. `custom-id-cache-eviction-live-reuse`: reproduce the exact memory/SQLite
+   outcomes after ownership-cache eviction before proposing a runtime fix.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -154,6 +156,30 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — documentation audit validated in source CI
+
+- Source `c9f0d0c05eadf27c5c7d8bb752fd394e8a37d1b7`, tree `4a58acc2`,
+  is committed and pushed as egeominotti on `docs-audit-polish`;
+  [PR #193](https://github.com/egeominotti/bunqueue/pull/193) targets main.
+  Separate mandatory pre-commit and pre-push skeptic verdicts are PASS.
+- [CI43597962861](https://github.com/egeominotti/bunqueue/actions/runs/43597962861)
+  attempt1 GREEN, watcher exit0: 26 successful jobs, nine expected release skips.
+  Unit 12,066/0/400, 1,136 files, 475.58 s; TCP 69/69 suites and 553/553;
+  embedded 43/43 and 349/349; PostgreSQL 16, 17 and 18.6 each 571/0/1
+  (opt-in soak skip). Every SDK, public API, WebSocket/SSE, type, format and docs
+  job passed. Automated review43597962850 succeeded without findings.
+- Current closure edits only the changelog and work-state records. Local native
+  Ubuntu, docs build/crawl, 422 diagnostic readers and 28 final state readers,
+  type/format, discovery/data/release checks and browser evidence are retained
+  in `feature_list.json` and `artifacts/docs-audit/`. No new code or SDK gate is
+  triggered by this editorial closure. Its exact-head CI and authorized main
+  integration are the remaining workflow steps at this checkpoint.
+- The source-confirmed ordinary memory/SQLite custom-ID cache limitation is
+  documented and tracked in `custom-id-cache-eviction-live-reuse`. Exact runtime
+  manifestations and a repair require reproduction first; no engine fix is
+  claimed. User commit/push/merge authorization remains valid, with egeominotti
+  identity; no version/publication action. Preserve user worktrees and files.
 
 ### 2026-11-14 — documentation contracts audited and corrected
 

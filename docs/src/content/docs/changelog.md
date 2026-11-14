@@ -455,6 +455,10 @@ head:
 
 ### Documentation
 
+- Record the completed documentation audit with its green source CI, isolated
+  Linux validation, rendered-link checks and review evidence. Keep live custom-ID
+  reuse after cache eviction as a separate reproduce-first runtime work item.
+
 - Correct current guides, protocol and agent references against the implementation:
   use authoritative async methods for TCP DLQ and cleanup operations, distinguish
   accepted-prefix bulk admission from atomic flow creation, and describe actual
