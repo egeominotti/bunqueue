@@ -222,6 +222,15 @@
       "issue": null
     },
     {
+      "id": "postgres-public-api-processing-flake",
+      "name": "Reproduce intermittent PostgreSQL 17 public-worker processing counts",
+      "description": "Reproduce first: test/postgres-public-api-queue-worker.test.ts, shares Queue, Worker, QueueEvents, progress, results, and logs across four brokers, failed at line77 in PostgreSQL 17.x Integration Tests of PR191 CI run43559077874 attempt1 on dd147ccf (548pass/1fail/1skip). All24 completed/event IDs and executions.size24 passed, but every processor count===1 was false (10.928s); the same case passed494.55ms in source run43557827964 and passed the single failed-job rerun in attempt2. Runtime and test files were unchanged by dd147ccf. Preserve the assertion. Repeat on a fresh isolated PostgreSQL17 four-broker fixture under controlled load, recording affected IDs, processor counts, failed/stalled reasons, attempts, lock tokens, lease deadlines and timestamps. The processor increments before awaiting progress/log commands and default3attempts permit ordinary retries, so repeated invocation alone does not prove concurrent delivery. Distinguish a legitimate failure/recovery retry, a fixture assumption and an engine divergence before changing tests or runtime; never use the user's existing database or weaken the invariant.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "2026-11-14, observation only, not fixed. CI43559077874 attempt1 job132338509583 failed; exactly one gh run rerun --failed, attempt2 job132340799679 passed; ci-watch.sh --run43559077874 exit3FLAKY,26validation jobs successful/9release skips. https://github.com/egeominotti/bunqueue/actions/runs/43559077874 . Raw failure/rerun summaries and watch logs artifacts/tests-quality-closure-ci-*.log/json; prior source PG17 log artifacts/tests-quality-source-ci-pg17.log. Read-only contract analysis .superpowers/sdd/2026-11-14-test-quality-speedups/pg17-delivery-ci-analysis.md; cause unproved, no assertion/runtime change.",
+      "issue": null
+    },
+    {
       "id": "postgres-runner-guard-destructuring",
       "name": "Make the PostgreSQL runner-coverage guard see destructured env reads",
       "description": "test/postgres-runner-coverage.test.ts finds files that read BUNQUEUE_TEST_POSTGRES_URL by matching process.env.BUNQUEUE_TEST_POSTGRES_URL / process.env['...'] text, so a file that destructures it (const { BUNQUEUE_TEST_POSTGRES_URL } = process.env) or reads it through a helper would again be skipped by every runner without the guard failing. Widen the detection (any mention of the variable name in a test file) and prove it on a mutant file.",
@@ -256,6 +265,15 @@
       "dependencies": [],
       "status": "not-started",
       "evidence": "",
+      "issue": null
+    },
+    {
+      "id": "race-chaos-accounting-flake",
+      "name": "Reproduce the legacy random chaos accounting failure",
+      "description": "Reproduce first: test/race-conditions.test.ts:606, Race Condition Tests > Mixed Concurrent Operations Stress Test > should maintain job count invariant under chaos, failed in Unit Tests job132344370497 of PR191 CI43560970951 attempt1 on1037ddd3: expected completed+dlq+active>=50, received49 (407.27ms). The unchanged code passed its single unit-job rerun in attempt2. It pushes100jobs with maxAttempts10, uses200unseeded Math.random pull/ack/fail operations, sleeps100ms and stops draining at the first empty200ms pull. Waiting excludes delayed and fail schedules retries1–3seconds later; a valid49counted+51delayed snapshot conserves100jobs but fails this predicate. CI did not print the state vector or IDs, so that explanation is not a proven cause and loss is not established. Preserve the failing assertion while diagnosing. Use a fresh isolated SQLite path, a recorded seed/operation trace and all100IDs; reproduce the valid-state counterexample, then distinguish omitted delayed work from an engine divergence. Any test fix must assert complete state and per-ID conservation instead of lowering the threshold, swallowing errors or using another arbitrary sleep.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": "2026-11-14, observation only, not fixed. CI43560970951 attempt1 unit12041pass/1fail/399skip,488679assertions1127files479.59s; exactly one gh run rerun --failed, attempt2GREEN, ci-watch.sh exit3FLAKY. https://github.com/egeominotti/bunqueue/actions/runs/43560970951 . All other product/PG16-18/SDK/type/docs/format jobs passed; this commit changed metadata only and the test was untouched. Raw artifacts/tests-quality-final-pr-ci-unit-{failure.log,attempt1-summary.json,attempt2-summary.json,rerun-watch.log}; read-only .superpowers/sdd/2026-11-14-test-quality-speedups/chaos-accounting-ci-analysis.md confirms omitted-state possibility, not the actual CI cause.",
       "issue": null
     },
     {
@@ -303,6 +321,15 @@
       "dependencies": [],
       "status": "done",
       "evidence": "2026-11-13, base 2f1ad824; lands in the commit that adds this entry. bun run test:sandbox green on tree df2e5338 (unit 11773 pass / 0 fail / 403 skip, tcp 553/0, embedded 349/0; artifacts/test-sandbox/2026-11-13T16-33-38.140Z/), the only change after it being this state update; skeptic CONDITIONAL only on this gate (AST comparison: every test once, identical bodies, hooks and order). Host checks before the gate: 2026-11-13, base 154d6fc5, staged, not committed. Split by concern: workflow-new-features into 4 files, client-dlq-dedup into 5, long-running-timeout into 2, advanced-batching into advanced-batching + advanced-forward, lockExpiration into lockExpiration + lockExpiration-events; shared helpers moved unchanged to test/support/workflow-wait-until.ts, client-dlq.ts and docs-counting-broker.ts; every resulting file is 300 lines or fewer. Host (diagnostic, macOS): bun test on each original set and on its split files gave identical sorted test names and statuses (JUnit reports): 20 / 0 / 0, 51 / 0 / 0, 6 / 0 / 0, 8 / 0 / 0, 9 / 0 / 0 (pass / fail / skip) before and after; a line-multiset diff of each original against its splits shows only headers, imports, export keywords and duplicated describe/hook lines. bun test test/agent-harness* and test/documented-feature-coverage.test.ts green; bun run typecheck, bun run format:check, git diff --check and ./init.sh clean. bun run test:model and test:sandbox:sdk not triggered (no src/ or sdk/ change)",
+      "issue": null
+    },
+    {
+      "id": "test-quality-speedups",
+      "name": "Strengthen test oracles and remove redundant waits and cases",
+      "description": "Approved test-only audit: strengthen manual lease, rate/concurrency and DLQ pagination assertions; remove six equivalent cases and four method/listener existence checks; preserve all remaining scenarios while splitting touched legacy files; replace workflow observation sleeps; configure test-owned real DLQ/stall maintenance and deterministic cleanup. No runtime, SDK, dependency, CI or gate-runner changes.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "2026-11-14, base699b18a0, implementation aa038a83b040ebc7a9b3a0b54821c559beae2c77. All four test-only tasks independently approved; whole-branch pre-commit and separate pre-push skeptic PASS,43-file matrix with three risks per file. Six equivalent cases removed,143 cases mechanically moved, three inherited client assertions strengthened; four existence checks removed and one rate-burst case added(net-9). Controlled lease/limit/pagination/log/event/force-close/state/concurrency/heartbeat/retry defects detected, disposable mutants restored/hash-verified. Workflow19/DLQ16/stall9 checks per mode retained through loaded repeats; runtime/config/SDK/runner unchanged. Frozen tree f3c1bdf4746ea4d5e9a77e30b3a37582eda2d366 passed bun run test:sandbox: unit11907/0/403,431447assertions/1111files,TCP553/0(69suites),embedded349/0(43),all errors0/anomaliesnone,wall6.83min versus8.92baseline,TCP5.94versus8.91min,embedded1.58versus4.13min. PeakRAM/PIDs1.57GiB/218,169.4MiB/62,53.0MiB/42;425validsamples. Artifacts artifacts/test-sandbox/2026-11-14T04-05-50.533Z/ and artifacts/test-quality-speedups/final-sandbox-review.json. Same tree passed fresh nativeUbuntu24.04.5arm64 machine-gate.sh exit0: unit12038/0/403(+131SDKTypeScript),TCP553/0,embedded349/0,tinyfs9/0,type890+2149,format2359;4CPU/16GiB,Bun1.4.4+38afee6c8,logs copied/Machine deleted; artifacts/machines/20261114T041303Z/manifest.md. Source tree3460918e19ddd0a79886f4919a868284f851b84b differs onlyfiveprose/statepaths,gate-delta3/readers410/0/releaseposts259/docsdata64/init179/0 green. Fresh skeptic source/test types890+2149,format2359,union six script entries588clean. Source PR191 CI run43557827964 attempt1 on aa038a83b040ebc7a9b3a0b54821c559beae2c77 GREEN(ci-watch.sh exit0),26jobs succeeded/9expectedskips;unit12042/0/399,all product/PG16-18/officialSDK/type/docs/format jobs passed. https://github.com/egeominotti/bunqueue/actions/runs/43557827964 . Evidence artifacts/tests-quality-source-ci-{summary.json,unit.log,watch.log} and .superpowers/sdd/2026-11-14-test-quality-speedups/ reports/rawreceipts. Final record is prose/state only; model suites passed in full unit gates, separate model/SDK gates not triggered by this tests-only diff.",
       "issue": null
     },
     {

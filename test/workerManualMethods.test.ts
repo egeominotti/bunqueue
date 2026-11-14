@@ -6,6 +6,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Queue, Worker } from '../src/client';
 import { shutdownManager } from '../src/client';
+import { getSharedManager } from '../src/client/manager';
 
 describe('Worker Manual Job Control - BullMQ v5', () => {
   let queue: Queue<{ value: number }>;
@@ -79,70 +80,41 @@ describe('Worker Manual Job Control - BullMQ v5', () => {
       embedded: true,
       autorun: false,
       useLocks: true,
+      lockDuration: 1000,
     });
+    try {
+      const added = await queue.add('test', { value: 1 });
+      const job = await worker.getNextJob();
+      expect(job).toBeDefined();
+      if (!job?.token) throw new Error('Expected a fetched job with a broker lock token');
+      expect(String(job.id)).toBe(added.id);
+      const manager = getSharedManager();
+      const lock = manager.getLockInfo(job.id);
+      expect(lock).not.toBeNull();
+      if (!lock) throw new Error('Expected an active broker lease');
+      const initial = { ...lock };
+      expect(String(initial.token)).toBe(job.token);
+      expect(await queue.getJobState(added.id)).toBe('active');
 
-    // Add and fetch a job with lock
-    await queue.add('test', { value: 1 });
-    const job = await worker.getNextJob('test-token');
+      expect(await worker.extendJobLocks([added.id], ['wrong-token'], 60000)).toBe(0);
+      expect(manager.getLockInfo(job.id)).toEqual(initial);
+      const before = Date.now();
+      expect(await worker.extendJobLocks([added.id], [job.token], 60000)).toBe(1);
+      const after = Date.now();
+      const renewed = manager.getLockInfo(job.id);
+      expect(String(renewed?.token)).toBe(job.token);
+      expect(renewed?.renewalCount).toBe(1);
+      expect(renewed?.expiresAt).toBeGreaterThan(initial.expiresAt);
+      expect(renewed?.expiresAt).toBeGreaterThanOrEqual(before + 60000);
+      expect(renewed?.expiresAt).toBeLessThanOrEqual(after + 60000);
+      expect(await queue.getJobState(added.id)).toBe('active');
 
-    if (job) {
-      const jobId = String(job.id);
-      // Try to extend locks (might not work without proper token setup)
-      const extended = await worker.extendJobLocks([jobId], ['test-token'], 60000);
-      // In embedded mode without full lock setup, this may return 0
-      expect(typeof extended).toBe('number');
+      await worker.processJobManually(job);
+      expect(await queue.getJobState(added.id)).toBe('completed');
+      expect(manager.getLockInfo(job.id)).toBeNull();
+    } finally {
+      await worker.close();
     }
-
-    await worker.close();
-  });
-
-  test('worker has getNextJob method', async () => {
-    const worker = new Worker('manual-test', async () => ({ done: true }), {
-      embedded: true,
-      autorun: false,
-    });
-
-    expect(typeof worker.getNextJob).toBe('function');
-
-    await worker.close();
-  });
-
-  test('worker has processJobManually method', async () => {
-    const worker = new Worker('manual-test', async () => ({ done: true }), {
-      embedded: true,
-      autorun: false,
-    });
-
-    expect(typeof worker.processJobManually).toBe('function');
-
-    await worker.close();
-  });
-
-  test('worker has extendJobLocks method', async () => {
-    const worker = new Worker('manual-test', async () => ({ done: true }), {
-      embedded: true,
-      autorun: false,
-    });
-
-    expect(typeof worker.extendJobLocks).toBe('function');
-
-    await worker.close();
-  });
-
-  test('worker emits stalled event', async () => {
-    const worker = new Worker('manual-test', async () => ({ done: true }), {
-      embedded: true,
-      autorun: false,
-    });
-
-    // Check that stalled event listener can be added
-    worker.on('stalled', () => undefined);
-
-    // The stalled event is emitted by the system when jobs stall
-    // Here we just verify the listener works
-    expect(worker.listenerCount('stalled')).toBe(1);
-
-    await worker.close();
   });
 });
 

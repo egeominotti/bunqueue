@@ -21,6 +21,7 @@ describe('DLQ Operations', () => {
   });
 
   afterEach(() => {
+    queue.close();
     shutdownManager();
   });
 
@@ -95,25 +96,25 @@ describe('DLQ Operations', () => {
     });
 
     it('should filter with limit', async () => {
-      await addAndFailJob(queue, QUEUE_NAME, { a: 1 });
-      await addAndFailJob(queue, QUEUE_NAME, { a: 2 });
-      await addAndFailJob(queue, QUEUE_NAME, { a: 3 });
-
-      const limited = queue.getDlq({ limit: 1 });
-      expect(limited.length).toBeLessThanOrEqual(1);
+      const first = await addAndFailJob(queue, QUEUE_NAME, { a: 1 });
+      const second = await addAndFailJob(queue, QUEUE_NAME, { a: 2 });
+      const third = await addAndFailJob(queue, QUEUE_NAME, { a: 3 });
+      expect(queue.getDlqStats().total).toBe(3);
+      expect(queue.getDlq().map((entry) => entry.job.id)).toEqual([first, second, third]);
+      expect(queue.getDlq({ limit: 1 }).map((entry) => entry.job.id)).toEqual([first]);
+      expect(queue.getDlq({ limit: 2 }).map((entry) => entry.job.id)).toEqual([first, second]);
     });
 
     it('should filter with offset', async () => {
-      await addAndFailJob(queue, QUEUE_NAME, { b: 1 });
-      await addAndFailJob(queue, QUEUE_NAME, { b: 2 });
-
-      const all = queue.getDlq();
-      const withOffset = queue.getDlq({ offset: 1 });
-
-      // offset should return fewer entries than all
-      if (all.length > 1) {
-        expect(withOffset.length).toBeLessThan(all.length);
-      }
+      const first = await addAndFailJob(queue, QUEUE_NAME, { b: 1 });
+      const second = await addAndFailJob(queue, QUEUE_NAME, { b: 2 });
+      const third = await addAndFailJob(queue, QUEUE_NAME, { b: 3 });
+      expect(queue.getDlqStats().total).toBe(3);
+      expect(queue.getDlq().map((entry) => entry.job.id)).toEqual([first, second, third]);
+      expect(queue.getDlq({ offset: 1 }).map((entry) => entry.job.id)).toEqual([second, third]);
+      expect(queue.getDlq({ offset: 1, limit: 1 }).map((entry) => entry.job.id)).toEqual([second]);
+      expect(queue.getDlq({ offset: 2, limit: 2 }).map((entry) => entry.job.id)).toEqual([third]);
+      expect(queue.getDlq({ offset: 3 }).map((entry) => entry.job.id)).toEqual([]);
     });
 
     it('should return empty when filter matches nothing', () => {

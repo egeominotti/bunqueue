@@ -17,10 +17,17 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Done
 
+- `test-quality-speedups`: implementation `aa038a83`, all four task reviews and
+  whole-branch/pre-push skeptic PASS; full sandbox and fresh Ubuntu green on
+  tree `f3c1bdf4`. Source PR #191 CI
+  [43557827964](https://github.com/egeominotti/bunqueue/actions/runs/43557827964)
+  attempt1 GREEN, unit12042/0/399 and all product/PostgreSQL16–18/SDK/docs/type/
+  format jobs passed. Final state-record CI and authorized integration follow.
 - `harness-audit-hardening`, `postgres-runner-guard-destructuring` and
   `machine-gate-interrupt-log-gaps`: integrated in `9b69dcba` + `45790ac7`;
   full sandbox, fresh Ubuntu and source CI run `43526774536` GREEN. Final
-  record-only commit and authorized merge/main verification remain below.
+  record commit `a1aff9db` passed PR CI; PR #190 squash merged as `699b18a0`,
+  main CI `43529801350` GREEN and original main checkout aligned.
 - `issue-189-tls-reload`: `SIGHUP` reloads the TLS certificate without a restart;
   commit `da289219` on `main`, sandbox green, skeptic `PASS`.
 - `agent-harness`: `CLAUDE.md`/`AGENTS.md` routing pages, `docs/agents/`, the state
@@ -55,15 +62,14 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 ### What's In Progress
 
 The three audit implementations are done, backed by green source CI. Their
-original staged worktrees remain preserved. Final integration steps are below;
+original staged worktrees remain preserved. Their integration is complete;
 other sessions' active work remains tracked in `feature_list.json`.
 
 ### What's Next
 
-1. Commit/push the final record-only closure after reader checks and skeptic,
-   watch its PR CI, then normally squash merge PR #190 (linear main history),
-   watch main CI and fast-forward the original clean main checkout. All are
-   explicitly authorized; no release/version bump or publication authorized.
+1. Validate/push the final CI-flake tracking record, watch its exact-head PR #191
+   CI, perform the authorized normal squash merge, then watch main CI and
+   fast-forward the original main checkout. No version/publication.
 2. `postgres-completion-recheck-state-index`: the prune recheck's consumer-state
    probe on PostgreSQL 16 and 17 with stale statistics.
 3. Owner decisions: `postgres-completion-read-model-plan` (trade-off measured,
@@ -72,6 +78,17 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ## Blockers / Risks
 
+- PR #191's metadata commit `1037ddd3` had a legacy random chaos-accounting
+  failure in Unit Tests, run43560970951 attempt1 (49 counted, expected at least
+  50). Its single unit-job rerun passed in attempt2, watcher exit3 FLAKY.
+  `race-chaos-accounting-flake` is not-started; delayed work is omitted from
+  that partial count, but actual CI state/IDs/seed were not captured. Preserve
+  the oracle and reproduce before asserting a cause or changing behavior.
+- PR #191's record commit `dd147ccf` had one PostgreSQL 17 processing-count
+  failure in run43559077874 attempt1; the single failed-job rerun passed in
+  attempt2 (`ci-watch.sh` exit3 FLAKY). The new not-started item
+  `postgres-public-api-processing-flake` requires reproduction and per-job
+  failure/lease diagnostics; the cause is unproved and the assertion remains.
 - `main` requires pull requests; only an account with bypass rights can push to it
   directly. The release push (CI's version gate tags, releases and publishes from
   `main`) therefore needs an account with write access to `main`, or a pull
@@ -122,6 +139,99 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-14 — unseeded chaos accounting finding tracked
+
+- CI43560970951 on metadata-only `1037ddd38f4e52da51dc461ef62b5d22a0122608`
+  failed only Unit Tests job132344370497: the unchanged legacy chaos case at
+  `race-conditions.test.ts:606` counted49 active/completed/DLQ jobs against its
+  at-least50 threshold. Unit12041/1/399; every product integration, PostgreSQL
+  version, SDK, docs, type and format job passed. The single failed-job rerun
+  passed in attempt2, watcher exit3 FLAKY; no second rerun was performed.
+- The test does not record its random trace or full state vector. Direct source
+  inspection confirms delayed retries are excluded and can outlast its
+  100ms sleep/200ms empty pull;49 counted+51 delayed is a valid100-job state,
+  but this does not establish the CI occurrence's cause. No assertion or runtime
+  change was made. New `race-chaos-accounting-flake` is not-started and requires
+  fresh isolated reproduction, a seeded trace, all IDs and complete conservation.
+- Failure, summaries, rerun watcher and read-only analysis are retained under
+  `artifacts/tests-quality-final-pr-ci-unit-*` and this plan's ignored workspace.
+  This final tracking record is metadata/changelog only; its own checks, skeptic,
+  push and exact-head CI precede normal PR #191 integration and main/local
+  verification. The PostgreSQL follow-up remains separate and unresolved.
+
+### 2026-11-14 — intermittent PostgreSQL processing-count finding tracked
+
+- PR #191 record commit `dd147ccfda69c052c4eee25dfb5b0b98f5418418` changed only
+  prose/state. CI43559077874 attempt1 failed the unchanged PostgreSQL 17 test
+  `postgres-public-api-queue-worker.test.ts`: all24 jobs completed, but at least
+  one processor invocation count exceeded one. The same test passed in the
+  source CI, PostgreSQL16/18 passed, and the single failed-job rerun passed in
+  attempt2; `ci-watch.sh` exit3 reports FLAKY, not a clean first-attempt result.
+- Preserved raw job132338509583 failure, both attempt summaries, watch logs and
+  source comparison. A read-only contract check found that progress/log errors
+  can legally trigger default retries; the log does not distinguish those from
+  recovery or a delivery defect. No cause/fix is claimed and no assertion or
+  runtime file changed. New `postgres-public-api-processing-flake` is
+  not-started and explicitly requires reproduction on its own isolated database.
+- This tracking record adds only metadata/changelog; its delta, readers,
+  skeptic, commit/push and exact-head CI precede the already authorized normal
+  merge, main CI and original-main fast-forward. No second rerun of
+  run43559077874, version bump, release or publication is authorized here.
+
+### 2026-11-14 — test quality validation and source CI complete
+
+- Source `aa038a83b040ebc7a9b3a0b54821c559beae2c77` pushed as `egeominotti`;
+  complete 43-file pre-commit and separate pre-push skeptic PASS. Source PR
+  [#191](https://github.com/egeominotti/bunqueue/pull/191) CI
+  [43557827964](https://github.com/egeominotti/bunqueue/actions/runs/43557827964)
+  attempt1 GREEN, `ci-watch.sh` exit0: unit12042/0/399,26 jobs succeeded and nine
+  expected skips; product, PostgreSQL16–18, all official SDKs, docs, type and
+  format jobs passed. This closes the implementation work item from source CI.
+- Frozen executable tree `f3c1bdf4746ea4d5e9a77e30b3a37582eda2d366` passed the
+  full sandbox: unit11907/0/403, TCP553/0, embedded349/0, errors0/anomaliesnone,
+  6.83 min versus8.92 baseline. Fresh native Ubuntu `20261114T041303Z` passed
+  unit12038/0/403, TCP553/0, embedded349/0, tinyfs9/0, type890+2149 and
+  format2359; complete logs copied and Machine deleted. Gate artifact paths and
+  full mutation/load/case-preservation evidence are in `feature_list.json`.
+- Source tree `3460918e` differs only by five prose/state paths; delta exit3,
+  410 reader tests,259 release-post checks, docs-data and final init179/0 passed.
+  Skeptic independently ran type890+2149,format2359 and six script entries588.
+  This final record is prose/state only and needs its own delta/readers and
+  skeptic before commit/push. Its CI and final merge/main CI are prospective.
+- Existing explicit commit/push/normal-merge authorization and `egeominotti`
+  preference remain; no version/release/publication. Keep managed worktrees,
+  original main's untracked content and all ignored evidence. Next: finish this
+  record's checks, exact-head PR CI, normal squash merge and main/local alignment.
+
+### 2026-11-14 — test quality and duration audit implementation
+
+- User request: analyze deletable/improvable tests only, then explicitly approved
+  implementing every finding.
+  Approved scope: six equivalent cases, four vacuous existence/listener cases,
+  stronger manual lock/rate/concurrency/DLQ assertions, workflow observation
+  waits and fast test-owned DLQ/stall sweeps with deterministic cleanup.
+- Branch `tests-quality-speedups`, base `699b18a0`; reusing the existing managed
+  worktree. Original main and all previous worktrees remain preserved. Prior
+  explicit commit/push/merge workflow and egeominotti preference remain in force;
+  no version/release/publication authorization.
+- Plan/design: `docs/superpowers/plans/2026-11-14-test-quality-speedups.md` and
+  `docs/superpowers/specs/2026-11-14-test-quality-design.md`. Baseline init green;
+  assertion and consolidation tasks independently approved. Linux focused runs
+  pass 65 and 382 cases; exact inventory proves six deletions and 143 moves,
+  with three inherited client assertions strengthened separately. Workflow
+  extraction is approved: all 19 scenarios per mode pass three loaded repeats,
+  and missing-state/event/parallelism defects are rejected. Targeted workflow
+  times changed from 104.142 to 5.759 s TCP and 74.705 to 6.546 s embedded.
+  DLQ/stall work is also approved: all 25 checks per mode remain, 150 loaded
+  passes plus 25 explicit TCP checks pass, and missing heartbeats/exhausted-retry
+  bypasses are detected. DLQ measured about 60 to 1.4 s; stall about 29 to 3–5 s.
+  Runtime mutants are restored and hash-verified. Frozen tree `f3c1bdf4`
+  passed the full sandbox: unit11907/0/403, TCP553/0, embedded349/0, no anomalies,
+  6.83 min versus 8.92 baseline. Fresh Ubuntu `20261114T041303Z` passed the same
+  tree: unit12038/0/403, TCP553/0, embedded349/0, tinyfs9/0, type890+2149 and
+  format2359; logs copied and Machine deleted. Final prose/state proof,
+  whole-branch skeptic and PR CI/integration are pending.
 
 ### 2026-11-14 — cancellation startup fix validated
 

@@ -214,6 +214,38 @@ head:
 
 ### Testing
 
+- Test assertions now observe real lease ownership and renewal, rate-limit
+  admission/refill, concurrency-policy removal, exact DLQ pagination, stored job
+  logs, waiting-event IDs and forced closure with a running processor. Fixture
+  deadlines fail explicitly. Six equivalent cases and four method/listener
+  existence checks are removed; the remaining acknowledgement, job-management,
+  CLI and client scenarios are split into focused modules. Controlled defects
+  verify that the stronger assertions detect the behavior they claim.
+- The TCP and embedded workflow suites share all 19 scenarios and observe
+  execution states and event delivery instead of fixed sleeps. Barriers prove
+  concurrency and subscription readiness, cleanup failures fail the scenario,
+  and real step/signal timeouts, retry attempts and compensation order are kept.
+- DLQ and stall contracts use fast maintenance only in their own disposable
+  brokers. Manual expiry/purge keeps its normal broker lifetime, capped DLQ
+  fixtures wait for the exact retained entries, and automatic retries are
+  observed after exhaustion. Fast stall sweeps make the heartbeat case detect
+  missing heartbeats while retaining every original check in both modes.
+  The full parallel sandbox measured 6.83 minutes versus 8.92 previously, with
+  TCP at 5.94 versus 8.91 minutes and embedded at 1.58 versus 4.13 minutes;
+  every suite passed, and a fresh native Ubuntu gate independently passed.
+- Record the completed test-quality work item with its isolated gate totals,
+  controlled-defect and case-preservation proofs, skeptic approvals and green
+  source PR CI evidence. The final record changes documentation and state only.
+- Track an intermittent PostgreSQL 17 public-worker processing-count failure
+  observed during PR validation. Its single failed-job rerun passed; a separate
+  reproduce-first work item retains the assertion and records the evidence
+  without claiming a cause or a fix.
+- Track a separate intermittent legacy chaos-accounting test failure in unit
+  CI. Its partial count omits delayed work, but the missing state/operation
+  trace leaves the observed cause unproved. The single unit-job rerun passed;
+  a reproduce-first follow-up preserves the oracle and requires full job
+  conservation rather than a relaxed threshold.
+
 - The CPU-intensive workers guide test "a non-yielding handler starves
   heartbeats and gets recovered" now observes the recovery it claims
   (`cpu-intensive-blocking-test-flake`). Its handler busy-looped 3 s in the
