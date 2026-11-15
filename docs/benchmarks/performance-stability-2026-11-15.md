@@ -85,8 +85,9 @@ The closure receipts record the following results for the retained runtime sourc
 | Documentation readers | 408 pass / 0 fail, 30 files, 1,949 expectations | `artifacts/perf-stability/closure.json` |
 | Protected-file comparison | 1,558 test/fixture/runner files byte-identical; none added or removed | `artifacts/perf-stability/closure.json` |
 | Independent final source review | PASS; no identified introduced correctness/stability defect | `artifacts/perf-stability/final-verdict.txt` |
+| Source commit `009f20df` CI | Attempt 1 GREEN; 26 successful jobs, 9 expected release skips; unit 12,066/0/400, TCP 553/0, PostgreSQL 16/17/18.6 each 571/0/1; all SDK/type/format/docs jobs passed | [CI run 43736304149](https://github.com/egeominotti/bunqueue/actions/runs/43736304149) |
 
-These receipts document the original implementation closure. Later article/site integration checks are recorded by the publishing session, not inferred from these earlier results. Regression checks and an independent review bound the evidence; they do not prove absence of every defect or provide a blanket production stability guarantee.
+The publishing session also built 391 site pages and verified the article, index, RSS, sitemap, 1200×630 OG image, all ten download checksums and static copies. Its 408 existing documentation/harness tests passed. These later checks are separate from the original runtime gates. Regression checks and an independent review bound the evidence; they do not prove absence of every defect or provide a blanket production stability guarantee.
 
 ## Reproduction and interpretation
 

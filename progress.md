@@ -17,6 +17,16 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ### What's Done
 
+- `performance-stability-optimizations`: source `009f20df`, tree `602bcc2b`,
+  [PR #194](https://github.com/egeominotti/bunqueue/pull/194). Source CI
+  [43736304149](https://github.com/egeominotti/bunqueue/actions/runs/43736304149)
+  attempt1 GREEN: 26 successful jobs, nine expected release skips; unit
+  12066/0/400, TCP553/0, PostgreSQL16/17/18.6 each571/0/1, all SDK/type/format/
+  docs jobs passed. Separate pre-commit/pre-push skeptic PASS. Monitoring and
+  MessagePack runtime have product/SDK/model/fresh Ubuntu evidence;1558
+  protected files unchanged. Article, full report and public A/B data included;
+  build391pages and existing readers408/0 passed. SQLite grouping rejected.
+  Closure-only CI and main merge/watch remain; version/package unchanged.
 - `docs-audit-polish`: source implementation `c9f0d0c0`, tree `4a58acc2`,
   [PR #193](https://github.com/egeominotti/bunqueue/pull/193). Separate source
   pre-commit/pre-push skeptic PASS; exact-head CI43597962861 attempt1 GREEN,
@@ -78,17 +88,6 @@ overview: [docs/agents/README.md](docs/agents/README.md).
   tree `b1a66b7a`. Evidence in `feature_list.json`.
 
 ### What's In Progress
-
-- performance-stability-optimizations on perf-stability-optimizations:
-  SQLite grouping rejected after concrete differential fault findings; keep its
-  scalar runtime and track redesign in performance-durable-batch-contract.
-  Monitoring and MessagePack implemented with1558 protected files byte-identical.
-  Full product sandbox11931/0/404+TCP553/0+embedded349/0 and SDK1557/0/3
-  passed with no resource anomalies. Fresh Ubuntu unit12062/0/404,TCP553/0,
-  embedded349/0,tinyfs9/0,type/format green; Machine deleted. Model12/0,
-  init green,140 native A/B samples valid. Final verdict and docs-only closure
-  receipts: artifacts/perf-stability/. Commit/push/merge and engineering article
-  now authorized; source CI/integration pending. Version/publication unchanged.
 
 The delivery/accounting implementation and PR #192 integration are complete;
 main CI43590920538 is GREEN on `7901c130`.
@@ -167,6 +166,22 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-15 — performance source CI green; integration closure
+
+- Source commit `009f20df` on `perf-stability-optimizations`, PR #194, passed
+  CI43736304149 attempt1 with26 successful jobs and nine release skips.
+  No reruns or flakes; logs in `artifacts/perf-stability/source-ci-full.log`.
+- All local runtime gates and separate commit/push skeptic reviews passed;
+  immutable comparison preserves1558 protected paths. Blog/report/downloads
+  match captured A/B data and the retained runtime. SQLite grouping is deferred
+  to `performance-durable-batch-contract`; no SQLite change or gain shipped.
+- User authorizes commit, push, merge main and article/report. No version bump
+  or package publication. This closure changes only documentation/state; watch
+  its exact-head CI, squash PR #194, watch main CI, and fast-forward original main.
+- Remaining measurement limits: one native host, unrecorded power/governor mode,
+  about24ns single-queue overhead; small TCP/disabled gains inconclusive. No
+  production tail-latency or durable-throughput claim.
 
 ### 2026-11-15 — article and main integration authorized
 

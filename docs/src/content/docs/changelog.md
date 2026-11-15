@@ -466,6 +466,9 @@ head:
 
 ### Documentation
 
+- Record the monitoring/MessagePack engineering campaign's validation and source
+  CI evidence, including unchanged tests and the rejected SQLite batching scope.
+
 - Add an [engineering article](/blog/faster-monitoring-and-msgpack/) and a
   dated technical report for the monitoring and MessagePack improvements,
   with full-precision samples, reproduction harnesses, checksums and workload
