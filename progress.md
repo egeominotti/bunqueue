@@ -11,12 +11,22 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ## Current State
 
-**Last Updated:** 2026-11-14
+**Last Updated:** 2026-11-15
 **Active items:** many sessions run at once; the items in progress are the
 `in-progress` entries of `feature_list.json`, each with its owning `branch`.
 
 ### What's Done
 
+- `performance-stability-optimizations`: source `009f20df`, tree `602bcc2b`,
+  [PR #194](https://github.com/egeominotti/bunqueue/pull/194). Source CI
+  [43736304149](https://github.com/egeominotti/bunqueue/actions/runs/43736304149)
+  attempt1 GREEN: 26 successful jobs, nine expected release skips; unit
+  12066/0/400, TCP553/0, PostgreSQL16/17/18.6 each571/0/1, all SDK/type/format/
+  docs jobs passed. Separate pre-commit/pre-push skeptic PASS. Monitoring and
+  MessagePack runtime have product/SDK/model/fresh Ubuntu evidence;1558
+  protected files unchanged. Article, full report and public A/B data included;
+  build391pages and existing readers408/0 passed. SQLite grouping rejected.
+  Closure-only CI and main merge/watch remain; version/package unchanged.
 - `docs-audit-polish`: source implementation `c9f0d0c0`, tree `4a58acc2`,
   [PR #193](https://github.com/egeominotti/bunqueue/pull/193). Separate source
   pre-commit/pre-push skeptic PASS; exact-head CI43597962861 attempt1 GREEN,
@@ -156,6 +166,50 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-15 — performance source CI green; integration closure
+
+- Source commit `009f20df` on `perf-stability-optimizations`, PR #194, passed
+  CI43736304149 attempt1 with26 successful jobs and nine release skips.
+  No reruns or flakes; logs in `artifacts/perf-stability/source-ci-full.log`.
+- All local runtime gates and separate commit/push skeptic reviews passed;
+  immutable comparison preserves1558 protected paths. Blog/report/downloads
+  match captured A/B data and the retained runtime. SQLite grouping is deferred
+  to `performance-durable-batch-contract`; no SQLite change or gain shipped.
+- User authorizes commit, push, merge main and article/report. No version bump
+  or package publication. This closure changes only documentation/state; watch
+  its exact-head CI, squash PR #194, watch main CI, and fast-forward original main.
+- Remaining measurement limits: one native host, unrecorded power/governor mode,
+  about24ns single-queue overhead; small TCP/disabled gains inconclusive. No
+  production tail-latency or durable-throughput claim.
+
+### 2026-11-15 — article and main integration authorized
+
+- User requested commit, push and merge to main, then a performance improvement
+  report and blog article. Existing immutable-test constraint remains active.
+- English engineering article, full measured report and sanitized public raw data
+  accompany monitoring/MessagePack. SQLite grouping remains excluded.
+  No version bump or package publication requested.
+- Identical runtime is covered by prior full gates; publication additions require
+  docs build/readers and operation-specific skeptic. Source CI/merge pending.
+
+### 2026-11-15 — performance stability implementation started
+
+- User authorized implementing the measured SQLite, monitoring and MessagePack
+  changes and checking stability with all existing tests unchanged. Commit,
+  push, merge, version and publication remain unauthorized.
+- Base 732c1fb5; isolated branch perf-stability-optimizations. Startup ./init.sh
+  green; plan docs/superpowers/plans/2026-11-15-performance-stability.md.
+- Original prototype evidence: original checkout
+  artifacts/performance-ab-2026-11-15/. Final source, fault probes, native A/B,
+  model/sandbox/SDK/fresh Ubuntu gates and independent review are pending.
+- Update: SQLite remains unchanged after20 fault/8crash comparative cases;
+  redesign tracked separately. Monitoring and MessagePack task reviews approved.
+  Final native A/B, isolated model, full product/SDK/freshUbuntu gates all passed.
+  Gated tree3271985cfb92e861756bc4c887d38b77b9922719; exact totals and artifact
+  paths are in the work item. Post-gate updates only these state records and the
+  plan; final tree/reader receipts in artifacts/perf-stability/closure.json and
+  independent verdict in final-verdict.txt. No test or fixture changed.
 
 ### 2026-11-14 — documentation audit validated in source CI
 

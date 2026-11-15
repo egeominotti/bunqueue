@@ -5,18 +5,9 @@ const unpackr = new Unpackr({ mapsAsObjects: false, useRecords: false });
 const PROTO_KEY_BYTES = new TextEncoder().encode('__proto__');
 
 function containsProtoKey(buffer: Uint8Array): boolean {
-  for (let index = 0; index <= buffer.length - PROTO_KEY_BYTES.length; index++) {
-    if (buffer[index] !== PROTO_KEY_BYTES[0]) continue;
-    let matches = true;
-    for (let offset = 1; offset < PROTO_KEY_BYTES.length; offset++) {
-      if (buffer[index + offset] !== PROTO_KEY_BYTES[offset]) {
-        matches = false;
-        break;
-      }
-    }
-    if (matches) return true;
-  }
-  return false;
+  return (
+    Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength).indexOf(PROTO_KEY_BYTES) !== -1
+  );
 }
 
 function defineSafe(target: Record<PropertyKey, unknown>, key: PropertyKey, value: unknown): void {

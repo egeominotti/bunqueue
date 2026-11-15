@@ -255,6 +255,7 @@ Before updating a number in README or the public site:
 
 ## Related documents
 
+- [Performance and Compatibility Assessment — 2026-11-15](../benchmarks/performance-stability-2026-11-15.md)
 - [Job Group Scheduling Benchmark — 2026-08-31](../benchmarks/job-groups-2026-08-31.md)
 - [Native PostgreSQL 15–18 Engineering Benchmark — 2026-08-26](../benchmarks/postgres-versions-2026-08-26.md)
 - [PostgreSQL 18 Multi-Broker Performance Analysis — 2026-08-26](../benchmarks/postgres-performance-analysis-2026-08-26.md)

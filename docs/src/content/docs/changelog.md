@@ -40,6 +40,17 @@ head:
   affects PostgreSQL 15 would not be caught: upgrade the database to PostgreSQL
   16 or newer.
 
+### Performance
+
+- Queue idle monitoring lazily aggregates active counts across processing maps
+  for multiple queues, avoiding a full active-job scan for each queue. It keeps
+  the scalar scan for one queue and refreshes counts after synchronous idle
+  callbacks, preserving live state observations, event order and time boundaries.
+
+- MessagePack decoding now searches for `__proto__` with native `Buffer.indexOf`
+  over a zero-copy view bounded to the input byte range. The safe materialization
+  path and decoded values remain unchanged.
+
 ### Tooling
 
 - Contributor harness audit hardening: sandbox gates reject reported failures
@@ -454,6 +465,15 @@ head:
   the same results as before (20, 51, 6, 8 and 9 passing).
 
 ### Documentation
+
+- Record the monitoring/MessagePack engineering campaign's validation and source
+  CI evidence, including unchanged tests and the rejected SQLite batching scope.
+
+- Add an [engineering article](/blog/faster-monitoring-and-msgpack/) and a
+  dated technical report for the monitoring and MessagePack improvements,
+  with full-precision samples, reproduction harnesses, checksums and workload
+  limits. Explain why the SQLite transaction-grouping prototype was excluded;
+  no SQLite speedup or new package release is claimed.
 
 - Record the completed documentation audit with its green source CI, isolated
   Linux validation, rendered-link checks and review evidence. Keep live custom-ID

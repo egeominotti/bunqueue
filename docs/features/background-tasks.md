@@ -22,7 +22,7 @@ Owns:
 - Startup recovery, split by lifecycle state under `background/recovery/`.
 - Recovery of orphaned processing entries (through the stall path, `orphanRecovery.ts`), memory-bound cleanup of stale waiting-deps, unique keys/groups, stalled candidates, orphaned `jobIndex`/`jobLocks`, client ownership of ended deliveries (`pruneEndedClientDeliveries`, `clientOwnership.ts`), and empty queues (`cleanupTasks.ts` plus the focused `emptyQueueCleanup.ts` reconciler).
 - Dependency resolution as a safety fallback to the event-driven fast path (`processPendingDependencies`, `dependencyProcessor.ts:16`).
-- Dashboard threshold monitoring and hysteresis state (`runMonitoringChecks`, `monitoringChecks.ts:56`).
+- Dashboard threshold monitoring and hysteresis state (`runMonitoringChecks`, `monitoringChecks.ts:57`).
 - Circuit-breaker error tracking for the `cleanup`, `dependency`, and `lockExpiration` tasks (`taskErrorTracking.ts`).
 
 Does NOT own (delegated):
@@ -50,7 +50,7 @@ Internal:
 External/runtime:
 
 - Bun/Node timers through `safeInterval` (`src/shared/timers.ts`, see [Shared Timers & Durations](./shared-timers.md)): a period that fits is one native `setInterval`; a longer one is re-armed per period instead of being shortened to a 1 ms spin. Each handle is a `SafeTimer`, stopped with `clear()`.
-- `process.memoryUsage()` for memory-pressure monitoring (`monitoringChecks.ts:166`).
+- `process.memoryUsage()` for memory-pressure monitoring (`monitoringChecks.ts:188`).
 - No third-party runtime dependencies.
 
 ## Public Interface
@@ -430,9 +430,18 @@ After all shard locks are released, dependency proofs with no remaining waiter
 are unpinned and ordinary FIFO pruning resumes. See
 [FlowProducer & Job Dependencies](./flow-producer.md).
 
-### `runMonitoringChecks` (`monitoringChecks.ts:56`)
+### `runMonitoringChecks` (`monitoringChecks.ts:57`)
 
 Returns immediately if `dashboardEmit` is unset. Otherwise runs `checkQueueIdle`, `checkQueueThreshold`, `checkWorkerOverload`, `checkMemoryPressure`, `checkStorageSize`. Idle/overload use a "since" timestamp so the event only fires once the threshold duration has elapsed; threshold/memory/storage use one-shot "emitted" flags with hysteresis (re-armed below 90% of the threshold).
+
+For multiple queues, the idle phase lazily aggregates active counts from the
+processing maps once until an idle event is emitted. It discards that local
+snapshot after each synchronous idle callback, so changes to active jobs and the
+live queue-name set are visible to later queues. A single queue keeps the scalar
+scan without allocating a count map. Empty queue sets, disabled idle monitoring,
+and an absent dashboard emitter do not build active counts. Waiting jobs retain
+the inclusive `runAt <= now` boundary. Idle and overload share the pass-start
+clock; queue-size monitoring reads its own clock after the idle phase.
 
 ## Concurrency & Locking
 

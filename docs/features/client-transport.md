@@ -50,6 +50,11 @@ Internal:
 External / runtime:
 - `Bun.connect` (TCP socket), `node:fs` `readFileSync` (TLS CA file, read into bytes), `Bun.hash` (pool key hashing).
 - `msgpackr` — `pack` / `unpack` for the binary protocol.
+- `src/shared/msgpack.ts` uses a bounded, zero-copy `Buffer` view to detect
+  `__proto__` bytes before decoding. A detected byte pattern selects safe
+  own-property materialization; ordinary frames retain the direct unpack path.
+  The view is limited to the input `Uint8Array` byte offset and length, including
+  for subarrays.
 - Node `events.EventEmitter` (base class for `TcpClient` and `ReconnectManager`).
 
 ## Public Interface

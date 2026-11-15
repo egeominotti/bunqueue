@@ -1,0 +1,4225 @@
+{
+  "schemaVersion": 1,
+  "summaries": [
+    {
+      "campaign": "msgpack",
+      "startedAt": "2026-11-15T15:35:10.243Z",
+      "scenarios": [
+        {
+          "scenario": "small",
+          "metrics": {
+            "decodeMs": {
+              "baseline": {
+                "median": 117.603459,
+                "min": 115.180083,
+                "max": 118.342792,
+                "cv": 0.008885662386149767
+              },
+              "candidate": {
+                "median": 116.552792,
+                "min": 115.89875,
+                "max": 117.895959,
+                "cv": 0.006262619452810576
+              },
+              "kind": "duration",
+              "speedup": 1.0090145159285417,
+              "durationReductionPercent": 0.8933980419742582
+            },
+            "decodesPerSecond": {
+              "baseline": {
+                "median": 4251575.627550207,
+                "min": 4225014.3971590595,
+                "max": 4341028.300873859,
+                "cv": 0.008957201809107631
+              },
+              "candidate": {
+                "median": 4289901.523766157,
+                "min": 4241027.4638844915,
+                "max": 4314110.376513983,
+                "cv": 0.006244240052627586
+              },
+              "kind": "rate",
+              "speedup": 1.0090145159285415,
+              "rateIncreasePercent": 0.9014515928541522
+            }
+          },
+          "baselineChecks": [
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            }
+          ],
+          "candidateChecks": [
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 133000000,
+              "expected": 133000000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            }
+          ]
+        },
+        {
+          "scenario": "64k",
+          "metrics": {
+            "decodeMs": {
+              "baseline": {
+                "median": 186.146666,
+                "min": 156.466458,
+                "max": 194.391584,
+                "cv": 0.06466585101201477
+              },
+              "candidate": {
+                "median": 9.827125,
+                "min": 9.398958,
+                "max": 10.401833,
+                "cv": 0.029712914119408206
+              },
+              "kind": "duration",
+              "speedup": 18.94212864901993,
+              "durationReductionPercent": 94.72076228322027
+            },
+            "decodesPerSecond": {
+              "baseline": {
+                "median": 10744.21606884971,
+                "min": 10288.511255713622,
+                "max": 12782.292291680817,
+                "cv": 0.0702746828655742
+              },
+              "candidate": {
+                "median": 203518.3230090184,
+                "min": 192273.80404972855,
+                "max": 212789.54539428733,
+                "cv": 0.0294415712545419
+              },
+              "kind": "rate",
+              "speedup": 18.94212864901993,
+              "rateIncreasePercent": 1794.212864901993
+            }
+          },
+          "baselineChecks": [
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            }
+          ],
+          "candidateChecks": [
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 131540000,
+              "expected": 131540000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            }
+          ]
+        },
+        {
+          "scenario": "1m",
+          "metrics": {
+            "decodeMs": {
+              "baseline": {
+                "median": 183.796041,
+                "min": 181.358875,
+                "max": 186.184792,
+                "cv": 0.00752814645682098
+              },
+              "candidate": {
+                "median": 12.922375,
+                "min": 12.501667,
+                "max": 13.45575,
+                "cv": 0.026645041381005242
+              },
+              "kind": "duration",
+              "speedup": 14.22308523007574,
+              "durationReductionPercent": 92.96917663204725
+            },
+            "decodesPerSecond": {
+              "baseline": {
+                "median": 1088.1627205452157,
+                "min": 1074.2015921472255,
+                "max": 1102.7858438138194,
+                "cv": 0.00751495939859207
+              },
+              "candidate": {
+                "median": 15477.031118505693,
+                "min": 14863.534176838897,
+                "max": 15997.86652452029,
+                "cv": 0.02656976707938243
+              },
+              "kind": "rate",
+              "speedup": 14.223085230075739,
+              "rateIncreasePercent": 1322.308523007574
+            }
+          },
+          "baselineChecks": [
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            }
+          ],
+          "candidateChecks": [
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 209762000,
+              "expected": 209762000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            }
+          ]
+        },
+        {
+          "scenario": "proto",
+          "metrics": {
+            "decodeMs": {
+              "baseline": {
+                "median": 76.424625,
+                "min": 74.0255,
+                "max": 79.89425,
+                "cv": 0.025035188636944133
+              },
+              "candidate": {
+                "median": 76.606584,
+                "min": 74.766917,
+                "max": 84.27425,
+                "cv": 0.04782772854846582
+              },
+              "kind": "duration",
+              "speedup": 0.9976247602947549,
+              "durationReductionPercent": -0.23808949013488512
+            },
+            "decodesPerSecond": {
+              "baseline": {
+                "median": 1308478.7789276035,
+                "min": 1251654.530832945,
+                "max": 1350885.8433918043,
+                "cv": 0.024794097688264245
+              },
+              "candidate": {
+                "median": 1305370.828178424,
+                "min": 1186602.075960332,
+                "max": 1337489.94893022,
+                "cv": 0.047161438796271014
+              },
+              "kind": "rate",
+              "speedup": 0.9976247602947548,
+              "rateIncreasePercent": -0.23752397052452245
+            }
+          },
+          "baselineChecks": [
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            }
+          ],
+          "candidateChecks": [
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            },
+            {
+              "checksum": 26600000,
+              "expected": 26600000,
+              "ownProtoKeys": true,
+              "prototypeUntouched": true,
+              "subarrayGuard": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "campaign": "msgpack-tcp",
+      "startedAt": "2026-11-15T15:35:17.456Z",
+      "scenarios": [
+        {
+          "scenario": "tcpsmall",
+          "metrics": {
+            "pushMs": {
+              "baseline": {
+                "median": 77.789208,
+                "min": 77.271958,
+                "max": 78.8825,
+                "cv": 0.006894325789901973
+              },
+              "candidate": {
+                "median": 77.608458,
+                "min": 76.967542,
+                "max": 77.997083,
+                "cv": 0.0038725564453436566
+              },
+              "kind": "duration",
+              "speedup": 1.0023289987284634,
+              "durationReductionPercent": 0.23235870970688133
+            },
+            "pullAckMs": {
+              "baseline": {
+                "median": 150.559959,
+                "min": 148.795041,
+                "max": 151.132833,
+                "cv": 0.004907064767752431
+              },
+              "candidate": {
+                "median": 151.0305,
+                "min": 149.547208,
+                "max": 153.14875,
+                "cv": 0.007982165600580274
+              },
+              "kind": "duration",
+              "speedup": 0.9968844637341464,
+              "durationReductionPercent": -0.3125273167748466
+            },
+            "loopMs": {
+              "baseline": {
+                "median": 228.451083,
+                "min": 227.52525,
+                "max": 229.617208,
+                "cv": 0.002974256318582316
+              },
+              "candidate": {
+                "median": 228.777,
+                "min": 226.51475,
+                "max": 230.757208,
+                "cv": 0.005925177025752599
+              },
+              "kind": "duration",
+              "speedup": 0.9985753943796799,
+              "durationReductionPercent": -0.14266380168570514
+            },
+            "jobsPerSecond": {
+              "baseline": {
+                "median": 8754.609405813148,
+                "min": 8710.148587818383,
+                "max": 8790.233171922677,
+                "cv": 0.00297001502353359
+              },
+              "candidate": {
+                "median": 8742.137540049918,
+                "min": 8667.118211969353,
+                "max": 8829.447088986479,
+                "cv": 0.005929811951057476
+              },
+              "kind": "rate",
+              "speedup": 0.9985753943796798,
+              "rateIncreasePercent": -0.14246056203202073
+            }
+          },
+          "baselineChecks": [
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            }
+          ],
+          "candidateChecks": [
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 2437000,
+              "expected": 2437000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            }
+          ]
+        },
+        {
+          "scenario": "tcp64k",
+          "metrics": {
+            "pushMs": {
+              "baseline": {
+                "median": 192.421708,
+                "min": 190.453333,
+                "max": 200.063917,
+                "cv": 0.01664093787687707
+              },
+              "candidate": {
+                "median": 162.289291,
+                "min": 159.88925,
+                "max": 168.328666,
+                "cv": 0.016952643278991666
+              },
+              "kind": "duration",
+              "speedup": 1.1856710126363175,
+              "durationReductionPercent": 15.659572567560831
+            },
+            "pullAckMs": {
+              "baseline": {
+                "median": 261.163375,
+                "min": 258.329375,
+                "max": 270.588417,
+                "cv": 0.014340128206017882
+              },
+              "candidate": {
+                "median": 237.526584,
+                "min": 230.260584,
+                "max": 242.011834,
+                "cv": 0.01627295857170253
+              },
+              "kind": "duration",
+              "speedup": 1.099512191864806,
+              "durationReductionPercent": 9.050576483015648
+            },
+            "loopMs": {
+              "baseline": {
+                "median": 455.990833,
+                "min": 451.294625,
+                "max": 461.72925,
+                "cv": 0.008734662406912593
+              },
+              "candidate": {
+                "median": 399.550833,
+                "min": 391.05325,
+                "max": 410.3405,
+                "cv": 0.014666065804079512
+              },
+              "kind": "duration",
+              "speedup": 1.1412586217784209,
+              "durationReductionPercent": 12.377441807037382
+            },
+            "jobsPerSecond": {
+              "baseline": {
+                "median": 4386.0530854136705,
+                "min": 4331.542781835892,
+                "max": 4431.694704983468,
+                "cv": 0.008710985580361423
+              },
+              "candidate": {
+                "median": 5005.620899306196,
+                "min": 4874.000982111198,
+                "max": 5114.392988678652,
+                "cv": 0.014589403458145387
+              },
+              "kind": "rate",
+              "speedup": 1.1412586217784209,
+              "rateIncreasePercent": 14.125862177842086
+            }
+          },
+          "baselineChecks": [
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            }
+          ],
+          "candidateChecks": [
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            },
+            {
+              "pushed": 2000,
+              "pulled": 2000,
+              "completed": 2000,
+              "checksum": 133445000,
+              "expected": 133445000,
+              "waiting": 0,
+              "active": 0,
+              "empty": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "campaign": "monitoring",
+      "startedAt": "2026-11-15T15:35:29.606Z",
+      "scenarios": [
+        {
+          "scenario": "modest100queues10kactive",
+          "metrics": {
+            "checkMs": {
+              "baseline": {
+                "median": 2.2842345390625,
+                "min": 2.24448079296875,
+                "max": 2.37216845703125,
+                "cv": 0.021121859332289165
+              },
+              "candidate": {
+                "median": 0.09053466796874998,
+                "min": 0.08601692578125,
+                "max": 0.09391194921874998,
+                "cv": 0.030987751717470074
+              },
+              "kind": "duration",
+              "speedup": 25.230495569398382,
+              "durationReductionPercent": 96.03654237686523
+            },
+            "elapsedMs": {
+              "baseline": {
+                "median": 584.764042,
+                "min": 574.587083,
+                "max": 607.275125,
+                "cv": 0.021121859332289165
+              },
+              "candidate": {
+                "median": 23.176874999999995,
+                "min": 22.020333,
+                "max": 24.041458999999996,
+                "cv": 0.030987751717470074
+              },
+              "kind": "duration",
+              "speedup": 25.230495569398382,
+              "durationReductionPercent": 96.03654237686523
+            },
+            "iterations": {
+              "baseline": {
+                "median": 256,
+                "min": 256,
+                "max": 256,
+                "cv": 0
+              },
+              "candidate": {
+                "median": 256,
+                "min": 256,
+                "max": 256,
+                "cv": 0
+              },
+              "kind": "work-count"
+            },
+            "setupMs": {
+              "baseline": {
+                "median": 25.644083,
+                "min": 25.303832999999997,
+                "max": 28.093374999999998,
+                "cv": 0.03872888232775537
+              },
+              "candidate": {
+                "median": 27.032166000000004,
+                "min": 25.071541999999997,
+                "max": 28.153667,
+                "cv": 0.03648690421406195
+              },
+              "kind": "untimed-setup"
+            }
+          },
+          "baselineChecks": [
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            }
+          ],
+          "candidateChecks": [
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            }
+          ]
+        },
+        {
+          "scenario": "stress1000queues100kactive",
+          "metrics": {
+            "checkMs": {
+              "baseline": {
+                "median": 502.040723875,
+                "min": 482.0379375,
+                "max": 540.2917447499999,
+                "cv": 0.03867755731584973
+              },
+              "candidate": {
+                "median": 1.5601874999999978,
+                "min": 1.484395750000001,
+                "max": 1.7957708750000023,
+                "cv": 0.06387984658860266
+              },
+              "kind": "duration",
+              "speedup": 321.7823010856072,
+              "durationReductionPercent": 99.68923088789337
+            },
+            "elapsedMs": {
+              "baseline": {
+                "median": 4016.325791,
+                "min": 3856.3035,
+                "max": 4322.333957999999,
+                "cv": 0.03867755731584973
+              },
+              "candidate": {
+                "median": 12.481499999999983,
+                "min": 11.875166000000007,
+                "max": 14.366167000000019,
+                "cv": 0.06387984658860266
+              },
+              "kind": "duration",
+              "speedup": 321.7823010856072,
+              "durationReductionPercent": 99.68923088789337
+            },
+            "iterations": {
+              "baseline": {
+                "median": 8,
+                "min": 8,
+                "max": 8,
+                "cv": 0
+              },
+              "candidate": {
+                "median": 8,
+                "min": 8,
+                "max": 8,
+                "cv": 0
+              },
+              "kind": "work-count"
+            },
+            "setupMs": {
+              "baseline": {
+                "median": 165.9615,
+                "min": 158.286791,
+                "max": 179.137166,
+                "cv": 0.04130897624836504
+              },
+              "candidate": {
+                "median": 165.53166599999997,
+                "min": 161.4955,
+                "max": 167.474334,
+                "cv": 0.01358572289421452
+              },
+              "kind": "untimed-setup"
+            }
+          },
+          "baselineChecks": [
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            }
+          ],
+          "candidateChecks": [
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 105000,
+              "active": 100000,
+              "waiting": 3000,
+              "delayed": 2000,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "4b6255caba87c293f78809556fd43451f0894e218064025bc81adc8c6676d836",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            }
+          ]
+        },
+        {
+          "scenario": "small-control",
+          "metrics": {
+            "checkMs": {
+              "baseline": {
+                "median": 0.000168548834,
+                "min": 0.0001632165,
+                "max": 0.000174701334,
+                "cv": 0.020178224873523512
+              },
+              "candidate": {
+                "median": 0.000192634666,
+                "min": 0.00018817725,
+                "max": 0.0001975625,
+                "cv": 0.01628158181695394
+              },
+              "kind": "duration",
+              "speedup": 0.8749662638603167,
+              "durationReductionPercent": -14.29012080854859
+            },
+            "elapsedMs": {
+              "baseline": {
+                "median": 84.274417,
+                "min": 81.60825,
+                "max": 87.350667,
+                "cv": 0.020178224873523526
+              },
+              "candidate": {
+                "median": 96.317333,
+                "min": 94.088625,
+                "max": 98.78125,
+                "cv": 0.016281581816953928
+              },
+              "kind": "duration",
+              "speedup": 0.8749662638603167,
+              "durationReductionPercent": -14.29012080854859
+            },
+            "iterations": {
+              "baseline": {
+                "median": 500000,
+                "min": 500000,
+                "max": 500000,
+                "cv": 0
+              },
+              "candidate": {
+                "median": 500000,
+                "min": 500000,
+                "max": 500000,
+                "cv": 0
+              },
+              "kind": "work-count"
+            },
+            "setupMs": {
+              "baseline": {
+                "median": 1.7671670000000006,
+                "min": 1.6245839999999987,
+                "max": 1.831042,
+                "cv": 0.044148102818262536
+              },
+              "candidate": {
+                "median": 1.732292000000001,
+                "min": 1.6750000000000007,
+                "max": 1.814582999999999,
+                "cv": 0.03097812378699314
+              },
+              "kind": "untimed-setup"
+            }
+          },
+          "baselineChecks": [
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            }
+          ],
+          "candidateChecks": [
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 6,
+              "active": 1,
+              "waiting": 3,
+              "delayed": 2,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "1ebf81a7210317348690a09b0c94a09bb0308d6621cc1eecc1cb378ab88c3fb6",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            }
+          ]
+        },
+        {
+          "scenario": "disabled-path",
+          "metrics": {
+            "checkMs": {
+              "baseline": {
+                "median": 0.0000183797416,
+                "min": 0.000018283675,
+                "max": 0.0000184284916,
+                "cv": 0.0026041288205536136
+              },
+              "candidate": {
+                "median": 0.000018313291599999998,
+                "min": 0.0000181819666,
+                "max": 0.000018712308400000002,
+                "cv": 0.008472004379813337
+              },
+              "kind": "duration",
+              "speedup": 1.0036285120911854,
+              "durationReductionPercent": 0.36153935918230573
+            },
+            "elapsedMs": {
+              "baseline": {
+                "median": 91.898708,
+                "min": 91.418375,
+                "max": 92.142458,
+                "cv": 0.0026041288205536166
+              },
+              "candidate": {
+                "median": 91.56645799999998,
+                "min": 90.90983299999999,
+                "max": 93.561542,
+                "cv": 0.008472004379813321
+              },
+              "kind": "duration",
+              "speedup": 1.0036285120911854,
+              "durationReductionPercent": 0.36153935918230573
+            },
+            "iterations": {
+              "baseline": {
+                "median": 5000000,
+                "min": 5000000,
+                "max": 5000000,
+                "cv": 0
+              },
+              "candidate": {
+                "median": 5000000,
+                "min": 5000000,
+                "max": 5000000,
+                "cv": 0
+              },
+              "kind": "work-count"
+            },
+            "setupMs": {
+              "baseline": {
+                "median": 25.907166999999998,
+                "min": 25.620874999999998,
+                "max": 26.495416999999996,
+                "cv": 0.013569105559617782
+              },
+              "candidate": {
+                "median": 25.990042000000003,
+                "min": 25.865458,
+                "max": 26.593792,
+                "cv": 0.010270808741025705
+              },
+              "kind": "untimed-setup"
+            }
+          },
+          "baselineChecks": [
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            }
+          ],
+          "candidateChecks": [
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            },
+            {
+              "accepted": 10500,
+              "active": 10000,
+              "waiting": 300,
+              "delayed": 200,
+              "timedEvents": 0,
+              "lifecycleCountersExact": true,
+              "stateChecksum": "b515e96d8c3833eccf55bbc03ba67d44c662fd9a83280825965594ab2054edba",
+              "oracle": {
+                "exactEvents": [
+                  [
+                    "queue:threshold",
+                    {
+                      "queue": "waiting",
+                      "size": 2,
+                      "threshold": 2
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "idle",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "queue:idle",
+                    {
+                      "queue": "delayed",
+                      "idleSeconds": 1
+                    }
+                  ],
+                  [
+                    "worker:overloaded",
+                    {
+                      "workerId": "oracle-worker",
+                      "name": "oracle-worker",
+                      "activeJobs": 1,
+                      "concurrency": 1,
+                      "overloadedSeconds": 1
+                    }
+                  ]
+                ],
+                "eventChecksum": "8b7d119d84f94f5881e6f559975e88aec45d5229d476626ce6869f1e44175eff",
+                "enabledStateChecksum": "f935721e59000440b644482db1b25c191f28a8c0586f073c488576a81e4196ee",
+                "disabledStateChecksum": "e7303f3dfbe6172bff2e3e82d42d95d2f8b93c57453c9cb62af42292b7496b51",
+                "callbackStateChecksum": "de31f7b56bbbf1ce90c882f8db4ae070f0e26dc47b4f51e64a5e296bdc3eb1ec",
+                "waitingBoundaryInclusive": true,
+                "disabledAndMissingEmitterPreserveState": true,
+                "synchronousCallbackMutationVisible": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

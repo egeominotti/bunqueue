@@ -1,0 +1,47 @@
+diff --git a/src/application/monitoringChecks.ts b/src/application/monitoringChecks.ts
+index 02bd8fb0..424591ec 100644
+--- a/src/application/monitoringChecks.ts
++++ b/src/application/monitoringChecks.ts
+@@ -89,0 +90,11 @@ function getQueueActive(queue: string, procShards: Map<unknown, { queue: string
++/** Count active jobs once for all queues until an idle callback changes live state. */
++function getActiveCounts(procShards: Map<unknown, { queue: string }>[]): Map<string, number> {
++  const counts = new Map<string, number>();
++  for (const shard of procShards) {
++    for (const job of shard.values()) {
++      counts.set(job.queue, (counts.get(job.queue) ?? 0) + 1);
++    }
++  }
++  return counts;
++}
++
+@@ -92,0 +104 @@ function checkQueueIdle(ctx: MonitoringContext, now: number): void {
++  let activeCounts: Map<string, number> | undefined;
+@@ -96 +108,4 @@ function checkQueueIdle(ctx: MonitoringContext, now: number): void {
+-    const active = getQueueActive(queue, ctx.processingShards);
++    const active =
++      ctx.queueNamesCache.size === 1
++        ? getQueueActive(queue, ctx.processingShards)
++        : ((activeCounts ??= getActiveCounts(ctx.processingShards)).get(queue) ?? 0);
+@@ -107,0 +123,2 @@ function checkQueueIdle(ctx: MonitoringContext, now: number): void {
++          // A synchronous callback may change processing maps or queues visited next.
++          activeCounts = undefined;
+diff --git a/src/shared/msgpack.ts b/src/shared/msgpack.ts
+index 2676c83e..8c722c05 100644
+--- a/src/shared/msgpack.ts
++++ b/src/shared/msgpack.ts
+@@ -8,12 +8,3 @@ function containsProtoKey(buffer: Uint8Array): boolean {
+-  for (let index = 0; index <= buffer.length - PROTO_KEY_BYTES.length; index++) {
+-    if (buffer[index] !== PROTO_KEY_BYTES[0]) continue;
+-    let matches = true;
+-    for (let offset = 1; offset < PROTO_KEY_BYTES.length; offset++) {
+-      if (buffer[index + offset] !== PROTO_KEY_BYTES[offset]) {
+-        matches = false;
+-        break;
+-      }
+-    }
+-    if (matches) return true;
+-  }
+-  return false;
++  return (
++    Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength).indexOf(PROTO_KEY_BYTES) !== -1
++  );

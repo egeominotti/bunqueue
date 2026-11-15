@@ -1,0 +1,173 @@
+/** Throwaway native A/B sample. Setup, integrity checks, and cleanup are untimed. */
+import { createHash } from 'node:crypto';
+import { isAbsolute, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import assert from 'node:assert/strict';
+import type { QueueManager } from '../src/application/queueManager';
+import type { MonitoringContext } from '../src/application/monitoringChecks';
+import type { QueueManagerStateView } from '../src/application/types/queueManager';
+import type { BackgroundTaskHandles } from '../src/application/backgroundTasks';
+import { monitoringOracle } from './monitoring-oracle';
+
+const option = (name: string) =>
+  process.argv.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1];
+const sourceRoot = option('source-root');
+assert(sourceRoot && isAbsolute(sourceRoot), '--source-root must be absolute');
+const scenario = option('scenario') ?? 'modest100queues10kactive';
+const scenarios = {
+  modest100queues10kactive: { queues: 100, activeEach: 100, iterations: 256, disabled: false },
+  stress1000queues100kactive: { queues: 1000, activeEach: 100, iterations: 8, disabled: false },
+  'small-control': { queues: 1, activeEach: 1, iterations: 500_000, disabled: false },
+  'disabled-path': { queues: 100, activeEach: 100, iterations: 5_000_000, disabled: true },
+};
+assert(Object.hasOwn(scenarios, scenario), `Unknown scenario: ${scenario}`);
+const config = scenarios[scenario as keyof typeof scenarios];
+const iterations = Number(option('iterations') ?? config.iterations);
+assert(Number.isSafeInteger(iterations) && iterations > 0, 'iterations must be positive');
+const load = (relative: string) => import(pathToFileURL(resolve(sourceRoot, relative)).href);
+const [managerModule, monitoring, background] = await Promise.all([
+  load('src/application/queueManager.ts'),
+  load('src/application/monitoringChecks.ts'),
+  load('src/application/backgroundTasks.ts'),
+]);
+const Manager: typeof import('../src/application/queueManager').QueueManager =
+  managerModule.QueueManager;
+const run: typeof import('../src/application/monitoringChecks').runMonitoringChecks =
+  monitoring.runMonitoringChecks;
+const createState: typeof import('../src/application/monitoringChecks').createMonitoringState =
+  monitoring.createMonitoringState;
+const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const inspect = (manager: QueueManager) =>
+  manager as unknown as QueueManagerStateView & {
+    backgroundTaskHandles: BackgroundTaskHandles | null;
+  };
+const createManager = () => {
+  const manager = new Manager({
+    cleanupIntervalMs: 3_600_000,
+    dependencyCheckMs: 3_600_000,
+    stallCheckMs: 3_600_000,
+    dlqMaintenanceMs: 3_600_000,
+    maxQueueEvents: 0,
+    maxMetricDataPoints: 0,
+  });
+  const handles = inspect(manager).backgroundTaskHandles;
+  if (handles) background.stopBackgroundTasks(handles);
+  manager.workerManager.stop();
+  return manager;
+};
+const manager = createManager();
+const setupStart = performance.now();
+let accepted = 0;
+const expectedActive = new Set<number>();
+try {
+  for (let queueIndex = 0; queueIndex < config.queues; queueIndex++) {
+    const queue = `monitoring-${queueIndex}`;
+    const jobs = Array.from({ length: config.activeEach }, (_, index) => {
+      const seq = queueIndex * config.activeEach + index;
+      expectedActive.add(seq);
+      return { data: { seq } };
+    });
+    const ids = await manager.pushBatch(queue, jobs);
+    assert.equal(ids.length, config.activeEach);
+    const pulled = await manager.pullBatch(queue, config.activeEach);
+    assert.equal(pulled.length, config.activeEach);
+    assert.deepEqual(new Set(pulled.map((job) => job.id)), new Set(ids));
+    accepted += ids.length;
+    accepted += (
+      await manager.pushBatch(queue, [
+        ...Array.from({ length: 3 }, (_, seq) => ({ data: { waiting: seq } })),
+        ...Array.from({ length: 2 }, (_, seq) => ({ data: { delayed: seq }, delay: 3_600_000 })),
+      ])
+    ).length;
+  }
+  const real = inspect(manager);
+  assert.equal(real.storage, null);
+  let timedEvents = 0;
+  const ctx: MonitoringContext = {
+    queueNamesCache: real.queueNamesCache,
+    shards: real.shards,
+    processingShards: real.processingShards,
+    workerManager: manager.workerManager,
+    storage: real.storage,
+    dashboardEmit: () => {
+      timedEvents++;
+    },
+    state: createState({
+      queueIdleMs: config.disabled ? 0 : 1000,
+      queueSize: config.disabled ? 0 : 10,
+      workerOverloadMs: 0,
+      memoryWarningMb: 0,
+      storageWarningMb: 0,
+    }),
+  };
+  const setupMs = performance.now() - setupStart;
+  // Fixed same-work iterations for both source roots; no adaptive timing in samples.
+  for (let warmup = 0; warmup < 8; warmup++) run(ctx);
+  const start = performance.now();
+  for (let iteration = 0; iteration < iterations; iteration++) run(ctx);
+  const elapsedMs = performance.now() - start;
+  assert.equal(timedEvents, 0);
+  const actualActive = new Set<number>();
+  const activePerQueue = new Map<string, number>();
+  for (const shard of real.processingShards) {
+    for (const [id, job] of shard) {
+      assert.equal(real.jobIndex.get(id)?.type, 'processing');
+      const seq = (job.data as { seq: number }).seq;
+      assert(!actualActive.has(seq), `Duplicate active payload: ${seq}`);
+      actualActive.add(seq);
+      activePerQueue.set(job.queue, (activePerQueue.get(job.queue) ?? 0) + 1);
+    }
+  }
+  assert.deepEqual(actualActive, expectedActive);
+  let waiting = 0;
+  let delayed = 0;
+  const queueStates: unknown[] = [];
+  const now = Date.now();
+  for (const shard of real.shards) {
+    for (const [queue, jobs] of shard.queues) {
+      let ready = 0;
+      let future = 0;
+      for (const job of jobs.values()) {
+        assert.equal(real.jobIndex.get(job.id)?.type, 'queue');
+        if (job.runAt <= now) ready++;
+        else future++;
+      }
+      assert.equal(ready, 3);
+      assert.equal(future, 2);
+      assert.equal(activePerQueue.get(queue), config.activeEach);
+      waiting += ready;
+      delayed += future;
+      queueStates.push([queue, ready, future, activePerQueue.get(queue)]);
+    }
+  }
+  assert.equal(real.jobIndex.size, accepted);
+  assert.equal(waiting, config.queues * 3);
+  assert.equal(delayed, config.queues * 2);
+  assert.equal(real.metrics.totalPushed.value, BigInt(accepted));
+  assert.equal(real.metrics.totalPulled.value, BigInt(expectedActive.size));
+  assert.equal(ctx.state.queueIdleSince.size, 0);
+  assert.equal(ctx.state.queueThresholdEmitted.size, 0);
+  const checks = {
+    accepted,
+    active: actualActive.size,
+    waiting,
+    delayed,
+    timedEvents,
+    lifecycleCountersExact: true,
+    stateChecksum: digest(
+      queueStates.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+    ),
+    oracle: await monitoringOracle({ createManager, inspect, run, createState, digest }),
+  };
+  console.log(
+    JSON.stringify({
+      scenario,
+      sourceRoot,
+      topology: 'embedded-in-memory, real QueueManager pushBatch/pullBatch, native host',
+      metrics: { checkMs: elapsedMs / iterations, elapsedMs, iterations, setupMs },
+      checks,
+    })
+  );
+} finally {
+  manager.shutdown();
+}

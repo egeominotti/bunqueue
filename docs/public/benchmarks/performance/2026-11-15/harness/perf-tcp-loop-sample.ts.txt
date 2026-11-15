@@ -1,0 +1,118 @@
+/** Throwaway native TCP sample, with a separate fresh broker process per call. */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const args = new Map(process.argv.slice(2).map((arg) => {
+  const [key, ...value] = arg.replace(/^--/, '').split('=');
+  return [key, value.join('=')];
+}));
+const sourceRoot = resolve(args.get('source-root') ?? `${import.meta.dir}/..`);
+const load = (relative: string) => import(pathToFileURL(join(sourceRoot, relative)).href);
+const assert = (value: unknown, message: string) => { if (!value) throw new Error(message); };
+const storage = args.get('storage') ?? 'memory';
+if (!['memory', 'sqlite'].includes(storage)) throw new Error('Invalid storage');
+const scenario = args.get('scenario') ?? 'tcp64k';
+if (!['tcpsmall', 'tcp64k'].includes(scenario)) throw new Error('Invalid scenario');
+const payloadBytes = scenario === 'tcpsmall' ? 32 : 65_536;
+
+if (args.has('server')) {
+  const { QueueManager } = await load('src/application/queueManager.ts');
+  const { createTcpServer } = await load('src/infrastructure/server/tcp.ts');
+  const manager = new QueueManager(storage === 'sqlite' ? { dataPath: args.get('data-path') } : {});
+  const server = createTcpServer(manager, { hostname: '127.0.0.1', port: 0 });
+  process.on('message', (message) => {
+    if (message !== 'stop') return;
+    server.stop();
+    manager.shutdown();
+    process.exit(0);
+  });
+  process.send?.({ ready: true, port: server.server.port });
+} else {
+  const jobs = Number(args.get('jobs') ?? 2_000);
+  if (!Number.isSafeInteger(jobs) || jobs <= 0) throw new Error('Invalid jobs');
+  const directory = mkdtempSync(join(tmpdir(), 'bunqueue-msgpack-ab-'));
+  let resolveReady!: (port: number) => void;
+  let rejectReady!: (error: Error) => void;
+  const ready = new Promise<number>((resolvePromise, rejectPromise) => {
+    resolveReady = resolvePromise;
+    rejectReady = rejectPromise;
+  });
+  const child = Bun.spawn([
+    process.execPath, import.meta.path, `--source-root=${sourceRoot}`, '--server',
+    `--storage=${storage}`, `--data-path=${join(directory, 'queue.db')}`,
+  ], {
+    cwd: sourceRoot,
+    env: {
+      ...process.env, LOG_LEVEL: 'error', BUNQUEUE_EMBEDDED: '0',
+      RATE_LIMIT_MAX_REQUESTS: String(Math.max(100_000, jobs * 4 + 1_000)),
+    },
+    stdout: 'pipe', stderr: 'pipe',
+    ipc(message) { if (message?.ready === true) resolveReady(message.port); },
+  });
+  child.exited.then((code) => rejectReady(new Error(`Broker exited before ready: ${code}`)));
+  const timer = setTimeout(() => rejectReady(new Error('Broker startup timeout')), 15_000);
+  let client: any;
+  let result: unknown;
+  try {
+    const port = await ready;
+    clearTimeout(timer);
+    const { TcpClient } = await load('src/client/tcp/client.ts');
+    client = new TcpClient({ host: '127.0.0.1', port, commandTimeout: 30_000 });
+    const send = async (command: Record<string, unknown>) => {
+      const response = await client.send(command);
+      assert(response.ok === true, `Command ${command.cmd} failed: ${JSON.stringify(response)}`);
+      return response;
+    };
+    await send({ cmd: 'Ping' });
+    const queue = `msgpack-ab-${process.pid}-${crypto.randomUUID()}`;
+    const text = 'a'.repeat(payloadBytes - 1) + 'Z';
+    const ids = new Set<string>();
+    const seen = new Set<string>();
+    let checksum = 0;
+    const start = Bun.nanoseconds();
+    for (let i = 0; i < jobs; i++) {
+      const response = await send({ cmd: 'PUSH', queue, data: { text, sequence: i } });
+      assert(typeof response.id === 'string' && !ids.has(response.id), 'Missing/duplicate push id');
+      ids.add(response.id);
+    }
+    const pushed = Bun.nanoseconds();
+    for (let i = 0; i < jobs; i++) {
+      const response = await send({ cmd: 'PULL', queue, timeout: 0 });
+      const job = response.job;
+      assert(job && ids.has(job.id) && !seen.has(job.id), 'Missing/unknown/duplicate pulled job');
+      seen.add(job.id);
+      assert(job.data.sequence === i && job.data.text.length === payloadBytes, 'Payload order/size changed');
+      checksum += job.data.text.length + job.data.text.charCodeAt(0) + job.data.text.charCodeAt(payloadBytes - 1) + job.data.sequence;
+      await send({ cmd: 'ACK', id: job.id, result: i });
+    }
+    const completed = Bun.nanoseconds();
+    const stats = (await send({ cmd: 'Stats' })).stats;
+    const metrics = (await send({ cmd: 'Metrics' })).metrics;
+    const empty = (await send({ cmd: 'PULL', queue, timeout: 0 })).job;
+    const expected = jobs * (payloadBytes + 97 + 90) + jobs * (jobs - 1) / 2;
+    assert(checksum === expected, 'Payload checksum mismatch');
+    assert(seen.size === jobs && ids.size === jobs && empty === null, 'Job conservation failed');
+    assert(stats.waiting === 0 && stats.active === 0 && stats.completed === jobs, 'Terminal state mismatch');
+    assert(metrics.totalPushed === jobs && metrics.totalPulled === jobs && metrics.totalCompleted === jobs, 'Lifecycle counters mismatch');
+    const loopMs = (completed - start) / 1e6;
+    result = {
+      scenario, sourceRoot, storage, jobs, payloadBytes,
+      metrics: { pushMs: (pushed - start) / 1e6, pullAckMs: (completed - pushed) / 1e6, loopMs, jobsPerSecond: jobs * 1000 / loopMs },
+      checks: { pushed: ids.size, pulled: seen.size, completed: stats.completed, checksum, expected, waiting: stats.waiting, active: stats.active, empty: empty === null },
+    };
+  } finally {
+    clearTimeout(timer);
+    client?.close();
+    if (child.exitCode === null) child.send('stop');
+    const stopTimer = setTimeout(() => child.kill(), 5_000);
+    const exitCode = await child.exited;
+    clearTimeout(stopTimer);
+    const stdout = await new Response(child.stdout).text();
+    const stderr = await new Response(child.stderr).text();
+    rmSync(directory, { recursive: true, force: true });
+    if (exitCode !== 0 || stdout.length || stderr.length) throw new Error(`Broker exit ${exitCode}: stdout=${stdout} stderr=${stderr}`);
+  }
+  console.log(JSON.stringify(result));
+}
