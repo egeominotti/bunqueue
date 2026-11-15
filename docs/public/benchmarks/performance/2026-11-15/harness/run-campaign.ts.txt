@@ -1,0 +1,73 @@
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { cpus, totalmem, release } from 'node:os';
+
+const campaign = resolve(import.meta.dir);
+const baselineRoot = resolve(process.env.BUNQUEUE_BASELINE_ROOT ?? (() => { throw new Error('Set BUNQUEUE_BASELINE_ROOT'); })());
+const candidateRoot = resolve(process.env.BUNQUEUE_CANDIDATE_ROOT ?? (() => { throw new Error('Set BUNQUEUE_CANDIDATE_ROOT'); })());
+const group = process.argv[2];
+const runner = resolve(process.argv[3]);
+const scenarios = process.argv[4].split(',');
+const samples = Number(process.env.AB_SAMPLES ?? 7);
+const label = process.env.AB_LABEL ?? group;
+const rawPath = resolve(campaign, `${label}-raw.jsonl`);
+const summaryPath = resolve(campaign, `${label}-summary.json`);
+const median = (values: number[]) => {
+  const ordered = [...values].sort((a, b) => a - b);
+  return ordered[Math.floor(ordered.length / 2)];
+};
+const stats = (values: number[]) => {
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((sum, x) => sum + (x - mean) ** 2, 0) / values.length;
+  return { median: median(values), min: Math.min(...values), max: Math.max(...values), cv: Math.sqrt(variance) / mean };
+};
+mkdirSync(campaign, { recursive: true });
+const metadata = {
+  group, label, runner, scenarios, samples, baselineRoot, candidateRoot,
+  candidateTree: process.env.AB_TREE ?? null,
+  gitRevision: (await Bun.$`git rev-parse HEAD`.text()).trim(),
+  bun: Bun.version, platform: process.platform, architecture: process.arch,
+  osRelease: release(), cpu: cpus()[0]?.model, logicalCpus: cpus().length,
+  memoryBytes: totalmem(), start: new Date().toISOString(),
+  method: 'native host; fresh process and state; discarded warmup per variant/scenario; alternating AB/BA pairs; serial runs',
+};
+appendFileSync(rawPath, JSON.stringify({ type: 'metadata', ...metadata }) + '\n');
+const records: any[] = [];
+for (const scenario of scenarios) {
+  for (let index = -1; index < samples; index++) {
+    const order = index % 2 === 0 ? ['baseline', group] : [group, 'baseline'];
+    for (const variant of order) {
+      const sourceRoot = variant === 'baseline' ? baselineRoot : candidateRoot;
+      const start = performance.now();
+      const child = Bun.spawn([process.execPath, runner, `--source-root=${sourceRoot}`, `--scenario=${scenario}`], {
+        cwd: sourceRoot, stdout: 'pipe', stderr: 'pipe',
+        env: { ...process.env, BUNQUEUE_EMBEDDED: '1' },
+      });
+      const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+      const lines = stdout.trim().split('\n');
+      let result: any;
+      for (const line of lines.toReversed()) {
+        try { const parsed = JSON.parse(line); if (parsed.metrics) { result = parsed; break; } } catch {}
+      }
+      const record = { type: 'sample', scenario, variant, sample: index, warmup: index < 0, code, wallMs: performance.now() - start, result, stdout, stderr };
+      appendFileSync(rawPath, JSON.stringify(record) + '\n');
+      if (code !== 0 || !result || stderr.trim()) throw new Error(`Invalid sample: ${group}/${scenario}/${variant}/${index}; code ${code}, stderr ${stderr.slice(0, 1500)}; stdout ${stdout.slice(-1000)}`);
+      if (index >= 0) records.push(record);
+      console.log(JSON.stringify({ group, scenario, variant, sample: index, metrics: result.metrics, wallMs: Math.round(record.wallMs) }));
+    }
+  }
+}
+const summaries = scenarios.map((scenario) => {
+  const baseline = records.filter((r) => r.scenario === scenario && r.variant === 'baseline');
+  const candidate = records.filter((r) => r.scenario === scenario && r.variant === group);
+  const metrics = Object.fromEntries(Object.keys(baseline[0].result.metrics).map((key) => {
+    const a = stats(baseline.map((r) => r.result.metrics[key]));
+    const b = stats(candidate.map((r) => r.result.metrics[key]));
+    if (key === 'iterations' || key === 'setupMs') return [key, { baseline: a, candidate: b, kind: key === 'setupMs' ? 'untimed-setup' : 'work-count' }];
+    if (key.endsWith('PerSecond')) return [key, { baseline: a, candidate: b, kind: 'rate', speedup: b.median / a.median, rateIncreasePercent: 100 * (b.median / a.median - 1) }];
+    return [key, { baseline: a, candidate: b, kind: 'duration', speedup: a.median / b.median, durationReductionPercent: 100 * (1 - b.median / a.median) }];
+  }));
+  return { scenario, metrics, baselineChecks: baseline.map((r) => r.result.checks), candidateChecks: candidate.map((r) => r.result.checks) };
+});
+await Bun.write(summaryPath, JSON.stringify({ metadata, summaries, end: new Date().toISOString() }, null, 2) + '\n');
+console.log(`Summary: ${summaryPath}`);

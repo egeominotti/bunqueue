@@ -87,13 +87,28 @@ function getQueueActive(queue: string, procShards: Map<unknown, { queue: string 
   return count;
 }
 
+/** Count active jobs once for all queues until an idle callback changes live state. */
+function getActiveCounts(procShards: Map<unknown, { queue: string }>[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const shard of procShards) {
+    for (const job of shard.values()) {
+      counts.set(job.queue, (counts.get(job.queue) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 function checkQueueIdle(ctx: MonitoringContext, now: number): void {
   const idleMs = ctx.state.thresholds.queueIdleMs;
   if (idleMs <= 0) return;
+  let activeCounts: Map<string, number> | undefined;
 
   for (const queue of ctx.queueNamesCache) {
     const waiting = getQueueWaiting(queue, ctx.shards, now);
-    const active = getQueueActive(queue, ctx.processingShards);
+    const active =
+      ctx.queueNamesCache.size === 1
+        ? getQueueActive(queue, ctx.processingShards)
+        : ((activeCounts ??= getActiveCounts(ctx.processingShards)).get(queue) ?? 0);
 
     if (waiting === 0 && active === 0) {
       if (!ctx.state.queueIdleSince.has(queue)) {
@@ -105,6 +120,8 @@ function checkQueueIdle(ctx: MonitoringContext, now: number): void {
             queue,
             idleSeconds: Math.floor((now - since) / 1000),
           });
+          // A synchronous callback may change processing maps or queues visited next.
+          activeCounts = undefined;
           ctx.state.queueIdleSince.delete(queue);
         }
       }

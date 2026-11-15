@@ -1,0 +1,67 @@
+/** Throwaway native benchmark; one JSON sample, selected source tree. */
+import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const args = new Map(process.argv.slice(2).map((arg) => {
+  const [key, ...value] = arg.replace(/^--/, '').split('=');
+  return [key, value.join('=')];
+}));
+const sourceRoot = resolve(args.get('source-root') ?? `${import.meta.dir}/..`);
+const scenario = args.get('scenario') ?? 'small';
+const defaults: Record<string, number> = { small: 500_000, '64k': 2_000, '1m': 200, proto: 100_000 };
+if (!(scenario in defaults)) throw new Error(`Unknown scenario ${scenario}`);
+const iterations = Number(args.get('iterations') ?? defaults[scenario]);
+if (!Number.isSafeInteger(iterations) || iterations <= 0) throw new Error('Invalid iterations');
+const { encodeMessagePack, decodeMessagePack } = await import(
+  pathToFileURL(join(sourceRoot, 'src/shared/msgpack.ts')).href
+);
+const assert = (value: unknown, message: string) => { if (!value) throw new Error(message); };
+
+// Keep buffers independent of msgpackr's shared output arena and outside timing.
+const sizes: Record<string, number> = { small: 32, '64k': 65_536, '1m': 1_048_576, proto: 32 };
+const payload = { text: 'a'.repeat(sizes[scenario] - 1) + 'Z', sequence: 47 };
+if (scenario === 'proto') {
+  Object.defineProperty(payload, '__proto__', { value: { poisoned: true }, enumerable: true });
+}
+const encoded = Buffer.from(encodeMessagePack({ cmd: 'PUSH', queue: 'decode-bench', data: payload }));
+const before = Object.getOwnPropertyDescriptor(Object.prototype, 'poisoned');
+const malicious = Object.create(null);
+malicious.__proto__ = { poisoned: true };
+malicious.nested = Object.create(null);
+malicious.nested.__proto__ = { poisoned: 'nested' };
+const decodedMalicious = decodeMessagePack(Buffer.from(encodeMessagePack(malicious)));
+assert(Object.hasOwn(decodedMalicious, '__proto__'), 'Missing own malicious key');
+assert(decodedMalicious.__proto__.poisoned === true, 'Malicious value changed');
+assert(Object.getPrototypeOf(decodedMalicious) === Object.prototype, 'Decoded prototype changed');
+assert(Object.hasOwn(decodedMalicious.nested, '__proto__'), 'Missing nested malicious key');
+assert(Object.getPrototypeOf(decodedMalicious.nested) === Object.prototype, 'Nested prototype changed');
+assert(Object.getOwnPropertyDescriptor(Object.prototype, 'poisoned') === before, 'Global pollution');
+
+const guarded = Buffer.alloc(encoded.length + 32, 0);
+guarded.write('__proto__', 0);
+guarded.write('__proto__', encoded.length + 16);
+guarded.set(encoded, 16);
+const slice = new Uint8Array(guarded.buffer, guarded.byteOffset + 16, encoded.length);
+const guardDecoded = decodeMessagePack(slice);
+assert(guardDecoded.data.text === payload.text, 'Subarray length/offset changed');
+assert(guardDecoded.data.sequence === 47, 'Subarray data changed');
+
+let checksum = 0;
+const start = Bun.nanoseconds();
+for (let i = 0; i < iterations; i++) {
+  const decoded = decodeMessagePack(encoded);
+  const text = decoded.data.text as string;
+  checksum += text.length + text.charCodeAt(0) + text.charCodeAt(text.length - 1) + decoded.data.sequence;
+  if (scenario === 'proto' && decoded.data.__proto__.poisoned !== true) throw new Error('Lost key');
+}
+const decodeMs = (Bun.nanoseconds() - start) / 1e6;
+const expected = iterations * (payload.text.length + 97 + 90 + 47);
+assert(checksum === expected, 'Payload checksum mismatch');
+console.log(JSON.stringify({
+  scenario,
+  sourceRoot,
+  iterations,
+  encodedBytes: encoded.length,
+  metrics: { decodeMs, decodesPerSecond: iterations * 1000 / decodeMs },
+  checks: { checksum, expected, ownProtoKeys: true, prototypeUntouched: true, subarrayGuard: true },
+}));

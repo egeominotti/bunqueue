@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-15",
+  "evidenceLevel": "engineering",
+  "repository": "https://github.com/egeominotti/bunqueue",
+  "baselineCommit": "732c1fb54378d71f467b5a2af9c9a32cc8da8475",
+  "candidate": {
+    "status": "Unreleased source; no package release",
+    "measuredTree": "697d296bf346bfd112b569f557058fed7cda7202",
+    "runtimeGitBlobs": {
+      "src/application/monitoringChecks.ts": "424591ec90bcd348f31c50aacf79f41fa1da327a",
+      "src/shared/msgpack.ts": "8c722c0554efb5f1a1ba942b3d3bda0d37a19e46"
+    },
+    "note": "The measured tree was uncommitted. Reproduce the exact runtime using optimized-runtime.patch.txt on the baseline; verify Git blob hashes."
+  },
+  "environment": {
+    "cpu": "Apple M5 Max",
+    "logicalCpus": 18,
+    "memoryBytes": 68719476736,
+    "platform": "darwin",
+    "architecture": "arm64",
+    "darwinRelease": "27.2.0",
+    "bun": "1.4.4"
+  },
+  "measuredSamples": 140,
+  "discardedWarmups": 20,
+  "reproductionGuide": "README.txt",
+  "method": "Seven fresh processes per variant/scenario; discarded fresh-process warmup; alternating AB/BA pairs; native host; serial campaigns; correctness checks in every sample.",
+  "projection": "Captured numeric metrics, checks, scenario data and process timing are retained at full JSON precision. Private source-root paths and redundant raw stdout/stderr are omitted; candidate labels are normalized. No timings reconstructed from rounded tables.",
+  "capturedPrivateArtifactHashes": {
+    "msgpack-raw.jsonl": "736c5db036ca687d7c5ed68ca417d61a302da90a28499ee99cfc18c3b3bc3f30",
+    "msgpack-tcp-raw.jsonl": "53cbcf57e46fe84c16453155a4cf73533ff128fd1feafab908eefea4f680534c",
+    "monitoring-raw.jsonl": "6005810e6f3f237af4a0d20f31a26a6641f251eecf75ec0bda6394e8ceaf7790"
+  },
+  "harness": {
+    "directory": "harness/",
+    "download": "Remove only the .txt suffix before running with Bun.",
+    "configurationOnlyAdaptation": "Coordinator source roots are read from BUNQUEUE_BASELINE_ROOT and BUNQUEUE_CANDIDATE_ROOT. Workload, timing, integrity checks and aggregation are unchanged."
+  },
+  "limitations": [
+    "One native host; power/governor mode not recorded for this campaign; not a production capacity or tail-latency study.",
+    "TCP uses an in-memory broker and scalar commands, not durable or batched worker throughput.",
+    "Monitoring timings are event-free; callback equivalence is checked separately.",
+    "Single-queue control adds about 24ns; small TCP/disabled/prototype-control differences are inconclusive.",
+    "SQLite transaction grouping is rejected and excluded from delivered-performance results."
+  ]
+}

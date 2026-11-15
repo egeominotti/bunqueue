@@ -1,0 +1,142 @@
+/** Untimed exact behavioral oracle shared by both A/B variants; no test files change. */
+import assert from 'node:assert/strict';
+import type { QueueManager } from '../src/application/queueManager';
+import type { QueueManagerStateView } from '../src/application/types/queueManager';
+import type {
+  MonitoringContext,
+  createMonitoringState,
+  runMonitoringChecks,
+} from '../src/application/monitoringChecks';
+
+interface OracleOptions {
+  createManager(): QueueManager;
+  inspect(manager: QueueManager): QueueManagerStateView;
+  run: typeof runMonitoringChecks;
+  createState: typeof createMonitoringState;
+  digest(value: unknown): string;
+}
+
+export async function monitoringOracle({
+  createManager,
+  inspect,
+  run,
+  createState,
+  digest,
+}: OracleOptions) {
+  const originalNow = Date.now;
+  let now = 2_000_000_000_000;
+  Date.now = () => now;
+  const manager = createManager();
+  try {
+    manager.setConcurrency('idle', 1);
+    await manager.push('busy', { data: { oracle: true } });
+    assert(await manager.pull('busy'));
+    await manager.pushBatch('waiting', [{ data: 1 }, { data: 2 }]);
+    await manager.push('delayed', { data: 3, delay: 100_000 });
+    await manager.push('boundary', { data: 4, delay: 1000 });
+    const worker = manager.registerWorker('oracle-worker', ['busy'], 1, {
+      workerId: 'oracle-worker',
+    });
+    manager.workerManager.heartbeat(worker.id, { activeJobs: 1 });
+    const real = inspect(manager);
+    const events: unknown[] = [];
+    const ctx: MonitoringContext = {
+      queueNamesCache: real.queueNamesCache,
+      shards: real.shards,
+      processingShards: real.processingShards,
+      workerManager: manager.workerManager,
+      storage: null,
+      dashboardEmit: (event, data) => {
+        events.push([event, data]);
+      },
+      state: createState({
+        queueIdleMs: 1000,
+        queueSize: 2,
+        workerOverloadMs: 1000,
+        memoryWarningMb: 0,
+        storageWarningMb: 0,
+      }),
+    };
+    now += 1000;
+    run(ctx);
+    assert(!ctx.state.queueIdleSince.has('boundary'), 'runAt === now must count as waiting');
+    now += 1000;
+    run(ctx);
+    assert.deepEqual(events, [
+      ['queue:threshold', { queue: 'waiting', size: 2, threshold: 2 }],
+      ['queue:idle', { queue: 'idle', idleSeconds: 1 }],
+      ['queue:idle', { queue: 'delayed', idleSeconds: 1 }],
+      [
+        'worker:overloaded',
+        {
+          workerId: 'oracle-worker',
+          name: 'oracle-worker',
+          activeJobs: 1,
+          concurrency: 1,
+          overloadedSeconds: 1,
+        },
+      ],
+    ]);
+    const stateSnapshot = () => ({
+      idle: [...ctx.state.queueIdleSince],
+      threshold: [...ctx.state.queueThresholdEmitted],
+      overload: [...ctx.state.workerOverloadedSince],
+      memory: ctx.state.memoryWarningEmitted,
+      storage: ctx.state.storageWarningEmitted,
+    });
+    const enabledState = stateSnapshot();
+    ctx.state = createState({
+      queueIdleMs: 0,
+      queueSize: 0,
+      workerOverloadMs: 0,
+      memoryWarningMb: 0,
+      storageWarningMb: 0,
+    });
+    ctx.state.queueIdleSince.set('sentinel', now - 10_000);
+    const disabledState = stateSnapshot();
+    run(ctx);
+    assert.deepEqual(stateSnapshot(), disabledState);
+    assert.equal(events.length, 4);
+    ctx.dashboardEmit = undefined;
+    run(ctx);
+    assert.deepEqual(stateSnapshot(), disabledState);
+
+    // Callbacks receive live context: a change to processing must affect later queues.
+    const activeEntries = real.processingShards.map((shard) => [...shard.entries()]);
+    ctx.state = createState({
+      queueIdleMs: 1000,
+      queueSize: 0,
+      workerOverloadMs: 0,
+      memoryWarningMb: 0,
+      storageWarningMb: 0,
+    });
+    ctx.state.queueIdleSince.set('idle', now - 1000);
+    const callbackEvents: unknown[] = [];
+    ctx.dashboardEmit = (event, data) => {
+      callbackEvents.push([event, data]);
+      for (const shard of real.processingShards) shard.clear();
+    };
+    try {
+      run(ctx);
+      assert.deepEqual(callbackEvents, [['queue:idle', { queue: 'idle', idleSeconds: 1 }]]);
+      assert.equal(ctx.state.queueIdleSince.get('busy'), now);
+    } finally {
+      for (let i = 0; i < activeEntries.length; i++) {
+        for (const [id, job] of activeEntries[i]) real.processingShards[i].set(id, job);
+      }
+    }
+    return {
+      exactEvents: events,
+      eventChecksum: digest(events),
+      enabledStateChecksum: digest(enabledState),
+      disabledStateChecksum: digest(disabledState),
+      callbackStateChecksum: digest(stateSnapshot()),
+      waitingBoundaryInclusive: true,
+      disabledAndMissingEmitterPreserveState: true,
+      synchronousCallbackMutationVisible: true,
+    };
+  } finally {
+    manager.shutdown();
+    Date.now = originalNow;
+  }
+}
