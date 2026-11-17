@@ -158,13 +158,20 @@ export abstract class SqliteJobLifecycle extends SqliteAdmission {
     });
   }
 
-  markWaitingChildren(jobId: JobId, timeline?: JobTimelineEntry[]): void {
+  markWaitingChildren(jobId: JobId, timeline?: JobTimelineEntry[], job?: Job): void {
     this.writeBuffer.setPendingState(jobId, 'waiting-children');
     this.flushIfBuffered(jobId);
     this.safeWrite(() => {
       this.db
-        .query('UPDATE jobs SET state = ?, started_at = NULL, timeline = ? WHERE id = ?')
-        .run('waiting-children', timeline && timeline.length > 0 ? pack(timeline) : null, jobId);
+        .query(
+          'UPDATE jobs SET state = ?, started_at = NULL, timeline = ?, extended_options = COALESCE(?, extended_options) WHERE id = ?'
+        )
+        .run(
+          'waiting-children',
+          timeline && timeline.length > 0 ? pack(timeline) : null,
+          job ? encodeJobOptions(job) : null,
+          jobId
+        );
     });
   }
 

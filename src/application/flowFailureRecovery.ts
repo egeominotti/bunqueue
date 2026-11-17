@@ -8,10 +8,14 @@ import type { SqliteStorage } from '../infrastructure/persistence/sqlite';
 import { shardIndex } from '../shared/hash';
 import type { SetLike } from '../shared/lru';
 import type { DependencyResultTracker } from './dependencyResultTracker';
+import { persistedJobState } from '../infrastructure/persistence/sqliteSerializer';
+import { dependencyReadyState } from './dependencyProcessor';
 import { flowFailureRecord } from './flowChildFailure';
 import { repairMissingFlowFailures } from './flowFailureRepair';
 import {
   type DependencyCompletionTracker,
+  isDependencyComplete,
+  loadColdDependencyCompletions,
   reconcileDependencyCompletionPins,
 } from './dependencyCompletions';
 
@@ -42,18 +46,26 @@ function findQueuedJob(ctx: FlowFailureRecoveryContext, id: JobId): Job | null {
 function promote(parent: Job, ctx: FlowFailureRecoveryContext): void {
   const idx = shardIndex(parent.queue);
   const shard = ctx.shards[idx];
+  const queue = shard.getQueue(parent.queue);
+  const queued = queue.find(parent.id);
+  const now = Date.now();
+  const update = { ...parent, runAt: queued ? parent.runAt : now };
+  // Replaying a failure value for an already runnable retry preserves its stored backoff state.
+  const previous = queued ? persistedJobState(parent) : undefined;
+  const ready =
+    previous === 'waiting' || previous === 'prioritized' || previous === 'delayed'
+      ? previous
+      : dependencyReadyState(update, now);
+  ctx.storage.updateFlowParentResolution(update, ready);
+  if (queued) return;
   if (shard.waitingDeps.delete(parent.id)) {
     shard.unregisterDependencies(parent.id, parent.dependsOn);
   }
   shard.waitingChildren.delete(parent.id);
-  const queue = shard.getQueue(parent.queue);
-  if (!queue.find(parent.id)) {
-    parent.runAt = Date.now();
-    queue.push(parent);
-    shard.incrementQueued(parent.id, false, parent.createdAt, parent.queue, parent.runAt);
-    shard.notify(parent.queue);
-  }
-  ctx.storage.updateFlowParentResolution(parent);
+  parent.runAt = update.runAt;
+  queue.push(parent);
+  shard.incrementQueued(parent.id, false, parent.createdAt, parent.queue, parent.runAt);
+  shard.notify(parent.queue);
 }
 
 /**
@@ -134,12 +146,8 @@ export function recoverFlowFailures(ctx: FlowFailureRecoveryContext): void {
       ctx.dependencyResults.releaseDependency(parent.id, record.childId);
       ctx.storage.updateFlowParentResolution(parent);
     }
-    const ready =
-      parent.dependsOn.length === 0 ||
-      parent.dependsOn.every(
-        (dependency) =>
-          ctx.completedJobs.has(dependency) || (ctx.depCompletions?.has(dependency) ?? false)
-      );
+    const stored = loadColdDependencyCompletions(parent.dependsOn, ctx);
+    const ready = parent.dependsOn.every((id) => isDependencyComplete(id, ctx, stored));
     if (ready) promote(parent, ctx);
     if (record.mode === 'remove') {
       ctx.storage.deleteFlowFailure(record.parentId, record.childId);

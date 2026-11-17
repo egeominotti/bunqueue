@@ -53,7 +53,8 @@ export function recoverPendingJobs(
             completionProofs.has(dependencyId) ||
             completedInBatch.has(dependencyId)
         );
-      const manuallyWaitingChildren = recoveredState === 'waiting-children' && !hasDependencies;
+      const manuallyWaitingChildren =
+        recoveredState === 'waiting-children' && (job.manuallyParked || !hasDependencies);
 
       if (manuallyWaitingChildren) {
         shard.waitingChildren.set(job.id, job);

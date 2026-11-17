@@ -1,6 +1,11 @@
 import type { TransactionSQL } from 'bun';
-import { createCronJob, type CronJob, type CronJobInput } from '../../../domain/types/cron';
-import { createJob, generateJobId, type JobInput } from '../../../domain/types/job';
+import {
+  createCronJob,
+  cronJobInput,
+  type CronJob,
+  type CronJobInput,
+} from '../../../domain/types/cron';
+import { createJob, generateJobId } from '../../../domain/types/job';
 import { expandCronShortcut, getNextCronRun, getNextIntervalRun } from '../../scheduler/cronParser';
 import { assertPersistedCronSupported } from '../../scheduler/cron/persisted';
 import { assertValidCronInput } from '../../scheduler/cron/validation';
@@ -108,25 +113,6 @@ export async function removePostgresCron(ctx: PostgresContext, name: string): Pr
   return rows.length > 0;
 }
 
-function spawnedInput(cron: CronJob): JobInput {
-  const uniqueKey = cron.uniqueKey ?? (cron.preventOverlap ? `cron:${cron.name}` : undefined);
-  const options = cron.jobOptions;
-  return {
-    name: cron.jobName,
-    data: cron.data,
-    priority: cron.priority,
-    uniqueKey,
-    dedup: cron.dedup ?? undefined,
-    maxAttempts: options?.maxAttempts,
-    backoff: options?.backoff,
-    timeout: options?.timeout,
-    delay: options?.delay,
-    stallTimeout: options?.stallTimeout,
-    removeOnComplete: options?.removeOnComplete,
-    removeOnFail: options?.removeOnFail,
-  };
-}
-
 function followingRun(cron: CronJob, now: number): number {
   if (cron.schedule) {
     return getNextCronRun(expandCronShortcut(cron.schedule), now, cron.timezone ?? undefined);
@@ -190,7 +176,7 @@ async function fireCron(
   const admitted = await admitPostgresJob(
     tx,
     ctx,
-    createJob(generateJobId(), cron.queue, spawnedInput(cron), now),
+    createJob(generateJobId(), cron.queue, cronJobInput(cron), now),
     { linkParent: false }
   );
   if (!admitted.inserted && cron.preventOverlap) {

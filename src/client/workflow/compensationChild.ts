@@ -2,6 +2,7 @@
 
 import { isLive } from './admission';
 import type { LostCompensationClaim } from './compensationClaim';
+import { assertExecutionDefinition } from './definitionGuard';
 import type { WorkflowEmitter } from './emitter';
 import type { WorkflowStore } from './store';
 import type { Execution, StepRecord } from './types';
@@ -54,6 +55,9 @@ export async function unwindChild(request: UnwindChildRequest): Promise<void> {
     );
   }
 
+  // A completed child can outlive the deployment that ran it. Only its own
+  // definition can dispatch those reversals. Hashless rows use the step journal.
+  assertExecutionDefinition(child, childWf);
   const outcome = await runChild({
     exec: child,
     workflow: childWf,

@@ -14,49 +14,14 @@ import {
 import type { HandlerContext } from '../types';
 import { validateGroupId, validateJobData, validateJobOptions } from '../protocol';
 
-type DurableDependencyManager = HandlerContext['queueManager'] & {
-  findMissingDependenciesDurable?: (ids: readonly JobId[]) => Promise<JobId[]>;
-};
-
-interface LocalBatchDependencyState {
-  readonly jobIndex: { has(id: JobId): boolean };
-  readonly completedJobs: { has(id: JobId): boolean };
-  readonly depCompletions: { has(id: JobId): boolean };
-  readonly batchIds: ReadonlySet<string> | null;
-}
-
-interface DurableBatchDependencyState {
-  readonly batchIds: ReadonlySet<string> | null;
-  readonly missingDependencies: ReadonlySet<JobId>;
-}
-
-type BatchDependencyState = LocalBatchDependencyState | DurableBatchDependencyState;
-
-function dependencyExistsLocally(id: JobId, ctx: HandlerContext): boolean {
-  return (
-    ctx.queueManager.getJobIndex().has(id) ||
-    ctx.queueManager.getCompletedJobs().has(id) ||
-    ctx.queueManager.getDepCompletions().has(id)
-  );
-}
-
-/** Validate PUSH dependencies against the authoritative engine when it exposes one. */
+/** Validate PUSH dependencies against the authoritative engine. */
 export function validatePushDependencies(
   dependencies: readonly string[] | undefined,
   ctx: HandlerContext
 ): string | null | Promise<string | null> {
   if (!dependencies || dependencies.length === 0) return null;
-  const manager = ctx.queueManager as DurableDependencyManager;
-  if (!manager.findMissingDependenciesDurable) {
-    for (const dependency of dependencies) {
-      if (!dependencyExistsLocally(jobId(dependency), ctx)) {
-        return `Dependency job not found: ${dependency}`;
-      }
-    }
-    return null;
-  }
   const ids = dependencies.map(jobId);
-  return manager.findMissingDependenciesDurable(ids).then((missingIds) => {
+  return ctx.queueManager.findMissingDependenciesDurable(ids).then((missingIds) => {
     const missing = new Set(missingIds.map(String));
     const dependency = dependencies.find((id) => missing.has(String(id)));
     return dependency === undefined ? null : `Dependency job not found: ${dependency}`;
@@ -74,8 +39,7 @@ export function validatePushDependencies(
  * add() calls in arbitrary order, so a child can legitimately precede its
  * parent in the array, and the readiness layer (waitingDeps) resolves the
  * chain once the whole batch is applied. Self-references are rejected, they
- * can never resolve. jobIndex/completedJobs/depCompletions are hoisted out
- * of the loop because PUSHB is the bulk hot path.
+ * can never resolve. The broker checks all external references in one batch.
  */
 export function validatePushBatchJobs(
   jobs: JobInput[],
@@ -85,37 +49,25 @@ export function validatePushBatchJobs(
   // moment the batch is applied. Allocated lazily (most batches have neither
   // custom ids nor dependencies).
   let batchIds: Set<string> | null = null;
+  const dependencies: JobId[] = [];
   for (const job of jobs) {
     if (job.customId) {
       batchIds ??= new Set();
       batchIds.add(job.customId);
     }
-  }
-
-  const manager = ctx.queueManager as DurableDependencyManager;
-  if (manager.findMissingDependenciesDurable) {
-    const dependencies = jobs.flatMap((job) =>
-      (job.dependsOn ?? []).filter((id) => !(batchIds?.has(String(id)) ?? false))
-    );
-    if (dependencies.length === 0) {
-      return validateJobs(jobs, { batchIds, missingDependencies: new Set() });
+    if (job.dependsOn) {
+      for (const id of job.dependsOn) dependencies.push(id);
     }
-    return manager.findMissingDependenciesDurable(dependencies).then((missingIds) =>
-      validateJobs(jobs, {
-        batchIds,
-        missingDependencies: new Set(missingIds),
-      })
-    );
   }
 
-  const jobIndex = ctx.queueManager.getJobIndex();
-  const completedJobs = ctx.queueManager.getCompletedJobs();
-  const depCompletions = ctx.queueManager.getDepCompletions();
-  return validateJobs(jobs, { jobIndex, completedJobs, depCompletions, batchIds });
+  const external = batchIds ? dependencies.filter((id) => !batchIds.has(id)) : dependencies;
+  if (external.length === 0) return validateJobs(jobs);
+  return ctx.queueManager
+    .findMissingDependenciesDurable(external)
+    .then((missingIds) => validateJobs(jobs, new Set(missingIds)));
 }
 
-function validateJobs(jobs: JobInput[], state: BatchDependencyState): string | null {
-  const { batchIds } = state;
+function validateJobs(jobs: JobInput[], missingDependencies?: ReadonlySet<JobId>): string | null {
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];
 
@@ -139,16 +91,7 @@ function validateJobs(jobs: JobInput[], state: BatchDependencyState): string | n
         if (key === job.customId) {
           return `jobs[${i}]: Job cannot depend on itself: ${key}`;
         }
-        const exists =
-          (batchIds?.has(key) ?? false) ||
-          ('missingDependencies' in state
-            ? !state.missingDependencies.has(depId)
-            : state.jobIndex.has(depId) ||
-              state.completedJobs.has(depId) ||
-              // removeOnComplete parents leave only a bare completion id behind;
-              // the gate must honor it exactly like PUSH does.
-              state.depCompletions.has(depId));
-        if (!exists) {
+        if (missingDependencies?.has(depId)) {
           return `jobs[${i}]: Dependency job not found: ${key}`;
         }
       }

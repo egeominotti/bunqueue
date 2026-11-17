@@ -73,21 +73,12 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
     this.batchFillPending = true;
     let failed = false;
     void this.doPullBatch()
-      .then((items) => {
+      .then(() => {
         this.consecutiveErrors = 0;
-        if (items.length === 0) return;
-        const deliveries = this.registerPulledJobs(items);
-        if (this.pendingJobsHead >= this.pendingJobs.length) {
-          this.pendingJobs = deliveries;
-          this.pendingJobsHead = 0;
-        } else {
-          this.pendingJobs = this.pendingJobs.slice(this.pendingJobsHead).concat(deliveries);
-          this.pendingJobsHead = 0;
-        }
       })
       .catch((error) => {
         failed = true;
-        this.handlePullError(error);
+        if (!this._closing && !this.closed) this.handlePullError(error);
       })
       .finally(() => {
         this.batchFillPending = false;
@@ -105,10 +96,7 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
     const timers: SafeTimer[] = [];
 
     this.activeJobs++;
-    for (const delivery of deliveries) {
-      this.beginDelivery(delivery);
-      if (this.groupLimiter) this.groupLimiter.increment(delivery.job);
-    }
+    for (const delivery of deliveries) this.beginDelivery(delivery);
 
     void Promise.allSettled(
       deliveries.map((delivery, index) => {
@@ -154,10 +142,7 @@ export class WorkerExecution<T = unknown, R = unknown> extends WorkerPolling<T, 
         this.releaseAbortController(id, controller);
       }
       this.activeJobs--;
-      for (const delivery of deliveries) {
-        this.finishDelivery(delivery);
-        if (this.groupLimiter) this.groupLimiter.decrement(delivery.job);
-      }
+      for (const delivery of deliveries) this.finishDelivery(delivery);
       if (this.running && !this._closing) this.scheduleProcessing();
     });
 

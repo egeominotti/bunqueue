@@ -12,6 +12,7 @@ import {
 } from '../flowParentBackpatch';
 import { commitParentLink, parentLinkState, prepareParentLink } from '../operations/parentLink';
 import { QueueManagerLocks } from './locks';
+import { isDependencyComplete, loadColdDependencyCompletions } from '../dependencyCompletions';
 
 export class QueueManagerQueries extends QueueManagerLocks {
   async getJob(jobId: JobId): Promise<Job | null> {
@@ -118,9 +119,9 @@ export class QueueManagerQueries extends QueueManagerLocks {
           throw new Error(`Parent job ${String(parentJobId)} changed state while linking`);
         }
 
-        const childFinished =
-          this.completedJobs.has(childJobId) || this.depCompletions.has(childJobId);
         const pushContext = this.contextFactory.getPushContext();
+        const stored = loadColdDependencyCompletions([childJobId], pushContext);
+        const childFinished = isDependencyComplete(childJobId, pushContext, stored);
         const plan = prepareParentLink(childJob, pushContext, childFinished, parentJobId);
         this.storage?.updateFlowLink(plan.linkedChild, plan.linkedParent, parentLinkState(plan));
         commitParentLink(plan, pushContext);

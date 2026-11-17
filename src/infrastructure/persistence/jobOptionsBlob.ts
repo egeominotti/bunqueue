@@ -4,6 +4,8 @@ import { storageLog } from '../../shared/logger';
 import { decodeMessagePack, encodeMessagePack } from '../../shared/msgpack';
 
 export interface StoredJobOptions {
+  cronName?: string;
+  manuallyParked?: boolean;
   backoffConfig: BackoffConfig | null;
   repeat: RepeatConfig | null;
   stackTraceLimit: number;
@@ -40,6 +42,8 @@ function validStoredOrder(value: unknown): string | null {
 /** Persist generation policies that do not have dedicated legacy columns. */
 export function encodeJobOptions(job: Job): Uint8Array {
   const options = {
+    ...(job.cronName !== undefined && { cronName: job.cronName }),
+    ...(job.manuallyParked && { manuallyParked: true }),
     backoffConfig: job.backoffConfig,
     repeat: job.repeat,
     stackTraceLimit: job.stackTraceLimit,
@@ -64,6 +68,8 @@ export function decodeJobOptions(blob: Uint8Array | null, context: string): Stor
   try {
     const decoded = decodeMessagePack<Partial<StoredJobOptions>>(blob);
     return {
+      ...(typeof decoded.cronName === 'string' && { cronName: decoded.cronName }),
+      ...(decoded.manuallyParked === true && { manuallyParked: true }),
       backoffConfig: decoded.backoffConfig ?? null,
       repeat: decoded.repeat ?? null,
       stackTraceLimit: decoded.stackTraceLimit ?? 10,

@@ -93,6 +93,8 @@ export interface Job {
 
   // Deduplication
   readonly uniqueKey: string | null;
+  readonly cronName?: string; // scheduler-owned generation, persisted in extended_options
+  manuallyParked?: boolean; // explicit waiting-children transition, persisted in extended_options
   readonly customId: string | null;
 
   // Dependencies & workflows
@@ -146,7 +148,8 @@ export interface Job {
 `customId` is a broker-wide identity key, not a per-queue key. When supplied it
 also becomes `jobs.id`, whose SQLite primary key is global. Ordinary
 memory/SQLite adds return a live generation only while its ownership is retained
-in the bounded custom-ID LRU (50,000 IDs by default). SQLite admission uses
+in the bounded custom-ID LRU (50,000 IDs by default), including while it waits
+for children after a manual park. SQLite admission uses
 upserts, so the primary key does not preserve the original live generation
 after eviction; durable admission does not remove that limit. PostgreSQL checks
 locked database identity independently. See

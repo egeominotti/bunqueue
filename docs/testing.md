@@ -310,6 +310,46 @@ Machine independently passed all product suites, source/test type checks,
 formatting and nine tinyfs cases; its manifest is
 `artifacts/machines/20261114T041303Z/manifest.md`.
 
+## Job integrity audit regressions
+
+Run the following four files together to check the failures recorded in the
+`severe-job-audit` work item. Each suite uses its own temporary databases.
+
+```bash
+BUNQUEUE_EMBEDDED=1 bun test \
+  test/repro-audit-dependency-completion.test.ts \
+  test/repro-audit-sqlite-job-identity.test.ts \
+  test/repro-audit-worker-lifecycle.test.ts \
+  test/repro-audit-workflow-recovery.test.ts
+```
+
+- The dependency tests require a waiting job to see every prerequisite that
+  completed, including one evicted from memory. Canceling a dependent must
+  also preserve the state of its unfinished prerequisite.
+- The SQLite tests verify producer retries against cached waiting, active and
+  manually parked jobs. They also verify ordinary work with a `cron:` key
+  survives restart, disconnect and cron registration. The original audit also
+  exercised the [documented custom-ID cache limit](src/content/docs/guide/queue/deduplication.mdx#custom-id-limits)
+  with deliberately evicted IDs. The baseline report records those two cases separately.
+- The worker tests follow real leases through pause and graceful shutdown,
+  then check group capacity after a processor updates its own job data.
+- The workflow tests compare nested deadlines across restart and track the
+  actual reversal of a child step after retention or a definition change.
+
+The extended regression run adds six files. Run them with the four above to
+exercise transient storage errors, retried prerequisites, late parent links,
+manual workers, acknowledgements in flight and retention of nested children.
+
+```bash
+BUNQUEUE_EMBEDDED=1 bun test \
+  test/repro-audit-dependency-proof-lifetime.test.ts \
+  test/repro-audit-dependency-promotion-retry.test.ts \
+  test/repro-completed-child-parent-link.test.ts \
+  test/repro-worker-delivery-cleanup.test.ts \
+  test/repro-worker-manual-drain-lease.test.ts \
+  test/repro-workflow-owned-children.test.ts
+```
+
 ## Validation layers
 
 `bun run typecheck` covers all of `src`, including `src/mcp`, and the test tree

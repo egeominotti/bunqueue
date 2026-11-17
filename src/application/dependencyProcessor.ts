@@ -8,7 +8,12 @@ import { MAX_TIMELINE_ENTRIES } from '../domain/types/job';
 import { SHARD_COUNT } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
 import type { BackgroundContext } from './types';
-import { releaseDependencyCompletionPins } from './dependencyCompletions';
+import {
+  hasUnfinishedDependency,
+  isDependencyComplete,
+  loadColdDependencyCompletions,
+  releaseDependencyCompletionPins,
+} from './dependencyCompletions';
 
 type DependencyReadyState = 'delayed' | 'prioritized' | 'waiting';
 
@@ -23,10 +28,23 @@ export function checkpointDependencyPromotion(
   now: number,
   storage: BackgroundContext['storage']
 ): void {
-  if (job.timeline.at(-1)?.state !== state && job.timeline.length < MAX_TIMELINE_ENTRIES) {
-    job.timeline.push({ state, timestamp: now });
+  const transition =
+    job.timeline.at(-1)?.state !== state && job.timeline.length < MAX_TIMELINE_ENTRIES
+      ? { state, timestamp: now }
+      : undefined;
+  if (storage) {
+    storage.updateFlowParentResolution(
+      {
+        id: job.id,
+        dependsOn: job.dependsOn,
+        runAt: job.runAt,
+        priority: job.priority,
+        timeline: transition ? [...job.timeline, transition] : job.timeline,
+      },
+      state
+    );
   }
-  storage?.updateFlowParentResolution(job, state);
+  if (transition) job.timeline.push(transition);
 }
 
 /**
@@ -37,11 +55,11 @@ export async function processPendingDependencies(ctx: BackgroundContext): Promis
   if (ctx.pendingDepChecks.size === 0) return;
 
   const completedIds = Array.from(ctx.pendingDepChecks);
-  const completedNow = new Set(completedIds);
   ctx.pendingDepChecks.clear();
 
   const jobsToCheckByShard = new Map<number, Set<JobId>>();
-  const releasedDependencyIds = new Set<JobId>();
+  // A previous attempt may have promoted every waiter but failed to release its pin.
+  const releasedDependencyIds = new Set<JobId>(completedIds);
 
   // Find all jobs waiting for the completed dependencies
   for (const completedId of completedIds) {
@@ -62,28 +80,26 @@ export async function processPendingDependencies(ctx: BackgroundContext): Promis
 
   // Process each shard in parallel
   // Lock acquired BEFORE reading waitingDeps to prevent TOCTOU race
-  await Promise.all(
+  const outcomes = await Promise.allSettled(
     Array.from(jobsToCheckByShard.entries()).map(async ([i, jobIdsToCheck]) => {
       await withWriteLock(ctx.shardLocks[i], () => {
         const shard = ctx.shards[i];
-        const jobsToPromote: Job[] = [];
-
-        // Check which jobs have all dependencies satisfied (inside lock).
-        // A removeOnComplete parent is not in completedJobs (its full record was
-        // dropped to bound memory), so also honor its bare-id depCompletions entry.
+        const waiting: Job[] = [];
         for (const jobId of jobIdsToCheck) {
           const job = shard.waitingDeps.get(jobId);
-          if (
-            job?.dependsOn.every(
-              (dep) =>
-                completedNow.has(dep) ||
-                ctx.completedJobs.has(dep) ||
-                (ctx.depCompletions?.has(dep) ?? false)
-            )
-          ) {
-            jobsToPromote.push(job);
-          }
+          if (job && (!ctx.storage || !hasUnfinishedDependency(job.dependsOn, ctx)))
+            waiting.push(job);
         }
+        // A notification wakes this check. A retry or ID reuse may already have retired it.
+        const stored = ctx.storage
+          ? loadColdDependencyCompletions(
+              waiting.flatMap((job) => job.dependsOn),
+              ctx
+            )
+          : undefined;
+        const jobsToPromote = waiting.filter((job) =>
+          job.dependsOn.every((dep) => isDependencyComplete(dep, ctx, stored))
+        );
 
         // Promote jobs with all dependencies satisfied
         if (jobsToPromote.length > 0) {
@@ -93,7 +109,15 @@ export async function processPendingDependencies(ctx: BackgroundContext): Promis
     })
   );
 
-  releaseDependencyCompletionPins(releasedDependencyIds, ctx);
+  try {
+    releaseDependencyCompletionPins(releasedDependencyIds, ctx);
+    const failed = outcomes.find((outcome) => outcome.status === 'rejected');
+    if (failed) throw failed.reason;
+  } catch (error) {
+    // Reverse edges identify the remaining waiters, even after partial shard success.
+    for (const id of releasedDependencyIds) ctx.pendingDepChecks.add(id);
+    throw error;
+  }
 }
 
 /** Move jobs from waitingDeps to the active queue */
@@ -106,8 +130,9 @@ function promoteJobsToQueue(
 ): void {
   const now = Date.now();
 
-  for (const job of jobsToPromote) {
-    if (shard.waitingDeps.has(job.id)) {
+  const promoted: Job[] = [];
+  try {
+    for (const job of jobsToPromote) {
       const state = dependencyReadyState(job, now);
       checkpointDependencyPromotion(job, state, now, ctx.storage);
       shard.waitingDeps.delete(job.id);
@@ -117,17 +142,26 @@ function promoteJobsToQueue(
       const isDelayed = state === 'delayed';
       shard.incrementQueued(job.id, isDelayed, job.createdAt, job.queue, job.runAt);
       ctx.jobIndex.set(job.id, { type: 'queue', shardIdx, queueName: job.queue });
+      promoted.push(job);
     }
+  } finally {
+    // A later checkpoint failure must still wake workers for the committed prefix.
+    notifyPromoted(promoted, shard, ctx);
   }
+}
 
-  if (jobsToPromote.length > 0) {
-    const promotedByQueue = new Map<string, number>();
-    for (const job of jobsToPromote) {
-      promotedByQueue.set(job.queue, (promotedByQueue.get(job.queue) ?? 0) + 1);
-    }
-    for (const [queue, count] of promotedByQueue) shard.notifyBatch(queue, count);
-    for (const job of jobsToPromote) {
-      ctx.dashboardEmit?.('job:dependencies-resolved', { jobId: String(job.id), queue: job.queue });
-    }
+function notifyPromoted(
+  promoted: Job[],
+  shard: BackgroundContext['shards'][number],
+  ctx: BackgroundContext
+): void {
+  if (promoted.length === 0) return;
+  const promotedByQueue = new Map<string, number>();
+  for (const job of promoted) {
+    promotedByQueue.set(job.queue, (promotedByQueue.get(job.queue) ?? 0) + 1);
+  }
+  for (const [queue, count] of promotedByQueue) shard.notifyBatch(queue, count);
+  for (const job of promoted) {
+    ctx.dashboardEmit?.('job:dependencies-resolved', { jobId: String(job.id), queue: job.queue });
   }
 }

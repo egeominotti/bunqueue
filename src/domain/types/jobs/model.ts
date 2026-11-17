@@ -1,5 +1,7 @@
 export type JobId = string & { readonly __brand: 'JobId' };
 export type LockToken = string & { readonly __brand: 'LockToken' };
+/** Only the scheduler can attach a cron origin to an admission. */
+export const cronSource = Symbol('cronSource');
 
 export const enum JobState {
   Waiting = 'waiting',
@@ -56,6 +58,7 @@ export interface Job {
   readonly ttl: number | null;
   readonly timeout: number | null;
   readonly uniqueKey: string | null;
+  readonly cronName?: string;
   readonly customId: string | null;
   readonly dependsOn: JobId[];
   readonly parentId: JobId | null;
@@ -86,10 +89,13 @@ export interface Job {
   readonly debounceTtl: number | null;
   /** Whether SQLite admission bypasses its write buffer; PostgreSQL is always transactional. */
   readonly durable?: boolean;
+  /** A manual wait can persist even when all previously linked children completed. */
+  manuallyParked?: boolean;
   timeline: JobTimelineEntry[];
 }
 
 export interface JobInput {
+  [cronSource]?: string;
   name?: string;
   data: unknown;
   priority?: number;

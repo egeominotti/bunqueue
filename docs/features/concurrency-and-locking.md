@@ -359,8 +359,9 @@ lock.createdAt`. Pull stamps `startedAt` before the lease is created, so a
 - **Malformed `LOCK_TIMEOUT_MS`** — the variable must be whole milliseconds >= 1 (`0` would fail every contended acquire at once). `lockTimeoutMs()` parses it with `parseDurationEnv` on first use (never at import) and caches it; QueueManager construction calls it before opening storage, so `abc`, `-1`, `0` or `1e3` stops server startup and the first embedded `Queue`/`Worker` with `Invalid LOCK_TIMEOUT_MS: "abc" (expected a whole number of milliseconds >= 1)`. A server checks it earlier, in `resolveServerConfig` (one `Fatal error:` line, before storage opens), and applies the resolved value with `configureLockTimeoutMs` before the QueueManager is built (the config file's `timeouts.lock` is ignored with a warning, as it always was); the rule and default (`LOCK_TIMEOUT_SETTING`) are defined once, in `lockTimeout.ts`. Before, `parseInt` made `abc` or `99999999999` fail every contended acquire after about 1 ms and `-1` at once.
 - **Resource-slot leaks** — every reclaim path (`handleRecoveryBoundExceeded`, `requeueExpiredJob`, `moveStalliedJobToDlq`, `retryStalliedJob`) calls `shard.releaseJobResources(queue, uniqueKey, groupId, ownerId)` before moving the job; omitting it wedges the queue's concurrency limiter. Passing `ownerId` also prevents a stale generation from releasing a replacement job's unique key.
 - **Orphan SQLite rows (#97)** — DLQ moves must `saveDlqEntry` + `deleteJob`; missing the delete leaves a `jobs` row that collides on retry with `UNIQUE constraint failed: jobs.id`.
-- **Cron preventOverlap (#73/#75)** — memory/SQLite discard `cron:`-prefixed
-  jobs on stall/lock expiry so the scheduler can recreate them on the next tick.
+- **Cron preventOverlap (#73/#75)** — memory/SQLite discard scheduler-owned jobs
+  with `cron:`-prefixed keys on stall/lock expiry so the scheduler can recreate
+  them on the next tick. One-off jobs with these keys follow ordinary recovery.
   PostgreSQL's discard checks dependency safety; protected IDs continue through
   normal lease recovery instead.
 - **False-positive suppression** — single-cycle hiccups never trigger action thanks to two-phase detection plus the `gracePeriod` after job start.

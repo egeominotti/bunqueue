@@ -40,7 +40,7 @@ export interface RecoverDeps {
 export async function recoverExecutions(deps: RecoverDeps): Promise<RecoverResult> {
   const { store, workflows } = deps;
   deps.assertActive();
-  const executions = store.listRecoverable();
+  const executions = store.listRecoverable({ includeOwnedWaits: true });
   const result: RecoverResult = { running: 0, waiting: 0, compensating: 0, total: 0 };
 
   for (const snapshot of executions) {
@@ -58,7 +58,20 @@ export async function recoverExecutions(deps: RecoverDeps): Promise<RecoverResul
     // help here, because the two unwinds are sequential, not concurrent.
     const exec = store.get(snapshot.id);
     if (!exec) continue;
-    bindExecutionDefinition(exec, wf, (value) => store.update(value));
+    const node = wf.nodes[exec.currentNodeIndex] as WorkflowNode | undefined;
+    const owned =
+      exec.parentExecutionId !== undefined && store.get(exec.parentExecutionId) !== null;
+    if (owned) {
+      // Only the gate belongs to recovery. The parent owns forward execution
+      // and unwind, including if the child moved on since the snapshot.
+      if (exec.state !== 'waiting' || node?.type !== 'waitFor') continue;
+      if (
+        !hasSignal(exec.signals, node.event) &&
+        (node.timeout === undefined || deps.timeoutTimers.has(exec.id))
+      )
+        continue;
+    }
+    bindForRecovery(exec, wf, node, store);
 
     if (exec.state === 'running') {
       const admission = decideAdmission(exec, exec.currentNodeIndex, deps.nodesInFlight);
@@ -70,7 +83,7 @@ export async function recoverExecutions(deps: RecoverDeps): Promise<RecoverResul
         result.running++;
       }
     } else if (exec.state === 'waiting') {
-      await recoverWaiting(exec, wf, deps);
+      await recoverWaiting(exec, node, deps, owned);
       deps.assertActive();
       result.waiting++;
     } else if (
@@ -129,8 +142,49 @@ async function recoverCompensation(
   }
 }
 
-async function recoverWaiting(exec: Execution, wf: Workflow, deps: RecoverDeps): Promise<void> {
-  const node = wf.nodes[exec.currentNodeIndex] as WorkflowNode | undefined;
+function bindForRecovery(
+  exec: Execution,
+  wf: Workflow,
+  node: WorkflowNode | undefined,
+  store: WorkflowStore
+): void {
+  let changed = false;
+  if (exec.state === 'waiting' && node?.type === 'waitFor' && node.timeout !== undefined) {
+    const key = `__waitFor:${node.event}`;
+    const record = exec.steps[key];
+    // Legacy gates have only updatedAt. Persist the original start and any
+    // missing definition hash together before either write can move updatedAt.
+    if (record?.startedAt === undefined) {
+      exec.steps[key] = { ...record, status: 'running', startedAt: exec.updatedAt };
+      changed = true;
+    }
+  }
+  bindExecutionDefinition(exec, wf, () => {
+    changed = true;
+  });
+  if (changed) store.update(exec);
+}
+
+async function wakeWaiting(exec: Execution, deps: RecoverDeps, owned: boolean): Promise<void> {
+  deps.assertActive();
+  if (owned) {
+    // Preserve the parked row until publication succeeds. An independent
+    // running child cannot be picked up again if its parent is already stuck.
+    deps.scheduleTimeoutCheck(exec.id, exec.workflowName, exec.currentNodeIndex, 0);
+    return;
+  }
+  exec.state = 'running';
+  deps.store.update(exec);
+  await enqueueWorkflowStep(deps.queue, exec, deps.assertActive);
+  deps.assertActive();
+}
+
+async function recoverWaiting(
+  exec: Execution,
+  node: WorkflowNode | undefined,
+  deps: RecoverDeps,
+  owned: boolean
+): Promise<void> {
   if (node?.type !== 'waitFor') {
     await enqueueWorkflowStep(deps.queue, exec, deps.assertActive);
     deps.assertActive();
@@ -141,11 +195,7 @@ async function recoverWaiting(exec: Execution, wf: Workflow, deps: RecoverDeps):
   // engine was recreated but before recover() reached the row. Key presence, not
   // value: a payload-less signal records the key with an `undefined` value.
   if (hasSignal(exec.signals, node.event)) {
-    deps.assertActive();
-    exec.state = 'running';
-    deps.store.update(exec);
-    await enqueueWorkflowStep(deps.queue, exec, deps.assertActive);
-    deps.assertActive();
+    await wakeWaiting(exec, deps, owned);
     return;
   }
 
@@ -154,19 +204,14 @@ async function recoverWaiting(exec: Execution, wf: Workflow, deps: RecoverDeps):
     if (deps.timeoutTimers.has(exec.id)) return;
 
     const waitKey = `__waitFor:${node.event}`;
-    const waitRecord = exec.steps[waitKey] as { startedAt?: number } | undefined;
-    const waitingSince = waitRecord?.startedAt ?? exec.updatedAt;
+    const waitingSince = exec.steps[waitKey]?.startedAt ?? exec.updatedAt;
     const elapsed = clock().now() - waitingSince;
     const remaining = node.timeout - elapsed;
 
     // A remaining budget that is not a finite number (a corrupted start time) cannot be
     // armed; the node re-runs now and runWaitFor fails the gate cleanly.
     if (!Number.isFinite(remaining) || remaining <= 0) {
-      deps.assertActive();
-      exec.state = 'running';
-      deps.store.update(exec);
-      await enqueueWorkflowStep(deps.queue, exec, deps.assertActive);
-      deps.assertActive();
+      await wakeWaiting(exec, deps, owned);
     } else {
       deps.assertActive();
       deps.scheduleTimeoutCheck(exec.id, exec.workflowName, exec.currentNodeIndex, remaining);

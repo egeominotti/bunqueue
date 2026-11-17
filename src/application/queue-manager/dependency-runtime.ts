@@ -26,10 +26,11 @@ export class QueueManagerDependencyRuntime extends QueueManagerServices {
         handleTaskSuccess('dependency');
       }
     } catch (error) {
+      // A failed wave keeps its notifications for the next completion or fallback interval.
+      // Immediately enqueuing another microtask would spin on persistent storage failures.
       handleTaskError('dependency', error);
     } finally {
       this.depFlushRunning = false;
-      if (this.pendingDepChecks.size > 0) this.scheduleDependencyFlush();
     }
   }
 

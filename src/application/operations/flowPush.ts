@@ -5,7 +5,11 @@ import type { LockGuard } from '../../shared/lock';
 import { shardIndex } from '../../shared/hash';
 import { latencyTracker } from '../latencyTracker';
 import { throughputTracker } from '../throughputTracker';
-import { emitWaitingChildrenAdmission, initialJobState, insertJobToShard } from './pushInsert';
+import {
+  emitWaitingChildrenAdmission,
+  initialJobState,
+  insertPreparedJobToShard,
+} from './pushInsert';
 import { type PushContext, withPendingQueueAdmissions } from './pushContext';
 import { validateAtomicFlowBatch } from './flowValidation';
 
@@ -47,7 +51,16 @@ function publishJobs(jobs: Job[], ctx: PushContext): Map<string, number> {
   const notifications = new Map<string, number>();
   for (const job of jobs) {
     const idx = shardIndex(job.queue);
-    insertJobToShard(job, { queue: job.queue, shard: ctx.shards[idx], shardIdx: idx }, ctx, false);
+    // Every dependency belongs to this just-committed graph; none has an earlier completion to pin.
+    insertPreparedJobToShard(
+      job,
+      { queue: job.queue, shard: ctx.shards[idx], shardIdx: idx },
+      ctx,
+      {
+        state: initialJobState(job, ctx),
+        completionPins: [],
+      }
+    );
     if (job.customId) ctx.customIdMap.set(job.customId, job.id);
     // A new generation under the ID of a job removed on completion: drop its result.
     ctx.removedResults?.forget(job.id);

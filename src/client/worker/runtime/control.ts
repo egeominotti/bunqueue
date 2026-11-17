@@ -36,21 +36,7 @@ export abstract class WorkerControl<T = unknown, R = unknown> extends WorkerStat
       this.registerWithServer();
     }
 
-    // heartbeatInterval is validated (finite, >= 0; 0 disables) and armed with
-    // safeInterval, so an interval above the native timer limit cannot spin.
-    if (this.opts.heartbeatInterval > 0 && !this.opts.skipLockRenewal && !this.heartbeatTimer) {
-      if (this.embedded) {
-        this.heartbeatTimer = safeInterval(() => {
-          const manager = getSharedManager();
-          for (const id of this.pulledJobIds) {
-            const token = this.opts.useLocks ? this.jobTokens.get(id) : undefined;
-            manager.jobHeartbeat(jobId(id), token);
-          }
-        }, this.opts.heartbeatInterval);
-      } else {
-        this.heartbeatTimer = startHeartbeat(this.getHeartbeatDeps(), this.opts.heartbeatInterval);
-      }
-    }
+    this.startJobHeartbeat();
     if (this.opts.heartbeatInterval > 0) this.startWorkerHeartbeat();
     if (this.stalledSubscription) {
       void this.stalledSubscription.waitUntilReady().then(
@@ -60,6 +46,41 @@ export abstract class WorkerControl<T = unknown, R = unknown> extends WorkerStat
     } else {
       this.poll();
     }
+  }
+
+  protected startJobHeartbeat(): void {
+    if (this.heartbeatTimer || this.opts.skipLockRenewal || this.opts.heartbeatInterval === 0)
+      return;
+    const jobIds = () =>
+      this.running || this.paused || this._closing ? this.pulledJobIds : this.manualProcessorIds();
+    if (this.embedded) {
+      this.heartbeatTimer = safeInterval(() => {
+        const manager = getSharedManager();
+        for (const id of jobIds()) {
+          const token = this.opts.useLocks ? this.jobTokens.get(id) : undefined;
+          manager.jobHeartbeat(jobId(id), token);
+        }
+      }, this.opts.heartbeatInterval);
+    } else {
+      this.heartbeatTimer = startHeartbeat(
+        this.getHeartbeatDeps(),
+        this.opts.heartbeatInterval,
+        jobIds
+      );
+    }
+  }
+
+  // A manually pulled job may be held for explicit lease management. Only
+  // manual deliveries actually in a processor get automatic renewal.
+  private *manualProcessorIds(): Iterable<string> {
+    for (const [id, delivery] of this.currentDeliveries) {
+      if (this.isActiveDelivery(delivery)) yield id;
+    }
+  }
+
+  protected stopJobHeartbeat(): void {
+    this.heartbeatTimer?.clear();
+    this.heartbeatTimer = null;
   }
 
   protected subscribeToStalledEvents(): void {

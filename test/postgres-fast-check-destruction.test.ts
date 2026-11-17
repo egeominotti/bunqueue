@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { DEFAULT_DLQ_CONFIG } from '../src/domain/types/dlq';
-import { createJob, jobId, type JobId, type JobInput } from '../src/domain/types/job';
+import { createJob, cronSource, jobId, type JobId, type JobInput } from '../src/domain/types/job';
 import { expirePendingPostgresJobs } from '../src/infrastructure/persistence/postgres/expiry';
 import { enforcePostgresDlqLimit } from '../src/infrastructure/persistence/postgres/dlqLifecycle';
 import { PostgresQueueStore } from '../src/infrastructure/persistence/postgres';
@@ -138,7 +138,7 @@ async function executeOperation(
       operation
     ) && { maxAttempts: 1 }),
     ...(operation === 'expire' && { ttl: 1 }),
-    ...(operation === 'release-cron' && { uniqueKey: `cron:${label}` }),
+    ...(operation === 'release-cron' && { [cronSource]: label, uniqueKey: `cron:${label}` }),
     ...(operation === 'dedup-replace' && { uniqueKey: `${label}-dedup` }),
   };
   const { producerId, consumerId, producerQueue } = await insertPair(a, b, label, input);
@@ -188,6 +188,22 @@ async function executeOperation(
 afterAll(() => scope.cleanup(), { timeout: 30_000 });
 
 describe('PostgreSQL fast-check destructive dependency invariants', () => {
+  test.skipIf(!postgresTestUrl)(
+    'releasing a lease preserves one-off work with a cron key',
+    async () => {
+      await withStores(async (a, b) => {
+        const id = jobId('report-once');
+        await a.insert(createJob(id, 'reports', { data: 'once', uniqueKey: 'cron:report' }));
+        const [first] = await a.claim('reports', 1, 'first-worker');
+        expect(first.job.id).toBe(id);
+        expect(await a.releaseClientLease(id, first.token)).toBe(true);
+        const [second] = await b.claim('reports', 1, 'second-worker');
+        expect(second?.job.id).toBe(id);
+        expect(second?.job.data).toBe('once');
+      });
+    }
+  );
+
   test.skipIf(!postgresTestUrl)(
     'covers every destructive adapter with a live consumer',
     async () => {

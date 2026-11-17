@@ -420,14 +420,19 @@ id `Set` as before.
 
 ### `processPendingDependencies` (`dependencyProcessor.ts:16`)
 
-Drains `pendingDepChecks` into a local array (clearing the set), uses each
-shard's reverse index (`getJobsWaitingFor`) to find waiting jobs — O(m) in
-waiters, not O(n) in all jobs — then per shard, under the shard write lock,
-re-checks every dependent's `dependsOn` against the current completion batch,
-`completedJobs`, or `depCompletions`. A ready parent is checkpointed in SQLite
-before its reverse edges are removed and it becomes visible in the run queue.
-After all shard locks are released, dependency proofs with no remaining waiter
-are unpinned and ordinary FIFO pruning resumes. See
+Drains `pendingDepChecks` and finds affected jobs through each shard's reverse
+index (`getJobsWaitingFor`). Under the shard write lock it verifies the
+current completion of every prerequisite. In memory, an evicted completion
+remains pinned while a parent waits on it. SQLite skips parents with an
+indexed unfinished prerequisite and checks the remaining cold IDs in batches
+of up to 500. A ready parent is checkpointed before its reverse edges are
+removed and it becomes visible in the run queue. After the final edge is
+released, an evicted ordinary ID is discarded and a removed-on-completion
+proof becomes eligible for FIFO pruning. Releasing an edge to unfinished
+work leaves its prerequisite pending. If a SQLite lookup, promotion checkpoint,
+or pin release fails, workers still receive notifications for every parent
+already promoted. The remaining work retries on the next completion or on
+the configured dependency-check interval. See
 [FlowProducer & Job Dependencies](./flow-producer.md).
 
 ### `runMonitoringChecks` (`monitoringChecks.ts:57`)

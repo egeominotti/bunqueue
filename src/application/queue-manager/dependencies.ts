@@ -2,9 +2,20 @@ import type { JobId } from '../../domain/types/job';
 import { EventType } from '../../domain/types/queue';
 import { processingShardIndex, shardIndex } from '../../shared/hash';
 import type { LockGuard } from '../../shared/lock';
+import { isDependencyComplete, loadColdDependencyCompletions } from '../dependencyCompletions';
 import { QueueManagerFlowOptions } from './flow-options';
 
 export class QueueManagerDependencies extends QueueManagerFlowOptions {
+  /** The TCP dependency-existence gate includes full completions outside SQLite's hot cache. */
+  async findMissingDependenciesDurable(ids: readonly JobId[]): Promise<JobId[]> {
+    const unknown = [...new Set(ids)].filter(
+      (id) => !this.jobIndex.has(id) && !this.completedJobs.has(id) && !this.depCompletions.has(id)
+    );
+    if (!this.storage || unknown.length === 0) return unknown;
+    const completed = this.storage.loadCompletedJobIds(unknown);
+    return unknown.filter((id) => !completed.has(id));
+  }
+
   async getFailedChildrenValues(parentJobId: JobId): Promise<Record<string, string>> {
     return this.failedChildrenValues.get(parentJobId) ?? {};
   }
@@ -50,11 +61,10 @@ export class QueueManagerDependencies extends QueueManagerFlowOptions {
         return false;
       }
 
+      const ctx = this.contextFactory.getPushContext();
+      const stored = loadColdDependencyCompletions(parentJob.dependsOn, ctx);
       const unresolved = parentJob.dependsOn.filter(
-        (dependency) =>
-          dependency !== childJobId &&
-          !this.completedJobs.has(dependency) &&
-          !this.depCompletions.has(dependency)
+        (dependency) => dependency !== childJobId && !isDependencyComplete(dependency, ctx, stored)
       );
       releasedDependencies = parentJob.dependsOn.filter(
         (dependency) => !unresolved.includes(dependency)

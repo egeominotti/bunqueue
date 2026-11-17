@@ -3,7 +3,7 @@
  */
 
 import { normalizeJobPayload } from '../job/payload';
-import type { BackoffConfig } from './jobs/model';
+import { cronSource, type BackoffConfig, type Job, type JobInput } from './jobs/model';
 
 /** Deduplication config for cron-spawned jobs */
 export interface CronDedup {
@@ -129,6 +129,31 @@ export function createCronJob(input: CronJobInput, nextRun: number): CronJob {
     preventOverlap: input.preventOverlap ?? true,
     jobOptions: input.jobOptions ?? null,
   };
+}
+
+/** Build a scheduler-owned admission for either storage engine. */
+export function cronJobInput(cron: CronJob): JobInput {
+  const options = cron.jobOptions;
+  return {
+    [cronSource]: cron.name,
+    name: cron.jobName,
+    data: cron.data,
+    priority: cron.priority,
+    uniqueKey: cron.uniqueKey ?? (cron.preventOverlap ? `cron:${cron.name}` : undefined),
+    dedup: cron.dedup ?? undefined,
+    maxAttempts: options?.maxAttempts,
+    backoff: options?.backoff,
+    timeout: options?.timeout,
+    delay: options?.delay,
+    stallTimeout: options?.stallTimeout,
+    removeOnComplete: options?.removeOnComplete,
+    removeOnFail: options?.removeOnFail,
+  };
+}
+
+/** Only a scheduler-owned generation with a protected key can be retired. */
+export function isProtectedCronJob(job: Job): boolean {
+  return job.cronName !== undefined && job.uniqueKey?.startsWith('cron:') === true;
 }
 
 /** Check if cron job has reached its execution limit */

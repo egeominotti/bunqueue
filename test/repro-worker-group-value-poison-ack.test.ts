@@ -267,11 +267,11 @@ describe('GroupConcurrencyLimiter.getGroupValue', () => {
   test('hostile values balance group counts and stay ACK-frontier safe', () => {
     const tracker = new GroupConcurrencyLimiter('g', 1);
     const poison = jobWith({ g: { toString: 'x' } });
-    tracker.increment(poison);
+    const reservation = tracker.reserve(poison);
     expect(tracker.canProcess(poison)).toBe(false);
     const group = tracker.getGroupValue(poison) as string;
     expect(tracker.getGroupCount(group)).toBe(1);
-    tracker.decrement(poison);
+    tracker.release(reservation);
     expect(tracker.getGroupCount(group)).toBe(0);
     expect(tracker.canProcess(poison)).toBe(true);
 

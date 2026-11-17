@@ -91,13 +91,15 @@ export function decideUnwindAction(
   //    good, so the record that actually failed was never retried. An operator acting
   //    on that would release the same stock twice, which is precisely the "never twice"
   //    this module exists to guarantee.
-  if (!isChild && !def) {
+  if (!isChild && !def?.compensate) {
     const failedBefore = record.compensation?.status === 'compensation-failed';
     const owedAndUnreached = record.compensation === undefined && record.compensatable === true;
     if (failedBefore || owedAndUnreached) {
       return {
         kind: 'halt-vanished',
-        error: `step "${name}" is no longer declared by workflow "${wf.name}", so its rollback cannot run`,
+        error: def
+          ? `step "${name}" in workflow "${wf.name}" no longer declares its compensation handler`
+          : `step "${name}" is no longer declared by workflow "${wf.name}", so its rollback cannot run`,
       };
     }
   }
@@ -150,17 +152,11 @@ export function decideUnwindAction(
 export function owesOutcome(wf: Workflow, name: string, record?: StepRecord): boolean {
   if (name.startsWith('sub:')) return true;
   const def = findStepDef(wf, name);
-  // A step that is still declared owes an outcome only if it declared a handler.
-  // `unwindSet` admits EVERY step with a definition, so this is the gate that keeps
-  // `abandonCompensation` from inventing outcomes for steps that were never part of the
-  // unwind.
-  if (def) return def.compensate !== undefined;
-  // The definition is gone, and here the two gates used to disagree. `unwindSet` keeps
-  // such a record when it already carries an outcome or ran WITH a handler; this one
-  // answered from the definition alone and so returned false for exactly the record
-  // `unwindSet` had gone out of its way to admit. `abandonCompensation` walked past it,
-  // and a renamed step ended a TERMINAL run with no outcome at all, in the function that
-  // exists to discharge "exactly one outcome per eligible step, never zero"
-  // (`test/repro-workflow-abandon-vanished.test.ts`).
-  return record?.compensation !== undefined || record?.compensatable === true;
+  // A rename or removal of just the handler leaves the original obligation
+  // in the journal. Explicit abandon must discharge it in either case.
+  return (
+    def?.compensate !== undefined ||
+    record?.compensation !== undefined ||
+    record?.compensatable === true
+  );
 }

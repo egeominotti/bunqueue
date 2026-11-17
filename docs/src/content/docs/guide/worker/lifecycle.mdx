@@ -100,10 +100,14 @@ Bunqueue.Worker.stop(worker)      # Drain, unregister and close
 </TabItem>
 </Tabs>
 
-Pausing stops new pulls; it does not interrupt processors already running or
-release jobs already buffered by the Worker. Lease-renewal and worker-registration
-heartbeats therefore continue while paused. `resume()` reuses those heartbeat
-loops, and repeated pause/resume cycles do not create additional timers.
+In the Bun worker, `pause()` stops new pulls and lets active processors finish.
+If a pull was already in flight, the worker buffers the jobs it receives.
+Heartbeats continue for those jobs while paused. `resume()` processes buffered
+jobs, and `close()` returns unstarted jobs to the queue.
+
+During graceful shutdown, the Bun worker keeps renewing active leases until
+the broker has acknowledged the processors’ outcomes. Calling `close(true)`
+during that wait ends lease renewal and lets shutdown proceed.
 
 `close(true)` stops owning the active delivery immediately; it does not forcibly
 cancel JavaScript already running inside the processor. If that processor later

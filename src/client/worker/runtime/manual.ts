@@ -11,6 +11,7 @@ import { PullRefusedError } from '../workerPull';
 import { processJob } from '../processor';
 import type { ManualJob } from '../types';
 import { WorkerControl } from './control';
+import type { WorkerDelivery } from './state';
 
 export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerControl<T, R> {
   /** Rate limit of the console line for pull failures nobody listens to. */
@@ -28,7 +29,12 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
     this.pullFailureLog.report(`Worker "${this.name}"`, this, error);
   }
 
-  private registerManualJob(job: InternalJob, token: string | null): ManualJob<T> {
+  protected abstract releaseUnstartedJobs(deliveries: WorkerDelivery[]): Promise<void>;
+
+  private async registerManualJob(
+    job: InternalJob,
+    token: string | null
+  ): Promise<ManualJob<T> | undefined> {
     const payload = resolvePublicJobPayload(job);
     const manualJob: ManualJob<T> = {
       ...job,
@@ -36,13 +42,25 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
       data: payload.data as T,
       ...(token ? { token } : {}),
     };
-    this.trackDelivery({ job: manualJob, token });
+    const delivery = this.trackDelivery({ job: manualJob, token });
+    if (this._closing || this.closed) {
+      await this.releaseUnstartedJobs([delivery]);
+      return undefined;
+    }
     return manualJob;
   }
 
   async getNextJob(token?: string, _opts?: { block?: boolean }): Promise<ManualJob<T> | undefined> {
-    if (this.closed) return undefined;
+    if (this._closing || this.closed) return undefined;
+    this.pendingPull++;
+    try {
+      return await this.pullManualJob(token);
+    } finally {
+      this.pendingPull--;
+    }
+  }
 
+  private async pullManualJob(token?: string): Promise<ManualJob<T> | undefined> {
     if (this.embedded) {
       const manager = getSharedManager();
       if (this.opts.useLocks) {
@@ -93,7 +111,7 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
     token?: string,
     fetchNextCallback?: () => Promise<ManualJob<T> | undefined>
   ): Promise<ManualJob<T> | undefined> {
-    if (this.closed) return undefined;
+    if (this._closing || this.closed) return undefined;
 
     const jobIdStr = String(job.id);
     let delivery = this.currentDelivery(jobIdStr);
@@ -123,9 +141,9 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
     }
     if (this.closed || this._closing || !this.isCurrentDelivery(delivery)) return undefined;
 
-    if (this.groupLimiter) this.groupLimiter.increment(processingJob);
     this.activeJobs++;
     this.beginDelivery(delivery);
+    this.startJobHeartbeat();
     const jobId = String(processingJob.id);
     const abortController = this.createAbortController(jobId);
     let timedOut = false;
@@ -163,7 +181,9 @@ export abstract class WorkerManual<T = unknown, R = unknown> extends WorkerContr
       this.releaseAbortController(jobId, abortController);
       this.activeJobs--;
       this.finishDelivery(delivery);
-      if (this.groupLimiter) this.groupLimiter.decrement(processingJob);
+      if (this.activeJobs === 0 && !this.running && !this.paused && !this._closing) {
+        this.stopJobHeartbeat();
+      }
     }
   }
 

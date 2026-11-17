@@ -115,11 +115,12 @@ export async function moveToWaitingChildren(
     const shard = ctx.shards[idx];
     // Release concurrency/uniqueKey/group slots before moving to waitingChildren
     shard.releaseJobResources(job.queue, job.uniqueKey, job.groupId, job.id);
+    job.manuallyParked = true;
     shard.waitingChildren.set(jobId, job);
     ctx.jobIndex.set(jobId, { type: 'queue', shardIdx: idx, queueName: job.queue });
   });
 
-  ctx.storage?.markWaitingChildren(jobId, job.timeline);
+  ctx.storage?.markWaitingChildren(job.id, job.timeline, job);
   ctx.eventsManager.broadcast({
     eventType: EventType.WaitingChildren,
     jobId,

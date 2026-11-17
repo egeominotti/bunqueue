@@ -176,7 +176,10 @@ if (job) {
 
 `processJobManually(job)` reuses the lease tracked by `getNextJob()`, so the
 token argument can be omitted. If you pass an explicit token, it must match the
-current delivery.
+current delivery. With `autorun: false`, the Bun worker renews the lease while
+the manual processor is running and until the broker accepts its outcome.
+Calling `close()` during processing keeps these renewals active. Use
+`heartbeatInterval: 0` or `skipLockRenewal: true` to disable them.
 
 ## Native batch members (Bun)
 

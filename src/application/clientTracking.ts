@@ -3,6 +3,7 @@
  * Handles job ownership and release on client disconnect
  */
 
+import { isProtectedCronJob } from '../domain/types/cron';
 import type { Job, JobId } from '../domain/types/job';
 import { shardIndex } from '../shared/hash';
 import { withWriteLock } from '../shared/lock';
@@ -211,7 +212,7 @@ function releaseJobToQueue(opts: ReleaseJobOptions): number {
   // Discard cron jobs with preventOverlap instead of re-queuing (#73).
   // The cron scheduler will re-create them at the next scheduled tick.
   // Re-queuing them causes the "starts right away on reconnect" bug.
-  if (job.uniqueKey?.startsWith('cron:')) {
+  if (isProtectedCronJob(job)) {
     ctx.jobIndex.delete(jobId);
     ctx.storage?.deleteJob(jobId);
     return 1;

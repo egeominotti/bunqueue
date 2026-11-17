@@ -275,10 +275,9 @@ first-class spawned-job name.
    upsert (so it doesn't clobber restart-skip logic) (`cron/runtime.ts:100`).
 6. Assign a fresh `generation`, store in map + heap, then `scheduleNext()`.
 
-At the manager layer, `addCron` first removes an orphaned queued job when
-`preventOverlap` is set, so a stale job from a disconnect window is not
-immediately consumed by the new worker (`application/queue-manager/services.ts`,
-#73). It then persists via `storage.saveCron`.
+When `preventOverlap` is set, `addCron` can remove a queued generation with
+the same deduplication key and persisted scheduler name before saving the cron.
+Ordinary jobs and ticks from another scheduler keep their place in the queue.
 
 ### Event-driven wake (`scheduleNext`, `runtime.ts`)
 
@@ -306,6 +305,10 @@ The timer is rearmed after every mutation (add/remove/load/tick).
 
 - Skip decisions live in `getSkipReason` (see tick step 5), not here: by the time `fireCronJob` runs the push is committed.
 - **`preventOverlap`**: when no explicit `uniqueKey`, auto-derives `cron:<name>` so the dedup layer blocks a new push while the prior job is still active.
+- Every tick carries its scheduler name in the persisted job. Lease release and
+  recovery retire a tick with a protected `cron:` key only when that origin
+  is present. Existing rows created before origin tracking use the ordinary
+  retry policy on recovery, including older in-flight ticks.
 - Push with `data`, `priority`, `uniqueKey`, `dedup`, and the `jobOptions` subset; record `lastFiredAt`; emit `cron:fired`.
 
 ### Restart recovery (`load`, `cron/runtime.ts:126-144`)

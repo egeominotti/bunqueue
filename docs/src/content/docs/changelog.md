@@ -22,6 +22,9 @@ head:
 
 ### Upgrade notes
 
+- The broker now records the scheduler that created each cron tick. Active jobs
+  written by an older broker have no scheduler origin and follow ordinary job
+  recovery. An in-flight tick from before the upgrade can therefore run again.
 - **The Python SDK (`bunqueue-client`) now requires Python 3.10 or later.** This
   is a breaking change for Python 3.9 users, and the next Python SDK release
   must carry it; the SDK's version number is not changed here. Python 3.9 has
@@ -558,6 +561,19 @@ head:
 
 ### Bug fixes
 
+- Ordinary jobs with `cron:` deduplication keys survive worker disconnects,
+  lease recovery, restarts and registration of a scheduler with the same key.
+  Repeating a push for a cached custom ID also preserves a job manually parked
+  in `waiting-children`, including its original payload.
+- Canceling a waiting dependent preserves its unfinished prerequisite’s state.
+  Waiting jobs can advance after their prerequisites finish even when an earlier
+  completion has left the in-memory cache.
+- Graceful worker shutdown keeps active deliveries leased until they settle.
+  Pausing during a pull preserves the returned delivery. Changing job data
+  inside a processor releases the concurrency slot acquired for its original group.
+- Nested workflow rollback checks the child’s stored definition before running
+  compensation. Retention preserves child history needed by a live parent, and
+  signal waits in children keep their deadlines across an engine restart.
 - Fix the legacy chaos test's incomplete job accounting. Delayed retries were
   omitted and an empty pull ended the drain before retries became due, so a
   valid 49-completed/51-delayed population failed a half-count threshold.

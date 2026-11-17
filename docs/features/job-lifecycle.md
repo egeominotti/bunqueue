@@ -158,6 +158,13 @@ admission.
    and parent shard write lock required by the request in ascending order.
 2. **Inspect custom-ID idempotency** (`handleCustomId`, `customId.ts`). A live
    generation is an idempotent skip only on a retained `customIdMap` hit.
+   The lookup includes jobs manually parked in `waiting-children`. A retry
+   returns the original generation with its original payload and queue position.
+   SQLite records an explicit manual park alongside the job options. Linking
+   a completed child preserves that park across restart. Linking an unfinished
+   child transfers the parent to dependency tracking. A parent already blocked
+   on a different prerequisite keeps every link, including the wake-up edge
+   for a newly attached child that may subsequently be retried.
    Memory/SQLite ordinary adds use a bounded LRU (50,000 default); cache misses
    do not perform authoritative live-generation rejection, and SQLite upserts
    do not repair that limit. PostgreSQL uses separate locked database checks;

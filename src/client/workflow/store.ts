@@ -248,25 +248,16 @@ export class WorkflowStore {
   }
 
   /**
-   * Executions in a recoverable state that recovery may drive ON ITS OWN.
-   *
-   * A `subWorkflow` child is a row like any other, so the state filter alone offered
-   * it to `recover()` as if it were a top-level run. Driving it independently re-ran
-   * its steps and produced fresh records with no `compensation`, which defeats the
-   * "a step that already carries an outcome is not re-run" guard: the parent's later
-   * unwind dispatched the child's reversal a SECOND time, against a provider that had
-   * already been refunded (`test/repro-model-child-recovered-alone.test.ts`; found by
-   * the state-machine model, seed 1267197984).
-   *
-   * A child's lifecycle belongs to its parent, which unwinds it through `unwindChild`.
-   * One exception: if the parent row is gone, nothing owns the child any more, so it
-   * is returned rather than stranded forever in a non-terminal state.
+   * Root and orphan executions that recovery may drive. Owned children resume
+   * through their parent. Recovery can also request parked children to restore
+   * their signal gates, whose timers belonged to the previous process.
    */
-  listRecoverable(): Execution[] {
+  listRecoverable({ includeOwnedWaits = false } = {}): Execution[] {
     const rows = this.stmts.listRecoverable.all() as Record<string, unknown>[];
     const all = rows.map(decodeExecution);
     return all.filter((execution) => {
       if (execution.state === 'failed' && execution.rollbackStatus !== undefined) return false;
+      if (includeOwnedWaits && execution.state === 'waiting') return true;
       return !execution.parentExecutionId || this.get(execution.parentExecutionId) === null;
     });
   }

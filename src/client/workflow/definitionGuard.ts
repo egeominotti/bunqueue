@@ -12,6 +12,12 @@ export class WorkflowDefinitionMismatchError extends Error {
   }
 }
 
+export function assertExecutionDefinition(exec: Execution, workflow: Workflow): void {
+  if (exec.definitionHash !== undefined && exec.definitionHash !== workflow.seal()) {
+    throw new WorkflowDefinitionMismatchError(exec.id, exec.workflowName);
+  }
+}
+
 /**
  * Legacy rows have no hash; bind them once to the currently registered graph. New rows
  * always arrive pre-bound by startExecution.
@@ -21,13 +27,9 @@ export function bindExecutionDefinition(
   workflow: Workflow,
   update: (exec: Execution) => void
 ): void {
-  const registeredHash = workflow.seal();
+  assertExecutionDefinition(exec, workflow);
   if (exec.definitionHash === undefined) {
-    exec.definitionHash = registeredHash;
+    exec.definitionHash = workflow.seal();
     update(exec);
-    return;
-  }
-  if (exec.definitionHash !== registeredHash) {
-    throw new WorkflowDefinitionMismatchError(exec.id, exec.workflowName);
   }
 }

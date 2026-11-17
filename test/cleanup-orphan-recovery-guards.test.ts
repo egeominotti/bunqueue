@@ -19,7 +19,7 @@ import { afterEach, describe, expect, setSystemTime, test } from 'bun:test';
 import { QueueManager } from '../src/application/queueManager';
 import { cleanup } from '../src/application/cleanupTasks';
 import type { BackgroundContext } from '../src/application/types';
-import type { Job, JobLock } from '../src/domain/types/job';
+import { cronSource, type Job, type JobLock } from '../src/domain/types/job';
 import { processingShardIndex, shardIndex } from '../src/shared/hash';
 
 const THIRTY_ONE_MINUTES = 31 * 60 * 1000;
@@ -206,7 +206,8 @@ describe('orphan recovery: races and budgets', () => {
     qm = new QueueManager();
     const ctx = backgroundContext(qm);
 
-    const first = await qm.push('cron-orphan', { data: {}, uniqueKey: 'cron:nightly' });
+    const tick = { data: {}, [cronSource]: 'nightly', uniqueKey: 'cron:nightly' };
+    const first = await qm.push('cron-orphan', tick);
     expect((await qm.pull('cron-orphan'))?.id).toBe(first.id);
     silence(processingJob(ctx, first.id));
 
@@ -215,7 +216,7 @@ describe('orphan recovery: races and budgets', () => {
     expect(isProcessing(ctx, first.id)).toBe(false);
     expect(ctx.jobIndex.has(first.id)).toBe(false);
     expect(qm.getDlq('cron-orphan')).toEqual([]);
-    const next = await qm.push('cron-orphan', { data: {}, uniqueKey: 'cron:nightly' });
+    const next = await qm.push('cron-orphan', tick);
     expect(next.id).not.toBe(first.id);
     expect((await qm.pull('cron-orphan'))?.id).toBe(next.id);
   });

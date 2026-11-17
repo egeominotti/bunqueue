@@ -3,6 +3,7 @@
  * Uses two-phase detection (like BullMQ) to prevent false positives
  */
 
+import { isProtectedCronJob } from '../domain/types/cron';
 import type { Job } from '../domain/types/job';
 import { calculateBackoff, MAX_TIMELINE_ENTRIES } from '../domain/types/job';
 import { FailureReason, recordJobFailureAttempt } from '../domain/types/dlq';
@@ -180,7 +181,7 @@ function moveStalliedJobToDlq(
   shard.releaseJobResources(job.queue, job.uniqueKey, job.groupId, job.id);
 
   // Discard cron jobs with preventOverlap instead of sending to DLQ (#73).
-  if (job.uniqueKey?.startsWith('cron:')) {
+  if (isProtectedCronJob(job)) {
     ctx.jobIndex.delete(job.id);
     ctx.storage?.deleteJob(job.id);
     return null;
@@ -217,7 +218,7 @@ function retryStalliedJob(
 ): void {
   // Discard cron jobs with preventOverlap instead of retrying (#73).
   // The cron scheduler will re-create them at the next scheduled tick.
-  if (job.uniqueKey?.startsWith('cron:')) {
+  if (isProtectedCronJob(job)) {
     ctx.processingShards[procIdx].delete(job.id);
     ctx.timeoutScheduler.cancel(job.id);
     shard.releaseJobResources(job.queue, job.uniqueKey, job.groupId, job.id);

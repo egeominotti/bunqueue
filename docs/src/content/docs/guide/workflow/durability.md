@@ -149,15 +149,20 @@ engine.archive(30 * 24 * 60 * 60 * 1000);                 // move to an archive 
 engine.getArchivedCount();
 ```
 
-`cleanup` deletes; `archive` moves rows to `workflow_executions_archive` transactionally, up to 1000 per call. Both take a minimum age and the cutoff is inclusive, so `cleanup(0)` and `archive(0)` really do take everything terminal, including a run that finished in the current millisecond.
+`cleanup` deletes eligible rows. `archive` moves up to 1000 eligible rows to
+`workflow_executions_archive` in one transaction. The age cutoff includes runs
+that finished in the current millisecond when you pass zero. Retention keeps
+a failed run that still owes rollback and a child whose result or reversal an
+ancestor still needs. A completed parent can keep its own children available
+for a pending grandparent's rollback.
 
 ## Nested runs belong to their parent
 
 A `subWorkflow` child is a row like any other, but its lifecycle is owned by the parent
-that started it, so it is deliberately not offered to `recover()` on its own. Driving it
-independently would re-run its steps behind the parent's back, and the fresh records
-would carry no rollback outcome, so the parent's later unwind would reverse the same
-child a second time.
+that started it. During recovery the parent controls forward execution and
+rollback. The engine restores each child's parked signal gate, including gates
+nested several levels deep. Its timer keeps the original deadline even when
+the parent is waiting for an operator to resolve a rollback.
 
 The parent claims its child as soon as it starts one, before waiting on it, and a later
 entry into that node resumes the existing child instead of starting another. That
