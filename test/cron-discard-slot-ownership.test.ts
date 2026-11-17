@@ -16,7 +16,7 @@ import { checkExpiredLocks } from '../src/application/lockManager';
 import { handleStalledJob } from '../src/application/stallDetection';
 import type { BackgroundContext, LockContext } from '../src/application/types';
 import type { Shard } from '../src/domain/queue/shard';
-import type { Job, JobId } from '../src/domain/types/job';
+import { cronSource, type Job, type JobId } from '../src/domain/types/job';
 import type { ConcurrencyLimiter } from '../src/domain/types/queue';
 import type { GroupPullOptions } from '../src/domain/types/group';
 import { StallAction } from '../src/domain/types/stall';
@@ -91,6 +91,7 @@ async function cronHoldingSlot(mode: Mode, queue: string, lockTtl: number, maxAt
   const cronKey = `cron:${queue}`;
   await manager.push(queue, {
     data: { role: 'cron' },
+    [cronSource]: queue,
     uniqueKey: cronKey,
     groupId: mode.groupId,
     maxAttempts,

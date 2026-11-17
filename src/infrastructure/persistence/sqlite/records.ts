@@ -124,8 +124,13 @@ export abstract class SqliteRecords extends SqliteFlows {
   }
 
   loadCompletedJobIds(requested: Iterable<JobId>): Set<JobId> {
-    const requestedIds = [...new Set(requested)];
     const ids = new Set<JobId>();
+    const requestedIds: JobId[] = [];
+    for (const id of new Set(requested)) {
+      const bufferedState = this.getBufferedJobState(id);
+      if (bufferedState === null) requestedIds.push(id);
+      else if (bufferedState === 'completed') ids.add(id);
+    }
     for (let offset = 0; offset < requestedIds.length; offset += 500) {
       const chunk = requestedIds.slice(offset, offset + 500);
       const placeholders = chunk.map(() => '?').join(',');

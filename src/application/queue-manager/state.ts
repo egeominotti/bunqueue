@@ -23,7 +23,7 @@ import { ContextFactory } from '../contextFactory';
 import { DependencyResultTracker } from '../dependencyResultTracker';
 import { RemovedResults } from '../removedResults';
 import { recoverFlowFailures } from '../flowFailureRecovery';
-import { DependencyCompletionTracker } from '../dependencyCompletions';
+import { DependencyCompletionTracker, hasDependencyWaiters } from '../dependencyCompletions';
 import { JobTimeoutScheduler } from '../background/timeouts';
 import type { RetiredTimeoutGeneration } from '../types/background';
 import { QueueTelemetryJournal } from '../queueTelemetryJournal';
@@ -127,6 +127,12 @@ export abstract class QueueManagerState {
       cleanupFailedInitialization.push(() => this.telemetryJournal.clearMemory());
       this.completedJobsData = new BoundedMap(this.config.maxCompletedJobs);
       this.completedJobs = new BoundedSet(this.config.maxCompletedJobs, (id) => {
+        if (!this.storage && this.dependencyResults.hasConsumers(id)) {
+          const location = this.jobIndex.get(id);
+          if (location?.type === 'completed' && hasDependencyWaiters(this.shards, id)) {
+            this.depCompletions.pinEvictedJob(id, location.queueName);
+          }
+        }
         this.jobIndex.delete(id);
         this.completedJobsData.delete(id);
       });

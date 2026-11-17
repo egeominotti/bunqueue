@@ -104,7 +104,16 @@ export function prepareParentLink(
     child,
     parent,
     linkedChild: { ...child, parentId: parent.id, data: childData },
-    linkedParent: { ...parent, childrenIds, dependsOn, data: parentData, timeline },
+    linkedParent: {
+      ...parent,
+      childrenIds,
+      dependsOn,
+      data: parentData,
+      timeline,
+      ...((membership === 'waiting-children' || parent.manuallyParked) && {
+        manuallyParked: membership === 'waiting-children' && childFinished,
+      }),
+    },
     parentMembership: membership,
     childFinished,
   };
@@ -119,8 +128,10 @@ export function commitParentLink(plan: ParentLinkPlan, ctx: PushContext): void {
   (parent as { dependsOn: JobId[] }).dependsOn = linkedParent.dependsOn;
   (parent as { data: unknown }).data = linkedParent.data;
   parent.timeline = linkedParent.timeline;
+  if (linkedParent.manuallyParked !== undefined)
+    parent.manuallyParked = linkedParent.manuallyParked;
 
-  if (!plan.childFinished) {
+  if (!plan.childFinished || plan.parentMembership === 'waiting-deps') {
     const parentShard = ctx.shards[shardIndex(parent.queue)];
     if (plan.parentMembership === 'queue') {
       if (parentShard.getQueue(parent.queue).remove(parent.id)) {
@@ -146,7 +157,7 @@ export function commitParentLink(plan: ParentLinkPlan, ctx: PushContext): void {
 export function parentLinkState(
   plan: ParentLinkPlan
 ): 'waiting-children' | 'waiting' | 'prioritized' | 'delayed' {
-  if (!plan.childFinished) return 'waiting-children';
+  if (!plan.childFinished || plan.parentMembership !== 'queue') return 'waiting-children';
   if (plan.parent.runAt > Date.now()) return 'delayed';
   return plan.parent.priority > 0 ? 'prioritized' : 'waiting';
 }

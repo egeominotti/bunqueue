@@ -171,6 +171,8 @@ export function rowToJob(row: DbJob): Job {
     ttl: row.ttl,
     timeout: row.timeout,
     uniqueKey: row.unique_key,
+    ...(extended.cronName !== undefined && { cronName: extended.cronName }),
+    ...(extended.manuallyParked && { manuallyParked: true }),
     customId: row.custom_id,
     dependsOn: dependsOn.map((s) => jobId(s)),
     parentId: row.parent_id ? jobId(row.parent_id) : null,

@@ -167,9 +167,9 @@ Single push: `pushJob` takes the required write locks and runs both checks insid
    via `jobIndex` without repairing that missing admission check. On a hit,
    three unfinished states are covered:
    - **waiting / delayed / prioritized** — `jobIndex` type `queue` and present in the PriorityQueue → return the existing job.
-   - **waiting-children** — `jobIndex` type `queue` but held in `shard.waitingDeps` (its row is already persisted, so it is _not_ in the PriorityQueue) → idempotent skip via the existing id.
+   - **waiting-children** — the lookup returns the original job when manually parked in `shard.waitingChildren`, or the existing ID when dependency-gated in `shard.waitingDeps`.
    - **active (processing)** — `jobIndex` type `processing`; the job was popped from the queue and is still running on a worker, with its row still on disk → idempotent skip via the existing id.
-     For the latter two, `PushContext` has no `processingShards`, so it cannot fetch the live `Job`; `pushJob` / `pushJobBatch` rebuild a placeholder `{ ...job, id }` after `createJob` (mirrors `handleDeduplication`'s active path) and insert nothing. **Completed (#92) and DLQ jobs are terminal** and fall through to the reuse path below.
+     For an active or dependency-gated job, the push path can return a placeholder carrying the existing ID. **Completed (#92) and DLQ jobs are terminal** and fall through to the reuse path below.
 3. **Terminal reuse is planned, not applied.** Completed, DLQ, and unreferenced
    payload-free dependency-completion generations produce a
    `CustomIdRetirement`. The inspection phase does not remove the old job,
@@ -218,7 +218,7 @@ Single push: `pushJob` takes the required write locks and runs both checks insid
 6. If the prior owner is gone from `jobIndex` (completed/failed), allow the new
    admission and register its key only after the required storage operation.
 
-When a dedup result is `skip`, the caller returns the existing queued job if found, otherwise a placeholder carrying `existingId` so the caller sees the correct id without a duplicate insert (`src/application/operations/push.ts:76-85`). The custom-id idempotency path uses the same placeholder shape for its active / waiting-children skips.
+When a dedup result is `skip`, the caller returns the existing queued job if found, otherwise a placeholder carrying `existingId` so the caller sees the correct id without a duplicate insert (`src/application/operations/push.ts:76-85`). The custom-ID path can also return a placeholder for active and dependency-gated jobs.
 
 ### 3. Batch push — `pushJobBatch` (`src/application/operations/pushBatch.ts`)
 

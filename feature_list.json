@@ -363,6 +363,16 @@
       "issue": null
     },
     {
+      "id": "severe-job-audit",
+      "name": "Fix ten severe job integrity and workflow recovery defects",
+      "description": "Reproduce and correct ten public-path defects in admission, dependency promotion, worker delivery and workflow recovery. Verify each corrected scenario at least five times and run the model, sandbox, Linux and CI gates.",
+      "dependencies": [],
+      "status": "done",
+      "branch": "severe-job-audit",
+      "evidence": "2026-11-17, base bf559e5a. Lands in the commit titled 'fix: preserve job delivery, dependency ordering and workflow rollback'. All ten defects reproduced 8/8 before correction, including five fresh Linux Machines in artifacts/severe-job-audit/repro-20261117T214844Z/summary.txt. The two eviction-limit probes are tracked separately in custom-id-cache-eviction-live-reuse. On runtime tree f6a1558aee5b2f9609c1377b019edad1d59c405d the ten-file BUNQUEUE_EMBEDDED=1 bun test run described in docs/testing.md passed 70/70 on every fresh Machine (3 Ubuntu 24.04, 2 Debian 13), 350/350, including the five issues found in review. Per-case results and logs: artifacts/severe-job-audit/validated-20261117T222920Z/summary.txt. bun run test:model 12/12, 96045 assertions; bun run test:sandbox 12001 unit pass / 0 fail / 405 skip, TCP 553/553, embedded 349/349, no resource anomalies (artifacts/test-sandbox/2026-11-17T22-32-18.440Z/summary.md). Native Ubuntu machine-gate.sh exit 0: 12132/0/405 unit, 553/553 TCP, 349/349 embedded, 9/9 tinyfs; Machine deleted (artifacts/machines/20261117T223057Z/manifest.md). Two PostgreSQL 18.6 suites passed 10/10 in an isolated Docker network. ./init.sh 179/0, bun run typecheck 890 source and 2173 test/project files, bun run format:check 2383 files, git diff --check clean. Skeptic round one found five failures. Round two verified the repair of all five, including 26/26 independent corrective tests. The final diff against the gated tree changes only feature_list.json and progress.md. The final review verdicts and integrated commit SHA, pull request and main CI run are recorded in artifacts/severe-job-audit/validated-20261117T222920Z/integration.json.",
+      "issue": null
+    },
+    {
       "id": "split-oversized-test-files",
       "name": "Split the test files that exceed the 300-line limit",
       "description": "test/workflow-new-features.test.ts (647 lines), test/client-dlq-dedup.test.ts (714), test/long-running-timeout.test.ts (350), test/docs-queue-guide/advanced-batching.test.ts (309) and test/lockExpiration.test.ts (307) are over the 300-line rule; split each by concern without changing any test.",

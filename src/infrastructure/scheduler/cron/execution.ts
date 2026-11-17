@@ -1,4 +1,4 @@
-import { isAtLimit, type CronJob } from '../../../domain/types/cron';
+import { cronJobInput, isAtLimit, type CronJob } from '../../../domain/types/cron';
 import { cronLog } from '../../../shared/logger';
 import { expandCronShortcut, getNextCronRun, getNextIntervalRun } from '../cronParser';
 import type { CronHeapEntry, PushJobCallback } from '../types/cronScheduler';
@@ -123,23 +123,7 @@ export class CronExecution extends CronRuntime {
   }
 
   private async fireCronJob(cron: CronJob, now: number): Promise<void> {
-    const effectiveUniqueKey =
-      cron.uniqueKey ?? (cron.preventOverlap ? `cron:${cron.name}` : undefined);
-    const options = cron.jobOptions;
-    await (this.pushJob as PushJobCallback)(cron.queue, {
-      name: cron.jobName,
-      data: cron.data,
-      priority: cron.priority,
-      uniqueKey: effectiveUniqueKey,
-      dedup: cron.dedup ?? undefined,
-      maxAttempts: options?.maxAttempts,
-      backoff: options?.backoff,
-      timeout: options?.timeout,
-      delay: options?.delay,
-      stallTimeout: options?.stallTimeout,
-      removeOnComplete: options?.removeOnComplete,
-      removeOnFail: options?.removeOnFail,
-    });
+    await (this.pushJob as PushJobCallback)(cron.queue, cronJobInput(cron));
     this.lastFiredAt.set(cron.name, now);
     this.dashboardEmit?.('cron:fired', { name: cron.name, queue: cron.queue });
   }

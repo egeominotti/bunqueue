@@ -4,36 +4,40 @@ import { WorkerManual } from './manual';
 import type { WorkerDelivery } from './state';
 
 export abstract class WorkerLifecycle<T = unknown, R = unknown> extends WorkerManual<T, R> {
+  private returningBatches = 0;
+
   async close(force = false): Promise<void> {
     if (this.closed) return;
-    if (this._closingPromise) {
-      if (force) this._forceClose = true;
-      return this._closingPromise;
+    if (force) {
+      this._forceClose = true;
+      this.stopHeartbeats();
     }
-    this._forceClose = force;
-    this._closingPromise = this._doClose(force);
+    this._closingPromise ??= this._doClose();
     return this._closingPromise;
   }
 
-  protected async _doClose(force: boolean): Promise<void> {
+  private stopHeartbeats(): void {
+    this.stopJobHeartbeat();
+    this.workerHeartbeatTimer?.clear();
+    this.workerHeartbeatTimer = null;
+  }
+
+  protected async _doClose(): Promise<void> {
     this._closing = true;
     this.running = false;
     this.paused = false;
     this.clearPollTimer();
     this.ackBatcher.notifyCapacityChanged();
-    this.heartbeatTimer?.clear();
-    this.heartbeatTimer = null;
-    this.workerHeartbeatTimer?.clear();
-    this.workerHeartbeatTimer = null;
+    this.pendingJobs = [];
+    this.pendingJobsHead = 0;
 
-    await this.releaseBufferedJobs();
-    if (!force) {
-      while (this.activeJobs > 0 && !this._forceClose) await Bun.sleep(50);
-    }
+    await this.releaseUnstartedJobs([...this.currentDeliveries.values()]);
+    while (this.activeJobs > 0 && !this._forceClose) await Bun.sleep(50);
 
     await this.ackBatcher.flush();
     await this.ackBatcher.waitForInFlight();
     this.ackBatcher.stop();
+    this.stopHeartbeats();
 
     if (this.registered) {
       if (this.embedded) {
@@ -49,6 +53,12 @@ export abstract class WorkerLifecycle<T = unknown, R = unknown> extends WorkerMa
     }
 
     await Bun.sleep(100);
+    // An unanswered TCP long poll is cancelled by closing its connection. Finish
+    // returning any deliveries we already received before closing that connection.
+    // Embedded pulls have no disconnect recovery and must finish handing back jobs.
+    while (this.returningBatches > 0 || (this.embedded && this.pendingPull > 0)) {
+      await Bun.sleep(10);
+    }
     if (this.stalledUnsubscribe) {
       this.stalledUnsubscribe();
       this.stalledUnsubscribe = null;
@@ -58,8 +68,6 @@ export abstract class WorkerLifecycle<T = unknown, R = unknown> extends WorkerMa
     this.pulledJobIds.clear();
     this.jobTokens.clear();
     this.cancelledJobs.clear();
-    this.pendingJobs = [];
-    this.pendingJobsHead = 0;
     if (this.groupLimiter) this.groupLimiter.clear();
 
     if (this.tcpPool) this.tcpPool.close();
@@ -68,19 +76,16 @@ export abstract class WorkerLifecycle<T = unknown, R = unknown> extends WorkerMa
     this.emit('closed');
   }
 
-  protected async releaseBufferedJobs(): Promise<void> {
-    const buffered = this.pendingJobs.slice(this.pendingJobsHead);
-    this.pendingJobs = [];
-    this.pendingJobsHead = 0;
-
-    for (const delivery of buffered) {
-      if (this.isCurrentDelivery(delivery)) await this.releasePulledJob(delivery);
-    }
-
-    for (const id of [...this.pulledJobIds]) {
-      if (this.hasActiveDelivery(id)) continue;
-      const delivery = this.currentDelivery(id);
-      if (delivery) await this.releasePulledJob(delivery);
+  protected async releaseUnstartedJobs(deliveries: WorkerDelivery[]): Promise<void> {
+    this.returningBatches++;
+    try {
+      for (const delivery of deliveries) {
+        if (this.isCurrentDelivery(delivery) && !this.isActiveDelivery(delivery)) {
+          await this.releasePulledJob(delivery);
+        }
+      }
+    } finally {
+      this.returningBatches--;
     }
   }
 

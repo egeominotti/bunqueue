@@ -3,6 +3,7 @@ import type { FlowFailureMode, FlowFailureRecord } from '../../../domain/types/f
 import type { Job, JobId } from '../../../domain/types/job';
 import type { DurableAdmissionMetadata } from '../types/admission';
 import { pack, unpack } from '../sqliteSerializer';
+import { encodeJobOptions } from '../jobOptionsBlob';
 import { SqliteMutations } from './mutations';
 
 export type FlowLinkWriteMode =
@@ -52,7 +53,8 @@ export abstract class SqliteFlows extends SqliteMutations {
         const parentUpdate = this.db
           .prepare(
             `UPDATE jobs
-             SET children_ids = ?, depends_on = ?, data = ?, state = ?, timeline = ?
+             SET children_ids = ?, depends_on = ?, data = ?, state = ?, timeline = ?,
+                 extended_options = COALESCE(?, extended_options)
              WHERE id = ?`
           )
           .run(
@@ -61,6 +63,7 @@ export abstract class SqliteFlows extends SqliteMutations {
             pack(parent.data),
             parentState,
             parent.timeline.length > 0 ? pack(parent.timeline) : null,
+            parent.manuallyParked === undefined ? null : encodeJobOptions(parent),
             parent.id
           );
         if (parentUpdate.changes !== 1) {

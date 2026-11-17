@@ -2,6 +2,11 @@ import type { Job, JobId } from '../../domain/types/job';
 import { EventType } from '../../domain/types/queue';
 import { shardIndex } from '../../shared/hash';
 import { withWriteLock } from '../../shared/lock';
+import {
+  hasUnfinishedDependency,
+  isDependencyComplete,
+  loadColdDependencyCompletions,
+} from '../dependencyCompletions';
 import { QueueManagerFlowFailures } from './flow-failures';
 
 export class QueueManagerFlowOptions extends QueueManagerFlowFailures {
@@ -36,6 +41,11 @@ export class QueueManagerFlowOptions extends QueueManagerFlowFailures {
     await withWriteLock(this.shardLocks[index], () => {
       if (this.jobIndex.get(parentId)?.type !== 'queue') return;
       const shard = this.shards[index];
+      if (
+        shard.waitingDeps.get(parentId) !== parentJob &&
+        shard.waitingChildren.get(parentId) !== parentJob
+      )
+        return;
       releasedDependencies = [...parentJob.dependsOn];
       shard.unregisterDependencies(parentId, releasedDependencies);
       for (const dependency of releasedDependencies) {
@@ -63,27 +73,33 @@ export class QueueManagerFlowOptions extends QueueManagerFlowFailures {
     await withWriteLock(this.shardLocks[index], () => {
       if (this.jobIndex.get(parentId)?.type !== 'queue') return;
       const shard = this.shards[index];
-      if (shard.waitingDeps.has(parentId)) {
-        releasedDependencies = [...parentJob.dependsOn];
-        shard.waitingDeps.delete(parentId);
-        shard.unregisterDependencies(parentId, parentJob.dependsOn);
-      }
+      if (
+        shard.waitingDeps.get(parentId) !== parentJob &&
+        shard.waitingChildren.get(parentId) !== parentJob
+      )
+        return;
+      // Another child may have been linked or retried while the failure callback yielded.
+      const ctx = this.contextFactory.getPushContext();
+      const stored = loadColdDependencyCompletions(parentJob.dependsOn, ctx);
+      if (!parentJob.dependsOn.every((id) => isDependencyComplete(id, ctx, stored))) return;
+      const now = Date.now();
+      const state = parentJob.priority > 0 ? 'prioritized' : 'waiting';
+      this.storage?.updateFlowParentResolution({ ...parentJob, runAt: now }, state);
+      releasedDependencies = [...parentJob.dependsOn];
+      shard.waitingDeps.delete(parentId);
+      shard.unregisterDependencies(parentId, releasedDependencies);
       shard.waitingChildren.delete(parentId);
       const queue = shard.getQueue(parentJob.queue);
-      if (!queue.find(parentId)) {
-        const now = Date.now();
-        parentJob.runAt = now;
-        queue.push(parentJob);
-        shard.incrementQueued(parentId, false, parentJob.createdAt, parentJob.queue, now);
-        this.jobIndex.set(parentId, {
-          type: 'queue',
-          shardIdx: index,
-          queueName: parentJob.queue,
-        });
-        this.storage?.updateFlowParentResolution(parentJob);
-        shard.notify(parentJob.queue);
-        promoted = true;
-      }
+      parentJob.runAt = now;
+      queue.push(parentJob);
+      shard.incrementQueued(parentId, false, parentJob.createdAt, parentJob.queue, now);
+      this.jobIndex.set(parentId, {
+        type: 'queue',
+        shardIdx: index,
+        queueName: parentJob.queue,
+      });
+      shard.notify(parentJob.queue);
+      promoted = true;
     });
     this.releaseCompletionPins(releasedDependencies);
     if (promoted) {
@@ -120,7 +136,7 @@ export class QueueManagerFlowOptions extends QueueManagerFlowFailures {
     await withWriteLock(this.shardLocks[index], () => {
       if (this.jobIndex.get(parentId)?.type !== 'queue') return;
       const shard = this.shards[index];
-      if (!shard.waitingDeps.has(parentId)) return;
+      if (shard.waitingDeps.get(parentId) !== parentJob) return;
       const dependencyIndex = parentJob.dependsOn.indexOf(childJob.id);
       if (dependencyIndex !== -1) {
         parentJob.dependsOn.splice(dependencyIndex, 1);
@@ -129,9 +145,8 @@ export class QueueManagerFlowOptions extends QueueManagerFlowFailures {
         this.dependencyResults.releaseDependency(parentId, childJob.id);
         this.storage?.updateFlowParentResolution(parentJob);
       }
-      readyToPromote =
-        parentJob.dependsOn.length === 0 ||
-        parentJob.dependsOn.every((dependency) => this.completedJobs.has(dependency));
+      const ctx = this.contextFactory.getPushContext();
+      readyToPromote = !hasUnfinishedDependency(parentJob.dependsOn, ctx);
     });
     if (releasedDependency) this.releaseCompletionPins([releasedDependency]);
     if (readyToPromote) {

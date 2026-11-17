@@ -265,6 +265,7 @@ Eligibility: user steps only (no `__` bookkeeping), status `completed` **or `fai
 - **Park, do not plough on.** A handler that throws settles as `compensation-failed` and the loop **breaks**. The remaining steps are left *without* an outcome on purpose — the run is parked (`compensation-stuck`, `rollbackStatus: 'stuck'`), not finished, and pre-marking them skipped would make a later resume believe they were handled.
 - **Bounded like the forward path, and bounded even when the forward path is not.** The bound comes from `decideUnwindAction` (`unwindPlan.ts`) as `def.timeout > 0 ? def.timeout : DEFAULT_COMPENSATE_TIMEOUT_MS`, so the 30 s default from `workflow.ts:121` applies to a reversal too, and a timeout settles as `compensation-failed` (`error: 'Step timed out after Nms'`) exactly like a throw. `timeout: 0` disables the bound on the forward path only: an unbounded reversal would hold the process-global compensation claim forever, locking operator control and, after force-close, preventing a replacement Engine from recovering the run. A hung HTTP call to a provider that is down — precisely when rollbacks run — must instead settle as a failed reversal and park the run in `compensation-stuck`, where an operator can resume or abandon it.
 - **Nested sagas.** A `sub:<name>` record is compensated by running the CHILD's `runCompensation` (`unwindChild`). A child that parks makes the parent's sub-step throw, so the parent parks too rather than reporting a clean rollback over a half-undone child. Resuming an ancestor may retry a child that is still `compensation-stuck`; it may not reopen a child explicitly abandoned to the terminal `failed` + `rollbackStatus: 'stuck'` pair.
+  Before dispatching child reversals, the engine checks the child's stored definition hash against the registered workflow. A mismatch parks the parent with a failed `sub:<name>` compensation. For older children without a hash, the step journal identifies outstanding reversals whose handler has disappeared. Restoring the original child definition lets an operator resume the parent.
 - **Operator exits** (`rollbackControl.ts`): `resumeCompensation` asks for the retry with a FLAG (`retryFailed`) rather than clearing the failed outcome, so the operator's record survives until a real outcome replaces it. Clearing was worse than it looked: it persisted the wipe before running anything, so a resume that met a failing store left a durable row with the diagnostic gone and the run marked `compensating`, re-driven at every startup, and guarding that needed a deep snapshot, a restore path and a second write that could mask the original error. `abandonCompensation` records every outstanding eligible step as `compensation-skipped` and makes the run terminal — this is where "exactly one outcome" is discharged. That terminal decision is monotonic: a later parent retry parks on the abandoned child instead of dispatching its reversal again.
 
 Triggered from the generic `processStep` catch, the `waitFor` timeout path, and recovery.
@@ -284,12 +285,14 @@ process-local claim as a distributed lock. Definitions are rebound only when a
 legacy row has no hash; a hashed row with a different registered graph fails
 closed.
 
-A child with a live parent is excluded from top-level recovery because its
-lifecycle belongs to that parent. Re-entry resumes the claimed child rather
-than provisioning another one. If the parent died between child persistence
-and parent claim persistence, the parent adopts the child by
-`parentExecutionId` and workflow name. A child whose parent row is gone becomes
-top-level recoverable so it cannot remain orphaned forever.
+A parent owns its child's forward execution and rollback. Re-entry resumes the
+claimed child. If the parent died between child persistence and claim persistence,
+it adopts the child by `parentExecutionId` and workflow name. During recovery
+the engine also restores parked signal gates at every nesting depth, including
+when the parent is parked for operator intervention. A timed gate keeps its
+original deadline. A legacy gate lacking a start record uses its stored
+`updatedAt` as the start. A child whose parent row is gone becomes recoverable
+as a top-level execution.
 
 ## Concurrency & Locking
 
@@ -386,7 +389,15 @@ closing the worker and queue.
   callers retrieve later deterministic pages with `offset`. Offset pages do not
   promise snapshot stability under concurrent insertion. `archive` moves at
   most 1000 rows per call.
-- **The retention cutoff is inclusive** (`updated_at <= Date.now() - maxAgeMs`). A strict `<` made `cleanup(0)`/`archive(0)` skip every row stamped in the current millisecond, which is where a run that has just reached a terminal state sits, so the documented "flush everything terminal now" call returned 0 (`test/repro-workflow-archive-boundary.test.ts`).
+- **Retention** applies an inclusive cutoff (`updated_at <= Date.now() - maxAgeMs`).
+  Within one SQLite write transaction, cleanup and archival retain executions
+  whose failure still owes rollback, children whose parent still needs to read
+  their result, and descendants reachable by an outstanding ancestor unwind.
+  A completed intermediate can own such descendants. A pivot ends that
+  ancestor's rollback obligation. The archive counts its batch of 1000 after
+  checking eligibility, in `updated_at, id` order.
+  Maintenance caches each parent's child statuses and rollback boundary. It
+  releases decoded step results and decision payloads as it scans other parents.
   The regression freezes the clock around synchronous store operations, verifies
   the exact-cutoff row is removed once, and checks that newer and nonterminal
   rows survive. It does not depend on completing SQLite work within one

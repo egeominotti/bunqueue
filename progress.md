@@ -11,12 +11,17 @@ overview: [docs/agents/README.md](docs/agents/README.md).
 
 ## Current State
 
-**Last Updated:** 2026-11-15
+**Last Updated:** 2026-11-17
 **Active items:** many sessions run at once; the items in progress are the
 `in-progress` entries of `feature_list.json`, each with its owning `branch`.
 
 ### What's Done
 
+- `severe-job-audit` fixes ten reproducible defects in durable job identity,
+  dependency promotion, worker lease renewal and group ownership, and nested
+  workflow rollback, retention and deadlines. Every original failure reproduced
+  in eight Linux runs. All 70 regression cases passed on each of five new
+  Ubuntu/Debian Machines after correction.
 - `performance-stability-optimizations`: source `009f20df`, tree `602bcc2b`,
   [PR #194](https://github.com/egeominotti/bunqueue/pull/194). Source CI
   [43736304149](https://github.com/egeominotti/bunqueue/actions/runs/43736304149)
@@ -108,6 +113,11 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 ## Blockers / Risks
 
+- The audit also exercised the documented custom-ID eviction limit. Its two
+  baseline probes belong to `custom-id-cache-eviction-live-reuse`. Existing
+  in-flight cron rows written before scheduler-origin tracking may run again
+  when a broker restarts after upgrading.
+
 - The legacy partial-count predicate from CI43560970951 has been reproduced
   with all100IDs retained (49completed/51delayed), then replaced with exact
   conservation checks under `ci-delivery-accounting-fixes`; its source
@@ -166,6 +176,74 @@ other sessions' active work remains tracked in `feature_list.json`.
 
 Newest first. Prepend one entry per session; for multi-session work fill the
 [`session-handoff.md`](session-handoff.md) sections into the entry.
+
+### 2026-11-17 — fix the ten verified job integrity and workflow defects
+
+- The four baseline suites reproduced every defect eight times on Linux. The
+  final ten-file suite passed 70/70 cases in each of five fresh isolated
+  Machines, including the corrective regressions added after skeptic review.
+  Raw logs and per-defect outcomes are in
+  `artifacts/severe-job-audit/validated-20261117T222920Z/summary.txt`.
+- Runtime tree `f6a1558aee5b2f9609c1377b019edad1d59c405d` passed the
+  model (12/12, 96,045 assertions), Docker sandbox (12,001 unit, 553 TCP,
+  349 embedded, zero failures or resource anomalies), and the native Ubuntu
+  gate (12,132 unit, 553 TCP, 349 embedded, 9 tinyfs, zero failures).
+  Both unit runs reported 405 skips. PostgreSQL 18.6 passed the 10 focused
+  lifecycle and destructive-operation tests.
+- See `artifacts/test-sandbox/2026-11-17T22-32-18.440Z/summary.md` and
+  `artifacts/machines/20261117T223057Z/manifest.md`. The integration receipt
+  next to the five-machine summary records the commit, reviews and main CI run.
+
+### 2026-11-17 — five additional reproductions of each severe job defect
+
+- Five new isolated arm64 Machines ran the four-file command in
+  [the testing reference](docs/testing.md#job-integrity-audit-regressions)
+  with Bun 1.4.4 on runtime `bf559e5a`. Three used Ubuntu 24.04 and two used
+  Debian 13. Every Machine received the same verified snapshot and was deleted.
+- Each run had 14 cases reproducing the ten defects, two cases demonstrating
+  the documented custom-ID limit, and nine passing controls. All 125 outcomes
+  matched the previous runs by case name. Each failing case matched its exact
+  assertion and expected/observed values after normalizing generated UUIDs.
+- All ten defects reproduced in 5/5 new runs and 8/8 overall. The raw logs,
+  per-case evidence and comparison script are under
+  `artifacts/severe-job-audit/repro-20261117T214844Z/`, alongside `summary.txt`.
+  Five supplemental SQLite reopenings restored blocked dependency promotion.
+  Five diagnostic macOS runs also reproduced blocked promotion with the default
+  50,000-entry completion cache. Production fixes remain pending.
+
+### 2026-11-17 — severe job integrity audit
+
+- Reviewed runtime `bf559e5a` using synthetic work, temporary SQLite files and
+  fresh TCP servers in isolated Ubuntu 24.04 and Debian 13 arm64 Machines with Bun 1.4.4.
+  The request was for investigation. Production fixes are pending.
+- Two confirmed job identity defects affect SQLite. A manually parked job can
+  be admitted again with its cache entry still present. Startup deletes an
+  ordinary active job with a producer-supplied `cron:` deduplication key.
+- Independent review confirmed that the public guide explicitly documents the
+  separate custom-ID eviction limit. Tests demonstrated both replacement of a
+  durable payload and delivery to two workers after eviction. These two cases
+  establish the impact of that known limit and are excluded from the defect count.
+- Completing unrelated jobs can strand a dependent whose prerequisite has
+  fallen out of the completion cache. SQLite still reports both prerequisites
+  completed and releases the dependent after restart. In memory, cancellation
+  of the last dependent can also manufacture completion of an unfinished prerequisite.
+- In embedded and TCP mode, graceful close can lose the result of an active job,
+  and pausing while a pull is in flight can exhaust an attempt before its
+  processor runs. In embedded mode, changing the worker limiter's group field
+  through `updateData` can leave that group's slot occupied indefinitely.
+- Nested workflows can report a successful rollback with zero reversals after
+  a child definition change. Cleanup or archival can remove a child needed for
+  a pending parent's rollback. Restart can lose a waiting child's signal deadline.
+- The four-file command in [the testing reference](docs/testing.md#job-integrity-audit-regressions)
+  ran twice on Ubuntu and once on Debian. All three runs returned the same
+  14 failing cases for the ten defects, two failing cases for the documented
+  limit and nine passing controls. See `artifacts/severe-job-audit/ubuntu-first.log`,
+  `ubuntu-second.log` and `debian.log` in that directory. The default-capacity diagnostics
+  also reproduced double delivery with 50,000 other pending custom IDs and
+  blocked promotion after 50,000 unrelated completions.
+- Scope was memory, SQLite, the embedded and TCP workers, and the local workflow
+  engine. The full product sandbox, PostgreSQL and external SDKs were outside
+  this targeted audit.
 
 ### 2026-11-15 — performance source CI green; integration closure
 

@@ -1,3 +1,4 @@
+import { isProtectedCronJob } from '../../../domain/types/cron';
 import { createDlqEntry, FailureReason, recordJobFailureAttempt } from '../../../domain/types/dlq';
 import { calculateBackoff, type JobId } from '../../../domain/types/job';
 import { isCorruptDependsOn } from '../../../infrastructure/persistence/sqliteSerializer';
@@ -55,7 +56,7 @@ export function recoverActiveJobs(
       const shard = ctx.shards[shardIndex(job.queue)];
       const stallConfig = shard.getStallConfig(job.queue);
 
-      if (job.uniqueKey?.startsWith('cron:')) {
+      if (isProtectedCronJob(job)) {
         ctx.storage.deleteJob(job.id);
         ctx.registerQueueName(job.queue);
         continue;

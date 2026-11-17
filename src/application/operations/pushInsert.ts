@@ -4,7 +4,12 @@ import type { JobLocation } from '../../domain/types/queue';
 import type { SetLike } from '../../shared/lru';
 import type { MapLike } from '../../shared/lru';
 import type { DependencyResultTracker } from '../dependencyResultTracker';
-import type { DependencyCompletionTracker } from '../dependencyCompletions';
+import {
+  hasUnfinishedDependency,
+  isDependencyComplete,
+  loadColdDependencyCompletions,
+  type DependencyCompletionTracker,
+} from '../dependencyCompletions';
 import type { SqliteStorage } from '../../infrastructure/persistence/sqlite';
 
 export interface PushInsertContext {
@@ -42,31 +47,29 @@ export function emitWaitingChildrenAdmission(job: Job, ctx: PushInsertContext): 
 export function initialJobState(
   job: Job,
   ctx: Pick<PushInsertContext, 'completedJobs' | 'depCompletions'>,
-  now: number = Date.now()
+  now: number = Date.now(),
+  stored?: ReadonlySet<JobId>
 ): 'waiting-children' | 'delayed' | 'prioritized' | 'waiting' {
   const needsWaiting =
-    job.dependsOn.length > 0 &&
-    !job.dependsOn.every(
-      (depId) => ctx.completedJobs.has(depId) || (ctx.depCompletions?.has(depId) ?? false)
-    );
+    job.dependsOn.length > 0 && !job.dependsOn.every((id) => isDependencyComplete(id, ctx, stored));
   if (needsWaiting) return 'waiting-children';
   if (job.runAt > now) return 'delayed';
   return job.priority > 0 ? 'prioritized' : 'waiting';
 }
 
 /** Complete persistence-sensitive preparation before changing queue membership. */
-export function prepareJobInsertion(
-  job: Job,
-  ctx: PushInsertContext,
-  recordTimeline = true,
-  now: number = Date.now()
-): PreparedJobInsertion {
-  const state = initialJobState(job, ctx, now);
+export function prepareJobInsertion(job: Job, ctx: PushInsertContext): PreparedJobInsertion {
+  const now = Date.now();
+  const stored =
+    ctx.storage && job.dependsOn.length > 0 && !hasUnfinishedDependency(job.dependsOn, ctx)
+      ? loadColdDependencyCompletions(job.dependsOn, ctx)
+      : undefined;
+  const state = initialJobState(job, ctx, now, stored);
   const completionPins =
     state === 'waiting-children'
       ? [...new Set(job.dependsOn)].filter((id) => ctx.depCompletions?.has(id) ?? false)
       : [];
-  if (recordTimeline) job.timeline.push({ state, timestamp: now });
+  job.timeline.push({ state, timestamp: now });
   return { state, completionPins };
 }
 
@@ -95,15 +98,4 @@ export function insertPreparedJobToShard(
       ctx.dependencyResults.retain(dependencyId, ctx.jobResults.get(dependencyId));
     }
   }
-}
-
-/** Insert a new job into the runnable heap or dependency wait set. */
-export function insertJobToShard(
-  job: Job,
-  target: { queue: string; shard: Shard; shardIdx: number },
-  ctx: PushInsertContext,
-  recordTimeline = true
-): void {
-  const prepared = prepareJobInsertion(job, ctx, recordTimeline);
-  insertPreparedJobToShard(job, target, ctx, prepared);
 }

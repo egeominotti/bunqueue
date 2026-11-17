@@ -312,13 +312,13 @@ describe('GroupConcurrencyLimiter - Unit Tests', () => {
     const jobB = { id: '2', data: { domain: 'b.com' } } as any;
 
     expect(limiter.canProcess(jobA)).toBe(true);
-    limiter.increment(jobA);
+    const group = limiter.reserve(jobA);
     expect(limiter.getGroupCount('a.com')).toBe(1);
 
-    limiter.increment(jobA);
+    limiter.reserve(jobA);
     expect(limiter.getGroupCount('a.com')).toBe(2);
 
-    limiter.increment(jobA);
+    limiter.reserve(jobA);
     expect(limiter.getGroupCount('a.com')).toBe(3);
 
     // At capacity
@@ -328,7 +328,7 @@ describe('GroupConcurrencyLimiter - Unit Tests', () => {
     expect(limiter.canProcess(jobB)).toBe(true);
 
     // Decrement frees a slot
-    limiter.decrement(jobA);
+    limiter.release(group);
     expect(limiter.getGroupCount('a.com')).toBe(2);
     expect(limiter.canProcess(jobA)).toBe(true);
   });
@@ -346,7 +346,7 @@ describe('GroupConcurrencyLimiter - Unit Tests', () => {
     expect(limiter.canProcess(jobNullData)).toBe(true);
 
     // Increment/decrement should be no-ops for null group
-    limiter.increment(jobNoField);
+    limiter.reserve(jobNoField);
     expect(limiter.getGroupCount('undefined')).toBe(0);
   });
 
@@ -373,10 +373,10 @@ describe('GroupConcurrencyLimiter - Unit Tests', () => {
     const limiter = new GroupConcurrencyLimiter('domain', 5);
     const job = { id: '1', data: { domain: 'cleanup.com' } } as any;
 
-    limiter.increment(job);
+    const group = limiter.reserve(job);
     expect(limiter.getGroupCount('cleanup.com')).toBe(1);
 
-    limiter.decrement(job);
+    limiter.release(group);
     expect(limiter.getGroupCount('cleanup.com')).toBe(0);
   });
 });

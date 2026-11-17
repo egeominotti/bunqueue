@@ -71,7 +71,9 @@ export function handleCustomId(
         throw new Error('Live custom ID shard must be locked before lookup');
       }
       const existingShard = ctx.shards[location.shardIdx];
-      const existingJob = existingShard.getQueue(location.queueName).find(existing);
+      const existingJob =
+        existingShard.getQueue(location.queueName).find(existing) ??
+        existingShard.waitingChildren.get(existing);
       if (existingJob) {
         return { skip: true, existingJob };
       }
@@ -99,15 +101,14 @@ export function handleCustomId(
     dlqQueue = terminalLocation.queueName;
   }
 
-  let dependencyCompletion = false;
-  if (ctx.depCompletions?.has(id)) {
+  const dependencyCompletion = ctx.depCompletions?.has(id) ?? false;
+  if (completed || dependencyCompletion) {
     const hasUnresolvedConsumers = ctx.shards.some(
       (shard) => (shard.getJobsWaitingFor(id)?.size ?? 0) > 0
     );
     if (hasUnresolvedConsumers) {
       throw new Error(`Custom ID ${String(id)} still has unresolved dependency consumers`);
     }
-    dependencyCompletion = true;
   }
 
   const retirement =

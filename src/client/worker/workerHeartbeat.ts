@@ -17,24 +17,24 @@ export interface HeartbeatDeps {
   readonly isExpectedFailure?: (error: unknown) => boolean;
 }
 
-/**
- * Renew every pulled job's lease each `intervalMs` (> 0, validated as the Worker's
- * `heartbeatInterval`). `safeInterval` honours an interval above the native timer limit
- * instead of letting the runtime fire it every millisecond.
- */
-export function startHeartbeat(deps: HeartbeatDeps, intervalMs: number): SafeTimer {
-  return safeInterval(() => void sendHeartbeat(deps), intervalMs);
+/** Recompute eligible delivery IDs on each tick, including after a pause or resume. */
+export function startHeartbeat(
+  deps: HeartbeatDeps,
+  intervalMs: number,
+  jobIds?: () => Iterable<string>
+): SafeTimer {
+  return safeInterval(() => void sendHeartbeat(deps, jobIds?.()), intervalMs);
 }
 
-export async function sendHeartbeat(deps: HeartbeatDeps): Promise<void> {
-  // Send heartbeat for ALL pulled jobs (including buffered ones)
-  // This is critical: when locks are enabled, we need to renew them
-  // even for jobs sitting in the buffer waiting to be processed
+export async function sendHeartbeat(
+  deps: HeartbeatDeps,
+  jobIds: Iterable<string> = deps.pulledJobIds
+): Promise<void> {
   if (deps.pulledJobIds.size === 0 || !deps.tcp) return;
 
   try {
     // Always take a fresh snapshot - avoids race with job start/complete
-    const ids = Array.from(deps.pulledJobIds);
+    const ids = Array.from(jobIds);
     if (ids.length === 0) return;
 
     if (deps.useLocks) {

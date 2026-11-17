@@ -1,4 +1,5 @@
 import type { TransactionSQL } from 'bun';
+import { isProtectedCronJob } from '../../../domain/types/cron';
 import { jobId, type JobId } from '../../../domain/types/job';
 import { decodePostgresJob, encodePostgresValue } from './codec';
 import { databaseNow, recordPostgresEvent, type PostgresContext } from './context';
@@ -10,7 +11,7 @@ import {
 import { lockPostgresBrokerSession } from './brokerSessions';
 
 function isProtectedCron(row: PostgresJobRow): boolean {
-  return decodePostgresJob(row).job.uniqueKey?.startsWith('cron:') === true;
+  return isProtectedCronJob(decodePostgresJob(row).job);
 }
 
 export async function discardPostgresProtectedCronLease(

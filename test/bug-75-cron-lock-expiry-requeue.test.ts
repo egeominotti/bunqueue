@@ -28,7 +28,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QueueManager } from '../src/application/queueManager';
 import { checkExpiredLocks } from '../src/application/lockManager';
-import { jobId } from '../src/domain/types/job';
+import { cronSource, jobId } from '../src/domain/types/job';
 import { shardIndex } from '../src/shared/hash';
 
 function getInternalLockContext(qm: QueueManager): Parameters<typeof checkExpiredLocks>[0] {
@@ -65,6 +65,7 @@ describe('Bug #75: Cron lock expiry re-queues job causing immediate fire on reco
     // 2. Push a cron job with the uniqueKey (simulating what the cron scheduler does)
     const cronJob = await qm.push('testing', {
       data: { type: 'cron' },
+      [cronSource]: 'test-cron',
       uniqueKey: 'cron:test-cron',
     });
     expect(cronJob).not.toBeNull();
@@ -92,6 +93,7 @@ describe('Bug #75: Cron lock expiry re-queues job causing immediate fire on reco
     // 1. Push a cron job with uniqueKey
     await qm.push('testing', {
       data: { type: 'cron' },
+      [cronSource]: 'test-cron',
       uniqueKey: 'cron:test-cron',
     });
 
@@ -128,6 +130,7 @@ describe('Bug #75: Cron lock expiry re-queues job causing immediate fire on reco
     // 1. Push cron job
     await qm.push('testing', {
       data: { type: 'cron-job' },
+      [cronSource]: 'start-new-test-job',
       uniqueKey: 'cron:start-new-test-job',
     });
 
@@ -183,6 +186,7 @@ describe('Bug #75: Cron lock expiry re-queues job causing immediate fire on reco
     const original = await qm.push('testing', {
       data: { generation: 'retired' },
       customId,
+      [cronSource]: 'generation-safe',
       uniqueKey: 'cron:generation-safe',
     });
     const retired = await qm.pullWithLock('testing', 'worker-old', 0, 50);
@@ -213,6 +217,7 @@ describe('Bug #75: Cron lock expiry re-queues job causing immediate fire on reco
     try {
       const accepted = await persistent.push('persistent-cron', {
         data: { generation: 'retired' },
+        [cronSource]: 'persistent-retirement',
         uniqueKey: 'cron:persistent-retirement',
         durable: true,
       });

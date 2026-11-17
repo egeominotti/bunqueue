@@ -16,22 +16,23 @@ export class QueueManagerServices extends QueueManagerObservability {
   addCron(input: CronJobInput): CronJob {
     assertValidCronInput(input);
     if (input.preventOverlap) {
-      this.removeOrphanedCronJob(input.queue, input.uniqueKey ?? `cron:${input.name}`);
+      this.removeOrphanedCronJob(input.queue, input.uniqueKey ?? `cron:${input.name}`, input.name);
     }
     const cron = this.cronScheduler.add(input);
     this.storage?.saveCron(cron);
     return cron;
   }
 
-  protected removeOrphanedCronJob(queue: string, uniqueKey: string): void {
+  private removeOrphanedCronJob(queue: string, uniqueKey: string, cronName: string): void {
     const index = shardIndex(queue);
     const shard = this.shards[index];
     const entry = shard.getUniqueKeyEntry(queue, uniqueKey);
     if (!entry) return;
     const targetId = entry.jobId;
     if (this.jobIndex.get(targetId)?.type !== 'queue') return;
-    const job = shard.getQueue(queue).remove(targetId);
-    if (!job) return;
+    const queued = shard.getQueue(queue);
+    if (queued.find(targetId)?.cronName !== cronName) return;
+    queued.remove(targetId);
     shard.decrementQueued(targetId);
     shard.releaseUniqueKey(queue, uniqueKey);
     this.jobIndex.delete(targetId);

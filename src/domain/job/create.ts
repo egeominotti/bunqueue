@@ -1,4 +1,5 @@
 import type { BackoffConfig, Job, JobId, JobInput, RepeatConfig } from '../types/jobs/model';
+import { cronSource } from '../types/jobs/model';
 import { JOB_DEFAULTS, MAX_BACKOFF_DELAY } from './constants';
 import { jobRunDelay } from './options';
 import { normalizeJobInput } from './optionNormalize';
@@ -83,6 +84,7 @@ function parseOptionalFields(input: JobInput) {
     ttl: input.ttl ?? null,
     timeout: input.timeout ?? null,
     uniqueKey: input.uniqueKey ?? null,
+    ...(input[cronSource] !== undefined && { cronName: input[cronSource] }),
     customId: input.customId ?? null,
     parentId: input.parentId ?? null,
     groupId: input.groupId ?? null,

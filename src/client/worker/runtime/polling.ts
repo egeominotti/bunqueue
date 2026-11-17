@@ -3,7 +3,7 @@ import { WORKER_CONSTANTS } from '../constants';
 import { isQuietPullFailure } from '../pullFailureLog';
 import { pullEmbedded, pullTcp, type PullConfig } from '../workerPull';
 import { WorkerBuffer } from './buffer';
-import type { PulledJob, WorkerDelivery } from './state';
+import type { WorkerDelivery } from './state';
 
 /**
  * What `doPullBatch` returns for a transient refusal (`isQuietPullFailure`: the broker's
@@ -13,7 +13,7 @@ import type { PulledJob, WorkerDelivery } from './state';
  * streak, instead of the 100 ms..30 s backoff of a permanent refusal; only `drained` is
  * not emitted, since the queue was not seen empty.
  */
-const QUIET_REFUSAL = Object.freeze([]) as unknown as PulledJob[];
+type PullResult = 'pulled' | 'empty' | 'refused';
 
 export abstract class WorkerPolling<T = unknown, R = unknown> extends WorkerBuffer<T, R> {
   protected poll(): void {
@@ -53,23 +53,13 @@ export abstract class WorkerPolling<T = unknown, R = unknown> extends WorkerBuff
           this.scheduleRateLimitPoll();
           return;
         }
-        const pulledItems = await this.doPullBatch();
+        const result = await this.doPullBatch();
         if (!this.running || this._closing) return;
-        refused = pulledItems === QUIET_REFUSAL;
+        refused = result === 'refused';
         // A pull the broker answered, even with no job, ends a failure streak; otherwise
         // occasional refusals between empty polls would escalate the backoff to 30 s.
         this.consecutiveErrors = 0;
-        if (pulledItems.length > 0) {
-          const items = this.registerPulledJobs(pulledItems);
-          if (this.pendingJobsHead >= this.pendingJobs.length) {
-            this.pendingJobs = items;
-            this.pendingJobsHead = 0;
-          } else {
-            this.pendingJobs = this.pendingJobs.slice(this.pendingJobsHead).concat(items);
-            this.pendingJobsHead = 0;
-          }
-          item = this.getNextEligibleJob();
-        }
+        if (result === 'pulled') item = this.getNextEligibleJob();
       }
 
       if (item) {
@@ -102,7 +92,8 @@ export abstract class WorkerPolling<T = unknown, R = unknown> extends WorkerBuff
     }
   }
 
-  protected async doPullBatch(): Promise<PulledJob[]> {
+  protected async doPullBatch(): Promise<PullResult> {
+    if (!this.running || this._closing) return 'empty';
     const groupBlockedBuffer =
       this.groupLimiter !== null && this.pendingJobsHead < this.pendingJobs.length;
     const leased = groupBlockedBuffer ? this.activeJobs : this.pulledJobIds.size;
@@ -114,16 +105,26 @@ export abstract class WorkerPolling<T = unknown, R = unknown> extends WorkerBuff
     const configuredBatchSize =
       this.opts.batch?.groupAffinity && this.batchAffinity === undefined ? 1 : this.opts.batchSize;
     const batchSize = Math.min(configuredBatchSize, slots, rateSlots, 1000);
-    if (batchSize <= 0) return [];
+    if (batchSize <= 0) return 'empty';
 
     const config = this.getPullConfig();
     this.pendingPull += batchSize;
     try {
-      return this.embedded
+      const items = this.embedded
         ? await pullEmbedded(config, batchSize)
         : await pullTcp(config, this.tcp as NonNullable<typeof this.tcp>, batchSize, this._closing);
+      if (items.length === 0) return 'empty';
+      // The broker has already leased these jobs. Record ownership before
+      // releasing the pull reservation, even if pause landed during the pull.
+      const deliveries = items.map((item) => this.trackDelivery(item));
+      if (this._closing || this.closed) {
+        await this.releaseUnstartedJobs(deliveries);
+        return 'empty';
+      }
+      this.bufferPulledJobs(deliveries);
+      return 'pulled';
     } catch (error) {
-      if (isQuietPullFailure(error)) return QUIET_REFUSAL;
+      if (isQuietPullFailure(error)) return 'refused';
       throw error;
     } finally {
       this.pendingPull -= batchSize;
@@ -161,7 +162,7 @@ export abstract class WorkerPolling<T = unknown, R = unknown> extends WorkerBuff
 
   /**
    * A failed pull: a thrown transport error or a permanent broker refusal (a transient
-   * one never gets here: `doPullBatch` reads it as no job, `QUIET_REFUSAL`). Retry after
+   * one never gets here: `doPullBatch` returns 'refused' without a job). Retry after
    * 100 ms doubling to 30 s, then report it with `context: 'pull'` (`reportPullFailure`,
    * `PullFailureLog`): as `error` to an attached listener (one that throws is logged);
    * without one, a permanent failure is logged at most once a minute and a transient

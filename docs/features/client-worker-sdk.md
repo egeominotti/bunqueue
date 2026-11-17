@@ -277,11 +277,10 @@ the registration one sends `Heartbeat`. A period above 2^31 - 1 ms is re-armed p
 period instead of ticking every millisecond. In TCP mode it waits for the dedicated
 event subscription attempt before the first poll; a failed event connection
 does not suppress processing, and normal reconnect logic later re-subscribes.
-`pause()` stops new polling but intentionally preserves both heartbeat timers:
-active and buffered deliveries must retain their leases, and the broker must
-retain the worker registration. `resume()` reuses those timers instead of
-creating duplicate intervals, so repeated pause/resume cycles remain
-idempotent and `close()` can release every owned runtime handle. Starting
+`pause()` stops new polling and preserves both heartbeat timers. A pull already
+in flight can still return jobs. The worker buffers those deliveries and renews
+their leases alongside active jobs until `resume()` dispatches them or `close()`
+returns them to waiting. `resume()` reuses the existing timers. Starting
 `close()` is a terminal lifecycle transition: `run()` and `resume()` become
 no-ops as soon as shutdown owns its promise, so a stale timer or callback
 cannot clear the closing/force state and restart polling during teardown.
@@ -325,8 +324,9 @@ most once per second.
 subtracts `pendingPull`, caps the batch at 1,000 and at the unconsumed worker
 rate budget, and reserves the requested slots across the asynchronous pull
 (issue #98). A worker limited to two starts therefore leases at most two jobs;
-the rest remain broker-visible as waiting. `runtime/buffer.ts` registers the
-leases and immediately renews freshly pulled locks when a multi-connection
+the rest remain broker-visible as waiting. The pull records each lease before
+releasing its slot reservation. `runtime/buffer.ts` immediately renews
+freshly buffered locks when a multi-connection
 pool could otherwise create a re-dispatch window.
 
 Every successful pull is assigned a monotonically increasing local delivery
@@ -337,8 +337,10 @@ It then atomically acquires the worker rate token at the actual dispatch
 boundary. A denied item is returned to the local buffer. Cleanup is
 generation-conditional: an old `.finally` decrements only its own active/group
 counts and cannot delete the current token, heartbeat membership, cancellation
-state, or pulled-job tracking. Automatic and manual processing share this
-contract.
+state, or pulled-job tracking. Each processor generation records its
+`limiter.groupKey` value at dispatch and releases that reservation when it
+settles. Updating the payload can change the group used on redelivery. The
+same rule applies to manual processing and to each member of a native batch.
 
 `WorkerRateLimiter` uses a rolling start-time window. `rateLimit(ms)` is a
 separate temporary override: it blocks admission even when no normal limiter
@@ -347,13 +349,21 @@ wait is the longer of the rolling-window wait and the override. Manual
 `processJobManually()` uses the same admission rule and waits without invoking
 the processor until both its rate token and group slot are available.
 
-`getNextJob()` returns a `ManualJob<T>` copy rather than the broker's mutable
-domain object. Its first-class `name` is separate from the typed user `data`,
+`getNextJob()` resolves to `undefined` once closing begins. A manual pull
+that receives a job during close returns the delivery to waiting.
+While the worker is open, `getNextJob()` returns a `ManualJob<T>` copy of the
+broker's domain object. Its first-class `name` is separate from the typed user `data`,
 and `token` contains the broker lease when locks are enabled. Passing that job
 to `processJobManually()` without a token reuses its tracked lease; an explicit
 token must match. The worker processes the canonical tracked delivery, and a
 job object from an older redelivery generation cannot replace or publish an
-outcome through the current generation.
+outcome through the current generation. With `autorun: false`, dispatching a
+manual processor starts the configured job heartbeat. It renews the current
+processing generations through their terminal acknowledgment, including during
+graceful close. The last manual processor releases the timer when the polling
+loop has never started. Holding a manual claim before dispatch still uses
+explicit lease management. `heartbeatInterval: 0` and `skipLockRenewal: true`
+disable renewal in both execution modes.
 
 ### Processing & outcome (`processor.ts`, `processorOutcome.ts`)
 
@@ -610,7 +620,7 @@ Crashed threads (`thread.ts`, `recovery.ts`):
   `worker/runtime/polling.ts`. The gate is re-checked immediately before
   `startJob` in `runtime/execution.ts`.
 - **Lock-based ownership** (`useLocks`, default true): each pulled job gets a
-  `token`; heartbeats renew the lock for **all** `pulledJobIds` (active and
+  `token`; the automatic polling worker renews **all** `pulledJobIds` (active and
   buffered) so buffered jobs don't expire (`workerHeartbeat.ts:26`). Lock TTL =
   `lockDuration` (default 30000), propagated to the server via `lockTtl` on
   pull (`workerPull.ts:79`). Manual pulls expose the same broker token on the
@@ -672,7 +682,7 @@ Crashed threads (`thread.ts`, `recovery.ts`):
   `PULL refused by the broker: <reason>`). It is a pull error, never an empty queue
   (an empty queue is `ok: true` with no job), so it emits no `drained`. A permanent
   one goes through `handlePullError`. A transient one is read by `doPullBatch` as no
-  job (`QUIET_REFUSAL`, `runtime/polling.ts`), as 2.9.10 read every refusal: the loop
+  job (the `refused` pull result in `runtime/polling.ts`), as 2.9.10 read every refusal: the loop
   re-polls on its empty-pull cadence (`pollTimeout > 0 ? 10 : drainDelay`, 50 ms by
   default) and a native-batch refill on its 10 ms refill timer, with no failure streak
   (an answered pull resets it), so sustained broker rate limiting or lock contention
@@ -717,9 +727,11 @@ Crashed threads (`thread.ts`, `recovery.ts`):
     SandboxedWorker) and with a listener that throws.
 - **ACK batching/backpressure** (`ackBatcher.ts`, `ackFrontier.ts`): flush triggers at the configured batch size, capped in TCP mode by an event-driven reachable-outcome frontier, or after `interval` (`DEFAULT_ACK_INTERVAL=50ms`). The frontier is the ACKs already pending plus started delivery generations that can still ACK plus scalar buffered deliveries that can start without first settling a pending ACK. Buffered eligibility observes runtime concurrency, rate capacity, and simulated per-group reservations; a sealed native batch contributes its exact started members rather than its configured maximum. A generation transfers synchronously from the unqueued set into the pending batch, while failure, an applied manual transition, pause, rate-limit changes, concurrency changes, and close re-evaluate a reduced frontier. ACKs assigned to an in-flight flush no longer contribute to later batches. Evaluating the dynamic ceiling never throws out of `queue()` or `notifyCapacityChanged()`: once an ACK is pushed into the pending batch it stays owned by the batcher, so if the ceiling callback throws, the batcher falls back to the static `batchSize` (the `interval` timer is still armed), reports the error through `onThresholdError` (the Worker emits `error` with `context: 'ack-threshold'` only when an `error` listener exists; a throwing observer is ignored), and never rejects the ACK promise — so a successful job is never turned into a FAIL, and the `concurrency`/`pause`/`rateLimit` setters and failure-path frontier retirements cannot throw from it. The buffer is bounded at `MAX_PENDING_ACKS=10000`; `queue()` blocks (awaits in-flight, then flushes) rather than dropping acks. `sendBatchWithRetry` retries transient failures up to `maxRetries=3` with exponential backoff (`100,200,400ms`). A valid structured `ignoredIndices` response settles only those exact pending positions as `false` without retry or error; malformed/unknown evidence is rejected. On true exhaustion it logs `(N acks lost)` and rejects each pending promise. `stop()` clears any still-queued acks _without settling their promises_ (callers are expected to `flush()` + `waitForInFlight()` first, as `Worker.close()` does); a batch already mid-retry when `stop()` lands is rejected with `AckBatcher stopped`.
 - **Graceful close** (`worker/runtime/lifecycle.ts`): `close(false)` stops
-  timers, moves buffered leased jobs back to waiting, waits only for active
-  processors, flushes ACKs, unregisters, and closes the pool. `close(true)`
-  breaks an in-progress graceful drain. Shutdown state is monotonic from the
+  polling and returns unstarted leases, including deliveries received from
+  outstanding pulls while closing. Job and worker heartbeats continue until
+  active processors and their terminal acknowledgments settle. The worker then
+  stops both timers, unregisters and closes the pool. `close(true)` stops
+  renewals immediately, including during an in-progress graceful drain. Shutdown state is monotonic from the
   first call, so stale `run()`/`resume()` calls cannot pull a batch after close
   begins. It cannot cancel arbitrary user code,
   so a processor may still return later; that late outcome is abandoned before

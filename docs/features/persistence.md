@@ -113,7 +113,7 @@ Key methods (real signatures):
   `markActiveBatch(updates: readonly ActiveJobWrite[])`,
   `markReleased(job)` (persists an uncharged return to the queue: disconnect
   release and a cancelled pull handoff),
-  `markWaitingChildren(jobId, timeline?)`,
+  `markWaitingChildren(jobId, timeline?, job?)`,
   `markCompleted(jobId, completedAt, timeline?)`,
   `markCompletedBatch(updates: readonly CompletedJobWrite[])`,
   `commitCompletionWrites(writes: readonly CompletionWrite[])` (the statements of
@@ -354,7 +354,10 @@ writes `queuedJobState(job)` (`delayed` when `run_at` is in the future, else
 interrupted work (`test/client-release-persistence.test.ts`,
 `test/pull-handoff-requeue-persistence.test.ts`).
 `markWaitingChildren` similarly records the dedicated buffered state, clears
-`started_at`, and persists the transition timeline when a row is available. Explicit
+`started_at`, and persists the transition timeline when a row is available. The
+broker supplies the job to persist its manual park in the existing options blob.
+Attaching a completed child preserves that flag. Attaching unfinished work clears
+it as the parent enters dependency tracking. Explicit
 deduplication-key release uses `clearJobUniqueKey` after its owner-aware
 in-memory mutation so recovery cannot recreate the removed key.
 
@@ -596,9 +599,11 @@ This module is not lock-coordinated with the shard locks documented in [Concurre
 - **Id type round-trip.** `brandId` preserves non-string id types without conversion (msgpackr can round-trip bigint), preserving id equality on the critical-loss → DLQ → restart path (`sqliteSerializer.ts:162-164`).
 - **Completed-without-result and orphan results.** A retained job acked with no
   result has `state='completed'` but no `job_results` row, so
-  `loadCompletedJobIds` uses the jobs state plus payload-free removed-completion
-  proofs. It deliberately ignores a standalone result row: that row can be the
-  first half of an interrupted legacy ACK while the job is still active.
+  `loadCompletedJobIds` checks the current buffered state and looks up remaining
+  IDs in the jobs table in batches of 500. Admission, dependency promotion, and
+  recovery can use these rows after a hot-cache eviction. Jobs removed on
+  completion have separate payload-free proofs. A standalone result row can
+  be the first half of an interrupted legacy ACK while the job is still active.
 - **Dependency-result read-through.** Application queries check the normal result LRU, then results protected for live dependency consumers, then `job_results`. SQLite therefore remains the durable fallback after either in-memory cache evicts; in memory-only mode the dependency tracker protects values only while a live edge requires them.
 - **Shutdown loss reporting.** `WriteBuffer.stop()` /
   `stopGracefully(timeoutMs=5000)` flush remaining jobs and report anything

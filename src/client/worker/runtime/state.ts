@@ -21,6 +21,7 @@ export interface PulledJob {
 
 export interface WorkerDelivery extends PulledJob {
   generation: number;
+  reservedGroup?: string | null;
 }
 
 export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter {
@@ -50,7 +51,7 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
   protected readonly cancelledJobs: Set<string> = new Set();
   private readonly abortControllers = new Map<string, Set<AbortController>>();
   private deliverySequence = 0;
-  private readonly currentDeliveries = new Map<string, WorkerDelivery>();
+  protected readonly currentDeliveries = new Map<string, WorkerDelivery>();
   private readonly activeDeliveries = new Map<string, Set<number>>();
   private readonly unqueuedAckCandidates = new Set<number>();
   protected heartbeatTimer: SafeTimer | null = null;
@@ -182,6 +183,7 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
       this.activeDeliveries.set(jobId, generations);
     }
     generations.add(delivery.generation);
+    if (this.groupLimiter) delivery.reservedGroup = this.groupLimiter.reserve(delivery.job);
     if (!this.embedded) this.unqueuedAckCandidates.add(delivery.generation);
   }
 
@@ -198,7 +200,9 @@ export abstract class WorkerState<T = unknown, R = unknown> extends EventEmitter
   protected finishDelivery(delivery: WorkerDelivery): void {
     const jobId = String(delivery.job.id);
     const generations = this.activeDeliveries.get(jobId);
-    generations?.delete(delivery.generation);
+    if (generations?.delete(delivery.generation) && this.groupLimiter) {
+      this.groupLimiter.release(delivery.reservedGroup ?? null);
+    }
     if (generations?.size === 0) this.activeDeliveries.delete(jobId);
     if (this.isCurrentDelivery(delivery)) {
       this.currentDeliveries.delete(jobId);

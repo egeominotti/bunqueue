@@ -1,14 +1,17 @@
 import { sendHeartbeat } from '../workerHeartbeat';
 import { WorkerLifecycle } from './lifecycle';
-import type { PulledJob, WorkerDelivery } from './state';
+import type { WorkerDelivery } from './state';
 
 export abstract class WorkerBuffer<T = unknown, R = unknown> extends WorkerLifecycle<T, R> {
-  protected registerPulledJobs(items: PulledJob[]): WorkerDelivery[] {
-    const deliveries = items.map((item) => this.trackDelivery(item));
-    if (this.opts.useLocks && items.length > 0 && this.tcpPool && this.tcpPool.getPoolSize() > 1) {
+  protected bufferPulledJobs(deliveries: WorkerDelivery[]): void {
+    if (this.opts.useLocks && this.tcpPool && this.tcpPool.getPoolSize() > 1) {
       void sendHeartbeat(this.getHeartbeatDeps());
     }
-    return deliveries;
+    this.pendingJobs =
+      this.pendingJobsHead >= this.pendingJobs.length
+        ? deliveries
+        : this.pendingJobs.slice(this.pendingJobsHead).concat(deliveries);
+    this.pendingJobsHead = 0;
   }
 
   protected getBufferedJob(): WorkerDelivery | null {

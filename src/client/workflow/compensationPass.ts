@@ -57,7 +57,7 @@ export async function unwind(pass: UnwindPass, runChild: ChildUnwind): Promise<v
       haltedAt = name;
       settle(record, 'compensation-failed', action.error);
       emitter?.emitStep('compensation:failed', exec.id, exec.workflowName, name, {
-        error: 'step no longer declared',
+        error: action.error,
       });
       assertActive();
       continue;

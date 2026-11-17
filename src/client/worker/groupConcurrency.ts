@@ -84,23 +84,15 @@ export class GroupConcurrencyLimiter {
     return current < this.maxPerGroup;
   }
 
-  /**
-   * Increment the active count for a job's group.
-   * Call this when a job starts processing.
-   */
-  increment(job: InternalJob): void {
+  /** Reserve the group at dispatch. Keep this key until the delivery finishes. */
+  reserve(job: InternalJob): string | null {
     const group = this.getGroupValue(job);
-    if (group === null) return;
-    const current = this.activeByGroup.get(group) ?? 0;
-    this.activeByGroup.set(group, current + 1);
+    if (group !== null) this.activeByGroup.set(group, this.getGroupCount(group) + 1);
+    return group;
   }
 
-  /**
-   * Decrement the active count for a job's group.
-   * Call this when a job finishes (completed or failed).
-   */
-  decrement(job: InternalJob): void {
-    const group = this.getGroupValue(job);
+  /** Release the captured reservation even if the processor changed the job's data. */
+  release(group: string | null): void {
     if (group === null) return;
     const current = this.activeByGroup.get(group) ?? 0;
     if (current <= 1) {

@@ -1,4 +1,5 @@
 import type { Job, JobId } from '../domain/types/job';
+import type { JobLocation } from '../domain/types/queue';
 import type { Shard } from '../domain/queue/shard';
 import type { SqliteStorage } from '../infrastructure/persistence/sqlite';
 import type { SetLike } from '../shared/lru';
@@ -22,6 +23,7 @@ export class DependencyCompletionTracker implements SetLike<JobId> {
   private recentOrderHead = 0;
   private nextRecentToken = 0;
   private readonly pinned = new Set<JobId>();
+  private readonly evictedJobs = new Set<JobId>();
   private readonly owners = new Map<JobId, string>();
   private readonly maxRecent: number;
 
@@ -54,9 +56,19 @@ export class DependencyCompletionTracker implements SetLike<JobId> {
     this.pinned.add(jobId);
   }
 
+  /** Only the ID of a retained job outlives its evicted payload, up to the last waiter. */
+  pinEvictedJob(jobId: JobId, queue: string): void {
+    this.pin(jobId, queue);
+    this.evictedJobs.add(jobId);
+  }
+
+  isPinned(jobId: JobId): boolean {
+    return this.pinned.has(jobId);
+  }
+
   unpin(jobId: JobId, retainAsRecent: boolean): void {
-    this.pinned.delete(jobId);
-    if (retainAsRecent) this.add(jobId);
+    if (!this.pinned.delete(jobId)) return;
+    if (retainAsRecent && !this.evictedJobs.has(jobId)) this.add(jobId);
     else this.delete(jobId);
   }
 
@@ -77,6 +89,7 @@ export class DependencyCompletionTracker implements SetLike<JobId> {
   }
 
   delete(jobId: JobId): boolean {
+    this.evictedJobs.delete(jobId);
     const wasPinned = this.pinned.delete(jobId);
     const wasRecent = this.recent.delete(jobId);
     if (wasRecent) {
@@ -104,6 +117,7 @@ export class DependencyCompletionTracker implements SetLike<JobId> {
     this.recentOrderHead = 0;
     this.nextRecentToken = 0;
     this.pinned.clear();
+    this.evictedJobs.clear();
     this.owners.clear();
   }
 
@@ -160,6 +174,45 @@ export interface DependencyCompletionContext {
   maxDependencyCompletions: number;
 }
 
+interface DependencyReadContext {
+  completedJobs: Pick<SetLike<JobId>, 'has'>;
+  depCompletions?: Pick<SetLike<JobId>, 'has'>;
+  jobIndex: ReadonlyMap<JobId, JobLocation>;
+  storage: SqliteStorage | null;
+}
+
+export function isDependencyComplete(
+  id: JobId,
+  ctx: Pick<DependencyReadContext, 'completedJobs' | 'depCompletions'>,
+  stored?: ReadonlySet<JobId>
+): boolean {
+  return ctx.completedJobs.has(id) || !!ctx.depCompletions?.has(id) || !!stored?.has(id);
+}
+
+/** A known unfinished sibling rules out promotion before any cold SQLite lookup. */
+export function hasUnfinishedDependency(
+  ids: readonly JobId[],
+  ctx: DependencyReadContext
+): boolean {
+  return ids.some((id) => {
+    const location = ctx.jobIndex.get(id);
+    return location !== undefined && location.type !== 'completed';
+  });
+}
+
+/** Look up only cold IDs. A live indexed generation takes precedence over an older row. */
+export function loadColdDependencyCompletions(
+  dependencies: Iterable<JobId>,
+  ctx: DependencyReadContext
+): ReadonlySet<JobId> | undefined {
+  if (!ctx.storage) return;
+  const cold = new Set<JobId>();
+  for (const id of dependencies) {
+    if (!ctx.jobIndex.has(id) && !isDependencyComplete(id, ctx)) cold.add(id);
+  }
+  return cold.size > 0 ? ctx.storage.loadCompletedJobIds(cold) : undefined;
+}
+
 export function hasDependencyWaiters(shards: Shard[], jobId: JobId): boolean {
   return shards.some((shard) => (shard.getJobsWaitingFor(jobId)?.size ?? 0) > 0);
 }
@@ -186,7 +239,9 @@ export function releaseDependencyCompletionPins(
   ctx: DependencyCompletionContext
 ): void {
   const candidates = [...new Set(dependencyIds)].filter(
-    (id) => !hasDependencyWaiters(ctx.shards, id)
+    (id) =>
+      (!ctx.depCompletions || ctx.depCompletions.isPinned(id)) &&
+      !hasDependencyWaiters(ctx.shards, id)
   );
   if (candidates.length === 0) return;
 

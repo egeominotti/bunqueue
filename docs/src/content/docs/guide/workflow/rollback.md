@@ -207,6 +207,11 @@ This applies whether the child finished or not. A child that FAILED is rolled ba
 
 If the child parks in `compensation-stuck`, the parent inherits it and parks too, rather than reporting a clean rollback over a half-undone child. The parent's `rollbackStatus` reads `stuck` and its `failureReason` names the child and the two ways out, `resumeCompensation` and `abandonCompensation`. Resuming the parent reaches the child: the retry is forwarded, so the child's failed reversal is attempted again and the whole saga can finish from one call.
 
+If the registered child revision differs from the one that performed the work,
+the parent parks with a definition mismatch on its `sub:<name>` record.
+Restore the original child definition and call `resumeCompensation(parentId)`
+to run the outstanding reversals.
+
 That forwarding applies only while the child is still parked. If you explicitly
 call `abandonCompensation(childId)`, the child becomes terminal (`failed` with
 `rollbackStatus: 'stuck'`). Resuming an ancestor cannot override that operator

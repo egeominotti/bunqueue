@@ -3,6 +3,7 @@
  * Handles BullMQ-style lock-based job ownership
  */
 
+import { isProtectedCronJob } from '../domain/types/cron';
 import type { Job, JobId, JobLock } from '../domain/types/job';
 import { isLeaseFromEarlierGeneration, isLockExpired } from '../domain/types/job';
 import { FailureReason, recordJobFailureAttempt } from '../domain/types/dlq';
@@ -157,11 +158,8 @@ function processExpiredLockInner(
   ctx.timeoutScheduler.cancel(jobId);
   detachClientJob(jobId, ctx);
 
-  // Discard cron jobs with preventOverlap instead of re-queuing (#75).
-  // During graceful shutdown, heartbeats stop and the lock expires before
-  // the job finishes. Re-queuing would cause "starts right away on reconnect".
-  // The cron scheduler will re-create the job at the next scheduled tick.
-  if (job.uniqueKey?.startsWith('cron:')) {
+  // Retire the scheduler's lost delivery (#75). Its next tick supplies fresh work.
+  if (isProtectedCronJob(job)) {
     ctx.retiredCronLeaseTokens.set(jobId, lock.token);
     shard.releaseJobResources(job.queue, job.uniqueKey, job.groupId, job.id);
     ctx.jobIndex.delete(jobId);

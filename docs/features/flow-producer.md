@@ -263,6 +263,16 @@ On child completion, dependency processing:
 5. appends the transition once and synchronously persists the resolved parent
    state before notifying workers.
 
+In memory-only mode, eviction of an ordinary completed job keeps its ID and
+source queue while an admitted parent still waits on that prerequisite. The
+last waiting parent releases the ID on promotion, cancellation, or removal.
+These IDs occupy no slots in the FIFO for jobs removed on completion. With
+SQLite, the completed job row supplies the same evidence even after cache
+eviction or restart. PUSH, PUSHB, and the promotion check look up cold
+prerequisites by ID. A completion notification triggers a fresh check of the
+current generation, so retrying a prerequisite before promotion keeps its
+parent blocked until the retried job completes.
+
 For `removeOnComplete`, SQLite atomically replaces the deleted child row with a
 payload-free `dependency_completions` record. The same transaction cannot
 observe a deleted job without its completion proof. Unreferenced records follow
@@ -310,6 +320,13 @@ Exactly one of these child options may be enabled:
 | `removeDependencyOnFailure` | Remove the failed edge and continue when ready |
 | `ignoreDependencyOnFailure` | Remove the edge and expose the error through `getIgnoredChildrenFailures` |
 | `continueParentOnFailure` | Release all remaining dependencies and expose the error through `getFailedChildrenValues` |
+
+After removing a failed edge, promotion rechecks the current parent and
+its remaining prerequisites under its shard lock. A sibling retried before
+promotion keeps the parent in `waiting-children` until that sibling completes.
+SQLite records the ready state on both live promotion and failure-policy replay.
+A sibling retried after that checkpoint cannot block an already runnable parent
+on a later restart.
 
 All four flags are columns in `jobs` and survive active-job recovery. A terminal
 child failure and its `flow_failures` outbox record are committed together.
